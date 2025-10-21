@@ -392,29 +392,25 @@
 <script>
 // 🔴 ZNAJDŹ I USUŃ TEN BLOK: 🔴
 
+// ✅ WKLEJ TEN BLOK W MIEJSCE USUNIĘTEGO: ✅
+
 /* ----- dane map i nazwy leków (będą uzupełnione z serwera) ----- */
 let mapaSerii = {}, mapaIlosci = {}, mapaKarencji = {}, nazwyLekow = [];
 
-/* jeśli używasz google.script.run w GAS - zostanie wywołane; gdy nie ma, pobiera dane z GAS Web App */
-if (window.google?.script?.run) {
-  // 💡 Tryb Google Apps Script (np. lokalne uruchomienie w edytorze GAS)
-  google.script.run.withSuccessHandler(initData).getData();
-} else {
-  // 🌐 Tryb GitHub Pages – pobieramy dane z opublikowanego Web App (JSON)
-  fetch('https://script.google.com/macros/s/AKfycbyMzPLQQECui1Q0JjtAfrwLXJ-ivaK_nt62L7ObH6LnTCKG6U0xyI3BIHH83oRWR9bP/exec?path=data')
-    .then(response => {
-      if (!response.ok) throw new Error('Błąd sieci: ' + response.status);
-      return response.json();
-    })
-    .then(data => {
-      console.log('✅ Dane pobrane z Google Apps Script:', data);
-      initData(data); // wywołuje Twoją funkcję z danymi
-    })
-    .catch(error => {
-      console.error('❌ Błąd pobierania danych z GAS:', error);
-      alert('Nie udało się pobrać danych. Sprawdź połączenie internetowe.');
-    });
-}
+// 🌐 Tryb GitHub Pages – pobieramy dane z lokalnego pliku data.json
+fetch('data.json') // <-- To jest poprawny kod
+  .then(response => {
+    if (!response.ok) throw new Error('Błąd sieci: ' + response.status);
+    return response.json();
+  })
+  .then(data => {
+    console.log('✅ Dane pobrane z data.json:', data); // <-- Nowy komunikat
+    initData(data); // wywołuje Twoją funkcję z danymi
+  })
+  .catch(error => {
+    console.error('❌ Błąd pobierania pliku data.json:', error); // <-- Nowy komunikat błędu
+    alert('Nie udało się pobrać danych. Spróbuj odświeżyć stronę.');
+  });
 function initData(data) {
   // nagłówek
   document.getElementById('nazwaLecznicy').textContent = data.nazwaLecznicy || '';
