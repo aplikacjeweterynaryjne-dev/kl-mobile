@@ -1,74 +1,77 @@
-// 🔒 Nazwa pamięci podręcznej
-const CACHE_NAME = 'karta-leczenia-cache-v1';
+// 🔒 Nazwa pamięci podręcznej (zmieniona na v2, aby wymusić aktualizację)
+const CACHE_NAME = 'karta-leczenia-cache-v2';
 
 // 📦 Lista plików do zapamiętania offline (tzw. App Shell)
 const urlsToCache = [
-  '/',
-  '/index.html',
-  '/manifest.json',
-  '/sw.js',
-  'https://script.google.com/macros/s/AKfycbwBv9xN3fWbDGvOUNNBj7vAduO-WxwiSCxciFbPUHZslt8ifVk2rSZoqbqCNBZIzjgQ/exec'
+  '/',
+  '/index.html',
+  '/manifest.json',
+  '/sw.js',
+  '/data.json'  // ✅ DODANO KLUCZOWY PLIK Z DANYMI
+  // ❌ USUNIĘTO stary adres Google Script, który powodował błąd
 ];
 
 // ⚙️ Instalacja Service Workera
 self.addEventListener('install', event => {
-  console.log('[Service Worker] Instalacja...');
-  event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(cache => {
-        console.log('[Service Worker] Otworzono cache i dodano pliki');
-        return cache.addAll(urlsToCache);
-      })
-  );
+  console.log('[Service Worker] Instalacja (v2)...');
+  event.waitUntil(
+    caches.open(CACHE_NAME)
+      .then(cache => {
+        console.log('[Service Worker] Otworzono cache i dodano pliki');
+        // Używamy .addAll(), aby pobrać wszystkie kluczowe zasoby
+        // Jeśli którykolwiek zawiedzie, instalacja się nie powiedzie, co jest dobre
+        return cache.addAll(urlsToCache);
+      })
+      .then(() => self.skipWaiting()) // Wymuś aktywację nowej wersji
+  );
 });
 
 // ♻️ Aktywacja — czyszczenie starych cache
 self.addEventListener('activate', event => {
-  console.log('[Service Worker] Aktywacja...');
-  event.waitUntil(
-    caches.keys().then(cacheNames => {
-      return Promise.all(
-        cacheNames.map(cacheName => {
-          if (cacheName !== CACHE_NAME) {
-            console.log('[Service Worker] Usuwanie starego cache:', cacheName);
-            return caches.delete(cacheName);
-          }
-        })
-      );
-    })
-  );
+  console.log('[Service Worker] Aktywacja (v2)...');
+  event.waitUntil(
+    caches.keys().then(cacheNames => {
+      return Promise.all(
+        cacheNames.map(cacheName => {
+          if (cacheName !== CACHE_NAME) {
+            console.log('[Service Worker] Usuwanie starego cache:', cacheName);
+            return caches.delete(cacheName);
+          }
+        })
+      );
+    }).then(() => self.clients.claim()) // Przejmij kontrolę nad stroną natychmiast
+  );
 });
 
 // 🌐 Przechwytywanie zapytań (strategia: Cache First)
 self.addEventListener('fetch', event => {
-  const url = event.request.url;
-
-  // Ignoruj zapytania do google.script.run (bo nie działają offline)
-  if (url.includes('google.script.run')) {
-    return fetch(event.request);
-  }
-
+  // Stosujemy strategię "Cache first, falling back to Network"
   event.respondWith(
     caches.match(event.request)
-      .then(response => {
-        // Jeśli plik jest w cache — zwróć go
-        if (response) {
-          return response;
+      .then(cachedResponse => {
+        // Zwróć z cache, jeśli jest
+        if (cachedResponse) {
+          return cachedResponse;
         }
 
-        // Jeśli nie ma — pobierz z sieci, dodaj do cache i zwróć
+        // Jeśli nie ma w cache, spróbuj pobrać z sieci
         return fetch(event.request).then(networkResponse => {
-          if (!networkResponse || networkResponse.status !== 200 || networkResponse.type !== 'basic') {
-            return networkResponse;
+          // Jeśli pobrano poprawnie, dodaj do cache i zwróć
+          if (networkResponse && networkResponse.status === 200) {
+            // Musimy sklonować odpowiedź, bo można ją odczytać tylko raz
+            const responseToCache = networkResponse.clone();
+            caches.open(CACHE_NAME).then(cache => {
+              cache.put(event.request, responseToCache);
+            });
           }
-
-          const responseToCache = networkResponse.clone();
-          caches.open(CACHE_NAME).then(cache => {
-            cache.put(event.request, responseToCache);
-          });
-
           return networkResponse;
         });
+      })
+      .catch(error => {
+        // W przypadku błędu sieci (np. offline) można zwrócić stronę zastępczą
+        // Na razie po prostu logujemy błąd
+        console.error('[Service Worker] Błąd pobierania:', error);
+        // Możesz tu zwrócić np. stronę offline.html, jeśli ją masz
       })
   );
 });
