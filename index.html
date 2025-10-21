@@ -393,10 +393,27 @@
 /* ----- dane map i nazwy leków (będą uzupełnione z serwera) ----- */
 let mapaSerii = {}, mapaIlosci = {}, mapaKarencji = {}, nazwyLekow = [];
 
-/* jeśli używasz google.script.run w GAS - zostanie wywołane; gdy nie ma, możesz podstawić dane testowe */
+/* jeśli używasz google.script.run w GAS - zostanie wywołane; gdy nie ma, pobiera dane z GAS Web App */
 if (window.google?.script?.run) {
+  // 💡 Tryb Google Apps Script (np. lokalne uruchomienie w edytorze GAS)
   google.script.run.withSuccessHandler(initData).getData();
 } else {
+  // 🌐 Tryb GitHub Pages – pobieramy dane z opublikowanego Web App (JSON)
+  fetch('https://script.google.com/macros/s/AKfycbwBv9xN3fWbDGvOUNNBj7vAduO-WxwiSCxciFbPUHZslt8ifVk2rSZoqbqCNBZIzjgQ/exec')
+    .then(response => {
+      if (!response.ok) throw new Error('Błąd sieci: ' + response.status);
+      return response.json();
+    })
+    .then(data => {
+      console.log('✅ Dane pobrane z Google Apps Script:', data);
+      initData(data); // wywołuje Twoją funkcję z danymi
+    })
+    .catch(error => {
+      console.error('❌ Błąd pobierania danych z GAS:', error);
+      alert('Nie udało się pobrać danych. Sprawdź połączenie internetowe.');
+    });
+}
+
   // fallback testowe dane jeśli uruchamiasz lokalnie - USUŃ lub PODMIEN jeśli chcesz
   const sample = {
     nazwaLecznicy: 'Przykładowa lecznica',
