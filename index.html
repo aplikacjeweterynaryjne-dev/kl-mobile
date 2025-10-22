@@ -623,6 +623,29 @@ function initData(data) {
 
   // podłącz zachowanie autouzupełniania klienta w nagłówku i w formularzu
   setupClientAutoFill();
+  // --- Przenoszenie przycisków ---
+
+  // Przenieś przycisk #formBtn nad tabelę (jeśli masz ten kod, jest OK)
+  const formBtnContainer = document.getElementById('formBtnContainer');
+  const formBtn = document.getElementById('formBtn');
+  if (formBtnContainer && formBtn) {
+    formBtnContainer.appendChild(formBtn);
+  } else {
+     if (!formBtn) console.warn("#formBtn not found, skipping move.");
+     if (!formBtnContainer) console.warn("#formBtnContainer not found, skipping move.");
+  }
+
+  // Przenieś przycisk #copyBtn do specjalnego wiersza tabeli
+  const copyBtn = document.getElementById('copyBtn');
+  const buttonPlaceholder = document.getElementById('copyBtnPlaceholder'); // Znajdź placeholder
+
+  if (copyBtn && buttonPlaceholder) {
+      buttonPlaceholder.appendChild(copyBtn); // Przenieś przycisk do placeholdera
+  } else {
+     if (!copyBtn) console.warn("#copyBtn not found, skipping move.");
+     if (!buttonPlaceholder) console.warn("#copyBtnPlaceholder not found, skipping move.");
+  }
+  // ✅ KONIEC WKLEJANEGO KODU
 }
 
 /* ---- generowanie wierszy (dokładnie tak jak wcześniej) ---- */
@@ -631,15 +654,33 @@ function generateRows(){
   tbody.innerHTML = '';
   for (let i=1;i<=13;i++){
     const row = document.createElement('tr');
-    if (i===10) {
+  if (i===10) {
       const cell = document.createElement('td');
       cell.colSpan = 8;
-      cell.textContent = 'Potwierdzenie nabycia produktu leczniczego weterynaryjnego/paszy leczniczej';
-      cell.style.fontWeight='bold';
-      cell.style.textAlign='left';
+      cell.style.textAlign = 'left'; // Wyrównanie dla całej komórki
+
+      // Główny kontener w komórce, używający flexbox
+      const mainContainer = document.createElement('div');
+      mainContainer.style.display = 'flex'; // Ustawienie elementów obok siebie
+      mainContainer.style.alignItems = 'center'; // Wyrównanie pionowe do środka
+      mainContainer.style.justifyContent = 'space-between'; // Opcjonalnie: rozsuń tekst i przycisk
+      cell.appendChild(mainContainer);
+
+      // Kontener na tekst (aby zachować pogrubienie)
+      const textDiv = document.createElement('div');
+      textDiv.textContent = 'Potwierdzenie nabycia produktu leczniczego weterynaryjnego/paszy leczniczej';
+      textDiv.style.fontWeight = 'bold';
+      mainContainer.appendChild(textDiv); // Dodaj tekst do głównego kontenera
+
+      // Kontener (placeholder) na przycisk
+      const buttonPlaceholder = document.createElement('div');
+      buttonPlaceholder.style.marginLeft = '10px'; // Dodaj mały odstęp między tekstem a przyciskiem
+      buttonPlaceholder.id = 'copyBtnPlaceholder'; // ✅ Dodajemy ID, aby łatwiej go znaleźć
+      mainContainer.appendChild(buttonPlaceholder); // Dodaj placeholder do głównego kontenera
+
       row.appendChild(cell);
       tbody.appendChild(row);
-      continue;
+      continue; // Kontynuuj pętlę
     }
     for (let j=1;j<=8;j++){
       const cell = document.createElement('td');
