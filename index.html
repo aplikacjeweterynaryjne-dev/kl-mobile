@@ -310,6 +310,12 @@
   }
 
 } /* Koniec @media print */
+  /* Styl dla nieaktywnego płótna podpisu */
+.signature-canvas:not(.active-draw) {
+  pointer-events: none; /* Blokuje interakcję myszy/dotyku */
+  background-color: #f0f0f0; /* Lekko szare tło dla wskazówki */
+  cursor: not-allowed;
+}
   </style>
 </head>
 
@@ -335,7 +341,11 @@
     <b>Nr dokumentu:</b> <input type="text" id="nrDokumentu" placeholder="________">
   </div>
 </div>
+<div id="formBtnContainer" style="text-align: center; margin-bottom: 10px;">
+    </div>
 
+<div class="table-container">
+  <table id="karta">
 <div class="table-container">
   <table id="karta">
   <thead>
@@ -381,8 +391,6 @@
 <p><b>Wyniki badań uzupełniających:</b><br>*W przypadku zwierząt znajdujących się w rejestrze zwierząt gospodarskich oznakowanych</p>
 
 <div class="actions">
-  <button id="copyBtn" class="btn">Przepisz dane z leczenia na miejscu</button>
-  <button id="formBtn" class="btn">📋 Wprowadź poprzez formularz</button>
   <button id="printBtn" class="btn" onclick="window.print()">Drukuj / Zapisz PDF</button>
   <div class="email-box">
   <label for="userEmail">📧 Podaj swój adres e-mail:</label>
@@ -532,8 +540,68 @@ fetch('data.json') // <-- To jest poprawny kod
   })
   .then(data => {
     console.log('✅ Dane pobrane z data.json:', data); // <-- Nowy komunikat
-    initData(data); // wywołuje Twoją funkcję z danymi
-  })
+   function initData(data) {
+  // nagłówek
+  document.getElementById('nazwaLecznicy').textContent = data.nazwaLecznicy || '';
+  // klienci -> datalist
+  const klientList = document.getElementById('klientList');
+  klientList.innerHTML = '';
+  (data.klienci || []).forEach(k => {
+    const opt = document.createElement('option');
+    opt.value = k.nazwa;
+    opt.dataset.adres = k.adres || '';
+    opt.dataset.nrstada = k.nrStada || '';
+    klientList.appendChild(opt);
+  });
+
+  // leki -> mapy i lista
+  nazwyLekow = [];
+  (data.leki || []).forEach(l => {
+    mapaSerii[l.nazwa] = l.nrSerii || '';
+    mapaIlosci[l.nazwa] = l.dawkowanie || '';
+    mapaKarencji[l.nazwa] = l.karencja || '';
+    nazwyLekow.push(l.nazwa);
+  });
+  rebuildListaLekow();
+
+  // default daty -> today
+  const today = new Date().toISOString().split('T')[0];
+  if (!document.getElementById('dataZgloszenia').value) document.getElementById('dataZgloszenia').value = today;
+  if (!document.getElementById('dataWykonania').value) document.getElementById('dataWykonania').value = today;
+  if (document.getElementById('formDataZgloszenia')) document.getElementById('formDataZgloszenia').value = today; // Dodano sprawdzenie, czy element istnieje
+  if (document.getElementById('formDataWykonania')) document.getElementById('formDataWykonania').value = today; // Dodano sprawdzenie
+
+  // podpis lekarza
+  if (data.doctorSignature) document.getElementById('doctor-signature').src = data.doctorSignature;
+
+  // generuj wiersze tabeli
+  generateRows();
+
+  // podłącz zachowanie autouzupełniania klienta w nagłówku i w formularzu
+  setupClientAutoFill();
+
+  // --- Przenoszenie przycisków ---
+
+  // Przenieś przycisk #formBtn nad tabelę
+  const formBtnContainer = document.getElementById('formBtnContainer');
+  const formBtn = document.getElementById('formBtn'); // Znajdź przycisk w pamięci
+  if (formBtnContainer && formBtn) {
+    formBtnContainer.appendChild(formBtn); // Przenieś przycisk
+  }
+
+  // Przenieś przycisk #copyBtn do specjalnego wiersza tabeli
+  const copyBtn = document.getElementById('copyBtn'); // Znajdź przycisk w pamięci
+  const specialRow = document.querySelector('#karta tbody tr td[colSpan="8"]'); // Znajdź komórkę
+  if (copyBtn && specialRow) {
+    const buttonContainer = specialRow.querySelector('div:last-child'); // Znajdź kontener (powinien być drugi div)
+    if (buttonContainer) {
+      buttonContainer.appendChild(copyBtn); // Przenieś przycisk
+    } else {
+      // Fallback, gdyby kontener nie istniał (mało prawdopodobne)
+      specialRow.appendChild(copyBtn);
+    }
+  }
+} // <- Prawidłowy zamykający nawias funkcji initData
   .catch(error => {
     console.error('❌ Błąd pobierania pliku data.json:', error); // <-- Nowy komunikat błędu
     alert('Nie udało się pobrać danych. Spróbuj odświeżyć stronę.');
@@ -587,15 +655,27 @@ function generateRows(){
   for (let i=1;i<=13;i++){
     const row = document.createElement('tr');
     if (i===10) {
-      const cell = document.createElement('td');
-      cell.colSpan = 8;
-      cell.textContent = 'Potwierdzenie nabycia produktu leczniczego weterynaryjnego/paszy leczniczej';
-      cell.style.fontWeight='bold';
-      cell.style.textAlign='left';
-      row.appendChild(cell);
-      tbody.appendChild(row);
-      continue;
-    }
+      const cell = document.createElement('td');
+      cell.colSpan = 8;
+      cell.style.textAlign = 'left'; // Zachowaj wyrównanie
+
+      // Dodaj tekst nagłówka
+      const textDiv = document.createElement('div');
+      textDiv.textContent = 'Potwierdzenie nabycia produktu leczniczego weterynaryjnego/paszy leczniczej';
+      textDiv.style.fontWeight = 'bold';
+      cell.appendChild(textDiv);
+
+      // Dodaj kontener na przycisk
+      const buttonContainer = document.createElement('div');
+      buttonContainer.style.marginTop = '5px'; // Odstęp
+      cell.appendChild(buttonContainer);
+
+      // Przeniesiemy tu przycisk później, po załadowaniu DOM
+
+      row.appendChild(cell);
+      tbody.appendChild(row);
+      continue; // Kontynuuj pętlę
+    }
     for (let j=1;j<=8;j++){
       const cell = document.createElement('td');
       if (j===1) cell.textContent = (i>10?i-10:i)+'.';
@@ -1050,70 +1130,100 @@ document.getElementById('micBtn').addEventListener('click', ()=>{
   };
 });
 
-/* ---- podpis (oryginalna logika) ---- */
+/* ---- ZAKTUALIZOWANA funkcja podpisów ---- */
 function initSignature(id){
-  const canvas=document.getElementById(id);
+  const canvas = document.getElementById(id); // Małe płótno
   if (!canvas) return;
-  const ctx=canvas.getContext('2d');
-  ctx.lineWidth = 2;
-  ctx.lineCap = 'round';
-  let drawing=false;
+  const ctx = canvas.getContext('2d');
+  // Na początku małe płótno jest nieaktywne (bez klasy .active-draw)
 
-  function getPos(e, c){
-    const rect = c.getBoundingClientRect();
-    const scaleX = c.width / rect.width;
-    const scaleY = c.height / rect.height;
+  // Przyciski i overlay
+  const fullscreenBtn = document.getElementById('fullscreenBtn');
+  const clearSignBtn = document.getElementById('clearSignBtn');
+  const fullscreenOverlay = document.getElementById('fullscreenOverlay');
+  const fullscreenCanvas = document.getElementById('fullscreenCanvas'); // Duże płótno
+  const closeBtn = document.getElementById('closeSignBtn');
+  const clearFullscreenBtn = document.getElementById('clearFullscreenSignBtn');
+
+  let fDrawing = false; // Flaga rysowania dla dużego płótna
+  let fctx; // Kontekst dużego płótna
+
+  // Funkcja pomocnicza do pobierania pozycji na dużym płótnie
+  function getFPos(e){
+    const rect = fullscreenCanvas.getBoundingClientRect();
     const clientX = (e.touches && e.touches[0]) ? e.touches[0].clientX : e.clientX;
     const clientY = (e.touches && e.touches[0]) ? e.touches[0].clientY : e.clientY;
-    return { x: (clientX - rect.left) * scaleX, y: (clientY - rect.top) * scaleY };
+    // Skalowanie nie jest potrzebne, jeśli canvas ma stały rozmiar
+    return { x: clientX - rect.left, y: clientY - rect.top };
   }
 
-  canvas.addEventListener('pointerdown', e=>{ drawing=true; const pos=getPos(e,canvas); ctx.beginPath(); ctx.moveTo(pos.x,pos.y); });
-  canvas.addEventListener('pointermove', e=>{ if(drawing){ const pos=getPos(e,canvas); ctx.lineTo(pos.x,pos.y); ctx.stroke(); }});
-  canvas.addEventListener('pointerup', ()=>{drawing=false;});
-  canvas.addEventListener('pointerleave', ()=>{drawing=false;});
+  // Funkcje obsługi rysowania na DUŻYM płótnie
+  const startDrawingFullscreen = e => {
+    fDrawing = true;
+    const pos = getFPos(e);
+    fctx.beginPath();
+    fctx.moveTo(pos.x, pos.y);
+  };
+  const drawFullscreen = e => {
+    if (fDrawing) {
+      const pos = getFPos(e);
+      fctx.lineTo(pos.x, pos.y);
+      fctx.stroke();
+    }
+  };
+  const stopDrawingFullscreen = () => { fDrawing = false; };
 
-  // fullscreen handlers
-  const fullscreenOverlay=document.getElementById('fullscreenOverlay');
-  const fullscreenCanvas=document.getElementById('fullscreenCanvas');
-  const closeBtn=document.getElementById('closeSignBtn');
-  const clearFullscreenBtn=document.getElementById('clearFullscreenSignBtn');
-
-  document.getElementById('fullscreenBtn').addEventListener('click', ()=>{
+  // Obsługa kliknięcia "Powiększ podpis" / "Podpisz dokument"
+  fullscreenBtn.addEventListener('click', ()=>{
+    fullscreenBtn.textContent = 'Podpisz dokument'; // Zmień tekst przycisku
     fullscreenOverlay.style.display='flex';
-    fullscreenCanvas.width = window.innerWidth - 20;
-    fullscreenCanvas.height = window.innerHeight - 80;
-    const fctx = fullscreenCanvas.getContext('2d');
-    fctx.clearRect(0,0,fullscreenCanvas.width,fullscreenCanvas.height);
-    fctx.lineWidth = 5;
+
+    // Dopasuj rozmiar dużego płótna i przygotuj kontekst
+    fullscreenCanvas.width = window.innerWidth - 40; // Mniejszy margines
+    fullscreenCanvas.height = window.innerHeight - 100; // Mniejszy margines
+    fctx = fullscreenCanvas.getContext('2d');
+    fctx.clearRect(0, 0, fullscreenCanvas.width, fullscreenCanvas.height);
+    fctx.lineWidth = 4; // Grubsza linia dla łatwiejszego podpisu
     fctx.lineCap = 'round';
-    fctx.drawImage(canvas,0,0,fullscreenCanvas.width,fullscreenCanvas.height);
 
-    let fDrawing=false;
-    function getFPos(e){ const rect=fullscreenCanvas.getBoundingClientRect(); const clientX = (e.touches && e.touches[0]) ? e.touches[0].clientX : e.clientX; const clientY = (e.touches && e.touches[0]) ? e.touches[0].clientY : e.clientY; return { x: clientX-rect.left, y: clientY-rect.top }; }
-    fullscreenCanvas.addEventListener('pointerdown', e=>{ fDrawing=true; const pos=getFPos(e); fctx.beginPath(); fctx.moveTo(pos.x,pos.y); });
-    fullscreenCanvas.addEventListener('pointermove', e=>{ if(fDrawing){ const pos=getFPos(e); fctx.lineTo(pos.x,pos.y); fctx.stroke(); }});
-    fullscreenCanvas.addEventListener('pointerup', ()=>{fDrawing=false;});
-    fullscreenCanvas.addEventListener('pointerleave', ()=>{fDrawing=false;});
+    // WAŻNE: Dodaj listenery DOPIERO po otwarciu overlay
+    fullscreenCanvas.addEventListener('pointerdown', startDrawingFullscreen);
+    fullscreenCanvas.addEventListener('pointermove', drawFullscreen);
+    fullscreenCanvas.addEventListener('pointerup', stopDrawingFullscreen);
+    fullscreenCanvas.addEventListener('pointerleave', stopDrawingFullscreen);
   });
 
+  // Obsługa kliknięcia "Zamknij podpis"
   closeBtn.addEventListener('click', ()=>{
-    const fctx = fullscreenCanvas.getContext('2d');
-    ctx.clearRect(0,0,canvas.width,canvas.height);
-    ctx.drawImage(fullscreenCanvas,0,0,canvas.width,canvas.height);
-    fullscreenOverlay.style.display='none';
+    // Skopiuj obraz z dużego płótna na małe
+    ctx.clearRect(0, 0, canvas.width, canvas.height); // Wyczyść małe
+    // Skaluj obraz podczas kopiowania
+    ctx.drawImage(fullscreenCanvas, 0, 0, canvas.width, canvas.height);
+
+    fullscreenOverlay.style.display = 'none'; // Zamknij overlay
+    fullscreenBtn.textContent = 'Powiększ podpis'; // Przywróć tekst przycisku
+
+    // WAŻNE: Usuń listenery z dużego płótna po zamknięciu
+    fullscreenCanvas.removeEventListener('pointerdown', startDrawingFullscreen);
+    fullscreenCanvas.removeEventListener('pointermove', drawFullscreen);
+    fullscreenCanvas.removeEventListener('pointerup', stopDrawingFullscreen);
+    fullscreenCanvas.removeEventListener('pointerleave', stopDrawingFullscreen);
   });
 
+  // Obsługa "Wyczyść podpis" (duże płótno)
   clearFullscreenBtn.addEventListener('click', ()=>{
-    const fctx = fullscreenCanvas.getContext('2d');
-    fctx.clearRect(0,0,fullscreenCanvas.width,fullscreenCanvas.height);
+    if (fctx) {
+      fctx.clearRect(0, 0, fullscreenCanvas.width, fullscreenCanvas.height);
+    }
   });
 
-  document.getElementById('clearSignBtn').addEventListener('click', ()=>{ ctx.clearRect(0,0,canvas.width,canvas.height); });
+  // Obsługa "Wyczyść podpis" (małe płótno) - czyści tylko małe
+  clearSignBtn.addEventListener('click', ()=>{
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  });
 }
-
-/* inicjalizacja podpisu po załadowaniu wierszy */
-window.addEventListener('load', ()=> initSignature('canvasPosiadacz'));
+// Pozostaw wywołanie inicjalizacji bez zmian:
+// window.addEventListener('load', ()=> initSignature('canvasPosiadacz'));
 /* ---- zapis wiersza automatycznie przy zmianie wiersza ---- */
 formRowSelect.addEventListener('change', ()=>{
   // zapis aktualnego wiersza przed przejściem do nowego
