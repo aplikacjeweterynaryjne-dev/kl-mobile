@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 
   <title>KARTA LECZENIA ZWIERZĄT</title>
-
   <!-- ✅ DODANE: obsługa PWA -->
   <meta name="theme-color" content="#2b74e4">
   <link rel="manifest" href="manifest.json">
@@ -183,6 +182,25 @@
       max-height: 95vh;
     }
   }
+    /* --- Styl dla przycisku edycji wiersza --- */
+.btn-edit-row {
+  background: #f0f0f0;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  padding: 0px 5px;
+  margin-left: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1.2;
+  vertical-align: middle;
+}
+.btn-edit-row:hover {
+  background: #e0e0e0;
+}
+/* Ukryj przycisk podczas drukowania */
+@media print {
+  .btn-edit-row { display: none !important; }
+}
   </style>
 </head>
 
@@ -471,7 +489,35 @@ function generateRows(){
     }
     for (let j=1;j<=8;j++){
       const cell = document.createElement('td');
-      if (j===1) cell.textContent = (i>10?i-10:i)+'.';
+      /* ✅ WKLEJ TEN BLOK W MIEJSCE USUNIĘTEGO: ✅ */
+if (j===1) {
+  // Obliczamy "logiczny" indeks wiersza (0-11),
+  // który jest używany przez funkcje formularza
+  const logicalIndex = (i > 10) ? i - 2 : i - 1;
+
+  // Bierzemy tekst, który miałeś tam wcześniej (np. "1.", "2." itd.)
+  const rowNumText = (i > 10 ? i - 10 : i) + '.';
+
+  // Wyczyść komórkę i dodaj numer
+  cell.textContent = rowNumText + ' '; 
+
+  // Stwórz i dodaj przycisk "edytuj"
+  const btn = document.createElement('button');
+  btn.textContent = '➡️'; // Możesz zmienić na '✏️' lub inny symbol
+  btn.className = 'btn-edit-row';
+  btn.title = 'Edytuj ten wiersz w formularzu';
+
+  btn.addEventListener('click', (e) => {
+    // Zatrzymujemy propagację, aby kliknięcie przycisku
+    // nie aktywowało edycji komórki (contenteditable)
+    e.stopPropagation(); 
+
+    // Wywołujemy naszą nową funkcję z indeksem tego wiersza
+    openFormAtRow(logicalIndex);
+  });
+
+  cell.appendChild(btn);
+}
       if (i!==10) cell.contentEditable = true;
       if (j>=2 && j<=4) cell.classList.add('center-text');
       // kolumna 3 -> number input
@@ -510,7 +556,28 @@ function generateRows(){
   // napelnij select w formularzu odpowiadającym wierszom
   populateRowSelect();
 }
+/* ✅ DODAJ TĘ NOWĄ FUNKCJĘ: ✅ */
 
+/* ---- NOWA FUNKCJA: Otwiera formularz na konkretnym wierszu ---- */
+function openFormAtRow(logicalIndex) {
+  // 1. Otwórz modal
+  formModal.style.display = 'flex';
+  
+  // 2. Przejdź od razu do kroku 2 (edycja wiersza)
+  showStep(2);
+  
+  // 3. Wypełnij listę rozwijaną wierszy (na wypadek gdyby nie była)
+  populateRowSelect();
+  
+  // 4. Ustaw listę rozwijaną na kliknięty wiersz
+  formRowSelect.value = logicalIndex;
+  
+  // 5. Wczytaj dane z tego wiersza do formularza
+  selectRowInForm(logicalIndex);
+  
+  // 6. Ustaw 'poprzedni' indeks, aby auto-zapis działał poprawnie
+  formRowSelect.dataset.prevIndex = logicalIndex;
+}
 /* ---- lista lekow w datalist ---- */
 function rebuildListaLekow(){
   const dl = document.getElementById('listaLekow');
