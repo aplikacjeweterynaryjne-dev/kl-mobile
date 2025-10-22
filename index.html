@@ -469,127 +469,6 @@
     display: none !important;
   }
 }
-  /* ======================================================== */
-/* STYLE DLA WYDRUKU TERMICZNEGO 110mm                     */
-/* ======================================================== */
-
-/* --- Ustawienia strony TYLKO dla trybu termicznego --- */
-@page {
-  /* Domyślne ustawienia strony dla normalnego druku (A4) */
-  /* size: A4; margin: 1cm; */ /* Możesz to odkomentować/dostosować, jeśli potrzebujesz */
-}
-body.print-thermal-110 @page {
-  size: 110mm auto; /* Szerokość 110mm, wysokość automatyczna */
-  margin: 5mm;      /* Małe marginesy */
-}
-
-/* --- Style aktywne TYLKO podczas drukowania w trybie termicznym --- */
-@media print {
-  body.print-thermal-110 {
-    font-size: 8pt; /* Bardzo mała czcionka bazowa */
-    margin: 0 !important;
-    transform: none !important;
-    width: 100%; /* Szerokość dopasowana do 110mm */
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
-
-  /* --- Nagłówek (nad tabelą) --- */
-  body.print-thermal-110 h2 {
-    font-size: 10pt;
-    margin-bottom: 3mm;
-  }
-  body.print-thermal-110 .top-section {
-    font-size: 7pt; /* Jeszcze mniejsza czcionka */
-    display: block; /* Zmień układ na blokowy, jeden pod drugim */
-    margin-bottom: 3mm;
-  }
-  body.print-thermal-110 .top-section div {
-    padding: 1px;
-    margin-bottom: 2px; /* Odstęp między sekcjami nagłówka */
-  }
-  body.print-thermal-110 .top-section input {
-    font-size: 7pt;
-    padding: 0;
-  }
-  /* Ukryj kontener przycisku formularza */
-  body.print-thermal-110 #formBtnContainer {
-      display: none !important;
-  }
-
-  /* --- Obracanie kontenera tabeli --- */
-  body.print-thermal-110 .table-container {
-    transform: rotate(-90deg);
-    transform-origin: top left; /* Obracaj względem lewego górnego rogu */
-
-    /* Wymiary i pozycja PO obrocie - WYMAGAJĄ EKSPERYMENTÓW */
-    width: calc(100vh - 10mm - 50mm); /* Szerokość = Wysokość strony - marginesy - przybliżona wys. nagłówka/stopki */
-                                     /* Dostosuj '50mm' do faktycznej wysokości nagłówka/stopki! */
-    height: calc(110mm - 10mm);      /* Wysokość = Szerokość papieru - marginesy (5mm + 5mm) */
-    position: relative; /* Lub absolute */
-    margin-top: 5mm;  /* Odstęp od góry */
-    margin-left: calc(110mm - 10mm); /* Przesunięcie w lewo o 'nową wysokość' */
-
-    overflow: hidden; /* Ukryj, co wystaje */
-    /* border: 1px dashed red; */ /* Włącz do debugowania */
-  }
-
-  /* --- Tabela wewnątrz obróconego kontenera --- */
-  body.print-thermal-110 table#karta {
-    font-size: 6pt; /* Bardzo mała czcionka */
-    width: 100%;    /* Tabela zajmuje teraz szerokość kontenera (oryginalną wysokość strony) */
-    margin: 0;
-    padding: 0;
-    /* border: 1px solid blue; */ /* Włącz do debugowania */
-  }
-   body.print-thermal-110 th, body.print-thermal-110 td {
-      padding: 1px; /* Minimalny padding */
-      white-space: nowrap; /* Zapobiegaj zawijaniu tekstu */
-   }
-
-   /* Specjalny wiersz (i=10) - zmniejszmy */
-   body.print-thermal-110 table#karta tbody tr td[colSpan="8"] {
-       font-size: 5pt;
-       padding: 0;
-   }
-   /* Ukryj przycisk przeniesiony do tego wiersza */
-    body.print-thermal-110 #copyBtnPlaceholder button {
-        display: none !important;
-    }
-
-  /* --- Stopka (podpisy) --- */
-  body.print-thermal-110 p {
-    font-size: 7pt;
-    margin: 1mm 0;
-  }
-  body.print-thermal-110 .signatures {
-    display: block; /* Zmień układ na blokowy */
-    margin-top: 5mm;
-  }
-  body.print-thermal-110 .signature-box {
-     width: 100%; /* Zajmij całą szerokość */
-     margin-bottom: 2mm;
-  }
-  body.print-thermal-110 .signature-label { font-size: 8pt; }
-  body.print-thermal-110 .signature-canvas, body.print-thermal-110 .signature-img { height: 20px; } /* Bardzo małe */
-  body.print-thermal-110 .signature-name { font-size: 7pt; }
-
-  /* --- Ukrywanie elementów w trybie termicznym --- */
-  body.print-thermal-110 #printBtn, /* Ukrywamy normalny przycisk druku */
-  body.print-thermal-110 .btn-edit-row, /* Ukrywamy strzałki edycji */
-  body.print-thermal-110 #fullscreenOverlay,
-  body.print-thermal-110 #formModal,
-  body.print-thermal-110 #fullscreenBtn,
-  body.print-thermal-110 #clearSignBtn,
-  /* copyBtn i formBtn są przenoszone, ale na wszelki wypadek ukrywamy ich pierwotne ID */
-  body.print-thermal-110 #copyBtn,
-  body.print-thermal-110 #formBtn,
-  body.print-thermal-110 .email-box,
-  body.print-thermal-110 .actions { /* Ukryj całą sekcję actions dla pewności */
-      display: none !important;
-  }
-
-} /* Koniec @media print dla thermal */
   </style>
 </head>
 
@@ -661,16 +540,17 @@ body.print-thermal-110 @page {
 <p><b>Wyniki badań uzupełniających:</b><br>*W przypadku zwierząt znajdujących się w rejestrze zwierząt gospodarskich oznakowanych</p>
 
 <div class="actions">
+  <button id="copyBtn" class="btn">Przepisz dane z leczenia na miejscu</button>
+  <button id="formBtn" class="btn">📋 Wprowadź poprzez formularz</button>
   <button id="printBtn" class="btn" onclick="window.print()">Drukuj / Zapisz PDF</button>
-  <button id="print110Btn" class="btn">🖨️ Druk 110</button>
-
   <div class="email-box">
-    <label for="userEmail">📧 Podaj swój adres e-mail:</label>
-    <div class="email-input-wrapper">
-      <input type="email" id="userEmail" placeholder="np. jan.kowalski@email.com">
-      <button type="button" id="saveEmail" title="Zapisz adres e-mail">💾</button>
-    </div>
+  <label for="userEmail">📧 Podaj swój adres e-mail:</label>
+  <div class="email-input-wrapper">
+    <input type="email" id="userEmail" placeholder="np. jan.kowalski@email.com">
+    <button type="button" id="saveEmail" title="Zapisz adres e-mail">💾</button>
   </div>
+</div>
+
 </div>
 
 <!-- fullscreen overlay for signature -->
@@ -1680,29 +1560,7 @@ if (saveEmailBtn && emailInput) {
       .then(() => console.log('✅ Service Worker zarejestrowany!'))
       .catch(err => console.error('❌ Błąd rejestracji SW:', err));
   }
-// --- Obsługa przycisku Druk 110 ---
-const print110Button = document.getElementById('print110Btn');
-if (print110Button) {
-  print110Button.addEventListener('click', () => {
-    // 1. Dodaj klasę do body
-    document.body.classList.add('print-thermal-110');
 
-    // 2. Wywołaj drukowanie
-    window.print();
-
-    // 3. Usuń klasę po krótkim czasie (po zakończeniu drukowania)
-    // Używamy setTimeout, bo onafterprint nie zawsze działa niezawodnie
-    setTimeout(() => {
-      document.body.classList.remove('print-thermal-110');
-    }, 1000); // Czas w milisekundach (1 sekunda)
-  });
-}
-
-// Opcjonalnie: Nasłuchuj na zdarzenie afterprint, aby usunąć klasę
-// To może zadziałać lepiej niż setTimeout w niektórych przeglądarkach
-window.addEventListener('afterprint', () => {
-    document.body.classList.remove('print-thermal-110');
-});
 </script>
 </body>
 </html>
