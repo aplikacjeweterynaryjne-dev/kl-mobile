@@ -310,12 +310,6 @@
   }
 
 } /* Koniec @media print */
-  /* Styl dla nieaktywnego płótna podpisu */
-.signature-canvas:not(.active-draw) {
-  pointer-events: none; /* Blokuje interakcję myszy/dotyku */
-  background-color: #f0f0f0; /* Lekko szare tło dla wskazówki */
-  cursor: not-allowed;
-}
   </style>
 </head>
 
@@ -341,11 +335,7 @@
     <b>Nr dokumentu:</b> <input type="text" id="nrDokumentu" placeholder="________">
   </div>
 </div>
-<div id="formBtnContainer" style="text-align: center; margin-bottom: 10px;">
-    </div>
 
-<div class="table-container">
-  <table id="karta">
 <div class="table-container">
   <table id="karta">
   <thead>
@@ -391,6 +381,8 @@
 <p><b>Wyniki badań uzupełniających:</b><br>*W przypadku zwierząt znajdujących się w rejestrze zwierząt gospodarskich oznakowanych</p>
 
 <div class="actions">
+  <button id="copyBtn" class="btn">Przepisz dane z leczenia na miejscu</button>
+  <button id="formBtn" class="btn">📋 Wprowadź poprzez formularz</button>
   <button id="printBtn" class="btn" onclick="window.print()">Drukuj / Zapisz PDF</button>
   <div class="email-box">
   <label for="userEmail">📧 Podaj swój adres e-mail:</label>
@@ -533,95 +525,19 @@
 let mapaSerii = {}, mapaIlosci = {}, mapaKarencji = {}, nazwyLekow = [];
 
 // 🌐 Tryb GitHub Pages – pobieramy dane z lokalnego pliku data.json
-/* ----- dane map i nazwy leków (będą uzupełnione z serwera) ----- */
-let mapaSerii = {}, mapaIlosci = {}, mapaKarencji = {}, nazwyLekow = [];
-
-// 🌐 Tryb GitHub Pages – pobieramy dane z lokalnego pliku data.json
-fetch('data.json')
-  .then(response => {
-    if (!response.ok) throw new Error('Błąd sieci: ' + response.status);
-    return response.json();
-  })
-  .then(data => {
-    console.log('✅ Dane pobrane z data.json:', data);
-    // ✅ POPRAWKA: Wywołujemy funkcję initData z pobranymi danymi
-    initData(data);
-  })
-  .catch(error => {
-    // ✅ POPRAWKA: Przeniesiono .catch() we właściwe miejsce
-    console.error('❌ Błąd pobierania pliku data.json:', error);
-    alert('Nie udało się pobrać danych. Spróbuj odświeżyć stronę.');
-  });
-
-// ✅ POPRAWKA: Definicja funkcji initData jest TERAZ na zewnątrz, we właściwym miejscu
-  // klienci -> datalist
-  const klientList = document.getElementById('klientList');
-  klientList.innerHTML = '';
-  (data.klienci || []).forEach(k => {
-    const opt = document.createElement('option');
-    opt.value = k.nazwa;
-    opt.dataset.adres = k.adres || '';
-    opt.dataset.nrstada = k.nrStada || '';
-    klientList.appendChild(opt);
-  });
-
-  // leki -> mapy i lista
-  nazwyLekow = [];
-  (data.leki || []).forEach(l => {
-    mapaSerii[l.nazwa] = l.nrSerii || '';
-    mapaIlosci[l.nazwa] = l.dawkowanie || '';
-    mapaKarencji[l.nazwa] = l.karencja || '';
-    nazwyLekow.push(l.nazwa);
-  });
-  rebuildListaLekow();
-
-  // default daty -> today
-  const today = new Date().toISOString().split('T')[0];
-  if (!document.getElementById('dataZgloszenia').value) document.getElementById('dataZgloszenia').value = today;
-  if (!document.getElementById('dataWykonania').value) document.getElementById('dataWykonania').value = today;
-  // Sprawdzamy, czy elementy istnieją przed ustawieniem wartości
-  const formDataZgloszenia = document.getElementById('formDataZgloszenia');
-  const formDataWykonania = document.getElementById('formDataWykonania');
-  if (formDataZgloszenia) formDataZgloszenia.value = today;
-  if (formDataWykonania) formDataWykonania.value = today;
-
-  // podpis lekarza
-  if (data.doctorSignature) document.getElementById('doctor-signature').src = data.doctorSignature;
-
-  // generuj wiersze tabeli
-  generateRows();
-
-  // podłącz zachowanie autouzupełniania klienta w nagłówku i w formularzu
-  setupClientAutoFill();
-
-  // --- Przenoszenie przycisków ---
-
-  // Przenieś przycisk #formBtn nad tabelę
-  const formBtnContainer = document.getElementById('formBtnContainer');
-  const formBtn = document.getElementById('formBtn');
-  // Sprawdzamy czy przyciski istnieją zanim je przeniesiemy
-  if (formBtnContainer && formBtn) {
-    formBtnContainer.appendChild(formBtn);
-  } else {
-     console.warn("#formBtn or #formBtnContainer not found, skipping move.");
-  }
-
-
-  // Przenieś przycisk #copyBtn do specjalnego wiersza tabeli
-  const copyBtn = document.getElementById('copyBtn');
-  const specialRow = document.querySelector('#karta tbody tr td[colSpan="8"]');
-  if (copyBtn && specialRow) {
-    const buttonContainer = specialRow.querySelector('div:last-child');
-    if (buttonContainer) {
-      buttonContainer.appendChild(copyBtn);
-    } else {
-      specialRow.appendChild(copyBtn); // Fallback
-       console.warn("Button container in special row not found, fallback append.");
-    }
-  } else {
-     console.warn("#copyBtn or special row not found, skipping move.");
-  }
-} // <- Koniec definicji funkcji initData
+fetch('data.json') // <-- To jest poprawny kod
+  .then(response => {
+    if (!response.ok) throw new Error('Błąd sieci: ' + response.status);
+    return response.json();
+  })
+  .then(data => {
+    console.log('✅ Dane pobrane z data.json:', data); // <-- Nowy komunikat
+    initData(data); // wywołuje Twoją funkcję z danymi
+  })
+  .catch(error => {
+    console.error('❌ Błąd pobierania pliku data.json:', error); // <-- Nowy komunikat błędu
+    alert('Nie udało się pobrać danych. Spróbuj odświeżyć stronę.');
+  });
 function initData(data) {
   // nagłówek
   document.getElementById('nazwaLecznicy').textContent = data.nazwaLecznicy || '';
@@ -671,142 +587,47 @@ function generateRows(){
   for (let i=1;i<=13;i++){
     const row = document.createElement('tr');
     if (i===10) {
-      const cell = document.createElement('td');
-      cell.colSpan = 8;
-      cell.style.textAlign = 'left'; // Zachowaj wyrównanie
-
-      // Dodaj tekst nagłówka
-      const textDiv = document.createElement('div');
-      textDiv.textContent = 'Potwierdzenie nabycia produktu leczniczego weterynaryjnego/paszy leczniczej';
-      textDiv.style.fontWeight = 'bold';
-      cell.appendChild(textDiv);
-
-      // Dodaj kontener na przycisk
-      const buttonContainer = document.createElement('div');
-      buttonContainer.style.marginTop = '5px'; // Odstęp
-      cell.appendChild(buttonContainer);
-
-      // Przeniesiemy tu przycisk później, po załadowaniu DOM
-
-      row.appendChild(cell);
-      tbody.appendChild(row);
-      continue; // Kontynuuj pętlę
-    }
- for (let j=1;j<=8;j++){
       const cell = document.createElement('td');
-
-      // ✅ POPRAWKA: Logika dla j=1 (numer wiersza + przycisk edycji)
-      if (j===1) {
-        const logicalIndex = (i > 10) ? i - 2 : i - 1;
-        const rowNumText = (i > 10 ? i - 10 : i) + '.';
-        cell.textContent = rowNumText + ' '; // Ustaw numer wiersza
-
-        // Dodaj przycisk edycji
-        const btn = document.createElement('button');
-        btn.textContent = '➡️';
-        btn.className = 'btn-edit-row';
-        btn.title = 'Edytuj ten wiersz w formularzu';
-        btn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          openFormAtRow(logicalIndex);
-        });
-        cell.appendChild(btn);
-      }
-
-      // Domyślne ustawienie contentEditable (pozostaje bez zmian)
-      if (i!==10 && j !== 1) { // Dodano j !== 1, żeby nie nadpisać komórki z przyciskiem
-           cell.contentEditable = true;
-      }
-
-       // Centrowanie tekstu (pozostaje bez zmian)
-      if (j>=2 && j<=4) {
-           cell.classList.add('center-text');
-      }
-
-      // --- Logika dla j=2 (Opis + jw. checkbox) ---
-      if (j === 2 && i !== 10) {
-        cell.contentEditable = false; // Wyłącz edycję na komórce
-
-        const textDiv = document.createElement('div');
-        textDiv.contentEditable = true;
-        textDiv.className = 'editable-text';
-        cell.appendChild(textDiv); // Dodaj edytowalny div na tekst
-
-        if (i !== 1) { // Nie dodawaj checkboxa w pierwszym wierszu
-          const container = document.createElement('div');
-          container.className = 'jw-checkbox-container';
-          container.contentEditable = false;
-
-          const checkbox = document.createElement('input');
-          checkbox.type = 'checkbox';
-          const checkboxId = `jw-check-${i}`;
-          checkbox.id = checkboxId;
-
-          const label = document.createElement('label');
-          label.htmlFor = checkboxId;
-          label.textContent = 'jw.';
-
-          checkbox.addEventListener('change', function(e) {
-            e.stopPropagation();
-            if (this.checked) {
-              copyDataFromAbove(row); // Przekaż cały wiersz <tr>
-            }
-          });
-
-          container.appendChild(checkbox);
-          container.appendChild(label);
-          cell.appendChild(container); // Dodaj kontener z checkboxem
-        }
-      } // Koniec if (j===2)
-
-      // --- Logika dla j=3 (Input liczbowy) ---
-      if (j===3 && i!==10){
-        const input = document.createElement('input');
-        input.type = 'number';
-        input.min = '0';
-        input.style.width = '50px';
-        cell.textContent = ''; // Wyczyść komórkę przed dodaniem inputa
-        cell.appendChild(input);
-      }
-
-      // --- Logika dla j=5 (Input z listą leków) ---
-      if (j===5 && i!==10){
-        const input = document.createElement('input');
-        input.setAttribute('list','listaLekow');
-        input.style.width = '95%';
-        input.addEventListener('input', function(){
-          // Twój kod obsługi zmiany leku (pozostaje bez zmian)
-          const nrCell = row.cells[5]; // Poprawka: indeksy są od 0
-          const iloscCell = row.cells[6];
-          const karCell = row.cells[7];
-          const nazwa = this.value;
-          const nr = mapaSerii[nazwa] || '';
-          const dawka = mapaIlosci[nazwa] || '';
-          const kar = mapaKarencji[nazwa] || '';
-          nrCell.textContent = nr;
-          // Sprawdź czy iloscCell nie jest null/undefined przed dostępem do innerHTML
-          if (iloscCell) {
-             iloscCell.innerHTML = `<input class="small-input" type="number" inputmode="numeric" pattern="[0-9]*" placeholder="ilość"> ${dawka||''}`;
-          }
-          if (karCell) {
-             karCell.textContent = kar;
-          }
-        });
-        cell.textContent = ''; // Wyczyść komórkę przed dodaniem inputa
-        cell.appendChild(input);
-      }
-
-      // Dla pozostałych kolumn (j=4, 6, 7, 8), po prostu dodajemy pustą komórkę
-      // (chyba że miały specjalną logikę, której tu nie widzę)
-
+      cell.colSpan = 8;
+      cell.textContent = 'Potwierdzenie nabycia produktu leczniczego weterynaryjnego/paszy leczniczej';
+      cell.style.fontWeight='bold';
+      cell.style.textAlign='left';
       row.appendChild(cell);
-    } // Koniec pętli for (j...)
-    tbody.appendChild(row);
-  } // Koniec pętli for (i...)
+      tbody.appendChild(row);
+      continue;
+    }
+    for (let j=1;j<=8;j++){
+      const cell = document.createElement('td');
+      if (j===1) cell.textContent = (i>10?i-10:i)+'.';
+      /* ✅ WKLEJ TEN BLOK W MIEJSCE USUNIĘTEGO: ✅ */
+if (j===1) {
+  // Obliczamy "logiczny" indeks wiersza (0-11),
+  // który jest używany przez funkcje formularza
+  const logicalIndex = (i > 10) ? i - 2 : i - 1;
 
-  // Napelnij select w formularzu (pozostaje bez zmian)
-  populateRowSelect();
-} // Koniec funkcji generateRows
+  // Bierzemy tekst, który miałeś tam wcześniej (np. "1.", "2." itd.)
+  const rowNumText = (i > 10 ? i - 10 : i) + '.';
+
+  // Wyczyść komórkę i dodaj numer
+  cell.textContent = rowNumText + ' '; 
+
+  // Stwórz i dodaj przycisk "edytuj"
+  const btn = document.createElement('button');
+  btn.textContent = '➡️'; // Możesz zmienić na '✏️' lub inny symbol
+  btn.className = 'btn-edit-row';
+  btn.title = 'Edytuj ten wiersz w formularzu';
+
+  btn.addEventListener('click', (e) => {
+    // Zatrzymujemy propagację, aby kliknięcie przycisku
+    // nie aktywowało edycji komórki (contenteditable)
+    e.stopPropagation(); 
+
+    // Wywołujemy naszą nową funkcję z indeksem tego wiersza
+    openFormAtRow(logicalIndex);
+  });
+
+  cell.appendChild(btn);
+}
       if (i!==10) cell.contentEditable = true;
       if (j>=2 && j<=4) cell.classList.add('center-text');
       // kolumna 3 -> number input
@@ -1229,99 +1050,69 @@ document.getElementById('micBtn').addEventListener('click', ()=>{
   };
 });
 
-/* ---- ZAKTUALIZOWANA funkcja podpisów ---- */
+/* ---- podpis (oryginalna logika) ---- */
 function initSignature(id){
-  const canvas = document.getElementById(id); // Małe płótno
+  const canvas=document.getElementById(id);
   if (!canvas) return;
-  const ctx = canvas.getContext('2d');
-  // Na początku małe płótno jest nieaktywne (bez klasy .active-draw)
+  const ctx=canvas.getContext('2d');
+  ctx.lineWidth = 2;
+  ctx.lineCap = 'round';
+  let drawing=false;
 
-  // Przyciski i overlay
-  const fullscreenBtn = document.getElementById('fullscreenBtn');
-  const clearSignBtn = document.getElementById('clearSignBtn');
-  const fullscreenOverlay = document.getElementById('fullscreenOverlay');
-  const fullscreenCanvas = document.getElementById('fullscreenCanvas'); // Duże płótno
-  const closeBtn = document.getElementById('closeSignBtn');
-  const clearFullscreenBtn = document.getElementById('clearFullscreenSignBtn');
-
-  let fDrawing = false; // Flaga rysowania dla dużego płótna
-  let fctx; // Kontekst dużego płótna
-
-  // Funkcja pomocnicza do pobierania pozycji na dużym płótnie
-  function getFPos(e){
-    const rect = fullscreenCanvas.getBoundingClientRect();
+  function getPos(e, c){
+    const rect = c.getBoundingClientRect();
+    const scaleX = c.width / rect.width;
+    const scaleY = c.height / rect.height;
     const clientX = (e.touches && e.touches[0]) ? e.touches[0].clientX : e.clientX;
     const clientY = (e.touches && e.touches[0]) ? e.touches[0].clientY : e.clientY;
-    // Skalowanie nie jest potrzebne, jeśli canvas ma stały rozmiar
-    return { x: clientX - rect.left, y: clientY - rect.top };
+    return { x: (clientX - rect.left) * scaleX, y: (clientY - rect.top) * scaleY };
   }
 
-  // Funkcje obsługi rysowania na DUŻYM płótnie
-  const startDrawingFullscreen = e => {
-    fDrawing = true;
-    const pos = getFPos(e);
-    fctx.beginPath();
-    fctx.moveTo(pos.x, pos.y);
-  };
-  const drawFullscreen = e => {
-    if (fDrawing) {
-      const pos = getFPos(e);
-      fctx.lineTo(pos.x, pos.y);
-      fctx.stroke();
-    }
-  };
-  const stopDrawingFullscreen = () => { fDrawing = false; };
+  canvas.addEventListener('pointerdown', e=>{ drawing=true; const pos=getPos(e,canvas); ctx.beginPath(); ctx.moveTo(pos.x,pos.y); });
+  canvas.addEventListener('pointermove', e=>{ if(drawing){ const pos=getPos(e,canvas); ctx.lineTo(pos.x,pos.y); ctx.stroke(); }});
+  canvas.addEventListener('pointerup', ()=>{drawing=false;});
+  canvas.addEventListener('pointerleave', ()=>{drawing=false;});
 
-  // Obsługa kliknięcia "Powiększ podpis" / "Podpisz dokument"
-  fullscreenBtn.addEventListener('click', ()=>{
-    fullscreenBtn.textContent = 'Podpisz dokument'; // Zmień tekst przycisku
+  // fullscreen handlers
+  const fullscreenOverlay=document.getElementById('fullscreenOverlay');
+  const fullscreenCanvas=document.getElementById('fullscreenCanvas');
+  const closeBtn=document.getElementById('closeSignBtn');
+  const clearFullscreenBtn=document.getElementById('clearFullscreenSignBtn');
+
+  document.getElementById('fullscreenBtn').addEventListener('click', ()=>{
     fullscreenOverlay.style.display='flex';
-
-    // Dopasuj rozmiar dużego płótna i przygotuj kontekst
-    fullscreenCanvas.width = window.innerWidth - 40; // Mniejszy margines
-    fullscreenCanvas.height = window.innerHeight - 100; // Mniejszy margines
-    fctx = fullscreenCanvas.getContext('2d');
-    fctx.clearRect(0, 0, fullscreenCanvas.width, fullscreenCanvas.height);
-    fctx.lineWidth = 4; // Grubsza linia dla łatwiejszego podpisu
+    fullscreenCanvas.width = window.innerWidth - 20;
+    fullscreenCanvas.height = window.innerHeight - 80;
+    const fctx = fullscreenCanvas.getContext('2d');
+    fctx.clearRect(0,0,fullscreenCanvas.width,fullscreenCanvas.height);
+    fctx.lineWidth = 5;
     fctx.lineCap = 'round';
+    fctx.drawImage(canvas,0,0,fullscreenCanvas.width,fullscreenCanvas.height);
 
-    // WAŻNE: Dodaj listenery DOPIERO po otwarciu overlay
-    fullscreenCanvas.addEventListener('pointerdown', startDrawingFullscreen);
-    fullscreenCanvas.addEventListener('pointermove', drawFullscreen);
-    fullscreenCanvas.addEventListener('pointerup', stopDrawingFullscreen);
-    fullscreenCanvas.addEventListener('pointerleave', stopDrawingFullscreen);
+    let fDrawing=false;
+    function getFPos(e){ const rect=fullscreenCanvas.getBoundingClientRect(); const clientX = (e.touches && e.touches[0]) ? e.touches[0].clientX : e.clientX; const clientY = (e.touches && e.touches[0]) ? e.touches[0].clientY : e.clientY; return { x: clientX-rect.left, y: clientY-rect.top }; }
+    fullscreenCanvas.addEventListener('pointerdown', e=>{ fDrawing=true; const pos=getFPos(e); fctx.beginPath(); fctx.moveTo(pos.x,pos.y); });
+    fullscreenCanvas.addEventListener('pointermove', e=>{ if(fDrawing){ const pos=getFPos(e); fctx.lineTo(pos.x,pos.y); fctx.stroke(); }});
+    fullscreenCanvas.addEventListener('pointerup', ()=>{fDrawing=false;});
+    fullscreenCanvas.addEventListener('pointerleave', ()=>{fDrawing=false;});
   });
 
-  // Obsługa kliknięcia "Zamknij podpis"
   closeBtn.addEventListener('click', ()=>{
-    // Skopiuj obraz z dużego płótna na małe
-    ctx.clearRect(0, 0, canvas.width, canvas.height); // Wyczyść małe
-    // Skaluj obraz podczas kopiowania
-    ctx.drawImage(fullscreenCanvas, 0, 0, canvas.width, canvas.height);
-
-    fullscreenOverlay.style.display = 'none'; // Zamknij overlay
-    fullscreenBtn.textContent = 'Powiększ podpis'; // Przywróć tekst przycisku
-
-    // WAŻNE: Usuń listenery z dużego płótna po zamknięciu
-    fullscreenCanvas.removeEventListener('pointerdown', startDrawingFullscreen);
-    fullscreenCanvas.removeEventListener('pointermove', drawFullscreen);
-    fullscreenCanvas.removeEventListener('pointerup', stopDrawingFullscreen);
-    fullscreenCanvas.removeEventListener('pointerleave', stopDrawingFullscreen);
+    const fctx = fullscreenCanvas.getContext('2d');
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    ctx.drawImage(fullscreenCanvas,0,0,canvas.width,canvas.height);
+    fullscreenOverlay.style.display='none';
   });
 
-  // Obsługa "Wyczyść podpis" (duże płótno)
   clearFullscreenBtn.addEventListener('click', ()=>{
-    if (fctx) {
-      fctx.clearRect(0, 0, fullscreenCanvas.width, fullscreenCanvas.height);
-    }
+    const fctx = fullscreenCanvas.getContext('2d');
+    fctx.clearRect(0,0,fullscreenCanvas.width,fullscreenCanvas.height);
   });
 
-  // Obsługa "Wyczyść podpis" (małe płótno) - czyści tylko małe
-  clearSignBtn.addEventListener('click', ()=>{
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-  });
+  document.getElementById('clearSignBtn').addEventListener('click', ()=>{ ctx.clearRect(0,0,canvas.width,canvas.height); });
 }
-// Pozostaw wywołanie inicjalizacji bez zmian:
+
+/* inicjalizacja podpisu po załadowaniu wierszy */
 window.addEventListener('load', ()=> initSignature('canvasPosiadacz'));
 /* ---- zapis wiersza automatycznie przy zmianie wiersza ---- */
 formRowSelect.addEventListener('change', ()=>{
