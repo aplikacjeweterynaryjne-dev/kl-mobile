@@ -533,16 +533,27 @@
 let mapaSerii = {}, mapaIlosci = {}, mapaKarencji = {}, nazwyLekow = [];
 
 // 🌐 Tryb GitHub Pages – pobieramy dane z lokalnego pliku data.json
-fetch('data.json') // <-- To jest poprawny kod
-  .then(response => {
-    if (!response.ok) throw new Error('Błąd sieci: ' + response.status);
-    return response.json();
-  })
-  .then(data => {
-    console.log('✅ Dane pobrane z data.json:', data); // <-- Nowy komunikat
-   function initData(data) {
-  // nagłówek
-  document.getElementById('nazwaLecznicy').textContent = data.nazwaLecznicy || '';
+/* ----- dane map i nazwy leków (będą uzupełnione z serwera) ----- */
+let mapaSerii = {}, mapaIlosci = {}, mapaKarencji = {}, nazwyLekow = [];
+
+// 🌐 Tryb GitHub Pages – pobieramy dane z lokalnego pliku data.json
+fetch('data.json')
+  .then(response => {
+    if (!response.ok) throw new Error('Błąd sieci: ' + response.status);
+    return response.json();
+  })
+  .then(data => {
+    console.log('✅ Dane pobrane z data.json:', data);
+    // ✅ POPRAWKA: Wywołujemy funkcję initData z pobranymi danymi
+    initData(data);
+  })
+  .catch(error => {
+    // ✅ POPRAWKA: Przeniesiono .catch() we właściwe miejsce
+    console.error('❌ Błąd pobierania pliku data.json:', error);
+    alert('Nie udało się pobrać danych. Spróbuj odświeżyć stronę.');
+  });
+
+// ✅ POPRAWKA: Definicja funkcji initData jest TERAZ na zewnątrz, we właściwym miejscu
   // klienci -> datalist
   const klientList = document.getElementById('klientList');
   klientList.innerHTML = '';
@@ -568,8 +579,11 @@ fetch('data.json') // <-- To jest poprawny kod
   const today = new Date().toISOString().split('T')[0];
   if (!document.getElementById('dataZgloszenia').value) document.getElementById('dataZgloszenia').value = today;
   if (!document.getElementById('dataWykonania').value) document.getElementById('dataWykonania').value = today;
-  if (document.getElementById('formDataZgloszenia')) document.getElementById('formDataZgloszenia').value = today; // Dodano sprawdzenie, czy element istnieje
-  if (document.getElementById('formDataWykonania')) document.getElementById('formDataWykonania').value = today; // Dodano sprawdzenie
+  // Sprawdzamy, czy elementy istnieją przed ustawieniem wartości
+  const formDataZgloszenia = document.getElementById('formDataZgloszenia');
+  const formDataWykonania = document.getElementById('formDataWykonania');
+  if (formDataZgloszenia) formDataZgloszenia.value = today;
+  if (formDataWykonania) formDataWykonania.value = today;
 
   // podpis lekarza
   if (data.doctorSignature) document.getElementById('doctor-signature').src = data.doctorSignature;
@@ -584,28 +598,30 @@ fetch('data.json') // <-- To jest poprawny kod
 
   // Przenieś przycisk #formBtn nad tabelę
   const formBtnContainer = document.getElementById('formBtnContainer');
-  const formBtn = document.getElementById('formBtn'); // Znajdź przycisk w pamięci
+  const formBtn = document.getElementById('formBtn');
+  // Sprawdzamy czy przyciski istnieją zanim je przeniesiemy
   if (formBtnContainer && formBtn) {
-    formBtnContainer.appendChild(formBtn); // Przenieś przycisk
+    formBtnContainer.appendChild(formBtn);
+  } else {
+     console.warn("#formBtn or #formBtnContainer not found, skipping move.");
   }
 
+
   // Przenieś przycisk #copyBtn do specjalnego wiersza tabeli
-  const copyBtn = document.getElementById('copyBtn'); // Znajdź przycisk w pamięci
-  const specialRow = document.querySelector('#karta tbody tr td[colSpan="8"]'); // Znajdź komórkę
+  const copyBtn = document.getElementById('copyBtn');
+  const specialRow = document.querySelector('#karta tbody tr td[colSpan="8"]');
   if (copyBtn && specialRow) {
-    const buttonContainer = specialRow.querySelector('div:last-child'); // Znajdź kontener (powinien być drugi div)
+    const buttonContainer = specialRow.querySelector('div:last-child');
     if (buttonContainer) {
-      buttonContainer.appendChild(copyBtn); // Przenieś przycisk
+      buttonContainer.appendChild(copyBtn);
     } else {
-      // Fallback, gdyby kontener nie istniał (mało prawdopodobne)
-      specialRow.appendChild(copyBtn);
+      specialRow.appendChild(copyBtn); // Fallback
+       console.warn("Button container in special row not found, fallback append.");
     }
+  } else {
+     console.warn("#copyBtn or special row not found, skipping move.");
   }
-} // <- Prawidłowy zamykający nawias funkcji initData
-  .catch(error => {
-    console.error('❌ Błąd pobierania pliku data.json:', error); // <-- Nowy komunikat błędu
-    alert('Nie udało się pobrać danych. Spróbuj odświeżyć stronę.');
-  });
+} // <- Koniec definicji funkcji initData
 function initData(data) {
   // nagłówek
   document.getElementById('nazwaLecznicy').textContent = data.nazwaLecznicy || '';
@@ -676,38 +692,121 @@ function generateRows(){
       tbody.appendChild(row);
       continue; // Kontynuuj pętlę
     }
-    for (let j=1;j<=8;j++){
+ for (let j=1;j<=8;j++){
       const cell = document.createElement('td');
-      if (j===1) cell.textContent = (i>10?i-10:i)+'.';
-      /* ✅ WKLEJ TEN BLOK W MIEJSCE USUNIĘTEGO: ✅ */
-if (j===1) {
-  // Obliczamy "logiczny" indeks wiersza (0-11),
-  // który jest używany przez funkcje formularza
-  const logicalIndex = (i > 10) ? i - 2 : i - 1;
 
-  // Bierzemy tekst, który miałeś tam wcześniej (np. "1.", "2." itd.)
-  const rowNumText = (i > 10 ? i - 10 : i) + '.';
+      // ✅ POPRAWKA: Logika dla j=1 (numer wiersza + przycisk edycji)
+      if (j===1) {
+        const logicalIndex = (i > 10) ? i - 2 : i - 1;
+        const rowNumText = (i > 10 ? i - 10 : i) + '.';
+        cell.textContent = rowNumText + ' '; // Ustaw numer wiersza
 
-  // Wyczyść komórkę i dodaj numer
-  cell.textContent = rowNumText + ' '; 
+        // Dodaj przycisk edycji
+        const btn = document.createElement('button');
+        btn.textContent = '➡️';
+        btn.className = 'btn-edit-row';
+        btn.title = 'Edytuj ten wiersz w formularzu';
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          openFormAtRow(logicalIndex);
+        });
+        cell.appendChild(btn);
+      }
 
-  // Stwórz i dodaj przycisk "edytuj"
-  const btn = document.createElement('button');
-  btn.textContent = '➡️'; // Możesz zmienić na '✏️' lub inny symbol
-  btn.className = 'btn-edit-row';
-  btn.title = 'Edytuj ten wiersz w formularzu';
+      // Domyślne ustawienie contentEditable (pozostaje bez zmian)
+      if (i!==10 && j !== 1) { // Dodano j !== 1, żeby nie nadpisać komórki z przyciskiem
+           cell.contentEditable = true;
+      }
 
-  btn.addEventListener('click', (e) => {
-    // Zatrzymujemy propagację, aby kliknięcie przycisku
-    // nie aktywowało edycji komórki (contenteditable)
-    e.stopPropagation(); 
+       // Centrowanie tekstu (pozostaje bez zmian)
+      if (j>=2 && j<=4) {
+           cell.classList.add('center-text');
+      }
 
-    // Wywołujemy naszą nową funkcję z indeksem tego wiersza
-    openFormAtRow(logicalIndex);
-  });
+      // --- Logika dla j=2 (Opis + jw. checkbox) ---
+      if (j === 2 && i !== 10) {
+        cell.contentEditable = false; // Wyłącz edycję na komórce
 
-  cell.appendChild(btn);
-}
+        const textDiv = document.createElement('div');
+        textDiv.contentEditable = true;
+        textDiv.className = 'editable-text';
+        cell.appendChild(textDiv); // Dodaj edytowalny div na tekst
+
+        if (i !== 1) { // Nie dodawaj checkboxa w pierwszym wierszu
+          const container = document.createElement('div');
+          container.className = 'jw-checkbox-container';
+          container.contentEditable = false;
+
+          const checkbox = document.createElement('input');
+          checkbox.type = 'checkbox';
+          const checkboxId = `jw-check-${i}`;
+          checkbox.id = checkboxId;
+
+          const label = document.createElement('label');
+          label.htmlFor = checkboxId;
+          label.textContent = 'jw.';
+
+          checkbox.addEventListener('change', function(e) {
+            e.stopPropagation();
+            if (this.checked) {
+              copyDataFromAbove(row); // Przekaż cały wiersz <tr>
+            }
+          });
+
+          container.appendChild(checkbox);
+          container.appendChild(label);
+          cell.appendChild(container); // Dodaj kontener z checkboxem
+        }
+      } // Koniec if (j===2)
+
+      // --- Logika dla j=3 (Input liczbowy) ---
+      if (j===3 && i!==10){
+        const input = document.createElement('input');
+        input.type = 'number';
+        input.min = '0';
+        input.style.width = '50px';
+        cell.textContent = ''; // Wyczyść komórkę przed dodaniem inputa
+        cell.appendChild(input);
+      }
+
+      // --- Logika dla j=5 (Input z listą leków) ---
+      if (j===5 && i!==10){
+        const input = document.createElement('input');
+        input.setAttribute('list','listaLekow');
+        input.style.width = '95%';
+        input.addEventListener('input', function(){
+          // Twój kod obsługi zmiany leku (pozostaje bez zmian)
+          const nrCell = row.cells[5]; // Poprawka: indeksy są od 0
+          const iloscCell = row.cells[6];
+          const karCell = row.cells[7];
+          const nazwa = this.value;
+          const nr = mapaSerii[nazwa] || '';
+          const dawka = mapaIlosci[nazwa] || '';
+          const kar = mapaKarencji[nazwa] || '';
+          nrCell.textContent = nr;
+          // Sprawdź czy iloscCell nie jest null/undefined przed dostępem do innerHTML
+          if (iloscCell) {
+             iloscCell.innerHTML = `<input class="small-input" type="number" inputmode="numeric" pattern="[0-9]*" placeholder="ilość"> ${dawka||''}`;
+          }
+          if (karCell) {
+             karCell.textContent = kar;
+          }
+        });
+        cell.textContent = ''; // Wyczyść komórkę przed dodaniem inputa
+        cell.appendChild(input);
+      }
+
+      // Dla pozostałych kolumn (j=4, 6, 7, 8), po prostu dodajemy pustą komórkę
+      // (chyba że miały specjalną logikę, której tu nie widzę)
+
+      row.appendChild(cell);
+    } // Koniec pętli for (j...)
+    tbody.appendChild(row);
+  } // Koniec pętli for (i...)
+
+  // Napelnij select w formularzu (pozostaje bez zmian)
+  populateRowSelect();
+} // Koniec funkcji generateRows
       if (i!==10) cell.contentEditable = true;
       if (j>=2 && j<=4) cell.classList.add('center-text');
       // kolumna 3 -> number input
@@ -1223,7 +1322,7 @@ function initSignature(id){
   });
 }
 // Pozostaw wywołanie inicjalizacji bez zmian:
-// window.addEventListener('load', ()=> initSignature('canvasPosiadacz'));
+window.addEventListener('load', ()=> initSignature('canvasPosiadacz'));
 /* ---- zapis wiersza automatycznie przy zmianie wiersza ---- */
 formRowSelect.addEventListener('change', ()=>{
   // zapis aktualnego wiersza przed przejściem do nowego
