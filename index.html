@@ -469,34 +469,6 @@
     display: none !important;
   }
 }
-  /* Styl dla przycisku 'jw.' */
-.jw-button {
-  background: #eee;
-  border: 1px solid #ccc;
-  border-radius: 3px;
-  padding: 1px 4px; /* Mały padding */
-  font-size: 10px;  /* Mała czcionka */
-  cursor: pointer;
-  margin-right: 5px; /* Odstęp od tekstu */
-  vertical-align: top; /* Wyrównanie do góry komórki */
-  float: left; /* Ustawienie po lewej stronie */
-}
-.jw-button:hover {
-  background: #ddd;
-}
-
-/* Upewnij się, że edytowalny tekst zajmuje resztę miejsca */
-.editable-text {
-  min-height: 1.2em;
-  display: block; /* Domyślnie blok, ale overflow załatwi resztę */
-  overflow: hidden; /* Zapobiega wypływaniu tekstu pod przycisk */
-  /* padding-left: 30px; Możesz dodać padding, jeśli float nie wystarczy */
-}
-
-/* Ukryj przycisk 'jw.' podczas drukowania */
-@media print {
-  .jw-button { display: none !important; }
-}
   </style>
 </head>
 
@@ -826,102 +798,36 @@ function generateRows(){
     }
     for (let j=1;j<=8;j++){
       const cell = document.createElement('td');
-      
+      if (j===1) cell.textContent = (i>10?i-10:i)+'.';
       /* ✅ WKLEJ TEN BLOK W MIEJSCE USUNIĘTEGO: ✅ */
-const cell = document.createElement('td');
+if (j===1) {
+  // Obliczamy "logiczny" indeks wiersza (0-11),
+  // który jest używany przez funkcje formularza
+  const logicalIndex = (i > 10) ? i - 2 : i - 1;
 
-      // --- Logika dla j=1 (Numer wiersza + przycisk edycji) ---
-      if (j===1) {
-        const logicalIndex = (i > 10) ? i - 2 : i - 1;
-        const rowNumText = (i > 10 ? i - 10 : i) + '.';
-        cell.textContent = rowNumText + ' '; // Ustaw numer wiersza
+  // Bierzemy tekst, który miałeś tam wcześniej (np. "1.", "2." itd.)
+  const rowNumText = (i > 10 ? i - 10 : i) + '.';
 
-        // Dodaj przycisk edycji
-        const btn = document.createElement('button');
-        btn.textContent = '➡️';
-        btn.className = 'btn-edit-row';
-        btn.title = 'Edytuj ten wiersz w formularzu';
-        btn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          openFormAtRow(logicalIndex);
-        });
-        cell.appendChild(btn);
+  // Wyczyść komórkę i dodaj numer
+  cell.textContent = rowNumText + ' '; 
 
-      // --- Logika dla j=2 (Przycisk "jw." + Opis) ---
-      } else if (j === 2 && i !== 10) {
-        cell.contentEditable = false; // Wyłącz edycję na samej komórce
+  // Stwórz i dodaj przycisk "edytuj"
+  const btn = document.createElement('button');
+  btn.textContent = '➡️'; // Możesz zmienić na '✏️' lub inny symbol
+  btn.className = 'btn-edit-row';
+  btn.title = 'Edytuj ten wiersz w formularzu';
 
-        // Dodaj przycisk 'jw.', ale nie w pierwszym wierszu (i!=1)
-        if (i !== 1) {
-          const jwButton = document.createElement('button');
-          jwButton.textContent = 'jw.';
-          jwButton.className = 'jw-button'; // Dodaj klasę dla stylów
-          jwButton.title = 'Kopiuj dane z wiersza powyżej (opis, liczba, rozpoznanie)';
+  btn.addEventListener('click', (e) => {
+    // Zatrzymujemy propagację, aby kliknięcie przycisku
+    // nie aktywowało edycji komórki (contenteditable)
+    e.stopPropagation(); 
 
-          jwButton.addEventListener('click', (e) => {
-            e.stopPropagation(); // Zapobiegaj aktywacji edycji komórki
-            copyDataFromAbove(row); // Przekaż bieżący wiersz <tr>
-          });
-          cell.appendChild(jwButton); // Dodaj przycisk do komórki jako PIERWSZY element
-        }
+    // Wywołujemy naszą nową funkcję z indeksem tego wiersza
+    openFormAtRow(logicalIndex);
+  });
 
-        // Stwórz wewnętrzny div dla edytowalnego tekstu (ZAWSZE)
-        const textDiv = document.createElement('div');
-        textDiv.contentEditable = true;
-        textDiv.className = 'editable-text'; // Użyjemy overflow: hidden w CSS
-        cell.appendChild(textDiv); // Dodaj div PO przycisku
-
-      // --- Domyślne ustawienia dla pozostałych kolumn ---
-      } else {
-         // Ustaw contentEditable dla innych kolumn (oprócz j=1 i j=2 w wierszach edytowalnych)
-         if (i !== 10) {
-             cell.contentEditable = true;
-         }
-      }
-
-      // --- Koniec obsługi j=1 i j=2 ---
-
-      // Centrowanie tekstu (dla kolumn 2, 3, 4) - Przenieś POZA if/else if
-      if (j>=2 && j<=4) {
-           cell.classList.add('center-text');
-      }
-
-      // --- Logika dla j=3 (Input liczbowy) ---
-      if (j===3 && i!==10){
-        // ... (Twój kod tworzący input number - upewnij się, że jest tutaj) ...
-         const input = document.createElement('input');
-         input.type = 'number';
-         input.min = '0';
-         input.style.width = '50px';
-         cell.textContent = ''; // Wyczyść komórkę przed dodaniem inputa
-         cell.appendChild(input);
-      }
-
-      // --- Logika dla j=5 (Input z listą leków) ---
-      if (j===5 && i!==10){
-        // ... (Twój kod tworzący input list - upewnij się, że jest tutaj) ...
-        const input = document.createElement('input');
-        input.setAttribute('list','listaLekow');
-        input.style.width = '95%';
-        input.addEventListener('input', function(){
-           // ... (Twój kod obsługi zmiany leku) ...
-          const nrCell = row.cells[5];
-          const iloscCell = row.cells[6];
-          const karCell = row.cells[7];
-          const nazwa = this.value;
-          const nr = mapaSerii[nazwa] || '';
-          const dawka = mapaIlosci[nazwa] || '';
-          const kar = mapaKarencji[nazwa] || '';
-          if(nrCell) nrCell.textContent = nr;
-          if(iloscCell) iloscCell.innerHTML = `<input class="small-input" type="number" inputmode="numeric" pattern="[0-9]*" placeholder="ilość"> ${dawka||''}`;
-          if(karCell) karCell.textContent = kar;
-        });
-        cell.textContent = ''; // Wyczyść komórkę przed dodaniem inputa
-        cell.appendChild(input);
-      }
-
-      // Dodaj komórkę do wiersza
-      row.appendChild(cell);
+  cell.appendChild(btn);
+}
       if (i!==10) cell.contentEditable = true;
       if (j>=2 && j<=4) cell.classList.add('center-text');
       // kolumna 3 -> number input
