@@ -1050,66 +1050,97 @@ document.getElementById('micBtn').addEventListener('click', ()=>{
   };
 });
 
-/* ---- podpis (oryginalna logika) ---- */
+/* ---- podpis (Wersja z blokadą małego płótna) ---- */
 function initSignature(id){
-  const canvas=document.getElementById(id);
+  const canvas = document.getElementById(id); // Małe płótno
   if (!canvas) return;
-  const ctx=canvas.getContext('2d');
-  ctx.lineWidth = 2;
+  const ctx = canvas.getContext('2d');
+  ctx.lineWidth = 2; // Możesz dostosować, ale nie będzie używane do rysowania
   ctx.lineCap = 'round';
-  let drawing=false;
 
-  function getPos(e, c){
-    const rect = c.getBoundingClientRect();
-    const scaleX = c.width / rect.width;
-    const scaleY = c.height / rect.height;
+  // ✅ DODANO: Zablokuj małe płótno na starcie
+  canvas.classList.add('disabled');
+
+  // Przyciski i overlay
+  const fullscreenBtn = document.getElementById('fullscreenBtn');
+  const clearSignBtn = document.getElementById('clearSignBtn');
+  const fullscreenOverlay = document.getElementById('fullscreenOverlay');
+  const fullscreenCanvas = document.getElementById('fullscreenCanvas'); // Duże płótno
+  const closeBtn = document.getElementById('closeSignBtn');
+  const clearFullscreenBtn = document.getElementById('clearFullscreenSignBtn');
+
+  // ❌ USUNIĘTO: Listenery rysowania dla małego płótna
+  // canvas.addEventListener('pointerdown', ...);
+  // canvas.addEventListener('pointermove', ...);
+  // canvas.addEventListener('pointerup', ...);
+  // canvas.addEventListener('pointerleave', ...);
+
+  // --- Logika dla dużego płótna (pozostaje prawie bez zmian) ---
+  let fDrawing = false;
+  let fctx;
+
+  function getFPos(e){
+    const rect = fullscreenCanvas.getBoundingClientRect();
     const clientX = (e.touches && e.touches[0]) ? e.touches[0].clientX : e.clientX;
     const clientY = (e.touches && e.touches[0]) ? e.touches[0].clientY : e.clientY;
-    return { x: (clientX - rect.left) * scaleX, y: (clientY - rect.top) * scaleY };
+    return { x: clientX - rect.left, y: clientY - rect.top };
   }
 
-  canvas.addEventListener('pointerdown', e=>{ drawing=true; const pos=getPos(e,canvas); ctx.beginPath(); ctx.moveTo(pos.x,pos.y); });
-  canvas.addEventListener('pointermove', e=>{ if(drawing){ const pos=getPos(e,canvas); ctx.lineTo(pos.x,pos.y); ctx.stroke(); }});
-  canvas.addEventListener('pointerup', ()=>{drawing=false;});
-  canvas.addEventListener('pointerleave', ()=>{drawing=false;});
+  const startDrawingFullscreen = e => { fDrawing = true; const pos=getFPos(e); fctx.beginPath(); fctx.moveTo(pos.x,pos.y); };
+  const drawFullscreen = e => { if(fDrawing){ const pos=getFPos(e); fctx.lineTo(pos.x,pos.y); fctx.stroke(); }};
+  const stopDrawingFullscreen = () => { fDrawing = false; };
 
-  // fullscreen handlers
-  const fullscreenOverlay=document.getElementById('fullscreenOverlay');
-  const fullscreenCanvas=document.getElementById('fullscreenCanvas');
-  const closeBtn=document.getElementById('closeSignBtn');
-  const clearFullscreenBtn=document.getElementById('clearFullscreenSignBtn');
+  // --- Obsługa przycisków ---
 
-  document.getElementById('fullscreenBtn').addEventListener('click', ()=>{
-    fullscreenOverlay.style.display='flex';
-    fullscreenCanvas.width = window.innerWidth - 20;
-    fullscreenCanvas.height = window.innerHeight - 80;
-    const fctx = fullscreenCanvas.getContext('2d');
-    fctx.clearRect(0,0,fullscreenCanvas.width,fullscreenCanvas.height);
-    fctx.lineWidth = 5;
+  fullscreenBtn.addEventListener('click', ()=>{
+    // ✅ ZMIANA: Zmień tekst przycisku
+    fullscreenBtn.textContent = 'Podpisz dokument';
+
+    fullscreenOverlay.style.display = 'flex';
+    fullscreenCanvas.width = window.innerWidth - 40; // Mniejszy margines
+    fullscreenCanvas.height = window.innerHeight - 100; // Mniejszy margines
+    fctx = fullscreenCanvas.getContext('2d');
+    fctx.clearRect(0, 0, fullscreenCanvas.width, fullscreenCanvas.height);
+    fctx.lineWidth = 4; // Grubsza linia
     fctx.lineCap = 'round';
-    fctx.drawImage(canvas,0,0,fullscreenCanvas.width,fullscreenCanvas.height);
 
-    let fDrawing=false;
-    function getFPos(e){ const rect=fullscreenCanvas.getBoundingClientRect(); const clientX = (e.touches && e.touches[0]) ? e.touches[0].clientX : e.clientX; const clientY = (e.touches && e.touches[0]) ? e.touches[0].clientY : e.clientY; return { x: clientX-rect.left, y: clientY-rect.top }; }
-    fullscreenCanvas.addEventListener('pointerdown', e=>{ fDrawing=true; const pos=getFPos(e); fctx.beginPath(); fctx.moveTo(pos.x,pos.y); });
-    fullscreenCanvas.addEventListener('pointermove', e=>{ if(fDrawing){ const pos=getFPos(e); fctx.lineTo(pos.x,pos.y); fctx.stroke(); }});
-    fullscreenCanvas.addEventListener('pointerup', ()=>{fDrawing=false;});
-    fullscreenCanvas.addEventListener('pointerleave', ()=>{fDrawing=false;});
+    // Skopiuj istniejący podpis (jeśli jest) z małego na duże płótno
+    fctx.drawImage(canvas, 0, 0, fullscreenCanvas.width, fullscreenCanvas.height);
+
+    // Dodaj listenery rysowania DOPIERO po otwarciu
+    fullscreenCanvas.addEventListener('pointerdown', startDrawingFullscreen);
+    fullscreenCanvas.addEventListener('pointermove', drawFullscreen);
+    fullscreenCanvas.addEventListener('pointerup', stopDrawingFullscreen);
+    fullscreenCanvas.addEventListener('pointerleave', stopDrawingFullscreen);
   });
 
   closeBtn.addEventListener('click', ()=>{
-    const fctx = fullscreenCanvas.getContext('2d');
-    ctx.clearRect(0,0,canvas.width,canvas.height);
-    ctx.drawImage(fullscreenCanvas,0,0,canvas.width,canvas.height);
-    fullscreenOverlay.style.display='none';
+    // Skopiuj z dużego na małe
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(fullscreenCanvas, 0, 0, canvas.width, canvas.height);
+
+    // ✅ ZMIANA: Przywróć tekst przycisku
+    fullscreenBtn.textContent = 'Powiększ podpis';
+
+    fullscreenOverlay.style.display = 'none';
+
+    // Usuń listenery z dużego płótna po zamknięciu
+    fullscreenCanvas.removeEventListener('pointerdown', startDrawingFullscreen);
+    fullscreenCanvas.removeEventListener('pointermove', drawFullscreen);
+    fullscreenCanvas.removeEventListener('pointerup', stopDrawingFullscreen);
+    fullscreenCanvas.removeEventListener('pointerleave', stopDrawingFullscreen);
   });
 
   clearFullscreenBtn.addEventListener('click', ()=>{
-    const fctx = fullscreenCanvas.getContext('2d');
-    fctx.clearRect(0,0,fullscreenCanvas.width,fullscreenCanvas.height);
+    if (fctx) {
+      fctx.clearRect(0, 0, fullscreenCanvas.width, fullscreenCanvas.height);
+    }
   });
 
-  document.getElementById('clearSignBtn').addEventListener('click', ()=>{ ctx.clearRect(0,0,canvas.width,canvas.height); });
+  // Ten przycisk nadal czyści małe płótno
+  clearSignBtn.addEventListener('click', ()=>{
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  });
 }
 
 /* inicjalizacja podpisu po załadowaniu wierszy */
