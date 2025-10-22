@@ -201,6 +201,28 @@
 @media print {
   .btn-edit-row { display: none !important; }
 }
+    /* --- Styl dla checkboxa 'jw.' (jak wyżej) --- */
+.jw-checkbox-container {
+  margin-top: 5px;
+  font-size: 11px;
+  color: #333;
+}
+.jw-checkbox-container input {
+  vertical-align: middle;
+  margin-right: 4px;
+}
+.jw-checkbox-container label {
+  vertical-align: middle;
+  cursor: pointer;
+}
+/* Kontener na tekst w edytowalnej komórce (kol. 2) */
+.editable-text {
+  min-height: 1.2em; /* Zapewnia miejsce do kliknięcia */
+}
+/* Ukryj checkbox 'jw.' podczas drukowania */
+@media print {
+  .jw-checkbox-container { display: none !important; }
+}
   </style>
 </head>
 
@@ -488,71 +510,77 @@ function generateRows(){
       continue;
     }
     for (let j=1;j<=8;j++){
-      const cell = document.createElement('td');
-      /* ✅ WKLEJ TEN BLOK W MIEJSCE USUNIĘTEGO: ✅ */
-if (j===1) {
-  // Obliczamy "logiczny" indeks wiersza (0-11),
-  // który jest używany przez funkcje formularza
-  const logicalIndex = (i > 10) ? i - 2 : i - 1;
-
-  // Bierzemy tekst, który miałeś tam wcześniej (np. "1.", "2." itd.)
-  const rowNumText = (i > 10 ? i - 10 : i) + '.';
-
-  // Wyczyść komórkę i dodaj numer
-  cell.textContent = rowNumText + ' '; 
-
-  // Stwórz i dodaj przycisk "edytuj"
-  const btn = document.createElement('button');
-  btn.textContent = '➡️'; // Możesz zmienić na '✏️' lub inny symbol
-  btn.className = 'btn-edit-row';
-  btn.title = 'Edytuj ten wiersz w formularzu';
-
-  btn.addEventListener('click', (e) => {
-    // Zatrzymujemy propagację, aby kliknięcie przycisku
-    // nie aktywowało edycji komórki (contenteditable)
-    e.stopPropagation(); 
-
-    // Wywołujemy naszą nową funkcję z indeksem tego wiersza
-    openFormAtRow(logicalIndex);
-  });
-
-  cell.appendChild(btn);
-}
-      if (i!==10) cell.contentEditable = true;
-      if (j>=2 && j<=4) cell.classList.add('center-text');
-      // kolumna 3 -> number input
-      if (j===3 && i!==10){
-        const input = document.createElement('input');
-        input.type = 'number';
-        input.min = '0';
-        input.style.width = '50px';
-        cell.textContent = '';
-        cell.appendChild(input);
+      const cell = document.createElement('td');
+      
+      // Twoja stara logika dla j=1 (zostaje bez zmian)
+      if (j===1) {
+        // ... (Twój kod z przyciskiem ➡️) ...
+        // ... (ten kod jest poprawny, zostaw go)
       }
-      // kolumna 5 -> input z listą leków
-      if (j===5 && i!==10){
-        const input = document.createElement('input');
-        input.setAttribute('list','listaLekow');
-        input.style.width = '95%';
-        input.addEventListener('input', function(){
-          const nrCell = row.cells[5];
-          const iloscCell = row.cells[6];
-          const karCell = row.cells[7];
-          const nazwa = this.value;
-          const nr = mapaSerii[nazwa] || '';
-          const dawka = mapaIlosci[nazwa] || '';
-          const kar = mapaKarencji[nazwa] || '';
-          nrCell.textContent = nr;
-          iloscCell.innerHTML = `<input class="small-input" type="number" inputmode="numeric" pattern="[0-9]*" placeholder="ilość"> ${dawka||''}`;
-          karCell.textContent = kar;
-        });
-        cell.textContent = '';
-        cell.appendChild(input);
-      }
-      row.appendChild(cell);
-    }
-    tbody.appendChild(row);
-  }
+      
+      // Domyślne ustawienie contentEditable (zostaje)
+      if (i!==10) cell.contentEditable = true;
+      
+      // Centrowanie tekstu (zostaje)
+      if (j>=2 && j<=4) cell.classList.add('center-text');
+
+      // --- ⬇️ NOWA SEKCJA ⬇️ ---
+      // Specjalna obsługa dla kolumny 2 (Opis zwierzęcia, j=2)
+      if (j === 2 && i !== 10) { 
+        cell.contentEditable = false; // Wyłączamy edycję na całej komórce
+
+        // Tworzymy wewnętrzny div, który będzie edytowalny
+        const textDiv = document.createElement('div');
+        textDiv.contentEditable = true;
+        textDiv.className = 'editable-text'; // Dodajemy klasę
+        cell.appendChild(textDiv);
+
+        // Dodaj checkbox 'jw.', ale nie w pierwszym wierszu (i!=1)
+        if (i !== 1) {
+          const container = document.createElement('div');
+          container.className = 'jw-checkbox-container';
+          container.contentEditable = false; // Ten div nie jest edytowalny
+
+          const checkbox = document.createElement('input');
+          checkbox.type = 'checkbox';
+          const checkboxId = `jw-check-${i}`;
+          checkbox.id = checkboxId;
+
+          const label = document.createElement('label');
+          label.htmlFor = checkboxId;
+          label.textContent = 'jw.'; // Opis "jak wyżej"
+
+          // Dodajemy logikę kopiowania
+          checkbox.addEventListener('change', function(e) {
+            e.stopPropagation(); // Zatrzymujemy edycję komórki
+            if (this.checked) {
+              // Przekazujemy cały element <tr> do nowej funkcji
+              copyDataFromAbove(row);
+            }
+          });
+
+          container.appendChild(checkbox);
+          container.appendChild(label);
+          cell.appendChild(container); // Dodajemy do komórki
+        }
+      }
+      // --- ⬆️ KONIEC NOWEJ SEKCJI ⬆️ ---
+
+      // Twoja stara logika dla j=3 (zostaje bez zmian)
+      if (j===3 && i!==10){
+        // ... (Twój kod z input type=number) ...
+      }
+      
+      // Twoja stara logika dla j=5 (zostaje bez zmian)
+      if (j===5 && i!==10){
+        // ... (Twój kod z listą leków) ...
+      }
+      
+      row.appendChild(cell);
+    }
+    tbody.appendChild(row);
+  }
+  // napelnij select w formularzu... (zostaje)
   // napelnij select w formularzu odpowiadającym wierszom
   populateRowSelect();
 }
@@ -814,7 +842,8 @@ function selectRowInForm(logicalIndex){
   const row = logical[logicalIndex];
   if (!row) return;
   // load values into form
-  document.getElementById('formOpis').value = row.cells[1].textContent.trim();
+  const textDiv = row.cells[1].querySelector('.editable-text');
+document.getElementById('formOpis').value = textDiv ? textDiv.textContent.trim() : '';
   const inp = row.cells[2].querySelector('input');
   document.getElementById('formLiczba').value = inp ? inp.value : '';
   document.getElementById('formRozpoznanie').value = row.cells[3].textContent.trim();
@@ -856,7 +885,8 @@ document.getElementById('saveRow').addEventListener('click', ()=>{
   if (!row) { alert('Brak wybranego wiersza'); return; }
 
   // write values
-  row.cells[1].textContent = document.getElementById('formOpis').value;
+  const textDiv = row.cells[1].querySelector('.editable-text');
+if (textDiv) textDiv.textContent = document.getElementById('formOpis').value;
   // cell 2 -> input
   const inp2 = row.cells[2].querySelector('input');
   if (inp2) inp2.value = document.getElementById('formLiczba').value;
