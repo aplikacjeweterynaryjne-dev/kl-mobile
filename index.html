@@ -1078,15 +1078,14 @@ document.getElementById('micBtn').addEventListener('click', ()=>{
 });
 
 /* ---- podpis (Wersja z blokadą małego płótna) ---- */
+/* ---- podpis (Wersja z blokadą i auto-resize) ---- */
 function initSignature(id){
   const canvas = document.getElementById(id); // Małe płótno
   if (!canvas) return;
   const ctx = canvas.getContext('2d');
-  ctx.lineWidth = 2; // Możesz dostosować, ale nie będzie używane do rysowania
+  ctx.lineWidth = 2;
   ctx.lineCap = 'round';
-
-  // ✅ DODANO: Zablokuj małe płótno na starcie
-  canvas.classList.add('disabled');
+  canvas.classList.add('disabled'); // Zablokuj małe płótno
 
   // Przyciski i overlay
   const fullscreenBtn = document.getElementById('fullscreenBtn');
@@ -1096,13 +1095,6 @@ function initSignature(id){
   const closeBtn = document.getElementById('closeSignBtn');
   const clearFullscreenBtn = document.getElementById('clearFullscreenSignBtn');
 
-  // ❌ USUNIĘTO: Listenery rysowania dla małego płótna
-  // canvas.addEventListener('pointerdown', ...);
-  // canvas.addEventListener('pointermove', ...);
-  // canvas.addEventListener('pointerup', ...);
-  // canvas.addEventListener('pointerleave', ...);
-
-  // --- Logika dla dużego płótna (pozostaje prawie bez zmian) ---
   let fDrawing = false;
   let fctx;
 
@@ -1117,41 +1109,96 @@ function initSignature(id){
   const drawFullscreen = e => { if(fDrawing){ const pos=getFPos(e); fctx.lineTo(pos.x,pos.y); fctx.stroke(); }};
   const stopDrawingFullscreen = () => { fDrawing = false; };
 
-  // --- Obsługa przycisków ---
+  // ✅ NOWA FUNKCJA: Obsługa zmiany rozmiaru/orientacji
+  const handleResize = () => {
+    // Sprawdź, czy overlay jest nadal widoczny
+    if (fullscreenOverlay.style.display !== 'flex') {
+      window.removeEventListener('resize', handleResize); // Usuń listener, jeśli overlay jest zamknięty
+      return;
+    }
 
-  fullscreenBtn.addEventListener('click', ()=>{
-    // ✅ ZMIANA: Zmień tekst przycisku
-    fullscreenBtn.textContent = 'Podpisz dokument';
+    console.log("Resize event detected"); // Log do debugowania
 
-    fullscreenOverlay.style.display = 'flex';
-    fullscreenCanvas.width = window.innerWidth - 40; // Mniejszy margines
-    fullscreenCanvas.height = window.innerHeight - 100; // Mniejszy margines
+    // Pobierz nowy rozmiar elementu canvas (ustawiony przez CSS)
+    const newWidth = fullscreenCanvas.offsetWidth;
+    const newHeight = fullscreenCanvas.offsetHeight;
+
+    // WAŻNE: Zachowaj obecny rysunek (jeśli istnieje)
+    // Tworzymy tymczasowe płótno w pamięci
+    const tempCanvas = document.createElement('canvas');
+    const tempCtx = tempCanvas.getContext('2d');
+    tempCanvas.width = fullscreenCanvas.width; // Stary rozmiar
+    tempCanvas.height = fullscreenCanvas.height;
+    // Kopiujemy obecny obraz na tymczasowe płótno
+    if (fullscreenCanvas.width > 0 && fullscreenCanvas.height > 0) {
+       tempCtx.drawImage(fullscreenCanvas, 0, 0);
+    }
+
+
+    // Zaktualizuj atrybuty width/height płótna, aby pasowały do CSS
+    // To niestety czyści płótno
+    fullscreenCanvas.width = newWidth;
+    fullscreenCanvas.height = newHeight;
+
+    // Musimy ponownie pobrać kontekst i ustawić style, bo resize je resetuje
     fctx = fullscreenCanvas.getContext('2d');
-    fctx.clearRect(0, 0, fullscreenCanvas.width, fullscreenCanvas.height);
-    fctx.lineWidth = 4; // Grubsza linia
+    fctx.lineWidth = 4;
     fctx.lineCap = 'round';
 
-    // Skopiuj istniejący podpis (jeśli jest) z małego na duże płótno
-    fctx.drawImage(canvas, 0, 0, fullscreenCanvas.width, fullscreenCanvas.height);
+    // Przywróć poprzedni rysunek na nowe, przeskalowane płótno
+    if (tempCanvas.width > 0 && tempCanvas.height > 0) {
+       fctx.drawImage(tempCanvas, 0, 0, newWidth, newHeight);
+    }
 
-    // Dodaj listenery rysowania DOPIERO po otwarciu
-    fullscreenCanvas.addEventListener('pointerdown', startDrawingFullscreen);
-    fullscreenCanvas.addEventListener('pointermove', drawFullscreen);
-    fullscreenCanvas.addEventListener('pointerup', stopDrawingFullscreen);
-    fullscreenCanvas.addEventListener('pointerleave', stopDrawingFullscreen);
+
+    console.log("Canvas resized to:", newWidth, newHeight); // Log do debugowania
+  };
+
+  // --- Obsługa przycisków ---
+  fullscreenBtn.addEventListener('click', ()=>{
+    fullscreenOverlay.style.display = 'flex';
+
+    // Pobierz rozmiar CSS i ustaw atrybuty canvas PO POKAZANIU OVERLAY
+    // Użyj requestAnimationFrame, aby upewnić się, że CSS już zadziałał
+    requestAnimationFrame(() => {
+        const canvasWidth = fullscreenCanvas.offsetWidth;
+        const canvasHeight = fullscreenCanvas.offsetHeight;
+        fullscreenCanvas.width = canvasWidth;
+        fullscreenCanvas.height = canvasHeight;
+
+        fctx = fullscreenCanvas.getContext('2d');
+        fctx.clearRect(0, 0, canvasWidth, canvasHeight); // Wyczyść płótno
+        fctx.lineWidth = 4;
+        fctx.lineCap = 'round';
+
+        // Skopiuj istniejący podpis z małego płótna
+        fctx.drawImage(canvas, 0, 0, canvasWidth, canvasHeight);
+
+        // Dodaj listenery rysowania
+        fullscreenCanvas.addEventListener('pointerdown', startDrawingFullscreen);
+        fullscreenCanvas.addEventListener('pointermove', drawFullscreen);
+        fullscreenCanvas.addEventListener('pointerup', stopDrawingFullscreen);
+        fullscreenCanvas.addEventListener('pointerleave', stopDrawingFullscreen);
+
+        // ✅ DODANO: Nasłuchuj na zmianę rozmiaru okna/orientacji
+        window.addEventListener('resize', handleResize);
+        console.log("Resize listener added"); // Log do debugowania
+    });
+
   });
 
   closeBtn.addEventListener('click', ()=>{
-    // Skopiuj z dużego na małe
+    // ✅ DODANO: Usuń nasłuchiwanie na resize PRZED skopiowaniem obrazu
+    window.removeEventListener('resize', handleResize);
+    console.log("Resize listener removed"); // Log do debugowania
+
+    // Skopiuj z dużego na małe (już uwzględnia poprawny rozmiar)
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(fullscreenCanvas, 0, 0, canvas.width, canvas.height);
 
-    // ✅ ZMIANA: Przywróć tekst przycisku
-    fullscreenBtn.textContent = 'Podpisz dokument';
-
     fullscreenOverlay.style.display = 'none';
 
-    // Usuń listenery z dużego płótna po zamknięciu
+    // Usuń listenery rysowania
     fullscreenCanvas.removeEventListener('pointerdown', startDrawingFullscreen);
     fullscreenCanvas.removeEventListener('pointermove', drawFullscreen);
     fullscreenCanvas.removeEventListener('pointerup', stopDrawingFullscreen);
@@ -1159,15 +1206,18 @@ function initSignature(id){
   });
 
   clearFullscreenBtn.addEventListener('click', ()=>{
-    if (fctx) {
-      fctx.clearRect(0, 0, fullscreenCanvas.width, fullscreenCanvas.height);
-    }
+      if (fctx) {
+        // Użyj aktualnych wymiarów do czyszczenia
+        fctx.clearRect(0, 0, fullscreenCanvas.width, fullscreenCanvas.height);
+      }
   });
 
-  // Ten przycisk nadal czyści małe płótno
-  clearSignBtn.addEventListener('click', ()=>{
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-  });
+  clearSignBtn.addEventListener('click', ()=>{ ctx.clearRect(0, 0, canvas.width, canvas.height); });
+
+} // Koniec initSignature
+
+// Inicjalizacja (bez zmian)
+window.addEventListener('load', ()=> initSignature('canvasPosiadacz'));
 }
 
 /* inicjalizacja podpisu po załadowaniu wierszy */
