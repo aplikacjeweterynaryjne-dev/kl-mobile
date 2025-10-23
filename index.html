@@ -699,16 +699,36 @@
       <label for="copyFromCardCheckbox">Przepisz produkty z karty leczenia</label>
     </div>
 
-    <div style="margin-top: 15px; display: flex; gap: 10px; align-items: flex-end;">
-      <div style="flex-grow: 1;">
-        <label for="productSelect">Wybierz produkt:</label><br>
-        <input list="listaLekow" id="productSelect" style="width: 100%; padding: 5px;">
-        </div>
-      <div>
-        <label for="productQuantityInput">Ilość:</label><br>
-        <input type="number" id="productQuantityInput" value="1" min="1" style="width: 60px; padding: 5px;">
-        <span id="productUnitDisplay" style="margin-left: 5px; font-size: 0.9em; color: #555;"></span> </div>
-        <input type="number" id="productQuantityInput" value="1" min="1" style="width: 60px; padding: 5px;">
+  <div style="margin-top: 15px; display: flex; gap: 10px; align-items: flex-end;">
+          <div style="flex-grow: 1;">
+            <label for="productSelect">Wybierz produkt:</label><br>
+            <input list="listaLekow" id="productSelect" style="width: 100%; padding: 5px;">
+          </div>
+          <div>
+            <label for="productQuantityInput">Ilość:</label><br>
+            <input type="number" id="productQuantityInput" value="1" min="1" style="width: 60px; padding: 5px;">
+            <span id="productUnitDisplay" style="margin-left: 5px; font-size: 0.9em; color: #555;"></span>
+          </div>
+          <button id="addProductBtn" class="btn primary small">Dodaj</button>
+        </div> ```
+
+---
+
+### Poprawka 4: Błąd JavaScript w Kalkulatorze
+
+W kodzie JS kalkulatora zduplikowałem deklaracje zmiennych.
+
+**🔴 Znajdź ten błędny fragment kodu (okolice linii 1404):**
+
+```javascript
+// --- Logika Kalkulatora (początkowa) ---
+const copyCheckbox = document.getElementById('copyFromCardCheckbox');
+// ... (inne zmienne) ...
+const pluCodeInput = document.getElementById('pluCodeInput');
+const pluBtn = document.getElementById('pluBtn');
+const pluCodeInput = document.getElementById('pluCodeInput'); // ❌ BŁĄD: Zduplikowana deklaracja
+const pluBtn = document.getElementById('pluBtn'); // ❌ BŁĄD: Zduplikowana deklaracja
+const productUnitDisplay = document.getElementById('productUnitDisplay'); // ✅ DODANO
       </div>
       <button id="addProductBtn" class="btn primary small">Dodaj</button>
     </div>
@@ -860,36 +880,34 @@ function generateRows(){
     }
     for (let j=1;j<=8;j++){
       const cell = document.createElement('td');
-      if (j===1) cell.textContent = (i>10?i-10:i)+'.';
-      /* ✅ WKLEJ TEN BLOK W MIEJSCE USUNIĘTEGO: ✅ */
-if (j===1) {
-  // Obliczamy "logiczny" indeks wiersza (0-11),
-  // który jest używany przez funkcje formularza
-  const logicalIndex = (i > 10) ? i - 2 : i - 1;
+  if (j===1) {
+        // Obliczamy "logiczny" indeks wiersza (0-11),
+        // który jest używany przez funkcje formularza
+        const logicalIndex = (i > 10) ? i - 2 : i - 1;
 
-  // Bierzemy tekst, który miałeś tam wcześniej (np. "1.", "2." itd.)
-  const rowNumText = (i > 10 ? i - 10 : i) + '.';
+        // Bierzemy tekst, który miałeś tam wcześniej (np. "1.", "2." itd.)
+        const rowNumText = (i > 10 ? i - 10 : i) + '.';
 
-  // Wyczyść komórkę i dodaj numer
-  cell.textContent = rowNumText + ' '; 
+        // Wyczyść komórkę i dodaj numer
+        cell.textContent = rowNumText + ' '; 
 
-  // Stwórz i dodaj przycisk "edytuj"
-  const btn = document.createElement('button');
-  btn.textContent = '➡️'; // Możesz zmienić na '✏️' lub inny symbol
-  btn.className = 'btn-edit-row';
-  btn.title = 'Edytuj ten wiersz w formularzu';
+        // Stwórz i dodaj przycisk "edytuj"
+        const btn = document.createElement('button');
+        btn.textContent = '➡️'; // Możesz zmienić na '✏️' lub inny symbol
+        btn.className = 'btn-edit-row';
+        btn.title = 'Edytuj ten wiersz w formularzu';
 
-  btn.addEventListener('click', (e) => {
-    // Zatrzymujemy propagację, aby kliknięcie przycisku
-    // nie aktywowało edycji komórki (contenteditable)
-    e.stopPropagation(); 
+        btn.addEventListener('click', (e) => {
+          // Zatrzymujemy propagację, aby kliknięcie przycisku
+          // nie aktywowało edycji komórki (contenteditable)
+          e.stopPropagation(); 
 
-    // Wywołujemy naszą nową funkcję z indeksem tego wiersza
-    openFormAtRow(logicalIndex);
-  });
+          // Wywołujemy naszą nową funkcję z indeksem tego wiersza
+          openFormAtRow(logicalIndex);
+        });
 
-  cell.appendChild(btn);
-}
+        cell.appendChild(btn);
+      }
       if (i!==10) cell.contentEditable = true;
       if (j>=2 && j<=4) cell.classList.add('center-text');
       // kolumna 3 -> number input
