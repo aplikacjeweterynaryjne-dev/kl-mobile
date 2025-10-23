@@ -707,6 +707,8 @@
       <div>
         <label for="productQuantityInput">Ilość:</label><br>
         <input type="number" id="productQuantityInput" value="1" min="1" style="width: 60px; padding: 5px;">
+        <span id="productUnitDisplay" style="margin-left: 5px; font-size: 0.9em; color: #555;"></span> </div>
+        <input type="number" id="productQuantityInput" value="1" min="1" style="width: 60px; padding: 5px;">
       </div>
       <button id="addProductBtn" class="btn primary small">Dodaj</button>
     </div>
@@ -1663,7 +1665,9 @@ const saveReceiptBtn = document.getElementById('saveReceiptBtn');
 const savedReceiptSummary = document.getElementById('savedReceiptSummary');
 const pluCodeInput = document.getElementById('pluCodeInput');
 const pluBtn = document.getElementById('pluBtn');
-
+const pluCodeInput = document.getElementById('pluCodeInput');
+const pluBtn = document.getElementById('pluBtn');
+const productUnitDisplay = document.getElementById('productUnitDisplay'); // ✅ DODANO
 // Tablica przechowuje teraz { name: '...', quantity: 1, price: 10.50 }
 let receiptItems = [];
 // receiptTotal jest teraz zadeklarowany globalnie (wcześniej w kodzie)
@@ -1883,7 +1887,20 @@ if (pluBtn) {
         }
     });
 }
-
+// ✅ DODANO: Aktualizacja jednostki/dawkowania po wyborze produktu
+if (productSelect && productUnitDisplay) {
+    productSelect.addEventListener('input', () => {
+        const selectedProductName = productSelect.value;
+        // Sprawdź, czy mapaIlosci istnieje i czy zawiera wybrany produkt
+        if (typeof mapaIlosci !== 'undefined' && mapaIlosci.hasOwnProperty(selectedProductName)) {
+            // Wyświetl całe dawkowanie jako jednostkę
+            productUnitDisplay.textContent = mapaIlosci[selectedProductName] || '';
+        } else {
+            productUnitDisplay.textContent = ''; // Wyczyść, jeśli nie znaleziono dawkowania
+        }
+    });
+}
+// ✅ DODANO: KONIEC
 // Pierwsze renderowanie paragonu
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', renderReceipt);
