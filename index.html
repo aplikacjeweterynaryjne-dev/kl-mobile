@@ -107,6 +107,7 @@
     background: #fff;
     display: none; /* Ukryj overlay na starcie */
     z-index: 9999;
+    /* Użyj flexbox DOPIERO gdy jest widoczny (JS ustawi display: flex) */
     flex-direction: column;
     padding: 10px;
     box-sizing: border-box;
@@ -835,4 +836,415 @@ function saveRow(idx){
   if (produktInput) { produktInput.value = document.getElementById('formLek').value; produktInput.dispatchEvent(new Event('input', { bubbles:true })); }
   row.cells[5].textContent = document.getElementById('formSeria').value;
   const cell6 = row.cells[6]; const iloscInput = cell6.querySelector('input[type="number"]');
-  if (il
+  if (iloscInput) { iloscInput.value = document.getElementById('formIlosc').value || ''; }
+  const dawkowanie = document.getElementById('formDawkowanie').value || '';
+  let textNode = iloscInput ? iloscInput.nextSibling : cell6.firstChild;
+  if (textNode && textNode.nodeType === Node.TEXT_NODE) { textNode.textContent = ' ' + dawkowanie; }
+  else if (iloscInput) { cell6.appendChild(document.createTextNode(' ' + dawkowanie)); }
+  else { cell6.textContent = (document.getElementById('formIlosc').value || '') + ' ' + dawkowanie; }
+  row.cells[7].textContent = document.getElementById('formKarencja').value;
+  row.classList.add('highlight-row'); setTimeout(() => row.classList.remove('highlight-row'), 1600);
+}
+
+function selectRowInForm(logicalIndex){
+  const logical = rowsEditable(); const row = logical[logicalIndex]; if (!row) return;
+  const textDiv = row.cells[1].querySelector('.editable-text'); // Znajdź div
+  document.getElementById('formOpis').value = textDiv ? textDiv.textContent.trim() : row.cells[1].textContent.trim(); // Czytaj z diva (fallback)
+  const inp = row.cells[2].querySelector('input'); document.getElementById('formLiczba').value = inp ? inp.value : '';
+  document.getElementById('formRozpoznanie').value = row.cells[3].textContent.trim();
+  const lekInput = row.cells[4].querySelector('input'); document.getElementById('formLek').value = lekInput ? lekInput.value : '';
+  document.getElementById('formSeria').value = row.cells[5].textContent.trim();
+  const cell6 = row.cells[6]; const iloscInput = cell6.querySelector('input[type="number"]');
+  document.getElementById('formIlosc').value = iloscInput ? iloscInput.value : '';
+  let tekstDawkowania = ''; const textNode = iloscInput ? iloscInput.nextSibling : cell6.firstChild;
+  if (textNode && textNode.nodeType === Node.TEXT_NODE) { tekstDawkowania = textNode.textContent.trim(); }
+  else if (!iloscInput) {
+     const fullText = cell6.textContent.trim(); const numberPart = document.getElementById('formIlosc').value;
+     if (numberPart && fullText.startsWith(numberPart)) { tekstDawkowania = fullText.substring(numberPart.length).trim(); }
+     else { tekstDawkowania = fullText; }
+  }
+  document.getElementById('formDawkowanie').value = tekstDawkowania;
+  document.getElementById('formKarencja').value = row.cells[7].textContent.trim();
+}
+
+document.getElementById('formLek').addEventListener('input', function(){
+  const n = this.value; document.getElementById('formSeria').value = mapaSerii[n] || '';
+  document.getElementById('formDawkowanie').value = mapaIlosci[n] || '';
+  document.getElementById('formKarencja').value = mapaKarencji[n] || '';
+});
+
+document.getElementById('saveRow').addEventListener('click', ()=>{
+  const idx = parseInt(formRowSelect.value,10); saveRow(idx); alert('Wiersz zapisany.');
+});
+
+document.getElementById('formCopyBtn').addEventListener('click', ()=>{
+  copyToRow10FromRow0(); const sel = formRowSelect; sel.value = 9; sel.dispatchEvent(new Event('change'));
+  const tbodyTrs = [...document.querySelectorAll('#karta tbody tr')];
+  const special = tbodyTrs.find(tr => tr.children.length === 1 && tr.children[0].colSpan==8);
+  if (special) { special.scrollIntoView({behavior:'smooth', block:'center'}); special.classList.add('highlight-row');
+    setTimeout(()=>special.classList.remove('highlight-row'),2000); }
+});
+
+if(document.getElementById('copyBtn')) {
+    document.getElementById('copyBtn').addEventListener('click', ()=> { copyToRow10FromRow0(); });
+}
+
+document.getElementById('micBtn').addEventListener('click', ()=>{
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) { alert('Twoja przeglądarka nie obsługuje rozpoznawania mowy'); return; }
+  const rec = new SpeechRecognition(); rec.lang = 'pl-PL'; rec.interimResults = false; rec.maxAlternatives = 1; rec.start();
+  rec.onresult = (e) => {
+    const text = e.results[0][0].transcript; document.getElementById('formLek').value = text;
+    document.getElementById('formSeria').value = mapaSerii[text] || '';
+    document.getElementById('formDawkowanie').value = mapaIlosci[text] || '';
+    document.getElementById('formKarencja').value = mapaKarencji[text] || '';
+  };
+  rec.onerror = (ev) => { console.error('Speech error', ev); alert('Błąd rozpoznawania mowy: ' + (ev.error || 'nieznany')); };
+});
+
+/* ---- podpis (Wersja z blokadą, auto-resize i wymuszeniem landscape) ---- */
+function initSignature(id){
+  const canvas = document.getElementById(id); if (!canvas) return;
+  const ctx = canvas.getContext('2d'); ctx.lineWidth = 2; ctx.lineCap = 'round'; canvas.classList.add('disabled');
+  const fullscreenBtn = document.getElementById('fullscreenBtn'); const clearSignBtn = document.getElementById('clearSignBtn');
+  const fullscreenOverlay = document.getElementById('fullscreenOverlay'); const fullscreenCanvas = document.getElementById('fullscreenCanvas');
+  const closeBtn = document.getElementById('closeSignBtn'); const clearFullscreenBtn = document.getElementById('clearFullscreenSignBtn');
+  let fDrawing = false; let fctx;
+  function getFPos(e){
+    const rect = fullscreenCanvas.getBoundingClientRect();
+    const clientX = (e.touches && e.touches[0]) ? e.touches[0].clientX : e.clientX;
+    const clientY = (e.touches && e.touches[0]) ? e.touches[0].clientY : e.clientY;
+    return { x: clientX - rect.left, y: clientY - rect.top };
+  }
+  const startDrawingFullscreen = e => {
+    if (window.innerHeight > window.innerWidth) { alert("Proszę obrócić urządzenie do pozycji poziomej, aby podpisać."); fDrawing = false; return; }
+    fDrawing = true; const pos=getFPos(e); fctx.beginPath(); fctx.moveTo(pos.x,pos.y);
+  };
+  const drawFullscreen = e => { if(fDrawing){ const pos=getFPos(e); fctx.lineTo(pos.x,pos.y); fctx.stroke(); }};
+  const stopDrawingFullscreen = () => { fDrawing = false; };
+  const handleResize = () => {
+    if (fullscreenOverlay.style.display !== 'flex') { window.removeEventListener('resize', handleResize); return; }
+    const newWidth = fullscreenCanvas.offsetWidth; const newHeight = fullscreenCanvas.offsetHeight;
+    const tempCanvas = document.createElement('canvas'); const tempCtx = tempCanvas.getContext('2d');
+    tempCanvas.width = fullscreenCanvas.width; tempCanvas.height = fullscreenCanvas.height;
+    if (fullscreenCanvas.width > 0 && fullscreenCanvas.height > 0) { tempCtx.drawImage(fullscreenCanvas, 0, 0); }
+    fullscreenCanvas.width = newWidth; fullscreenCanvas.height = newHeight;
+    fctx = fullscreenCanvas.getContext('2d'); fctx.lineWidth = 6; fctx.lineCap = 'round';
+    if (tempCanvas.width > 0 && tempCanvas.height > 0) { fctx.drawImage(tempCanvas, 0, 0, newWidth, newHeight); }
+  };
+  fullscreenBtn.addEventListener('click', async ()=>{
+    fullscreenOverlay.style.display = 'flex';
+    try { if (screen.orientation && screen.orientation.lock) { await screen.orientation.lock('landscape'); console.log("Orientacja zablokowana na landscape."); }
+          else { console.warn("Screen Orientation API not fully supported."); }
+    } catch (error) { console.error("Nie udało się zablokować orientacji:", error); }
+    requestAnimationFrame(() => {
+        const canvasWidth = fullscreenCanvas.offsetWidth; const canvasHeight = fullscreenCanvas.offsetHeight;
+        fullscreenCanvas.width = canvasWidth; fullscreenCanvas.height = canvasHeight;
+        fctx = fullscreenCanvas.getContext('2d'); fctx.clearRect(0, 0, canvasWidth, canvasHeight);
+        fctx.lineWidth = 6; fctx.lineCap = 'round'; fctx.drawImage(canvas, 0, 0, canvasWidth, canvasHeight);
+        fullscreenCanvas.addEventListener('pointerdown', startDrawingFullscreen);
+        fullscreenCanvas.addEventListener('pointermove', drawFullscreen);
+        fullscreenCanvas.addEventListener('pointerup', stopDrawingFullscreen);
+        fullscreenCanvas.addEventListener('pointerleave', stopDrawingFullscreen);
+        window.addEventListener('resize', handleResize);
+    });
+  });
+  closeBtn.addEventListener('click', ()=>{
+    window.removeEventListener('resize', handleResize);
+    if (screen.orientation && screen.orientation.unlock) { screen.orientation.unlock(); console.log("Orientacja odblokowana."); }
+    ctx.clearRect(0, 0, canvas.width, canvas.height); ctx.drawImage(fullscreenCanvas, 0, 0, canvas.width, canvas.height);
+    fullscreenOverlay.style.display = 'none';
+    fullscreenCanvas.removeEventListener('pointerdown', startDrawingFullscreen);
+    fullscreenCanvas.removeEventListener('pointermove', drawFullscreen);
+    fullscreenCanvas.removeEventListener('pointerup', stopDrawingFullscreen);
+    fullscreenCanvas.removeEventListener('pointerleave', stopDrawingFullscreen);
+  });
+  clearFullscreenBtn.addEventListener('click', ()=>{ if (fctx) { fctx.clearRect(0, 0, fullscreenCanvas.width, fullscreenCanvas.height); } });
+  clearSignBtn.addEventListener('click', ()=>{ ctx.clearRect(0, 0, canvas.width, canvas.height); });
+} // Koniec initSignature
+
+window.addEventListener('load', ()=> initSignature('canvasPosiadacz'));
+
+/* ---- PRZYCISK Zakończ w kroku 2 formularza ---- */
+if (document.getElementById('step2')) {
+    const finishBtn = document.createElement('button'); finishBtn.textContent = 'Zakończ'; finishBtn.className = 'btn warn small'; finishBtn.style.marginLeft = '6px';
+    finishBtn.addEventListener('click', ()=>{
+      const idx = parseInt(formRowSelect.value,10); saveRow(idx); syncHeaderFormToTop(); formModal.style.display = 'none';
+    });
+    const rightActionsContainer = document.getElementById('step2').querySelector('.form-actions .right');
+    if (rightActionsContainer) { rightActionsContainer.appendChild(finishBtn); }
+    else { console.warn("Konteiner '.form-actions .right' nie znaleziony w kroku 2."); }
+} else { console.warn("Element #step2 nie znaleziony przy próbie dodania przycisku 'Zakończ'."); }
+
+window.addEventListener("resize", () => {
+  const modal = document.getElementById("formModal"); const card = modal.querySelector(".form-card");
+  if (card) { card.style.height = window.innerHeight * 0.9 + "px"; card.style.width = Math.min(window.innerWidth * 0.95, 600) + "px"; }
+});
+
+const micKarencjaBtn = document.getElementById('micKarencja'); const karencjaInput = document.getElementById('formKarencja');
+if ('webkitSpeechRecognition' in window && micKarencjaBtn) {
+  const recognition = new webkitSpeechRecognition(); recognition.lang = 'pl-PL'; recognition.continuous = false; recognition.interimResults = false;
+  micKarencjaBtn.addEventListener('click', () => {
+    if (micKarencjaBtn.classList.contains('active')) { recognition.stop(); micKarencjaBtn.classList.remove('active'); }
+    else { recognition.start(); micKarencjaBtn.classList.add('active'); }
+  });
+  recognition.onresult = (event) => { const text = event.results[0][0].transcript; karencjaInput.value = karencjaInput.value ? karencjaInput.value + ' ' + text : text; };
+  recognition.onerror = (e) => { console.error('Błąd rozpoznawania mowy:', e.error); micKarencjaBtn.classList.remove('active'); };
+  recognition.onend = () => { micKarencjaBtn.classList.remove('active'); };
+} else if (!micKarencjaBtn) { console.warn("Przycisk #micKarencja nie znaleziony."); }
+else { if(micKarencjaBtn) micKarencjaBtn.style.display = 'none'; console.warn('Rozpoznawanie mowy nie jest obsługiwane w tej przeglądarce.'); }
+
+const drukujBtn = document.getElementById('drukujBtn'); if (drukujBtn) { drukujBtn.addEventListener('click', () => { window.print(); }); }
+const emailInput = document.getElementById('userEmail'); const saveEmailBtn = document.getElementById('saveEmail');
+try { const savedEmail = localStorage.getItem('userEmail'); if (savedEmail && emailInput) emailInput.value = savedEmail; }
+catch (e) { console.warn('Brak dostępu do localStorage:', e); }
+if (saveEmailBtn && emailInput) {
+  saveEmailBtn.addEventListener('click', () => {
+    const email = emailInput.value.trim(); if (!email) { alert('⚠️ Wprowadź adres e-mail.'); return; }
+    if (!email.includes('@') || !email.includes('.')) { alert('⚠️ Wprowadź poprawny adres e-mail.'); return; }
+    try { localStorage.setItem('userEmail', email); alert('📨 Adres e-mail został zapisany lokalnie.'); }
+    catch (e) { console.error('Błąd zapisu w localStorage:', e); alert('❌ Nie udało się zapisać adresu e-mail lokalnie.'); }
+  });
+}
+
+// ✅ DODANO: POCZĄTEK: Kod dla Kalkulatora Wizyty
+
+// --- Nawigacja między zakładkami ---
+const kartaSection = document.getElementById('kartaLeczeniaSection');
+const kalkulatorSection = document.getElementById('kalkulatorWizytySection');
+const tabKartaBtn = document.getElementById('tabKartaBtn');
+const tabKalkulatorBtn = document.getElementById('tabKalkulatorBtn');
+
+function showSection(sectionToShow) {
+  if (kartaSection) kartaSection.style.display = 'none';
+  if (kalkulatorSection) kalkulatorSection.style.display = 'none';
+  if (tabKartaBtn) tabKartaBtn.classList.remove('primary');
+  if (tabKalkulatorBtn) tabKalkulatorBtn.classList.remove('primary');
+
+  if (sectionToShow === 'karta' && kartaSection) {
+    kartaSection.style.display = 'block';
+    if (tabKartaBtn) tabKartaBtn.classList.add('primary');
+  } else if (sectionToShow === 'kalkulator' && kalkulatorSection) {
+    kalkulatorSection.style.display = 'block';
+    if (tabKalkulatorBtn) tabKalkulatorBtn.classList.add('primary');
+  }
+}
+
+if (tabKartaBtn && tabKalkulatorBtn) {
+    tabKartaBtn.addEventListener('click', () => showSection('karta'));
+    tabKalkulatorBtn.addEventListener('click', () => showSection('kalkulator'));
+}
+
+
+// Opcjonalny przycisk "Otwórz Kalkulator" w Karcie Leczenia
+const openCalcBtn = document.getElementById('openCalculatorBtn');
+if (openCalcBtn) {
+    openCalcBtn.addEventListener('click', () => showSection('kalkulator'));
+}
+
+// --- Logika Kalkulatora (początkowa) ---
+const copyCheckbox = document.getElementById('copyFromCardCheckbox');
+const productSelect = document.getElementById('productSelect');
+const quantityInput = document.getElementById('productQuantityInput');
+const addProductBtn = document.getElementById('addProductBtn');
+const receiptDisplay = document.getElementById('receiptDisplay');
+const saveReceiptBtn = document.getElementById('saveReceiptBtn');
+const savedReceiptSummary = document.getElementById('savedReceiptSummary');
+const pluCodeInput = document.getElementById('pluCodeInput');
+const pluBtn = document.getElementById('pluBtn');
+
+let receiptItems = []; // Tablica przechowująca pozycje paragonu { name: '...', quantity: 1 }
+
+// Funkcja renderująca paragon
+function renderReceipt() {
+  // Sprawdź czy elementy istnieją
+  if (!receiptDisplay) return;
+
+  if (receiptItems.length === 0) {
+    receiptDisplay.innerHTML = '<p style="text-align: center; color: #999;">Paragon jest pusty</p>';
+    return;
+  }
+
+  receiptDisplay.innerHTML = ''; // Wyczyść
+  const list = document.createElement('ul');
+  list.style.listStyle = 'none';
+  list.style.padding = '0';
+  list.style.margin = '0';
+
+  receiptItems.forEach((item, index) => {
+    const listItem = document.createElement('li');
+    listItem.style.display = 'flex';
+    listItem.style.justifyContent = 'space-between';
+    listItem.style.marginBottom = '5px';
+    listItem.style.borderBottom = '1px solid #eee';
+    listItem.style.paddingBottom = '3px';
+
+    const nameSpan = document.createElement('span');
+    nameSpan.textContent = item.name;
+
+    const quantitySpan = document.createElement('span');
+    quantitySpan.textContent = `x ${item.quantity}`;
+    // TODO: Dodać edycję ilości
+
+    const removeBtn = document.createElement('button');
+    removeBtn.textContent = '❌';
+    removeBtn.className = 'btn small ghost';
+    removeBtn.style.padding = '2px 5px';
+    removeBtn.title = 'Usuń pozycję';
+    removeBtn.onclick = () => {
+      receiptItems.splice(index, 1); // Usuń element z tablicy
+      renderReceipt(); // Odśwież widok
+    };
+
+    const controlsDiv = document.createElement('div');
+    controlsDiv.style.display = 'flex';
+    controlsDiv.style.alignItems = 'center';
+    controlsDiv.style.gap = '8px';
+    controlsDiv.appendChild(quantitySpan);
+    controlsDiv.appendChild(removeBtn);
+
+    listItem.appendChild(nameSpan);
+    listItem.appendChild(controlsDiv);
+    list.appendChild(listItem);
+  });
+  receiptDisplay.appendChild(list);
+}
+
+// Dodawanie produktu z formularza
+if (addProductBtn) {
+    addProductBtn.addEventListener('click', () => {
+      const productName = productSelect ? productSelect.value.trim() : '';
+      const quantity = quantityInput ? parseInt(quantityInput.value, 10) : 0;
+
+      if (productName && quantity > 0) {
+        // Sprawdź, czy produkt jest na liście leków (prosta walidacja)
+        if (typeof nazwyLekow !== 'undefined' && nazwyLekow.includes(productName)) {
+           // Sprawdź, czy produkt już jest na paragonie
+           const existingItem = receiptItems.find(item => item.name === productName);
+           if(existingItem){
+               existingItem.quantity += quantity; // Zwiększ ilość
+           } else {
+               receiptItems.push({ name: productName, quantity: quantity }); // Dodaj nowy
+           }
+           renderReceipt();
+           if (productSelect) productSelect.value = ''; // Wyczyść pole wyboru
+           if (quantityInput) quantityInput.value = 1; // Zresetuj ilość
+        } else {
+            alert('Wybrany produkt nie znajduje się w bazie leków.');
+        }
+      } else {
+          alert('Wybierz produkt i podaj poprawną ilość.');
+      }
+    });
+}
+
+
+// Kopiowanie z karty leczenia
+if (copyCheckbox) {
+    copyCheckbox.addEventListener('change', () => {
+      if (copyCheckbox.checked) {
+        receiptItems = []; // Wyczyść obecny paragon
+        const rows = document.querySelectorAll('#karta tbody tr');
+        rows.forEach(row => {
+          if (row.cells.length === 8) { // Pomijaj wiersz specjalny
+            const lekInput = row.cells[4].querySelector('input[list="listaLekow"]');
+            const iloscInput = row.cells[6].querySelector('input.small-input');
+
+            if (lekInput && iloscInput) {
+                 const productName = lekInput.value.trim();
+                 // Upewnij się, że iloscInput.value nie jest pusty przed parsowaniem
+                 const quantityValue = iloscInput.value;
+                 const quantity = quantityValue ? parseInt(quantityValue, 10) : 0;
+
+                 if (productName && quantity > 0) {
+                    // Dodaj tylko jeśli nazwa i ilość są poprawne
+                    const existing = receiptItems.find(item => item.name === productName);
+                    if(existing){
+                        existing.quantity += quantity;
+                    } else {
+                        receiptItems.push({ name: productName, quantity: quantity });
+                    }
+                 }
+            }
+          }
+        });
+        renderReceipt(); // Pokaż skopiowane
+      } else {
+        // Opcjonalnie: można wyczyścić paragon po odznaczeniu
+        // receiptItems = [];
+        // renderReceipt();
+      }
+    });
+}
+
+// Zapisywanie paragonu (prosta wersja)
+if (saveReceiptBtn) {
+    saveReceiptBtn.addEventListener('click', () => {
+      if (receiptItems.length > 0) {
+        if (savedReceiptSummary) {
+            savedReceiptSummary.innerHTML = '<h4>Zapisany Paragon:</h4>';
+            const list = document.createElement('ul');
+            list.style.listStyle = 'none'; list.style.paddingLeft = '10px';
+            receiptItems.forEach(item => {
+              const li = document.createElement('li');
+              li.textContent = `${item.name} x ${item.quantity}`;
+              list.appendChild(li);
+            });
+            savedReceiptSummary.appendChild(list);
+        }
+        alert('Paragon zapisany (tymczasowo).');
+        // Opcjonalnie: przełącz z powrotem na Kartę Leczenia
+        // showSection('karta');
+      } else {
+          alert('Paragon jest pusty, nie ma czego zapisywać.');
+      }
+    });
+}
+
+// Obsługa PLU (bardzo uproszczona)
+if (pluBtn) {
+    pluBtn.addEventListener('click', () => {
+        const code = pluCodeInput ? pluCodeInput.value.trim() : '';
+        if(code){
+            // Uproszczone: Traktuj kod jako nazwę leku
+            const productName = code; // W przyszłości: productName = pluMap[code];
+            if (typeof nazwyLekow !== 'undefined' && nazwyLekow.includes(productName)) {
+                const existingItem = receiptItems.find(item => item.name === productName);
+                if(existingItem){
+                    existingItem.quantity += 1; // Domyślnie dodaj 1 szt.
+                } else {
+                    receiptItems.push({ name: productName, quantity: 1 });
+                }
+                renderReceipt();
+                if (pluCodeInput) pluCodeInput.value = ''; // Wyczyść pole
+            } else {
+                alert(`Nie znaleziono produktu dla kodu PLU: ${code}`);
+            }
+        }
+    });
+}
+
+// Pierwsze renderowanie pustego paragonu przy starcie (jeśli element istnieje)
+if (document.readyState === 'loading') { // Czekaj na załadowanie DOM
+    document.addEventListener('DOMContentLoaded', renderReceipt);
+} else {
+    // Sprawdź czy element istnieje przed wywołaniem
+    if (document.getElementById('receiptDisplay')) {
+       renderReceipt(); // DOM już załadowany
+    }
+}
+
+// ✅ DODANO: KONIEC: Kod dla Kalkulatora Wizyty
+
+
+</script>
+<script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js')
+      .then(() => console.log('✅ Service Worker zarejestrowany!'))
+      .catch(err => console.error('❌ Błąd rejestracji SW:', err));
+  }
+
+</script>
+</body>
+</html>
