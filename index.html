@@ -1,219 +1,234 @@
 <!DOCTYPE html>
 <html lang="pl">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 
-  <title>KARTA LECZENIA ZWIERZĄT</title>
+  <title>KARTA LECZENIA ZWIERZĄT</title>
 
-    <meta name="theme-color" content="#2b74e4">
-  <link rel="manifest" href="manifest.json">
+  <!-- ✅ DODANE: obsługa PWA -->
+  <meta name="theme-color" content="#2b74e4">
+  <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0275d8">
-  <link rel="icon" href="https://www.gstatic.com/images/icons/material/system/2x/pets_black_24dp.png" type="image/png">
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <link rel="icon" href="https://www.gstatic.com/images/icons/material/system/2x/pets_black_24dp.png" type="image/png">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
 
-  <style>
-  /* --- Sekcja Drukuj + e-mail (styling) --- */
-  .drukuj-sekcja {
-    margin-top: 20px;
-    padding: 10px 0 0 0;
-    border-top: 1px solid #e0e0e0;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 10px;
-  }
-
-  .drukuj-sekcja #drukujBtn {
-    background: #e6e6e6;
-    border: 1px solid #aaa;
-    padding: 6px 12px;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 15px;
-  }
-
-  .drukuj-sekcja #drukujBtn:hover {
-    background: #dcdcdc;
-  }
-
-  /* 📧 Pole e-mail */
-  .email-box {
-    width: 100%;
-    font-size: 14px;
-  }
-
-  .email-input-wrapper {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    margin-top: 6px;
-  }
-
-  .email-input-wrapper input[type="email"] {
-    width: 33%;
-    min-width: 180px;
-    padding: 6px 8px;
-    border: 1px solid #ccc;
-    border-radius: 5px;
-    box-sizing: border-box;
-  }
-
-  .email-input-wrapper button {
-    background: #f5f5f5;
-    border: 1px solid #bbb;
-    border-radius: 5px;
-    cursor: pointer;
-    font-size: 16px;
-    padding: 5px 8px;
-  }
-
-  /* Ukryj pole e-mail przy drukowaniu */
-  @media print {
-    .email-box, .drukuj-sekcja button#saveEmail { display: none !important; }
-  }
-
-  body { font-family: Arial, sans-serif; margin: 20px; transform: scale(0.95); transform-origin: top left; }
-  h2 { text-align: center; font-size: 15px; text-transform: uppercase; margin-bottom: 10px; }
-  .top-section { display: grid; grid-template-columns: 1fr 1fr 1fr; font-size: 12px; margin-bottom: 10px; }
-  .top-section div { padding: 5px; }
-  .table-container { width: 100%; overflow-x: auto; }
-  table { border-collapse: collapse; width: 100%; font-size: 11px; }
-  th, td { border: 1px solid #000; padding: 4px; text-align: left; vertical-align: middle; }
-  th { background: #e8eefc; text-align: center; }
-  td[contenteditable="true"] { background: #fefefe; }
-  .actions { text-align: right; margin-top: 10px; }
-  @media print { #printBtn, #copyBtn, #clearSignBtn, #fullscreenBtn, #formBtn { display: none; } }
-  input[type="date"] { font-size: 11px; }
-  .small-input { width: 40px; display: inline-block; margin-right: 3px; }
-  .center-text { text-align: center; }
-
-  /* podpisy */
-  .signatures { display: flex; justify-content: space-between; margin-top: 20px; }
-  .signature-box { display: flex; flex-direction: column; align-items: center; width: 48%; }
-  .signature-label { font-weight: bold; margin-bottom: 2px; display: block; text-align: center; width: 100%; }
-  .signature-canvas { border: 1px solid #000; display: block; height: 80px; width: 100%; margin-top: 5px; touch-action: none; }
-  .signature-img { display: block; height: 80px; width: 100%; object-fit: contain; margin-top: 5px; }
-  .signature-name { margin-top: 2px; font-weight: normal; text-align: center; }
-  /* podpisy */
-  /* ... (inne style podpisów) ... */
-/* podpisy */
-  /* ... (inne style podpisów) ... */
-  .fullscreen-overlay {
-    position: fixed;
-    top: 0; left: 0; right: 0; bottom: 0; /* Pokryj cały ekran */
-    background: #fff;
-    display: none; /* Ukryj overlay na starcie */
-    z-index: 9999;
-    /* Użyj flexbox DOPIERO gdy jest widoczny (JS ustawi display: flex) */
-    flex-direction: column;
-    padding: 10px;
-    box-sizing: border-box;
-  }
-  .fullscreen-canvas {
-    flex-grow: 1; /* Pozwól płótnu rosnąć, ale... */
-    max-height: 80vh; /* Ogranicz wysokość */
-    width: 100%;
-    border: 1px solid #000;
-    touch-action: none;
-    cursor: crosshair;
-  }
-  /* Styl dla przycisków w overlay */
-  .fullscreen-overlay button {
-    margin-top: 8px;
-    padding: 8px 15px;
-  }
-  /* Dostosowanie dla trybu poziomego */
-  @media (orientation: landscape) and (max-height: 500px) {
-    .fullscreen-overlay { padding: 5px; }
-    .fullscreen-overlay button { margin-top: 5px; padding: 5px 10px; }
+  <style>
+  /* --- Sekcja Drukuj + e-mail (styling) --- */
+  .drukuj-sekcja {
+    margin-top: 20px;
+    padding: 10px 0 0 0;
+    border-top: 1px solid #e0e0e0;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
   }
-  #closeSignBtn { margin-top: 8px; }
-  #clearFullscreenSignBtn { margin-top: 8px; }
 
-  /* ---- formularz (dodany, nie wpływa na tabelę) ---- */
-  #formModal {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100vw;
-    height: 100vh;
-    background: rgba(0,0,0,0.48);
-    display: none;
-    z-index: 10000;
-    justify-content: center;
-    align-items: center;
-    overflow: hidden;
-  }
+  .drukuj-sekcja #drukujBtn {
+    background: #e6e6e6;
+    border: 1px solid #aaa;
+    padding: 6px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 15px;
+  }
 
-  .form-card {
-    width: 140vw;
-    max-width: 600px;
-    height: 120vh;
-    overflow-y: auto;
-    background: #fff;
-    border-radius: 12px;
-    padding: 24px;
-    box-sizing: border-box;
-    display: flex;
-    flex-direction: column;
-    justify-content: flex-start;
-    font-size: clamp(18px, 5vw, 22px);
-  }
+  .drukuj-sekcja #drukujBtn:hover {
+    background: #dcdcdc;
+  }
 
-  @media (max-width: 480px) {
-    .form-card {
-      width: 98vw;
-      height: 95vh;
-      padding: 12px;
-    }
-    input, select, textarea, button {
-      font-size: 1rem;
-    }
-  }
+  /* 📧 Pole e-mail */
+  .email-box {
+    width: 100%;
+    font-size: 14px;
+  }
 
-  .form-step { display:none; }
-  .form-step.active { display:block; }
-  .form-row { margin-bottom:8px; }
-  .form-row label { display:block; font-weight:600; font-size:13px; margin-bottom:4px; }
-  .form-row input[type="text"], .form-row input[type="date"], .form-row input[type="number"], .form-row textarea, .form-row input[list] {
-    width:100%; padding:8px; font-size:14px; border:1px solid #ccc; border-radius:6px;
-    box-sizing:border-box;
-  }
-  .form-row textarea { min-height:70px; resize:vertical; }
-  .form-actions { display:flex; gap:8px; justify-content:space-between; margin-top:12px; flex-wrap:wrap; }
-  .form-actions .left, .form-actions .right { display:flex; gap:8px; }
-  .btn { padding:8px 11px; border-radius:8px; border:1px solid #bbb; background:#f7f7f7; cursor:pointer; font-size:14px; }
-  .btn.primary { background:#2b74e4; color:#fff; border-color:#2260c5; }
-  .btn.warn { background:#c0392b; color:#fff; border-color:#992d22; }
-  .btn.ghost { background:transparent; border-color:#ccc; }
-  .small { padding:6px 8px; font-size:13px; }
+  .email-input-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 6px;
+  }
 
-  #micBtn { padding:6px 8px; border-radius:8px; cursor:pointer; border:1px solid #ccc; background:#eef; }
+  .email-input-wrapper input[type="email"] {
+    width: 33%;
+    min-width: 180px;
+    padding: 6px 8px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    box-sizing: border-box;
+  }
 
-  .highlight-row { animation: highlightAnim 2s ease; }
-  @keyframes highlightAnim {
-    0% { background: #ffff99; }
-    100% { background: transparent; }
-  }
+  .email-input-wrapper button {
+    background: #f5f5f5;
+    border: 1px solid #bbb;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 16px;
+    padding: 5px 8px;
+  }
 
-  @media (orientation: portrait) {
-    .form-card {
-      width: 98vw;
-      max-width: 720px;
-    }
-  }
+  /* Ukryj pole e-mail przy drukowaniu */
+  @media print {
+    .email-box, .drukuj-sekcja button#saveEmail { display: none !important; }
+  }
 
-  @media (orientation: landscape) {
-    .form-card {
-      width: 90vw;
-      max-width: 720px;
-      max-height: 95vh;
-    }
-  }
-    /* --- Styl dla przycisku edycji wiersza --- */
+  body { font-family: Arial, sans-serif; margin: 20px; transform: scale(0.95); transform-origin: top left; }
+  h2 { text-align: center; font-size: 15px; text-transform: uppercase; margin-bottom: 10px; }
+  .top-section { display: grid; grid-template-columns: 1fr 1fr 1fr; font-size: 12px; margin-bottom: 10px; }
+  .top-section div { padding: 5px; }
+  .table-container { width: 100%; overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 11px; }
+  th, td { border: 1px solid #000; padding: 4px; text-align: left; vertical-align: middle; }
+  th { background: #e8eefc; text-align: center; }
+  td[contenteditable="true"] { background: #fefefe; }
+  .actions { text-align: right; margin-top: 10px; }
+  @media print { #printBtn, #copyBtn, #clearSignBtn, #fullscreenBtn, #formBtn { display: none; } }
+  input[type="date"] { font-size: 11px; }
+  .small-input { width: 40px; display: inline-block; margin-right: 3px; }
+  .center-text { text-align: center; }
+
+  /* podpisy */
+  .signatures { display: flex; justify-content: space-between; margin-top: 20px; }
+  .signature-box { display: flex; flex-direction: column; align-items: center; width: 48%; }
+  .signature-label { font-weight: bold; margin-bottom: 2px; display: block; text-align: center; width: 100%; }
+  .signature-canvas { border: 1px solid #000; display: block; height: 80px; width: 100%; margin-top: 5px; touch-action: none; }
+  .signature-img { display: block; height: 80px; width: 100%; object-fit: contain; margin-top: 5px; }
+  .signature-name { margin-top: 2px; font-weight: normal; text-align: center; }
+  /* podpisy */
+  /* ... (inne style podpisów) ... */
+/* podpisy */
+  /* ... (inne style podpisów) ... */
+  .fullscreen-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0; /* Pokryj cały ekran */
+    background: #fff;
+    display: none; /* ✅ POPRAWKA: Ukryj overlay na starcie */
+    z-index: 9999;
+    /* Użyj flexbox DOPIERO gdy jest widoczny (JS ustawi display: flex) */
+    flex-direction: column;
+    padding: 10px;
+    box-sizing: border-box;
+  }
+  /* ... (reszta stylów dla .fullscreen-canvas i przycisków pozostaje bez zmian) ... */
+  .fullscreen-canvas {
+    flex-grow: 1; /* Pozwól płótnu rozciągnąć się pionowo */
+    width: 100%; /* Zajmij całą dostępną szerokość */
+    border: 1px solid #000;
+    touch-action: none;
+    cursor: crosshair; /* Zmień kursor na krzyżyk */
+  }
+  /* Styl dla przycisków w overlay */
+  .fullscreen-overlay button {
+    margin-top: 8px; /* Odstęp między przyciskami a płótnem/sobą */
+    padding: 8px 15px; /* Trochę większe przyciski */
+  }
+    /* ✅ DODAJ: Dostosowanie dla trybu poziomego */
+  @media (orientation: landscape) and (max-height: 500px) { /* Stosuj tylko na niższych ekranach w poziomie */
+    .fullscreen-overlay {
+      padding: 5px; /* Mniejszy padding */
+    }
+    .fullscreen-canvas {
+      /* Możesz eksperymentować z max-height, np. 80vh (80% wysokości widoku) */
+      /* lub zostawić flex-grow, jeśli padding wystarczy */
+      max-height: 85vh;
+    }
+    .fullscreen-overlay button {
+      margin-top: 5px; /* Mniejszy odstęp */
+      padding: 5px 10px; /* Mniejsze przyciski */
+    }
+  }
+  #closeSignBtn { /* Domyślny odstęp już jest, zerujemy */
+      margin-top: 8px;
+  }
+   #clearFullscreenSignBtn {
+       margin-top: 8px;
+   }
+
+  /* ---- formularz (dodany, nie wpływa na tabelę) ---- */
+  #formModal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0,0,0,0.48);
+    display: none;
+    z-index: 10000;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+  }
+
+  .form-card {
+    width: 140vw;
+    max-width: 600px;
+    height: 120vh;
+    overflow-y: auto;
+    background: #fff;
+    border-radius: 12px;
+    padding: 24px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    font-size: clamp(18px, 5vw, 22px);
+  }
+
+  @media (max-width: 480px) {
+    .form-card {
+      width: 98vw;
+      height: 95vh;
+      padding: 12px;
+    }
+    input, select, textarea, button {
+      font-size: 1rem;
+    }
+  }
+
+  .form-step { display:none; }
+  .form-step.active { display:block; }
+  .form-row { margin-bottom:8px; }
+  .form-row label { display:block; font-weight:600; font-size:13px; margin-bottom:4px; }
+  .form-row input[type="text"], .form-row input[type="date"], .form-row input[type="number"], .form-row textarea, .form-row input[list] {
+    width:100%; padding:8px; font-size:14px; border:1px solid #ccc; border-radius:6px;
+    box-sizing:border-box;
+  }
+  .form-row textarea { min-height:70px; resize:vertical; }
+  .form-actions { display:flex; gap:8px; justify-content:space-between; margin-top:12px; flex-wrap:wrap; }
+  .form-actions .left, .form-actions .right { display:flex; gap:8px; }
+  .btn { padding:8px 11px; border-radius:8px; border:1px solid #bbb; background:#f7f7f7; cursor:pointer; font-size:14px; }
+  .btn.primary { background:#2b74e4; color:#fff; border-color:#2260c5; }
+  .btn.warn { background:#c0392b; color:#fff; border-color:#992d22; }
+  .btn.ghost { background:transparent; border-color:#ccc; }
+  .small { padding:6px 8px; font-size:13px; }
+
+  #micBtn { padding:6px 8px; border-radius:8px; cursor:pointer; border:1px solid #ccc; background:#eef; }
+
+  .highlight-row { animation: highlightAnim 2s ease; }
+  @keyframes highlightAnim {
+    0% { background: #ffff99; }
+    100% { background: transparent; }
+  }
+
+  @media (orientation: portrait) {
+    .form-card {
+      width: 98vw;
+      max-width: 720px;
+    }
+  }
+
+  @media (orientation: landscape) {
+    .form-card {
+      width: 90vw;
+      max-width: 720px;
+      max-height: 95vh;
+    }
+  }
+    /* --- Styl dla przycisku edycji wiersza --- */
 .btn-edit-row {
   background: #f0f0f0;
   border: 1px solid #ccc;
@@ -229,367 +244,477 @@
   background: #e0e0e0;
 }
 
-/* ======================================================== */
-/* KOMPLETNE STYLE DLA WYDRUKU (aby zmieścić na A4)        */
-/* ======================================================== */
+/* Ukryj przycisk podczas drukowania */
+
 @media print {
+
+  .btn-edit-row { display: none !important; }
+
+}
+
+    /* ======================================================== */
+
+/* STYLE DLA WYDRUKU (aby zmieścić na A4)                   */
+
+/* ======================================================== */
+
+@media print {
+
+
 
   /* --- Ustawienia strony A4 --- */
+
   @page {
+
     size: A4;
-    margin: 1cm; /* Możesz zmniejszyć, np. do 0.5cm */
+
+    /* Możesz dostosować marginesy, np. zmniejszyć do 0.5cm */
+
+    margin: 1cm; 
+
   }
+
+
 
   /* --- Zmniejszenie ogólnych odstępów i czcionek --- */
+
   body {
-    font-size: 10pt;
-    margin: 0 !important;
-    transform: none !important;
-    width: 100%;
-    -webkit-print-color-adjust: exact;
+
+    font-size: 10pt; /* Zmniejsz bazowy rozmiar czcionki dla wydruku */
+
+    margin: 0 !important; /* Usuń margines body tylko dla wydruku */
+
+    transform: none !important; /* Wyłącz skalowanie dla wydruku */
+
+    width: 100%; /* Upewnij się, że body zajmuje całą szerokość */
+
+    -webkit-print-color-adjust: exact; /* Zachowaj kolory tła (np. w nagłówkach tabeli) */
+
     print-color-adjust: exact;
-  }
-  h2 { font-size: 13pt; margin-bottom: 5px; }
-  p { margin-top: 4px; margin-bottom: 4px; font-size: 9pt; }
 
-  /* --- Sekcja nagłówkowa --- */
-  .top-section {
-    font-size: 9pt;
+  }
+
+
+
+  h2 {
+
+    font-size: 13pt; /* Mniejszy tytuł */
+
     margin-bottom: 5px;
-    grid-template-columns: 1fr 1fr 1fr;
+
   }
-  .top-section div { padding: 2px; }
-  .top-section input[type="date"],
-  .top-section input[type="text"] { font-size: 9pt; padding: 1px; }
 
-  /* --- Tabela --- */
-  .table-container { margin-bottom: 5px; }
-  table { font-size: 8pt; }
-  th, td { padding: 1px 2px; word-break: break-word; }
-  td input[type="number"],
-  td input[list],
-  td .small-input { font-size: 8pt; padding: 0; margin: 0; height: auto; max-width: 95%; }
-  td[contenteditable="true"] { padding: 1px 2px; }
 
-  /* --- Podpisy --- */
-  .signatures { margin-top: 10px; }
-  .signature-box { width: 48%; }
-  .signature-label { font-size: 9pt; margin-bottom: 0; }
-  .signature-canvas, .signature-img { height: 40px; margin-top: 2px; }
-  .signature-name { font-size: 9pt; margin-top: 1px; }
 
-  /* --- Ukrywanie WSZYSTKICH niepotrzebnych elementów --- */
-  .actions,           /* Sekcja z przyciskami na dole */
-  #fullscreenOverlay, /* Overlay podpisu */
-  #formModal,         /* Modal formularza */
-  #fullscreenBtn,     /* Przycisk powiększenia podpisu */
-  #clearSignBtn,      /* Przycisk czyszczenia podpisu */
-  #copyBtn,           /* Przycisk kopiowania danych */
-  #formBtn,           /* Przycisk otwierania formularza */
-  .email-box,         /* Sekcja e-mail */
-  .drukuj-sekcja button#saveEmail, /* Przycisk zapisu e-mail */
-  #printBtn,          /* Przycisk Drukuj (z <div class="actions">) */
-  .btn-edit-row {     /* ✅ Strzałki edycji wiersza */
+  .top-section {
+
+    font-size: 9pt; /* Mniejsza czcionka w sekcji nagłówkowej */
+
+    margin-bottom: 5px;
+
+    grid-template-columns: 1fr 1fr 1fr; /* Upewnij się, że układ jest zachowany */
+
+  }
+
+  .top-section div {
+
+      padding: 2px; /* Mniejszy padding */
+
+  }
+
+   .top-section input[type="date"],
+
+   .top-section input[type="text"] {
+
+      font-size: 9pt; /* Mniejsza czcionka inputów */
+
+      padding: 1px;
+
+   }
+
+
+
+
+
+  /* --- Zmniejszenie tabeli --- */
+
+  .table-container {
+
+    margin-bottom: 5px;
+
+  }
+
+  table {
+
+    font-size: 8pt; /* Znacznie mniejsza czcionka w tabeli */
+
+  }
+
+  th, td {
+
+    padding: 1px 2px; /* Minimalny padding w komórkach */
+
+    word-break: break-word; /* Pozwól na łamanie długich słów */
+
+  }
+
+  /* Zmniejszenie inputów wewnątrz tabeli */
+
+   td input[type="number"],
+
+   td input[list],
+
+   td .small-input {
+
+     font-size: 8pt;
+
+     padding: 0;
+
+     margin: 0;
+
+     height: auto;
+
+     max-width: 95%; /* Zapobiegaj rozpychaniu komórki */
+
+   }
+
+   /* Usunięcie dodatkowego miejsca przy edytowalnych komórkach */
+
+   td[contenteditable="true"] {
+
+     padding: 1px 2px;
+
+   }
+
+
+
+
+
+  /* --- Zmniejszenie sekcji podpisów --- */
+
+  p { /* Zmniejsz marginesy wokół paragrafów */
+
+    margin-top: 4px;
+
+    margin-bottom: 4px;
+
+    font-size: 9pt;
+
+  }
+
+
+
+  .signatures {
+
+    margin-top: 10px; /* Mniejszy odstęp nad podpisami */
+
+  }
+
+  .signature-box {
+
+    width: 48%; /* Zachowaj szerokość */
+
+  }
+
+  .signature-label {
+
+     font-size: 9pt;
+
+     margin-bottom: 0;
+
+  }
+
+  .signature-canvas, .signature-img {
+
+    height: 40px; /* Znacznie zmniejsz wysokość obszaru podpisu */
+
+    margin-top: 2px;
+
+  }
+
+   .signature-name {
+
+     font-size: 9pt;
+
+     margin-top: 1px;
+
+   }
+
+
+
+  /* --- Ukrywanie niepotrzebnych elementów (już masz część z tego) --- */
+
+  .actions, /* Ukryj całą sekcję akcji */
+
+  #fullscreenOverlay, /* Ukryj overlay do podpisu */
+
+  #formModal, /* Ukryj formularz modalny */
+
+  #fullscreenBtn, /* Dodatkowe ukrycie na wszelki wypadek */
+
+  #clearSignBtn,
+
+  #copyBtn,
+
+  #formBtn,
+
+  .email-box {
+
     display: none !important;
+
   }
-
-} /* Koniec @media print */
-
-/* ✅ DODANO: POCZĄTEK: Ukryj zapisany paragon podczas drukowania */
+  /* Ukryj strzałki edycji wiersza podczas drukowania */
 @media print {
-  #savedReceiptSummary {
+  .btn-edit-row {
     display: none !important;
   }
 }
-/* ✅ DODANO: KONIEC: Ukryj zapisany paragon podczas drukowania */
-
-  </style>
+  </style>
 </head>
 
 <body>
-
-<div style="text-align: center; margin-bottom: 15px; border-bottom: 1px solid #ccc; padding-bottom: 10px;">
-  <button id="tabKartaBtn" class="btn primary">📝 Karta Leczenia</button>
-  <button id="tabKalkulatorBtn" class="btn">🧮 Kalkulator Wizyty</button>
-</div>
-<div id="kartaLeczeniaSection">
-
 <h2>KARTA LECZENIA ZWIERZĄT GOSPODARSKICH ORAZ ZWIERZĄT, Z KTÓRYCH POZYSKANE TKANKI LUB PRODUKTY SĄ PRZEZNACZONE DO SPOŻYCIA PRZEZ LUDZI / EWIDENCJA LECZENIA ZWIERZĄT</h2>
 
 <div class="top-section">
-  <div>
-    <b>Nazwa i adres zakładu leczniczego dla zwierząt:</b><br>
-    <span id="nazwaLecznicy"></span><br>
-    <b>Wykonanie czynności lekarsko-weterynaryjnych dnia:</b>
-    <input type="date" id="dataWykonania"><br>
-    <b>Nr stada:</b> <span id="nrStada"></span>
-  </div>
-  <div>
-    <b>Imię, nazwisko i adres albo nazwa siedziby i adres posiadacza zwierzęcia:</b><br>
-    <input list="klientList" id="klientSelect" placeholder="Wpisz lub wybierz klienta"><br>
-    <span id="adresKlienta"></span>
-    <datalist id="klientList"></datalist>
-  </div>
-  <div>
-    <b>Zgłoszenie:</b> Data: <input type="date" id="dataZgloszenia"><br>
-    <b>Nr dokumentu:</b> <input type="text" id="nrDokumentu" placeholder="________">
-  </div>
+  <div>
+    <b>Nazwa i adres zakładu leczniczego dla zwierząt:</b><br>
+    <span id="nazwaLecznicy"></span><br>
+    <b>Wykonanie czynności lekarsko-weterynaryjnych dnia:</b>
+    <input type="date" id="dataWykonania"><br>
+    <b>Nr stada:</b> <span id="nrStada"></span>
+  </div>
+  <div>
+    <b>Imię, nazwisko i adres albo nazwa siedziby i adres posiadacza zwierzęcia:</b><br>
+    <input list="klientList" id="klientSelect" placeholder="Wpisz lub wybierz klienta"><br>
+    <span id="adresKlienta"></span>
+    <datalist id="klientList"></datalist>
+  </div>
+  <div>
+    <b>Zgłoszenie:</b> Data: <input type="date" id="dataZgloszenia"><br>
+    <b>Nr dokumentu:</b> <input type="text" id="nrDokumentu" placeholder="________">
+  </div>
 </div>
-<div id="formBtnContainer" style="text-align: center; margin-bottom: 10px;">
-    </div>
 
 <div class="table-container">
-  <table id="karta">
-  <thead>
-    <tr>
-      <th rowspan="2" style="width:30px;">Lp.</th>
-      <th rowspan="2" class="center-text">
-        Nazwa siedziby stada i opis leczonego zwierzęcia<br>
-        (gatunek, płeć numer identyfikacyjny, sposób oznakowania, wiek, masa ciała)
-      </th>
-      <th rowspan="2" class="center-text">Liczba leczonych zwierząt</th>
-      <th rowspan="2" class="center-text">Rozpoznanie albo wstępne rozpoznanie choroby</th>
-      <th colspan="3">
-        Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posiadacza zwierzęcia produkty lecznicze weterynaryjne lub pasze lecznicze
-      </th>
-      <th rowspan="2">okres karencji / Zabieg leczniczy lub profilaktyczne zalecenia lekarskie oraz uwagi</th>
-    </tr>
-    <tr>
-      <th>Nazwa produktu leczniczego/ produktu leczniczego weterynaryjnego/ paszy leczniczej</th>
-      <th>Numer serii produktu leczniczego lub produktu leczniczego weterynaryjnego</th>
-      <th>Ilość, dawkowanie zastosowanego produktu leczniczego lub ilość, dawkowanie i okres stosowanie nabytego produktu leczniczego, weterynaryjnego/paszy leczniczej</th>
-    </tr>
-  </thead>
-  <tbody></tbody>
-  </table>
+  <table id="karta">
+  <thead>
+    <tr>
+      <th rowspan="2" style="width:30px;">Lp.</th>
+      <th rowspan="2" class="center-text">
+        Nazwa siedziby stada i opis leczonego zwierzęcia<br>
+        (gatunek, płeć numer identyfikacyjny, sposób oznakowania, wiek, masa ciała)
+      </th>
+      <th rowspan="2" class="center-text">Liczba leczonych zwierząt</th>
+      <th rowspan="2" class="center-text">Rozpoznanie albo wstępne rozpoznanie choroby</th>
+      <th colspan="3">
+        Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posiadacza zwierzęcia produkty lecznicze weterynaryjne lub pasze lecznicze
+      </th>
+      <th rowspan="2">okres karencji / Zabieg leczniczy lub profilaktyczne zalecenia lekarskie oraz uwagi</th>
+    </tr>
+    <tr>
+      <th>Nazwa produktu leczniczego/ produktu leczniczego weterynaryjnego/ paszy leczniczej</th>
+      <th>Numer serii produktu leczniczego lub produktu leczniczego weterynaryjnego</th>
+      <th>Ilość, dawkowanie zastosowanego produktu leczniczego lub ilość, dawkowanie i okres stosowanie nabytego produktu leczniczego, weterynaryjnego/paszy leczniczej</th>
+    </tr>
+  </thead>
+  <tbody></tbody>
+  </table>
 </div>
 
 <p><b>Oświadczam, że nabyte produkty lecznicze weterynaryjne/pasze lecznicze zostaną zastosowane zgodnie z zaleceniami lekarza weterynarii.</b></p>
 
 <div class="signatures">
-  <div class="signature-box">
-    <span class="signature-label">Lekarz weterynarii</span>
-    <img id="doctor-signature" class="signature-img" alt="Podpis lekarza">
-    <span class="signature-name">lek. wet. Magdalena Chojnowska</span>
-  </div>
-  <div class="signature-box">
-    <span class="signature-label">Podpis posiadacza zwierzęcia</span>
-    <canvas id="canvasPosiadacz" class="signature-canvas"></canvas>
-    <button id="fullscreenBtn">Podpisz dokument</button>
-    <button id="clearSignBtn">Wyczyść podpis</button>
-  </div>
+  <div class="signature-box">
+    <span class="signature-label">Lekarz weterynarii</span>
+    <img id="doctor-signature" class="signature-img" alt="Podpis lekarza">
+    <span class="signature-name">lek. wet. Magdalena Chojnowska</span>
+  </div>
+  <div class="signature-box">
+    <span class="signature-label">Podpis posiadacza zwierzęcia</span>
+    <canvas id="canvasPosiadacz" class="signature-canvas"></canvas>
+    <button id="fullscreenBtn">Podpisz dokument</button>
+    <button id="clearSignBtn">Wyczyść podpis</button>
+  </div>
 </div>
 
 <p><b>Wyniki badań uzupełniających:</b><br>*W przypadku zwierząt znajdujących się w rejestrze zwierząt gospodarskich oznakowanych</p>
 
 <div class="actions">
- <button id="openCalculatorBtn" class="btn small">Otwórz Kalkulator</button>   <button id="copyBtn" class="btn">Przepisz dane z leczenia na miejscu</button>
-  <button id="formBtn" class="btn">📋 Wprowadź poprzez formularz</button>
-  <button id="printBtn" class="btn" onclick="window.print()">Drukuj / Zapisz PDF</button>
-  <div class="email-box">
-  <label for="userEmail">📧 Podaj swój adres e-mail:</label>
-  <div class="email-input-wrapper">
-    <input type="email" id="userEmail" placeholder="np. jan.kowalski@email.com">
-    <button type="button" id="saveEmail" title="Zapisz adres e-mail">💾</button>
-  </div>
+  <button id="copyBtn" class="btn">Przepisz dane z leczenia na miejscu</button>
+  <button id="formBtn" class="btn">📋 Wprowadź poprzez formularz</button>
+  <button id="printBtn" class="btn" onclick="window.print()">Drukuj / Zapisz PDF</button>
+  <div class="email-box">
+  <label for="userEmail">📧 Podaj swój adres e-mail:</label>
+  <div class="email-input-wrapper">
+    <input type="email" id="userEmail" placeholder="np. jan.kowalski@email.com">
+    <button type="button" id="saveEmail" title="Zapisz adres e-mail">💾</button>
+  </div>
 </div>
 
 </div>
 
+<!-- fullscreen overlay for signature -->
 <div class="fullscreen-overlay" id="fullscreenOverlay">
-  <canvas id="fullscreenCanvas" class="fullscreen-canvas"></canvas>
-  <button id="closeSignBtn">Zamknij podpis</button>
-  <button id="clearFullscreenSignBtn">Wyczyść podpis</button>
+  <canvas id="fullscreenCanvas" class="fullscreen-canvas"></canvas>
+  <button id="closeSignBtn">Zamknij podpis</button>
+  <button id="clearFullscreenSignBtn">Wyczyść podpis</button>
 </div>
 
+<!-- FORMULARZ (modal od dołu na mobilnych) -->
 <div id="formModal" aria-hidden="true">
-  <div class="form-card" role="dialog" aria-modal="true">
-        <div id="step1" class="form-step active">
-      <h3>Dane posiadacza / nagłówek</h3>
-      <div class="form-row">
-        <label for="formKlient">Imię, nazwisko lub nazwa siedziby</label>
-        <input list="klientList" id="formKlient" placeholder="Wpisz lub wybierz klienta">
-      </div>
-      <div class="form-row">
-        <label for="formAdres">Adres</label>
-        <input type="text" id="formAdres" placeholder="Adres">
-      </div>
-      <div class="form-row">
-        <label for="formNrStada">Nr stada</label>
-        <input type="text" id="formNrStada" placeholder="Nr stada">
-      </div>
-      <div class="form-row">
-        <label for="formDataZgloszenia">Data zgłoszenia</label>
-        <input type="date" id="formDataZgloszenia">
-      </div>
-      <div class="form-row">
-        <label for="formDataWykonania">Data wykonania</label>
-        <input type="date" id="formDataWykonania">
-      </div>
-      <div class="form-row">
-        <label for="formNrDokumentu">Nr dokumentu</label>
-        <input type="text" id="formNrDokumentu" placeholder="Numer dokumentu">
-      </div>
-      <div class="form-actions">
-        <div class="left">
-          <button id="closeForm" class="btn ghost small">Zakończ</button>
-        </div>
-        <div class="right">
-          <button id="nextToProducts" class="btn primary small">Dalej ➜</button>
-        </div>
-      </div>
-    </div>
-
-        <div id="step2" class="form-step">
-      <h3>Edycja wierszy tabeli</h3>
-
-      <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
-        <label style="margin:0; font-weight:600;">Wybierz wiersz</label>
-        <select id="formRowSelect" style="flex:1; padding:8px; border-radius:6px; border:1px solid #ccc;"></select>
-        <div style="display:flex; gap:6px;">
-          <button id="prevRow" class="btn small">◀</button>
-          <button id="nextRow" class="btn small">▶</button>
-        </div>
-      </div>
-
-      <div class="form-row">
-        <label for="formOpis">Nazwa siedziby stada i opis zwierzęcia</label>
-        <textarea id="formOpis" placeholder="Opis zwierzęcia"></textarea>
-      </div>
-      <div class="form-row">
-        <label for="formLiczba">Liczba leczonych zwierząt</label>
-        <input type="number" id="formLiczba" min="0" placeholder="0">
-      </div>
-      <div class="form-row">
-        <label for="formRozpoznanie">Rozpoznanie / wstępne rozpoznanie</label>
-        <input type="text" id="formRozpoznanie" placeholder="Rozpoznanie">
-      </div>
-
-      <div class="form-row">
-        <label for="formLek">Nazwa produktu leczniczego (lista)</label>
-        <input list="listaLekow" id="formLek" placeholder="Wybierz lek">
-      </div>
-      <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
-        <button id="micBtn" class="" title="Dyktuj nazwę produktu">🎤</button>
-        <small style="color:#666">Naciśnij mikrofon aby dyktować</small>
-      </div>
-
-      <div class="form-row">
-        <label for="formSeria">Numer serii produktu</label>
-        <input type="text" id="formSeria" placeholder="Numer serii">
-      </div>
-      <form id="myForm">
-
-  <div class="form-row">
-    <label>Ilość </label>
-    <input type="number" inputmode="numeric" pattern="[0-9]*" id="formIlosc" placeholder="0" style="width:60px;">
-  </div>
-
-  <div class="form-row">
-    <label>Dawkowanie / jednostka</label>
-    <input type="text" id="formDawkowanie" placeholder="np. 2 ml/kg">
-  </div>
-</form>
-
-      <div class="mic-container">
-  <input type="text" id="formKarencja" placeholder="Okres karencji / uwagi">
-  <button type="button" id="micKarencja" class="mic-btn" title="Dyktuj">🎤</button>
-</div>
-
-
-      <div class="form-actions" style="margin-top:12px;">
-        <div class="left">
-          <button id="backToHeader" class="btn ghost small">⬅ Cofnij</button>
-        </div>
-        <div class="right">
-          <button id="saveRow" class="btn primary small">Zapisz wiersz</button>
-          <button id="formCopyBtn" class="btn small">Przepisz dane z leczenia na miejscu</button>
-        </div>
-      </div>
-    </div>
-
-  </div>
-</div>
-
-<datalist id="listaLekow"></datalist>
-
-</div> <div id="kalkulatorWizytySection" style="display: none;">
-  <h2>Kalkulator Wizyty</h2>
-  <div id="calculatorUI">
-    <div id="receiptDisplay" style="border: 1px solid #ccc; min-height: 100px; margin-bottom: 15px; padding: 5px; background: #f9f9f9;">
-      <p style="text-align: center; color: #999;">Paragon jest pusty</p>
-    </div>
-
-    <div>
-      <input type="checkbox" id="copyFromCardCheckbox">
-      <label for="copyFromCardCheckbox">Przepisz produkty z karty leczenia</label>
-    </div>
-
-    <div style="margin-top: 15px; display: flex; gap: 10px; align-items: flex-end;">
-      <div style="flex-grow: 1;">
-        <label for="productSelect">Wybierz produkt:</label><br>
-        <input list="listaLekow" id="productSelect" style="width: 100%; padding: 5px;">
-        </div>
-      <div>
-        <label for="productQuantityInput">Ilość:</label><br>
-        <input type="number" id="productQuantityInput" value="1" min="1" style="width: 60px; padding: 5px;">
+  <div class="form-card" role="dialog" aria-modal="true">
+    <!-- krok 1: nagłówek -->
+    <div id="step1" class="form-step active">
+      <h3>Dane posiadacza / nagłówek</h3>
+      <div class="form-row">
+        <label for="formKlient">Imię, nazwisko lub nazwa siedziby</label>
+        <input list="klientList" id="formKlient" placeholder="Wpisz lub wybierz klienta">
       </div>
-      <button id="addProductBtn" class="btn primary small">Dodaj</button>
+      <div class="form-row">
+        <label for="formAdres">Adres</label>
+        <input type="text" id="formAdres" placeholder="Adres">
+      </div>
+      <div class="form-row">
+        <label for="formNrStada">Nr stada</label>
+        <input type="text" id="formNrStada" placeholder="Nr stada">
+      </div>
+      <div class="form-row">
+        <label for="formDataZgloszenia">Data zgłoszenia</label>
+        <input type="date" id="formDataZgloszenia">
+      </div>
+      <div class="form-row">
+        <label for="formDataWykonania">Data wykonania</label>
+        <input type="date" id="formDataWykonania">
+      </div>
+      <div class="form-row">
+        <label for="formNrDokumentu">Nr dokumentu</label>
+        <input type="text" id="formNrDokumentu" placeholder="Numer dokumentu">
+      </div>
+      <div class="form-actions">
+        <div class="left">
+          <button id="closeForm" class="btn ghost small">Zakończ</button>
+        </div>
+        <div class="right">
+          <button id="nextToProducts" class="btn primary small">Dalej ➜</button>
+        </div>
+      </div>
     </div>
 
-    <div style="margin-top: 10px; display: flex; gap: 10px; align-items: flex-end;">
-       <div>
-           <label for="pluCodeInput">Kod PLU:</label><br>
-           <input type="text" id="pluCodeInput" style="width: 80px; padding: 5px;">
-       </div>
-       <button id="pluBtn" class="btn small">PLU</button>
-    </div>
+    <!-- krok 2: edycja wierszy -->
+    <div id="step2" class="form-step">
+      <h3>Edycja wierszy tabeli</h3>
 
+      <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
+        <label style="margin:0; font-weight:600;">Wybierz wiersz</label>
+        <select id="formRowSelect" style="flex:1; padding:8px; border-radius:6px; border:1px solid #ccc;"></select>
+        <div style="display:flex; gap:6px;">
+          <button id="prevRow" class="btn small">◀</button>
+          <button id="nextRow" class="btn small">▶</button>
+        </div>
+      </div>
 
-    <div style="text-align: right; margin-top: 20px;">
-      <button id="saveReceiptBtn" class="btn primary">Zapisz Paragon</button>
-    </div>
+      <div class="form-row">
+        <label for="formOpis">Nazwa siedziby stada i opis zwierzęcia</label>
+        <textarea id="formOpis" placeholder="Opis zwierzęcia"></textarea>
+      </div>
+      <div class="form-row">
+        <label for="formLiczba">Liczba leczonych zwierząt</label>
+        <input type="number" id="formLiczba" min="0" placeholder="0">
+      </div>
+      <div class="form-row">
+        <label for="formRozpoznanie">Rozpoznanie / wstępne rozpoznanie</label>
+        <input type="text" id="formRozpoznanie" placeholder="Rozpoznanie">
+      </div>
+
+      <div class="form-row">
+        <label for="formLek">Nazwa produktu leczniczego (lista)</label>
+        <input list="listaLekow" id="formLek" placeholder="Wybierz lek">
+      </div>
+      <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
+        <button id="micBtn" class="" title="Dyktuj nazwę produktu">🎤</button>
+        <small style="color:#666">Naciśnij mikrofon aby dyktować</small>
+      </div>
+
+      <div class="form-row">
+        <label for="formSeria">Numer serii produktu</label>
+        <input type="text" id="formSeria" placeholder="Numer serii">
+      </div>
+      <form id="myForm">
+
+  <div class="form-row">
+    <label>Ilość </label>
+    <input type="number" inputmode="numeric" pattern="[0-9]*" id="formIlosc" placeholder="0" style="width:60px;">
   </div>
 
-  <div id="savedReceiptSummary" style="margin-top: 20px; border-top: 1px dashed #ccc; padding-top: 10px;">
-     </div>
+  <div class="form-row">
+    <label>Dawkowanie / jednostka</label>
+    <input type="text" id="formDawkowanie" placeholder="np. 2 ml/kg">
+  </div>
+</form>
 
-</div> <script>
+      <div class="mic-container">
+  <input type="text" id="formKarencja" placeholder="Okres karencji / uwagi">
+  <button type="button" id="micKarencja" class="mic-btn" title="Dyktuj">🎤</button>
+</div>
+
+
+      <div class="form-actions" style="margin-top:12px;">
+        <div class="left">
+          <button id="backToHeader" class="btn ghost small">⬅ Cofnij</button>
+        </div>
+        <div class="right">
+          <button id="saveRow" class="btn primary small">Zapisz wiersz</button>
+          <button id="formCopyBtn" class="btn small">Przepisz dane z leczenia na miejscu</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- datalist dla leków (tworzone dynamicznie) -->
+<datalist id="listaLekow"></datalist>
+
+<script>
+// 🔴 ZNAJDŹ I USUŃ TEN BLOK: 🔴
+
+// ✅ WKLEJ TEN BLOK W MIEJSCE USUNIĘTEGO: ✅
+
 /* ----- dane map i nazwy leków (będą uzupełnione z serwera) ----- */
 let mapaSerii = {}, mapaIlosci = {}, mapaKarencji = {}, nazwyLekow = [];
 
 // 🌐 Tryb GitHub Pages – pobieramy dane z lokalnego pliku data.json
-fetch('data.json')
-  .then(response => {
-    if (!response.ok) throw new Error('Błąd sieci: ' + response.status);
-    return response.json();
-  })
-  .then(data => {
-    console.log('✅ Dane pobrane z data.json:', data);
-    initData(data);
-  })
-  .catch(error => {
-    console.error('❌ Błąd pobierania pliku data.json:', error);
-    alert('Nie udało się pobrać danych. Spróbuj odświeżyć stronę.');
-  });
-
+fetch('data.json') // <-- To jest poprawny kod
+  .then(response => {
+    if (!response.ok) throw new Error('Błąd sieci: ' + response.status);
+    return response.json();
+  })
+  .then(data => {
+    console.log('✅ Dane pobrane z data.json:', data); // <-- Nowy komunikat
+    initData(data); // wywołuje Twoją funkcję z danymi
+  })
+  .catch(error => {
+    console.error('❌ Błąd pobierania pliku data.json:', error); // <-- Nowy komunikat błędu
+    alert('Nie udało się pobrać danych. Spróbuj odświeżyć stronę.');
+  });
 function initData(data) {
   // nagłówek
   document.getElementById('nazwaLecznicy').textContent = data.nazwaLecznicy || '';
   // klienci -> datalist
   const klientList = document.getElementById('klientList');
   klientList.innerHTML = '';
-  (data.klienci || []).forEach(k => {
+  (data.klienci||[]).forEach(k=>{
     const opt = document.createElement('option');
     opt.value = k.nazwa;
     opt.dataset.adres = k.adres || '';
     opt.dataset.nrstada = k.nrStada || '';
     klientList.appendChild(opt);
+    // also add to the top klientSelect if present (same datalist used)
   });
 
   // leki -> mapy i lista
   nazwyLekow = [];
-  (data.leki || []).forEach(l => {
+  (data.leki||[]).forEach(l=>{
     mapaSerii[l.nazwa] = l.nrSerii || '';
     mapaIlosci[l.nazwa] = l.dawkowanie || '';
     mapaKarencji[l.nazwa] = l.karencja || '';
@@ -601,10 +726,8 @@ function initData(data) {
   const today = new Date().toISOString().split('T')[0];
   if (!document.getElementById('dataZgloszenia').value) document.getElementById('dataZgloszenia').value = today;
   if (!document.getElementById('dataWykonania').value) document.getElementById('dataWykonania').value = today;
-  const formDataZgloszenia = document.getElementById('formDataZgloszenia');
-  const formDataWykonania = document.getElementById('formDataWykonania');
-  if (formDataZgloszenia) formDataZgloszenia.value = today;
-  if (formDataWykonania) formDataWykonania.value = today;
+  document.getElementById('formDataZgloszenia').value = today;
+  document.getElementById('formDataWykonania').value = today;
 
   // podpis lekarza
   if (data.doctorSignature) document.getElementById('doctor-signature').src = data.doctorSignature;
@@ -614,8 +737,9 @@ function initData(data) {
 
   // podłącz zachowanie autouzupełniania klienta w nagłówku i w formularzu
   setupClientAutoFill();
-
   // --- Przenoszenie przycisków ---
+
+  // Przenieś przycisk #formBtn nad tabelę (jeśli masz ten kod, jest OK)
   const formBtnContainer = document.getElementById('formBtnContainer');
   const formBtn = document.getElementById('formBtn');
   if (formBtnContainer && formBtn) {
@@ -625,115 +749,163 @@ function initData(data) {
      if (!formBtnContainer) console.warn("#formBtnContainer not found, skipping move.");
   }
 
+  // Przenieś przycisk #copyBtn do specjalnego wiersza tabeli
   const copyBtn = document.getElementById('copyBtn');
-  const buttonPlaceholder = document.getElementById('copyBtnPlaceholder');
+  const buttonPlaceholder = document.getElementById('copyBtnPlaceholder'); // Znajdź placeholder
+
   if (copyBtn && buttonPlaceholder) {
-      buttonPlaceholder.appendChild(copyBtn);
+      buttonPlaceholder.appendChild(copyBtn); // Przenieś przycisk do placeholdera
   } else {
      if (!copyBtn) console.warn("#copyBtn not found, skipping move.");
      if (!buttonPlaceholder) console.warn("#copyBtnPlaceholder not found, skipping move.");
   }
-} // <- Koniec funkcji initData
+  // ✅ KONIEC WKLEJANEGO KODU
+}
 
-/* ---- generowanie wierszy ---- */
+/* ---- generowanie wierszy (dokładnie tak jak wcześniej) ---- */
 function generateRows(){
   const tbody = document.querySelector('#karta tbody');
   tbody.innerHTML = '';
   for (let i=1;i<=13;i++){
     const row = document.createElement('tr');
-    if (i===10) {
+  if (i===10) {
       const cell = document.createElement('td');
       cell.colSpan = 8;
-      cell.style.textAlign = 'left';
+      cell.style.textAlign = 'left'; // Wyrównanie dla całej komórki
+
+      // Główny kontener w komórce, używający flexbox
       const mainContainer = document.createElement('div');
-      mainContainer.style.display = 'flex';
-      mainContainer.style.alignItems = 'center';
-      mainContainer.style.justifyContent = 'space-between';
+      mainContainer.style.display = 'flex'; // Ustawienie elementów obok siebie
+      mainContainer.style.alignItems = 'center'; // Wyrównanie pionowe do środka
+      mainContainer.style.justifyContent = 'space-between'; // Opcjonalnie: rozsuń tekst i przycisk
       cell.appendChild(mainContainer);
+
+      // Kontener na tekst (aby zachować pogrubienie)
       const textDiv = document.createElement('div');
       textDiv.textContent = 'Potwierdzenie nabycia produktu leczniczego weterynaryjnego/paszy leczniczej';
       textDiv.style.fontWeight = 'bold';
-      mainContainer.appendChild(textDiv);
+      mainContainer.appendChild(textDiv); // Dodaj tekst do głównego kontenera
+
+      // Kontener (placeholder) na przycisk
       const buttonPlaceholder = document.createElement('div');
-      buttonPlaceholder.style.marginLeft = '10px';
-      buttonPlaceholder.id = 'copyBtnPlaceholder';
-      mainContainer.appendChild(buttonPlaceholder);
+      buttonPlaceholder.style.marginLeft = '10px'; // Dodaj mały odstęp między tekstem a przyciskiem
+      buttonPlaceholder.id = 'copyBtnPlaceholder'; // ✅ Dodajemy ID, aby łatwiej go znaleźć
+      mainContainer.appendChild(buttonPlaceholder); // Dodaj placeholder do głównego kontenera
+
       row.appendChild(cell);
       tbody.appendChild(row);
-      continue;
+      continue; // Kontynuuj pętlę
     }
     for (let j=1;j<=8;j++){
       const cell = document.createElement('td');
+      if (j===1) cell.textContent = (i>10?i-10:i)+'.';
+      /* ✅ WKLEJ TEN BLOK W MIEJSCE USUNIĘTEGO: ✅ */
+if (j===1) {
+  // Obliczamy "logiczny" indeks wiersza (0-11),
+  // który jest używany przez funkcje formularza
+  const logicalIndex = (i > 10) ? i - 2 : i - 1;
 
-      if (j===1) { // Logika dla j=1
-        const logicalIndex = (i > 10) ? i - 2 : i - 1;
-        const rowNumText = (i > 10 ? i - 10 : i) + '.';
-        cell.textContent = rowNumText + ' ';
-        const btn = document.createElement('button');
-        btn.textContent = '➡️';
-        btn.className = 'btn-edit-row';
-        btn.title = 'Edytuj ten wiersz w formularzu';
-        btn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          openFormAtRow(logicalIndex);
-        });
-        cell.appendChild(btn);
-      } else { // Domyślne dla pozostałych + logika specjalna
-         if (i !== 10) {
-             cell.contentEditable = true;
-         }
-      }
+  // Bierzemy tekst, który miałeś tam wcześniej (np. "1.", "2." itd.)
+  const rowNumText = (i > 10 ? i - 10 : i) + '.';
 
-      if (j>=2 && j<=4) { cell.classList.add('center-text'); } // Centrowanie
+  // Wyczyść komórkę i dodaj numer
+  cell.textContent = rowNumText + ' '; 
 
-      if (j===3 && i!==10){ // Input liczbowy
-         const input = document.createElement('input');
-         input.type = 'number'; input.min = '0'; input.style.width = '50px';
-         cell.textContent = ''; cell.appendChild(input);
-      }
+  // Stwórz i dodaj przycisk "edytuj"
+  const btn = document.createElement('button');
+  btn.textContent = '➡️'; // Możesz zmienić na '✏️' lub inny symbol
+  btn.className = 'btn-edit-row';
+  btn.title = 'Edytuj ten wiersz w formularzu';
 
-      if (j===5 && i!==10){ // Input listy leków
+  btn.addEventListener('click', (e) => {
+    // Zatrzymujemy propagację, aby kliknięcie przycisku
+    // nie aktywowało edycji komórki (contenteditable)
+    e.stopPropagation(); 
+
+    // Wywołujemy naszą nową funkcję z indeksem tego wiersza
+    openFormAtRow(logicalIndex);
+  });
+
+  cell.appendChild(btn);
+}
+      if (i!==10) cell.contentEditable = true;
+      if (j>=2 && j<=4) cell.classList.add('center-text');
+      // kolumna 3 -> number input
+      if (j===3 && i!==10){
         const input = document.createElement('input');
-        input.setAttribute('list','listaLekow'); input.style.width = '95%';
+        input.type = 'number';
+        input.min = '0';
+        input.style.width = '50px';
+        cell.textContent = '';
+        cell.appendChild(input);
+      }
+      // kolumna 5 -> input z listą leków
+      if (j===5 && i!==10){
+        const input = document.createElement('input');
+        input.setAttribute('list','listaLekow');
+        input.style.width = '95%';
         input.addEventListener('input', function(){
-          const nrCell = row.cells[5]; const iloscCell = row.cells[6]; const karCell = row.cells[7];
-          const nazwa = this.value; const nr = mapaSerii[nazwa] || '';
-          const dawka = mapaIlosci[nazwa] || ''; const kar = mapaKarencji[nazwa] || '';
-          if(nrCell) nrCell.textContent = nr;
-          if(iloscCell) iloscCell.innerHTML = `<input class="small-input" type="number" inputmode="numeric" pattern="[0-9]*" placeholder="ilość"> ${dawka||''}`;
-          if(karCell) karCell.textContent = kar;
+          const nrCell = row.cells[5];
+          const iloscCell = row.cells[6];
+          const karCell = row.cells[7];
+          const nazwa = this.value;
+          const nr = mapaSerii[nazwa] || '';
+          const dawka = mapaIlosci[nazwa] || '';
+          const kar = mapaKarencji[nazwa] || '';
+          nrCell.textContent = nr;
+          iloscCell.innerHTML = `<input class="small-input" type="number" inputmode="numeric" pattern="[0-9]*" placeholder="ilość"> ${dawka||''}`;
+          karCell.textContent = kar;
         });
-        cell.textContent = ''; cell.appendChild(input);
+        cell.textContent = '';
+        cell.appendChild(input);
       }
       row.appendChild(cell);
-    } // Koniec pętli for (j...)
+    }
     tbody.appendChild(row);
-  } // Koniec pętli for (i...)
+  }
+  // napelnij select w formularzu odpowiadającym wierszom
   populateRowSelect();
-} // Koniec funkcji generateRows
+}
+/* ✅ DODAJ TĘ NOWĄ FUNKCJĘ: ✅ */
 
 /* ---- NOWA FUNKCJA: Otwiera formularz na konkretnym wierszu ---- */
 function openFormAtRow(logicalIndex) {
+  // 1. Otwórz modal
   formModal.style.display = 'flex';
+  
+  // 2. Przejdź od razu do kroku 2 (edycja wiersza)
   showStep(2);
+  
+  // 3. Wypełnij listę rozwijaną wierszy (na wypadek gdyby nie była)
   populateRowSelect();
+  
+  // 4. Ustaw listę rozwijaną na kliknięty wiersz
   formRowSelect.value = logicalIndex;
+  
+  // 5. Wczytaj dane z tego wiersza do formularza
   selectRowInForm(logicalIndex);
+  
+  // 6. Ustaw 'poprzedni' indeks, aby auto-zapis działał poprawnie
   formRowSelect.dataset.prevIndex = logicalIndex;
 }
 /* ---- lista lekow w datalist ---- */
 function rebuildListaLekow(){
   const dl = document.getElementById('listaLekow');
   dl.innerHTML = '';
-  nazwyLekow.forEach(n=>{ const o = document.createElement('option'); o.value = n; dl.appendChild(o); });
+  nazwyLekow.forEach(n=>{
+    const o = document.createElement('option');
+    o.value = n;
+    dl.appendChild(o);
+  });
 }
 
-/* ---- podłączenie autouzupełniania klienta ---- */
+/* ---- podłączenie autouzupełniania klienta (nagłówek i pole formularza) ---- */
 function setupClientAutoFill(){
   const klientSelect = document.getElementById('klientSelect');
   const klientList = document.getElementById('klientList');
   klientSelect.addEventListener('input', function(){
-    const val = this.value; const opt = [...klientList.options].find(o=>o.value===val);
+    const val = this.value;
+    const opt = [...klientList.options].find(o=>o.value===val);
     if (opt){
       document.getElementById('adresKlienta').textContent = opt.dataset.adres || '';
       document.getElementById('nrStada').textContent = opt.dataset.nrstada || '';
@@ -742,508 +914,652 @@ function setupClientAutoFill(){
       document.getElementById('nrStada').textContent = '';
     }
   });
+
+  // formularz - automatyczne uzupełnianie adresu i nr stada po wyborze klienta
   const formKlient = document.getElementById('formKlient');
   formKlient.addEventListener('input', function(){
-    const val = this.value; const opt = [...klientList.options].find(o=>o.value===val);
+    const val = this.value;
+    const opt = [...klientList.options].find(o=>o.value===val);
     if (opt){
       document.getElementById('formAdres').value = opt.dataset.adres || '';
       document.getElementById('formNrStada').value = opt.dataset.nrstada || '';
+    } else {
+      // nieznany klient -> nie czyścimy adresu aby użytkownik mógł pisać
     }
   });
 }
 
-/* ---- kopiowanie do wiersza 10 ---- */
+/* ---- kopiowanie do wiersza 10 i przewinięcie + podświetlenie ---- */
 function copyToRow10FromRow0(){
-  const rows = document.querySelectorAll('#karta tbody tr'); if (!rows[0]) return;
-  const ed = rowsEditable(); if (ed.length === 0) return; const src = ed[0];
+  const rows = document.querySelectorAll('#karta tbody tr');
+  if (!rows[0]) return;
+  // only copy if rows[0] is a normal row (we built so first is row 1)
+  // find source cells: first non-10 row (rows array includes the special row as one element)
+  // Safer way: build arr of editable rows (like rowsEditable())
+  const ed = rowsEditable();
+  if (ed.length === 0) return;
+  const src = ed[0]; // first editable row
+  // find the DOM row index of physical row10 in tbody (it is the 10th created tr)
   const tbodyTrs = [...document.querySelectorAll('#karta tbody tr')];
-  const specialIndex = tbodyTrs.findIndex(tr => tr.children.length === 1 && tr.children[0].colSpan==8); if (specialIndex === -1) return;
-  const logicalRows = rowsEditable(); if (logicalRows.length >= 10) {
-    const target = logicalRows[9];
-    const sourceTextDiv = src.cells[1].querySelector('.editable-text'); // Poprawka: Bierzemy z diva
-    const targetTextDiv = target.cells[1].querySelector('.editable-text'); // Poprawka: Zapisujemy do diva
-    if (sourceTextDiv && targetTextDiv) targetTextDiv.textContent = sourceTextDiv.textContent;
-    else target.cells[1].textContent = src.cells[1].textContent; // Fallback
-    const srcInput = src.cells[2].querySelector('input'); const tgtInput = target.cells[2].querySelector('input');
+  // find index of the row which has colSpan === 8 (our special row)
+  const specialIndex = tbodyTrs.findIndex(tr => tr.children.length === 1 && tr.children[0].colSpan==8);
+  if (specialIndex === -1) return;
+  const row10 = tbodyTrs[specialIndex];
+  // copy cells 1..3 from src into the "special" row cells (special row has single TD colspan 8)
+  // Original behaviour: rows[10].cells[1] etc. In our DOM the "special" row is single cell colspan 8,
+  // but original code earlier assumed rows[10].cells[1] exists. To match original behaviour we will insert
+  // a new row AFTER the special row and fill it (but user wanted structure unchanged). So keep original approach:
+  // In earlier code, rows[10] referenced the 11th element of NodeList of rows (including special as its own row),
+  // and they set rows[10].cells[1] etc. That worked because special row still had 8 cells in earlier code.
+  // To be compatible, we will locate the editable rows array and find the 10th logical row (index 9) and copy into it.
+  const logicalRows = rowsEditable(); // array of trs for logical rows (skips special)
+  if (logicalRows.length >= 10) {
+    const target = logicalRows[9]; // 0-based -> 9 = 10th editable row (this corresponds to original design)
+    // copy columns: cells[1], cells[2], cells[3]
+    target.cells[1].textContent = src.cells[1].textContent;
+    // cell[2] may contain input
+    const srcInput = src.cells[2].querySelector('input');
+    const tgtInput = target.cells[2].querySelector('input');
     if (srcInput && tgtInput) tgtInput.value = srcInput.value;
     target.cells[3].textContent = src.cells[3].textContent;
-    target.classList.add('highlight-row'); setTimeout(()=>target.classList.remove('highlight-row'),2000);
+    // highlight and scroll
+    target.classList.add('highlight-row');
+    setTimeout(()=>target.classList.remove('highlight-row'),2000);
+    // scroll into view
     target.scrollIntoView({behavior:'smooth', block:'center'});
-  } else { alert('Brak wystarczającej liczby wierszy aby przenieść dane do wiersza 10.'); }
+  } else {
+    alert('Brak wystarczającej liczby wierszy aby przenieść dane do wiersza 10.');
+  }
 }
 
-/* helper: zwraca tablicę edytowalnych wierszy */
-function rowsEditable(){ return [...document.querySelectorAll('#karta tbody tr')].filter(tr=>tr.cells.length === 8); }
+/* helper: zwraca tabelę logicznych (edytowalnych) wierszy jako tablica */
+function rowsEditable(){
+  return [...document.querySelectorAll('#karta tbody tr')].filter(tr=>tr.cells.length === 8);
+}
 
-/* ---- Formularz: logika ---- */
-const formModal = document.getElementById('formModal'); const step1 = document.getElementById('step1'); const step2 = document.getElementById('step2');
-const formBtn = document.getElementById('formBtn'); const closeForm = document.getElementById('closeForm');
-const nextToProducts = document.getElementById('nextToProducts'); const backToHeader = document.getElementById('backToHeader');
+/* ---- Formularz: otwieranie, krokowanie, synchronizacja nagłówka ---- */
+const formModal = document.getElementById('formModal');
+const step1 = document.getElementById('step1');
+const step2 = document.getElementById('step2');
+const formBtn = document.getElementById('formBtn');
+const closeForm = document.getElementById('closeForm');
+const nextToProducts = document.getElementById('nextToProducts');
+const backToHeader = document.getElementById('backToHeader');
 const formRowSelect = document.getElementById('formRowSelect');
 
-if (formBtn) {
-    formBtn.addEventListener('click', ()=>{
-      formModal.style.display = 'flex'; showStep(1); populateRowSelect(); formRowSelect.dataset.prevIndex = 0;
-      document.getElementById('formKlient').value = document.getElementById('klientSelect').value || '';
-      document.getElementById('formAdres').value = document.getElementById('adresKlienta').textContent || '';
-      document.getElementById('formNrStada').value = document.getElementById('nrStada').textContent || '';
-      document.getElementById('formDataZgloszenia').value = document.getElementById('dataZgloszenia').value || '';
-      document.getElementById('formDataWykonania').value = document.getElementById('dataWykonania').value || '';
-      document.getElementById('formNrDokumentu').value = document.getElementById('nrDokumentu').value || '';
-    });
-}
+formBtn.addEventListener('click', ()=>{
+  formModal.style.display = 'flex';
+  showStep(1);
+  populateRowSelect();
+  formRowSelect.dataset.prevIndex = 0; 
+  // set form fields from current header values (so form reflects table)
+  document.getElementById('formKlient').value = document.getElementById('klientSelect').value || '';
+  document.getElementById('formAdres').value = document.getElementById('adresKlienta').textContent || '';
+  document.getElementById('formNrStada').value = document.getElementById('nrStada').textContent || '';
+  document.getElementById('formDataZgloszenia').value = document.getElementById('dataZgloszenia').value || '';
+  document.getElementById('formDataWykonania').value = document.getElementById('dataWykonania').value || '';
+  document.getElementById('formNrDokumentu').value = document.getElementById('nrDokumentu').value || '';
+});
+
 closeForm.addEventListener('click', ()=> formModal.style.display = 'none');
-function showStep(n){ step1.classList.toggle('active', n===1); step2.classList.toggle('active', n===2); }
-nextToProducts.addEventListener('click', ()=>{ syncHeaderFormToTop(); populateRowSelect(); selectRowInForm(0); showStep(2); });
-backToHeader.addEventListener('click', ()=>{ showStep(1); });
-function syncHeaderFormToTop(){
-  const klient = document.getElementById('formKlient').value; const adres = document.getElementById('formAdres').value;
-  const nrStada = document.getElementById('formNrStada').value; const dataZ = document.getElementById('formDataZgloszenia').value;
-  const dataW = document.getElementById('formDataWykonania').value; const nrDok = document.getElementById('formNrDokumentu').value;
-  document.getElementById('klientSelect').value = klient; document.getElementById('adresKlienta').textContent = adres;
-  document.getElementById('nrStada').textContent = nrStada; if (dataZ) document.getElementById('dataZgloszenia').value = dataZ;
-  if (dataW) document.getElementById('dataWykonania').value = dataW; document.getElementById('nrDokumentu').value = nrDok;
+
+function showStep(n){
+  step1.classList.toggle('active', n===1);
+  step2.classList.toggle('active', n===2);
 }
+
+/* Next -> synchronizuj nagłówek i przejdź do kroku 2 */
+nextToProducts.addEventListener('click', ()=>{
+  // sync header form -> top header immediately (as user wanted)
+  syncHeaderFormToTop();
+  // populate first selected row data into form fields
+  populateRowSelect();
+  selectRowInForm(0); // default first logical row
+  showStep(2);
+});
+
+/* back */
+backToHeader.addEventListener('click', ()=>{
+  showStep(1);
+});
+
+/* sync header: wpisane w formularzu wartości trafiają do headera */
+function syncHeaderFormToTop(){
+  const klient = document.getElementById('formKlient').value;
+  const adres = document.getElementById('formAdres').value;
+  const nrStada = document.getElementById('formNrStada').value;
+  const dataZ = document.getElementById('formDataZgloszenia').value;
+  const dataW = document.getElementById('formDataWykonania').value;
+  const nrDok = document.getElementById('formNrDokumentu').value;
+  document.getElementById('klientSelect').value = klient;
+  document.getElementById('adresKlienta').textContent = adres;
+  document.getElementById('nrStada').textContent = nrStada;
+  if (dataZ) document.getElementById('dataZgloszenia').value = dataZ;
+  if (dataW) document.getElementById('dataWykonania').value = dataW;
+  document.getElementById('nrDokumentu').value = nrDok;
+}
+
+/* ---- Row select: wypełnij select indeksami logicznych wierszy (1..13 bez wiersza 10) ---- */
 function populateRowSelect(){
-  const sel = formRowSelect; sel.innerHTML = ''; const logical = rowsEditable();
+  const sel = formRowSelect;
+  sel.innerHTML = '';
+  const logical = rowsEditable();
   logical.forEach((tr, idx) => {
-    const display = tr.cells[0].textContent || (idx+1)+'.'; const opt = document.createElement('option');
-    opt.value = idx; opt.textContent = (idx+1) + '.'; sel.appendChild(opt);
+    // compute displayed row number -> use first cell (like "1." etc)
+    const display = tr.cells[0].textContent || (idx+1)+'.';
+    const opt = document.createElement('option');
+    opt.value = idx; // index within logical array
+    opt.textContent = (idx+1) + '.';
+    sel.appendChild(opt);
   });
 }
+
+/* ---- wybierz kolejny/poprzedni w formularzu ---- */
 document.getElementById('nextRow').addEventListener('click', ()=>{
-  const sel = formRowSelect; const prevIdx = parseInt(sel.dataset.prevIndex,10); if (!isNaN(prevIdx)) saveRow(prevIdx);
-  if (sel.selectedIndex < sel.options.length - 1) sel.selectedIndex++; sel.dispatchEvent(new Event('change'));
-});
-document.getElementById('prevRow').addEventListener('click', ()=>{
-  const sel = formRowSelect; const prevIdx = parseInt(sel.dataset.prevIndex,10); if (!isNaN(prevIdx)) saveRow(prevIdx);
-  if (sel.selectedIndex > 0) sel.selectedIndex--; sel.dispatchEvent(new Event('change'));
-});
-formRowSelect.addEventListener('change', ()=>{
-  const prevIdx = parseInt(formRowSelect.dataset.prevIndex,10); if (!isNaN(prevIdx)) saveRow(prevIdx);
-  const idx = parseInt(formRowSelect.value,10); selectRowInForm(idx); formRowSelect.dataset.prevIndex = idx;
+  const sel = formRowSelect;
+  const prevIdx = parseInt(sel.dataset.prevIndex,10);
+  if (!isNaN(prevIdx)) saveRow(prevIdx); // autozapis obecnego wiersza
+  if (sel.selectedIndex < sel.options.length - 1) sel.selectedIndex++;
+  sel.dispatchEvent(new Event('change'));
 });
 
-/* ---- funkcja zapisu wiersza ---- */
+document.getElementById('prevRow').addEventListener('click', ()=>{
+  const sel = formRowSelect;
+  const prevIdx = parseInt(sel.dataset.prevIndex,10);
+  if (!isNaN(prevIdx)) saveRow(prevIdx); // autozapis obecnego wiersza
+  if (sel.selectedIndex > 0) sel.selectedIndex--;
+  sel.dispatchEvent(new Event('change'));
+});
+
+// dodatkowo przy ręcznym wyborze wiersza w dropdown autozapis
+formRowSelect.addEventListener('change', ()=>{
+  const prevIdx = parseInt(formRowSelect.dataset.prevIndex,10);
+  if (!isNaN(prevIdx)) saveRow(prevIdx); // teraz zapisze również 0
+  const idx = parseInt(formRowSelect.value,10);
+  selectRowInForm(idx);
+  formRowSelect.dataset.prevIndex = idx;
+});
+
+
+
+/* ---- zapis aktualnego wiersza przy zmianie wiersza w formularzu ---- */
+formRowSelect.addEventListener('change', ()=> {
+  // zapis aktualnego wiersza przed przejściem do nowego
+  const prevIdx = parseInt(formRowSelect.dataset.prevIndex, 10);
+  if (!isNaN(prevIdx)) {
+    saveRow(prevIdx);
+  }
+  const idx = parseInt(formRowSelect.value, 10);
+  selectRowInForm(idx);
+  formRowSelect.dataset.prevIndex = idx; // zapamiętaj nowy indeks
+});
+
+/* ---- funkcja zapisu wiersza (jeśli jeszcze nie masz) ---- */
 function saveRow(idx){
-  const logical = rowsEditable(); const row = logical[idx]; if (!row) return;
-  const textDiv = row.cells[1].querySelector('.editable-text'); // Znajdź div
-  if (textDiv) textDiv.textContent = document.getElementById('formOpis').value; // Zapisz do diva
-  else row.cells[1].textContent = document.getElementById('formOpis').value; // Fallback
-  const inp2 = row.cells[2].querySelector('input'); if (inp2) inp2.value = document.getElementById('formLiczba').value;
+  const logical = rowsEditable();
+  const row = logical[idx];
+  if (!row) return;
+
+  // write values
+  row.cells[1].textContent = document.getElementById('formOpis').value;
+  const inp2 = row.cells[2].querySelector('input');
+  if (inp2) inp2.value = document.getElementById('formLiczba').value;
   row.cells[3].textContent = document.getElementById('formRozpoznanie').value;
   const produktInput = row.cells[4].querySelector('input');
-  if (produktInput) { produktInput.value = document.getElementById('formLek').value; produktInput.dispatchEvent(new Event('input', { bubbles:true })); }
+  if (produktInput) {
+    produktInput.value = document.getElementById('formLek').value;
+    produktInput.dispatchEvent(new Event('input', { bubbles:true }));
+  }
   row.cells[5].textContent = document.getElementById('formSeria').value;
-  const cell6 = row.cells[6]; const iloscInput = cell6.querySelector('input[type="number"]');
-  if (iloscInput) { iloscInput.value = document.getElementById('formIlosc').value || ''; }
-  const dawkowanie = document.getElementById('formDawkowanie').value || '';
-  let textNode = iloscInput ? iloscInput.nextSibling : cell6.firstChild;
-  if (textNode && textNode.nodeType === Node.TEXT_NODE) { textNode.textContent = ' ' + dawkowanie; }
-  else if (iloscInput) { cell6.appendChild(document.createTextNode(' ' + dawkowanie)); }
-  else { cell6.textContent = (document.getElementById('formIlosc').value || '') + ' ' + dawkowanie; }
+  const iloInp = row.cells[6].querySelector('input');
+  if (iloInp) iloInp.value = document.getElementById('formDawkowanie').value || iloInp.value;
   row.cells[7].textContent = document.getElementById('formKarencja').value;
-  row.classList.add('highlight-row'); setTimeout(() => row.classList.remove('highlight-row'), 1600);
+  row.classList.add('highlight-row');
+  setTimeout(()=>row.classList.remove('highlight-row'), 1600);
 }
 
+
 function selectRowInForm(logicalIndex){
-  const logical = rowsEditable(); const row = logical[logicalIndex]; if (!row) return;
-  const textDiv = row.cells[1].querySelector('.editable-text'); // Znajdź div
-  document.getElementById('formOpis').value = textDiv ? textDiv.textContent.trim() : row.cells[1].textContent.trim(); // Czytaj z diva (fallback)
-  const inp = row.cells[2].querySelector('input'); document.getElementById('formLiczba').value = inp ? inp.value : '';
+  const logical = rowsEditable();
+  const row = logical[logicalIndex];
+  if (!row) return;
+  // load values into form
+  document.getElementById('formOpis').value = row.cells[1].textContent.trim();
+  const inp = row.cells[2].querySelector('input');
+  document.getElementById('formLiczba').value = inp ? inp.value : '';
   document.getElementById('formRozpoznanie').value = row.cells[3].textContent.trim();
-  const lekInput = row.cells[4].querySelector('input'); document.getElementById('formLek').value = lekInput ? lekInput.value : '';
+  const lekInput = row.cells[4].querySelector('input');
+  document.getElementById('formLek').value = lekInput ? lekInput.value : '';
   document.getElementById('formSeria').value = row.cells[5].textContent.trim();
-  const cell6 = row.cells[6]; const iloscInput = cell6.querySelector('input[type="number"]');
-  document.getElementById('formIlosc').value = iloscInput ? iloscInput.value : '';
-  let tekstDawkowania = ''; const textNode = iloscInput ? iloscInput.nextSibling : cell6.firstChild;
-  if (textNode && textNode.nodeType === Node.TEXT_NODE) { tekstDawkowania = textNode.textContent.trim(); }
-  else if (!iloscInput) {
-     const fullText = cell6.textContent.trim(); const numberPart = document.getElementById('formIlosc').value;
-     if (numberPart && fullText.startsWith(numberPart)) { tekstDawkowania = fullText.substring(numberPart.length).trim(); }
-     else { tekstDawkowania = fullText; }
-  }
-  document.getElementById('formDawkowanie').value = tekstDawkowania;
+  // ilość w komórce 6 może być input + tekst dawkowania
+  // --- Wczytanie ilości i dawkowania z komórki 6 ---
+const cell6 = row.cells[6];
+
+// liczba (mały input)
+const iloscInput = cell6.querySelector('input[type="number"]');
+document.getElementById('formIlosc').value = iloscInput ? iloscInput.value : '';
+
+// tekst po input (dawkowanie)
+let tekstDawkowania = '';
+if (cell6.childNodes.length > 1 && cell6.childNodes[1].nodeType === Node.TEXT_NODE) {
+  tekstDawkowania = cell6.childNodes[1].textContent.trim();
+}
+document.getElementById('formDawkowanie').value = tekstDawkowania;
+
   document.getElementById('formKarencja').value = row.cells[7].textContent.trim();
 }
 
+/* ---- po wyborze produktu w formularzu automatycznie uzupełnij seria/dawkowanie/karencja ---- */
 document.getElementById('formLek').addEventListener('input', function(){
-  const n = this.value; document.getElementById('formSeria').value = mapaSerii[n] || '';
+  const n = this.value;
+  document.getElementById('formSeria').value = mapaSerii[n] || '';
+  // jeśli dawkowanie ma być w polu 'tekstowym' (zachowujemy format tabeli)
   document.getElementById('formDawkowanie').value = mapaIlosci[n] || '';
   document.getElementById('formKarencja').value = mapaKarencji[n] || '';
 });
 
+/* ---- zapis wiersza: zapisuje do logicznego wiersza (nie zmienia struktury tabeli) ---- */
 document.getElementById('saveRow').addEventListener('click', ()=>{
-  const idx = parseInt(formRowSelect.value,10); saveRow(idx); alert('Wiersz zapisany.');
+  const idx = parseInt(formRowSelect.value,10);
+  const logical = rowsEditable();
+  const row = logical[idx];
+  if (!row) { alert('Brak wybranego wiersza'); return; }
+
+  // write values
+  row.cells[1].textContent = document.getElementById('formOpis').value;
+  // cell 2 -> input
+  const inp2 = row.cells[2].querySelector('input');
+  if (inp2) inp2.value = document.getElementById('formLiczba').value;
+  row.cells[3].textContent = document.getElementById('formRozpoznanie').value;
+  // produkt input
+  const produktInput = row.cells[4].querySelector('input');
+  if (produktInput) {
+    produktInput.value = document.getElementById('formLek').value;
+    // dispatch input event to trigger table logic (fills serie/ilosc/karencja like original)
+    produktInput.dispatchEvent(new Event('input', { bubbles:true }));
+  }
+  // series
+  row.cells[5].textContent = document.getElementById('formSeria').value;
+  // ilość -> if there's input inside cell[6], set it; otherwise set text
+  const iloInp = row.cells[6].querySelector('input');
+  if (iloInp) {
+    // if user provided numeric in formDawkowanie, try set numeric portion
+    // but the table's cell[6] holds "<input> dostawanieTekst", so set input value
+    iloInp.value = document.getElementById('formDawkowanie').value || iloInp.value;
+    // ensure we don't destroy trailing dosing text - that part comes from map and already set by productInput.dispatchEvent
+  } else {
+    row.cells[6].textContent = document.getElementById('formDawkowanie').value;
+  }
+  row.cells[7].textContent = document.getElementById('formKarencja').value;
+
+  // Visually confirm
+  row.classList.add('highlight-row');
+  setTimeout(()=>row.classList.remove('highlight-row'), 1600);
+  alert('Wiersz zapisany.');
 });
 
+/* ---- przycisk przepisz w formularzu: przenieś dane z pierwszego wiersza do wiersza 10 i przenieś użytkownika tam ---- */
 document.getElementById('formCopyBtn').addEventListener('click', ()=>{
-  copyToRow10FromRow0(); const sel = formRowSelect; sel.value = 9; sel.dispatchEvent(new Event('change'));
+  copyToRow10FromRow0();
+
+  // ustaw w formularzu na wiersz 10 (indeks logiczny 9)
+  const sel = formRowSelect;
+  sel.value = 9; // 0-based index
+  sel.dispatchEvent(new Event('change'));
+
+  // przewiń do wiersza 10 w tabeli
   const tbodyTrs = [...document.querySelectorAll('#karta tbody tr')];
   const special = tbodyTrs.find(tr => tr.children.length === 1 && tr.children[0].colSpan==8);
-  if (special) { special.scrollIntoView({behavior:'smooth', block:'center'}); special.classList.add('highlight-row');
-    setTimeout(()=>special.classList.remove('highlight-row'),2000); }
+  if (special) { 
+    special.scrollIntoView({behavior:'smooth', block:'center'}); 
+    special.classList.add('highlight-row'); 
+    setTimeout(()=>special.classList.remove('highlight-row'),2000); 
+  }
+
+  // formularz pozostaje otwarty
 });
 
-if(document.getElementById('copyBtn')) {
-    document.getElementById('copyBtn').addEventListener('click', ()=> { copyToRow10FromRow0(); });
-}
 
+/* ---- przycisk górny: przepisz dane z leczenia na miejscu (tak jak oryginalnie) ---- */
+document.getElementById('copyBtn').addEventListener('click', ()=> {
+  // wykonaj kopię i przewiń do wiersza 10
+  copyToRow10FromRow0();
+});
+
+/* ---- mikrofon (dyktowanie nazwy leku) ---- */
 document.getElementById('micBtn').addEventListener('click', ()=>{
+  // check for SpeechRecognition
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SpeechRecognition) { alert('Twoja przeglądarka nie obsługuje rozpoznawania mowy'); return; }
-  const rec = new SpeechRecognition(); rec.lang = 'pl-PL'; rec.interimResults = false; rec.maxAlternatives = 1; rec.start();
+  const rec = new SpeechRecognition();
+  rec.lang = 'pl-PL';
+  rec.interimResults = false;
+  rec.maxAlternatives = 1;
+  rec.start();
   rec.onresult = (e) => {
-    const text = e.results[0][0].transcript; document.getElementById('formLek').value = text;
+    const text = e.results[0][0].transcript;
+    document.getElementById('formLek').value = text;
+    // auto-fill based on recognized name (best effort)
     document.getElementById('formSeria').value = mapaSerii[text] || '';
     document.getElementById('formDawkowanie').value = mapaIlosci[text] || '';
     document.getElementById('formKarencja').value = mapaKarencji[text] || '';
   };
-  rec.onerror = (ev) => { console.error('Speech error', ev); alert('Błąd rozpoznawania mowy: ' + (ev.error || 'nieznany')); };
+  rec.onerror = (ev) => {
+    console.error('Speech error', ev);
+    alert('Błąd rozpoznawania mowy: ' + (ev.error || 'nieznany'));
+  };
 });
 
+/* ---- podpis (Wersja z blokadą małego płótna) ---- */
+/* ---- podpis (Wersja z blokadą i auto-resize) ---- */
 /* ---- podpis (Wersja z blokadą, auto-resize i wymuszeniem landscape) ---- */
 function initSignature(id){
-  const canvas = document.getElementById(id); if (!canvas) return;
-  const ctx = canvas.getContext('2d'); ctx.lineWidth = 2; ctx.lineCap = 'round'; canvas.classList.add('disabled');
-  const fullscreenBtn = document.getElementById('fullscreenBtn'); const clearSignBtn = document.getElementById('clearSignBtn');
-  const fullscreenOverlay = document.getElementById('fullscreenOverlay'); const fullscreenCanvas = document.getElementById('fullscreenCanvas');
-  const closeBtn = document.getElementById('closeSignBtn'); const clearFullscreenBtn = document.getElementById('clearFullscreenSignBtn');
-  let fDrawing = false; let fctx;
+  const canvas = document.getElementById(id); // Małe płótno
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  ctx.lineWidth = 2;
+  ctx.lineCap = 'round';
+  canvas.classList.add('disabled'); // Zablokuj małe płótno
+
+  // Przyciski i overlay
+  const fullscreenBtn = document.getElementById('fullscreenBtn');
+  const clearSignBtn = document.getElementById('clearSignBtn');
+  const fullscreenOverlay = document.getElementById('fullscreenOverlay');
+  const fullscreenCanvas = document.getElementById('fullscreenCanvas'); // Duże płótno
+  const closeBtn = document.getElementById('closeSignBtn');
+  const clearFullscreenBtn = document.getElementById('clearFullscreenSignBtn');
+
+  let fDrawing = false;
+  let fctx;
+
   function getFPos(e){
     const rect = fullscreenCanvas.getBoundingClientRect();
     const clientX = (e.touches && e.touches[0]) ? e.touches[0].clientX : e.clientX;
     const clientY = (e.touches && e.touches[0]) ? e.touches[0].clientY : e.clientY;
     return { x: clientX - rect.left, y: clientY - rect.top };
   }
+
+  // ✅ ZMIANA: Dodano sprawdzanie orientacji przed rozpoczęciem rysowania
   const startDrawingFullscreen = e => {
-    if (window.innerHeight > window.innerWidth) { alert("Proszę obrócić urządzenie do pozycji poziomej, aby podpisać."); fDrawing = false; return; }
-    fDrawing = true; const pos=getFPos(e); fctx.beginPath(); fctx.moveTo(pos.x,pos.y);
+    // Sprawdź orientację - prostsza metoda porównania wymiarów okna
+    if (window.innerHeight > window.innerWidth) {
+        alert("Proszę obrócić urządzenie do pozycji poziomej, aby podpisać.");
+        fDrawing = false; // Upewnij się, że rysowanie jest zablokowane
+        return; // Zakończ funkcję, nie zaczynaj rysować
+    }
+    // Jeśli jest landscape, kontynuuj normalnie
+    fDrawing = true;
+    const pos=getFPos(e);
+    fctx.beginPath();
+    fctx.moveTo(pos.x,pos.y);
   };
   const drawFullscreen = e => { if(fDrawing){ const pos=getFPos(e); fctx.lineTo(pos.x,pos.y); fctx.stroke(); }};
   const stopDrawingFullscreen = () => { fDrawing = false; };
+
   const handleResize = () => {
-    if (fullscreenOverlay.style.display !== 'flex') { window.removeEventListener('resize', handleResize); return; }
-    const newWidth = fullscreenCanvas.offsetWidth; const newHeight = fullscreenCanvas.offsetHeight;
-    const tempCanvas = document.createElement('canvas'); const tempCtx = tempCanvas.getContext('2d');
-    tempCanvas.width = fullscreenCanvas.width; tempCanvas.height = fullscreenCanvas.height;
-    if (fullscreenCanvas.width > 0 && fullscreenCanvas.height > 0) { tempCtx.drawImage(fullscreenCanvas, 0, 0); }
-    fullscreenCanvas.width = newWidth; fullscreenCanvas.height = newHeight;
-    fctx = fullscreenCanvas.getContext('2d'); fctx.lineWidth = 6; fctx.lineCap = 'round';
-    if (tempCanvas.width > 0 && tempCanvas.height > 0) { fctx.drawImage(tempCanvas, 0, 0, newWidth, newHeight); }
+    if (fullscreenOverlay.style.display !== 'flex') {
+      window.removeEventListener('resize', handleResize);
+      return;
+    }
+    const newWidth = fullscreenCanvas.offsetWidth;
+    const newHeight = fullscreenCanvas.offsetHeight;
+    const tempCanvas = document.createElement('canvas');
+    const tempCtx = tempCanvas.getContext('2d');
+    tempCanvas.width = fullscreenCanvas.width;
+    tempCanvas.height = fullscreenCanvas.height;
+    if (fullscreenCanvas.width > 0 && fullscreenCanvas.height > 0) {
+       tempCtx.drawImage(fullscreenCanvas, 0, 0);
+    }
+    fullscreenCanvas.width = newWidth;
+    fullscreenCanvas.height = newHeight;
+    fctx = fullscreenCanvas.getContext('2d');
+    fctx.lineWidth = 6; // Ustawiamy grubość linii (poprawiona z ostatniej zmiany)
+    fctx.lineCap = 'round';
+    if (tempCanvas.width > 0 && tempCanvas.height > 0) {
+       fctx.drawImage(tempCanvas, 0, 0, newWidth, newHeight);
+    }
   };
-  fullscreenBtn.addEventListener('click', async ()=>{
+
+  // --- Obsługa przycisków ---
+  fullscreenBtn.addEventListener('click', async ()=>{ // Zmieniono na async dla await
     fullscreenOverlay.style.display = 'flex';
-    try { if (screen.orientation && screen.orientation.lock) { await screen.orientation.lock('landscape'); console.log("Orientacja zablokowana na landscape."); }
-          else { console.warn("Screen Orientation API not fully supported."); }
-    } catch (error) { console.error("Nie udało się zablokować orientacji:", error); }
+
+    // ✅ ZMIANA: Spróbuj zablokować orientację na poziomą
+    try {
+        if (screen.orientation && screen.orientation.lock) {
+            await screen.orientation.lock('landscape');
+            console.log("Orientacja zablokowana na landscape.");
+        } else {
+            console.warn("Screen Orientation API not fully supported.");
+        }
+    } catch (error) {
+        console.error("Nie udało się zablokować orientacji:", error);
+        // Można tu dodać komunikat dla użytkownika, jeśli blokada jest krytyczna
+        // alert("Nie udało się wymusić orientacji poziomej. Spróbuj obrócić urządzenie ręcznie.");
+    }
+
     requestAnimationFrame(() => {
-        const canvasWidth = fullscreenCanvas.offsetWidth; const canvasHeight = fullscreenCanvas.offsetHeight;
-        fullscreenCanvas.width = canvasWidth; fullscreenCanvas.height = canvasHeight;
-        fctx = fullscreenCanvas.getContext('2d'); fctx.clearRect(0, 0, canvasWidth, canvasHeight);
-        fctx.lineWidth = 6; fctx.lineCap = 'round'; fctx.drawImage(canvas, 0, 0, canvasWidth, canvasHeight);
+        const canvasWidth = fullscreenCanvas.offsetWidth;
+        const canvasHeight = fullscreenCanvas.offsetHeight;
+        fullscreenCanvas.width = canvasWidth;
+        fullscreenCanvas.height = canvasHeight;
+
+        fctx = fullscreenCanvas.getContext('2d');
+        fctx.clearRect(0, 0, canvasWidth, canvasHeight);
+        fctx.lineWidth = 6; // Ustawiamy grubość linii
+        fctx.lineCap = 'round';
+        fctx.drawImage(canvas, 0, 0, canvasWidth, canvasHeight);
+
         fullscreenCanvas.addEventListener('pointerdown', startDrawingFullscreen);
         fullscreenCanvas.addEventListener('pointermove', drawFullscreen);
         fullscreenCanvas.addEventListener('pointerup', stopDrawingFullscreen);
         fullscreenCanvas.addEventListener('pointerleave', stopDrawingFullscreen);
+
         window.addEventListener('resize', handleResize);
     });
+
   });
+
   closeBtn.addEventListener('click', ()=>{
     window.removeEventListener('resize', handleResize);
-    if (screen.orientation && screen.orientation.unlock) { screen.orientation.unlock(); console.log("Orientacja odblokowana."); }
-    ctx.clearRect(0, 0, canvas.width, canvas.height); ctx.drawImage(fullscreenCanvas, 0, 0, canvas.width, canvas.height);
+
+    // ✅ ZMIANA: Odblokuj orientację
+    if (screen.orientation && screen.orientation.unlock) {
+        screen.orientation.unlock();
+        console.log("Orientacja odblokowana.");
+    }
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(fullscreenCanvas, 0, 0, canvas.width, canvas.height);
+
     fullscreenOverlay.style.display = 'none';
+
     fullscreenCanvas.removeEventListener('pointerdown', startDrawingFullscreen);
     fullscreenCanvas.removeEventListener('pointermove', drawFullscreen);
     fullscreenCanvas.removeEventListener('pointerup', stopDrawingFullscreen);
     fullscreenCanvas.removeEventListener('pointerleave', stopDrawingFullscreen);
   });
-  clearFullscreenBtn.addEventListener('click', ()=>{ if (fctx) { fctx.clearRect(0, 0, fullscreenCanvas.width, fullscreenCanvas.height); } });
+
+  clearFullscreenBtn.addEventListener('click', ()=>{
+      if (fctx) {
+        fctx.clearRect(0, 0, fullscreenCanvas.width, fullscreenCanvas.height);
+      }
+  });
+
   clearSignBtn.addEventListener('click', ()=>{ ctx.clearRect(0, 0, canvas.width, canvas.height); });
+
 } // Koniec initSignature
 
+// Inicjalizacja (bez zmian)
 window.addEventListener('load', ()=> initSignature('canvasPosiadacz'));
-
-/* ---- PRZYCISK Zakończ w kroku 2 formularza ---- */
-if (document.getElementById('step2')) {
-    const finishBtn = document.createElement('button'); finishBtn.textContent = 'Zakończ'; finishBtn.className = 'btn warn small'; finishBtn.style.marginLeft = '6px';
-    finishBtn.addEventListener('click', ()=>{
-      const idx = parseInt(formRowSelect.value,10); saveRow(idx); syncHeaderFormToTop(); formModal.style.display = 'none';
-    });
-    const rightActionsContainer = document.getElementById('step2').querySelector('.form-actions .right');
-    if (rightActionsContainer) { rightActionsContainer.appendChild(finishBtn); }
-    else { console.warn("Konteiner '.form-actions .right' nie znaleziony w kroku 2."); }
-} else { console.warn("Element #step2 nie znaleziony przy próbie dodania przycisku 'Zakończ'."); }
-
-window.addEventListener("resize", () => {
-  const modal = document.getElementById("formModal"); const card = modal.querySelector(".form-card");
-  if (card) { card.style.height = window.innerHeight * 0.9 + "px"; card.style.width = Math.min(window.innerWidth * 0.95, 600) + "px"; }
+/* ---- zapis wiersza automatycznie przy zmianie wiersza ---- */
+formRowSelect.addEventListener('change', ()=>{
+  // zapis aktualnego wiersza przed przejściem do nowego
+  const prevIdx = parseInt(formRowSelect.dataset.prevIndex,10);
+  if (!isNaN(prevIdx)) {
+    saveRow(prevIdx);
+  }
+  const idx = parseInt(formRowSelect.value,10);
+  selectRowInForm(idx);
+  formRowSelect.dataset.prevIndex = idx; // zapamiętaj nowy indeks
 });
 
-const micKarencjaBtn = document.getElementById('micKarencja'); const karencjaInput = document.getElementById('formKarencja');
-if ('webkitSpeechRecognition' in window && micKarencjaBtn) {
-  const recognition = new webkitSpeechRecognition(); recognition.lang = 'pl-PL'; recognition.continuous = false; recognition.interimResults = false;
-  micKarencjaBtn.addEventListener('click', () => {
-    if (micKarencjaBtn.classList.contains('active')) { recognition.stop(); micKarencjaBtn.classList.remove('active'); }
-    else { recognition.start(); micKarencjaBtn.classList.add('active'); }
-  });
-  recognition.onresult = (event) => { const text = event.results[0][0].transcript; karencjaInput.value = karencjaInput.value ? karencjaInput.value + ' ' + text : text; };
-  recognition.onerror = (e) => { console.error('Błąd rozpoznawania mowy:', e.error); micKarencjaBtn.classList.remove('active'); };
-  recognition.onend = () => { micKarencjaBtn.classList.remove('active'); };
-} else if (!micKarencjaBtn) { console.warn("Przycisk #micKarencja nie znaleziony."); }
-else { if(micKarencjaBtn) micKarencjaBtn.style.display = 'none'; console.warn('Rozpoznawanie mowy nie jest obsługiwane w tej przeglądarce.'); }
+/* ---- funkcja zapisu wiersza (przeniesiona w górę aby można użyć dynamicznie) ---- */
+function saveRow(idx){
+  const logical = rowsEditable();
+  const row = logical[idx];
+  if (!row) return;
 
-const drukujBtn = document.getElementById('drukujBtn'); if (drukujBtn) { drukujBtn.addEventListener('click', () => { window.print(); }); }
-const emailInput = document.getElementById('userEmail'); const saveEmailBtn = document.getElementById('saveEmail');
-try { const savedEmail = localStorage.getItem('userEmail'); if (savedEmail && emailInput) emailInput.value = savedEmail; }
-catch (e) { console.warn('Brak dostępu do localStorage:', e); }
+  // write values
+  row.cells[1].textContent = document.getElementById('formOpis').value;
+  const inp2 = row.cells[2].querySelector('input');
+  if (inp2) inp2.value = document.getElementById('formLiczba').value;
+  row.cells[3].textContent = document.getElementById('formRozpoznanie').value;
+  const produktInput = row.cells[4].querySelector('input');
+  if (produktInput) {
+    produktInput.value = document.getElementById('formLek').value;
+    produktInput.dispatchEvent(new Event('input', { bubbles:true }));
+  }
+  row.cells[5].textContent = document.getElementById('formSeria').value;
+
+// --- ZAPIS ILOŚCI I DAWKOWANIA ---
+const cell = row.cells[6]; // kolumna Ilość / dawkowanie
+const iloscInput = cell.querySelector('input[type="number"]');
+if (iloscInput) {
+  // przepisz wartość liczbową z formularza
+  iloscInput.value = document.getElementById('formIlosc').value || '';
+}
+
+const dawkowanie = document.getElementById('formDawkowanie').value || '';
+// jeśli po input jest tekst — zaktualizuj go
+if (cell.childNodes.length > 1 && cell.childNodes[1].nodeType === Node.TEXT_NODE) {
+  cell.childNodes[1].textContent = ' ' + dawkowanie;
+} else {
+  // jeśli brak tekstu — dodaj nowy
+  cell.appendChild(document.createTextNode(' ' + dawkowanie));
+}
+
+// --- pozostałe pola ---
+row.cells[7].textContent = document.getElementById('formKarencja').value;
+
+// efekt wizualny: podświetlenie zapisanego wiersza
+row.classList.add('highlight-row');
+setTimeout(() => row.classList.remove('highlight-row'), 1600);
+
+}
+
+/* ---- przycisk Zakończ w kroku 2 ---- */
+const finishBtn = document.createElement('button');
+finishBtn.textContent = 'Zakończ';
+finishBtn.className = 'btn warn small';
+finishBtn.style.marginLeft = '6px';
+finishBtn.addEventListener('click', ()=>{
+  const idx = parseInt(formRowSelect.value,10);
+  saveRow(idx);          // zapis obecnego wiersza
+  syncHeaderFormToTop(); // aktualizacja nagłówka
+  formModal.style.display = 'none'; // zamknij formularz
+});
+step2.querySelector('.form-actions .right').appendChild(finishBtn);
+// Dopasowanie formularza do ekranu przy rotacji lub resize
+window.addEventListener("resize", () => {
+  const modal = document.getElementById("formModal");
+  const card = modal.querySelector(".form-card");
+  if (card) {
+    card.style.height = window.innerHeight * 0.9 + "px";
+    card.style.width = Math.min(window.innerWidth * 0.95, 600) + "px";
+  }
+});
+// 🎤 Dyktowanie głosowe dla pola "Okres karencji / uwagi"
+const micBtn = document.getElementById('micKarencja');
+const karencjaInput = document.getElementById('formKarencja');
+
+if ('webkitSpeechRecognition' in window) {
+  const recognition = new webkitSpeechRecognition();
+  recognition.lang = 'pl-PL';
+  recognition.continuous = false;
+  recognition.interimResults = false;
+
+  micBtn.addEventListener('click', () => {
+    if (micBtn.classList.contains('active')) {
+      recognition.stop();
+      micBtn.classList.remove('active');
+    } else {
+      recognition.start();
+      micBtn.classList.add('active');
+    }
+  });
+
+  recognition.onresult = (event) => {
+    const text = event.results[0][0].transcript;
+    karencjaInput.value = karencjaInput.value
+      ? karencjaInput.value + ' ' + text
+      : text;
+  };
+
+  recognition.onerror = (e) => {
+    console.error('Błąd rozpoznawania mowy:', e.error);
+    micBtn.classList.remove('active');
+  };
+
+  recognition.onend = () => {
+    micBtn.classList.remove('active');
+  };
+} else {
+  micBtn.style.display = 'none';
+  console.warn('Rozpoznawanie mowy nie jest obsługiwane w tej przeglądarce.');
+}
+// === Obsługa przycisku Drukuj i zapisu e-maila ===
+
+// Drukuj (jeśli chcesz żeby kliknięcie tego przycisku wywołało window.print)
+const drukujBtn = document.getElementById('drukujBtn');
+if (drukujBtn) {
+  drukujBtn.addEventListener('click', () => {
+    window.print();
+  });
+}
+
+// Elementy e-mail
+const emailInput = document.getElementById('userEmail');
+const saveEmailBtn = document.getElementById('saveEmail');
+
+// Wczytaj zapisany e-mail z localStorage (jeśli jest)
+try {
+  const savedEmail = localStorage.getItem('userEmail');
+  if (savedEmail && emailInput) emailInput.value = savedEmail;
+} catch (e) {
+  console.warn('Brak dostępu do localStorage:', e);
+}
+
+// Zapisuj e-mail po kliknięciu przycisku 💾
 if (saveEmailBtn && emailInput) {
   saveEmailBtn.addEventListener('click', () => {
-    const email = emailInput.value.trim(); if (!email) { alert('⚠️ Wprowadź adres e-mail.'); return; }
-    if (!email.includes('@') || !email.includes('.')) { alert('⚠️ Wprowadź poprawny adres e-mail.'); return; }
-    try { localStorage.setItem('userEmail', email); alert('📨 Adres e-mail został zapisany lokalnie.'); }
-    catch (e) { console.error('Błąd zapisu w localStorage:', e); alert('❌ Nie udało się zapisać adresu e-mail lokalnie.'); }
-  });
-}
-
-// ✅ DODANO: POCZĄTEK: Kod dla Kalkulatora Wizyty
-
-// --- Nawigacja między zakładkami ---
-const kartaSection = document.getElementById('kartaLeczeniaSection');
-const kalkulatorSection = document.getElementById('kalkulatorWizytySection');
-const tabKartaBtn = document.getElementById('tabKartaBtn');
-const tabKalkulatorBtn = document.getElementById('tabKalkulatorBtn');
-
-function showSection(sectionToShow) {
-  if (kartaSection) kartaSection.style.display = 'none';
-  if (kalkulatorSection) kalkulatorSection.style.display = 'none';
-  if (tabKartaBtn) tabKartaBtn.classList.remove('primary');
-  if (tabKalkulatorBtn) tabKalkulatorBtn.classList.remove('primary');
-
-  if (sectionToShow === 'karta' && kartaSection) {
-    kartaSection.style.display = 'block';
-    if (tabKartaBtn) tabKartaBtn.classList.add('primary');
-  } else if (sectionToShow === 'kalkulator' && kalkulatorSection) {
-    kalkulatorSection.style.display = 'block';
-    if (tabKalkulatorBtn) tabKalkulatorBtn.classList.add('primary');
-  }
-}
-
-if (tabKartaBtn && tabKalkulatorBtn) {
-    tabKartaBtn.addEventListener('click', () => showSection('karta'));
-    tabKalkulatorBtn.addEventListener('click', () => showSection('kalkulator'));
-}
-
-
-// Opcjonalny przycisk "Otwórz Kalkulator" w Karcie Leczenia
-const openCalcBtn = document.getElementById('openCalculatorBtn');
-if (openCalcBtn) {
-    openCalcBtn.addEventListener('click', () => showSection('kalkulator'));
-}
-
-// --- Logika Kalkulatora (początkowa) ---
-const copyCheckbox = document.getElementById('copyFromCardCheckbox');
-const productSelect = document.getElementById('productSelect');
-const quantityInput = document.getElementById('productQuantityInput');
-const addProductBtn = document.getElementById('addProductBtn');
-const receiptDisplay = document.getElementById('receiptDisplay');
-const saveReceiptBtn = document.getElementById('saveReceiptBtn');
-const savedReceiptSummary = document.getElementById('savedReceiptSummary');
-const pluCodeInput = document.getElementById('pluCodeInput');
-const pluBtn = document.getElementById('pluBtn');
-
-let receiptItems = []; // Tablica przechowująca pozycje paragonu { name: '...', quantity: 1 }
-
-// Funkcja renderująca paragon
-function renderReceipt() {
-  // Sprawdź czy elementy istnieją
-  if (!receiptDisplay) return;
-
-  if (receiptItems.length === 0) {
-    receiptDisplay.innerHTML = '<p style="text-align: center; color: #999;">Paragon jest pusty</p>';
-    return;
-  }
-
-  receiptDisplay.innerHTML = ''; // Wyczyść
-  const list = document.createElement('ul');
-  list.style.listStyle = 'none';
-  list.style.padding = '0';
-  list.style.margin = '0';
-
-  receiptItems.forEach((item, index) => {
-    const listItem = document.createElement('li');
-    listItem.style.display = 'flex';
-    listItem.style.justifyContent = 'space-between';
-    listItem.style.marginBottom = '5px';
-    listItem.style.borderBottom = '1px solid #eee';
-    listItem.style.paddingBottom = '3px';
-
-    const nameSpan = document.createElement('span');
-    nameSpan.textContent = item.name;
-
-    const quantitySpan = document.createElement('span');
-    quantitySpan.textContent = `x ${item.quantity}`;
-    // TODO: Dodać edycję ilości
-
-    const removeBtn = document.createElement('button');
-    removeBtn.textContent = '❌';
-    removeBtn.className = 'btn small ghost';
-    removeBtn.style.padding = '2px 5px';
-    removeBtn.title = 'Usuń pozycję';
-    removeBtn.onclick = () => {
-      receiptItems.splice(index, 1); // Usuń element z tablicy
-      renderReceipt(); // Odśwież widok
-    };
-
-    const controlsDiv = document.createElement('div');
-    controlsDiv.style.display = 'flex';
-    controlsDiv.style.alignItems = 'center';
-    controlsDiv.style.gap = '8px';
-    controlsDiv.appendChild(quantitySpan);
-    controlsDiv.appendChild(removeBtn);
-
-    listItem.appendChild(nameSpan);
-    listItem.appendChild(controlsDiv);
-    list.appendChild(listItem);
-  });
-  receiptDisplay.appendChild(list);
-}
-
-// Dodawanie produktu z formularza
-if (addProductBtn) {
-    addProductBtn.addEventListener('click', () => {
-      const productName = productSelect ? productSelect.value.trim() : '';
-      const quantity = quantityInput ? parseInt(quantityInput.value, 10) : 0;
-
-      if (productName && quantity > 0) {
-        // Sprawdź, czy produkt jest na liście leków (prosta walidacja)
-        if (typeof nazwyLekow !== 'undefined' && nazwyLekow.includes(productName)) {
-           // Sprawdź, czy produkt już jest na paragonie
-           const existingItem = receiptItems.find(item => item.name === productName);
-           if(existingItem){
-               existingItem.quantity += quantity; // Zwiększ ilość
-           } else {
-               receiptItems.push({ name: productName, quantity: quantity }); // Dodaj nowy
-           }
-           renderReceipt();
-           if (productSelect) productSelect.value = ''; // Wyczyść pole wyboru
-           if (quantityInput) quantityInput.value = 1; // Zresetuj ilość
-        } else {
-            alert('Wybrany produkt nie znajduje się w bazie leków.');
-        }
-      } else {
-          alert('Wybierz produkt i podaj poprawną ilość.');
-      }
-    });
-}
-
-
-// Kopiowanie z karty leczenia
-if (copyCheckbox) {
-    copyCheckbox.addEventListener('change', () => {
-      if (copyCheckbox.checked) {
-        receiptItems = []; // Wyczyść obecny paragon
-        const rows = document.querySelectorAll('#karta tbody tr');
-        rows.forEach(row => {
-          if (row.cells.length === 8) { // Pomijaj wiersz specjalny
-            const lekInput = row.cells[4].querySelector('input[list="listaLekow"]');
-            const iloscInput = row.cells[6].querySelector('input.small-input');
-
-            if (lekInput && iloscInput) {
-                 const productName = lekInput.value.trim();
-                 // Upewnij się, że iloscInput.value nie jest pusty przed parsowaniem
-                 const quantityValue = iloscInput.value;
-                 const quantity = quantityValue ? parseInt(quantityValue, 10) : 0;
-
-                 if (productName && quantity > 0) {
-                    // Dodaj tylko jeśli nazwa i ilość są poprawne
-                    const existing = receiptItems.find(item => item.name === productName);
-                    if(existing){
-                        existing.quantity += quantity;
-                    } else {
-                        receiptItems.push({ name: productName, quantity: quantity });
-                    }
-                 }
-            }
-          }
-        });
-        renderReceipt(); // Pokaż skopiowane
-      } else {
-        // Opcjonalnie: można wyczyścić paragon po odznaczeniu
-        // receiptItems = [];
-        // renderReceipt();
-      }
-    });
-}
-
-// Zapisywanie paragonu (prosta wersja)
-if (saveReceiptBtn) {
-    saveReceiptBtn.addEventListener('click', () => {
-      if (receiptItems.length > 0) {
-        if (savedReceiptSummary) {
-            savedReceiptSummary.innerHTML = '<h4>Zapisany Paragon:</h4>';
-            const list = document.createElement('ul');
-            list.style.listStyle = 'none'; list.style.paddingLeft = '10px';
-            receiptItems.forEach(item => {
-              const li = document.createElement('li');
-              li.textContent = `${item.name} x ${item.quantity}`;
-              list.appendChild(li);
-            });
-            savedReceiptSummary.appendChild(list);
-        }
-        alert('Paragon zapisany (tymczasowo).');
-        // Opcjonalnie: przełącz z powrotem na Kartę Leczenia
-        // showSection('karta');
-      } else {
-          alert('Paragon jest pusty, nie ma czego zapisywać.');
-      }
-    });
-}
-
-// Obsługa PLU (bardzo uproszczona)
-if (pluBtn) {
-    pluBtn.addEventListener('click', () => {
-        const code = pluCodeInput ? pluCodeInput.value.trim() : '';
-        if(code){
-            // Uproszczone: Traktuj kod jako nazwę leku
-            const productName = code; // W przyszłości: productName = pluMap[code];
-            if (typeof nazwyLekow !== 'undefined' && nazwyLekow.includes(productName)) {
-                const existingItem = receiptItems.find(item => item.name === productName);
-                if(existingItem){
-                    existingItem.quantity += 1; // Domyślnie dodaj 1 szt.
-                } else {
-                    receiptItems.push({ name: productName, quantity: 1 });
-                }
-                renderReceipt();
-                if (pluCodeInput) pluCodeInput.value = ''; // Wyczyść pole
-            } else {
-                alert(`Nie znaleziono produktu dla kodu PLU: ${code}`);
-            }
-        }
-    });
-}
-
-// Pierwsze renderowanie pustego paragonu przy starcie (jeśli element istnieje)
-if (document.readyState === 'loading') { // Czekaj na załadowanie DOM
-    document.addEventListener('DOMContentLoaded', renderReceipt);
-} else {
-    // Sprawdź czy element istnieje przed wywołaniem
-    if (document.getElementById('receiptDisplay')) {
-       renderReceipt(); // DOM już załadowany
+    const email = emailInput.value.trim();
+    if (!email) {
+      alert('⚠️ Wprowadź adres e-mail.');
+      return;
     }
+    // podstawowa walidacja
+    if (!email.includes('@') || !email.includes('.')) {
+      alert('⚠️ Wprowadź poprawny adres e-mail.');
+      return;
+    }
+    try {
+      localStorage.setItem('userEmail', email);
+      alert('📨 Adres e-mail został zapisany lokalnie.');
+    } catch (e) {
+      console.error('Błąd zapisu w localStorage:', e);
+      alert('❌ Nie udało się zapisać adresu e-mail lokalnie.');
+    }
+  });
 }
-
-// ✅ DODANO: KONIEC: Kod dla Kalkulatora Wizyty
-
 
 </script>
 <script>
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('sw.js')
-      .then(() => console.log('✅ Service Worker zarejestrowany!'))
-      .catch(err => console.error('❌ Błąd rejestracji SW:', err));
-  }
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js')
+      .then(() => console.log('✅ Service Worker zarejestrowany!'))
+      .catch(err => console.error('❌ Błąd rejestracji SW:', err));
+  }
 
 </script>
 </body>
