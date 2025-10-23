@@ -1619,7 +1619,7 @@ if (saveEmailBtn && emailInput) {
       .then(() => console.log('✅ Service Worker zarejestrowany!'))
       .catch(err => console.error('❌ Błąd rejestracji SW:', err));
   }
-// ✅ DODANO: POCZĄTEK: Kod dla Kalkulatora Wizyty
+// ✅ POCZĄTEK: Zaktualizowany kod dla Kalkulatora Wizyty (z cenami)
 
 // --- Nawigacja między zakładkami ---
 const kartaSection = document.getElementById('kartaLeczeniaSection');
@@ -1639,6 +1639,7 @@ function showSection(sectionToShow) {
   } else if (sectionToShow === 'kalkulator' && kalkulatorSection) {
     kalkulatorSection.style.display = 'block';
     if (tabKalkulatorBtn) tabKalkulatorBtn.classList.add('primary');
+    renderReceipt(); // Przelicz sumę po przełączeniu
   }
 }
 
@@ -1647,14 +1648,12 @@ if (tabKartaBtn && tabKalkulatorBtn) {
     tabKalkulatorBtn.addEventListener('click', () => showSection('kalkulator'));
 }
 
-
-// Opcjonalny przycisk "Otwórz Kalkulator" w Karcie Leczenia
 const openCalcBtn = document.getElementById('openCalculatorBtn');
 if (openCalcBtn) {
     openCalcBtn.addEventListener('click', () => showSection('kalkulator'));
 }
 
-// --- Logika Kalkulatora (początkowa) ---
+// --- Logika Kalkulatora (z cenami) ---
 const copyCheckbox = document.getElementById('copyFromCardCheckbox');
 const productSelect = document.getElementById('productSelect');
 const quantityInput = document.getElementById('productQuantityInput');
@@ -1665,38 +1664,87 @@ const savedReceiptSummary = document.getElementById('savedReceiptSummary');
 const pluCodeInput = document.getElementById('pluCodeInput');
 const pluBtn = document.getElementById('pluBtn');
 
-let receiptItems = []; // Tablica przechowująca pozycje paragonu { name: '...', quantity: 1 }
+// Tablica przechowuje teraz { name: '...', quantity: 1, price: 10.50 }
+let receiptItems = [];
+// receiptTotal jest teraz zadeklarowany globalnie (wcześniej w kodzie)
 
-// Funkcja renderująca paragon
+// Funkcja formatująca cenę
+function formatPrice(price) {
+    // Sprawdź czy price jest liczbą, jeśli nie zwróć "0,00 zł"
+    if (isNaN(price) || price === null) {
+        return '0,00 zł';
+    }
+    return price.toFixed(2).replace('.', ',') + ' zł'; // Formatuj jako X,XX zł
+}
+
+
+// Funkcja renderująca paragon z cenami i sumą
 function renderReceipt() {
-  // Sprawdź czy elementy istnieją
   if (!receiptDisplay) return;
+
+  receiptTotal = 0; // Zresetuj sumę przed przeliczeniem
+  receiptDisplay.innerHTML = ''; // Wyczyść
 
   if (receiptItems.length === 0) {
     receiptDisplay.innerHTML = '<p style="text-align: center; color: #999;">Paragon jest pusty</p>';
+    // Dodaj div na sumę, nawet gdy paragon jest pusty
+    const totalDivEmpty = document.createElement('div');
+    totalDivEmpty.style.textAlign = 'right';
+    totalDivEmpty.style.marginTop = '10px';
+    totalDivEmpty.style.fontWeight = 'bold';
+    totalDivEmpty.textContent = `Suma: ${formatPrice(receiptTotal)}`;
+    receiptDisplay.appendChild(totalDivEmpty);
     return;
   }
 
-  receiptDisplay.innerHTML = ''; // Wyczyść
   const list = document.createElement('ul');
-  list.style.listStyle = 'none';
-  list.style.padding = '0';
-  list.style.margin = '0';
+  list.style.listStyle = 'none'; list.style.padding = '0'; list.style.margin = '0';
 
   receiptItems.forEach((item, index) => {
+    // Upewnij się, że quantity i price są liczbami
+    const quantity = Number(item.quantity) || 0;
+    const price = Number(item.price) || 0;
+    const itemTotal = quantity * price;
+    receiptTotal += itemTotal; // Dodaj do sumy całkowitej
+
     const listItem = document.createElement('li');
     listItem.style.display = 'flex';
     listItem.style.justifyContent = 'space-between';
+    listItem.style.alignItems = 'center'; // Lepsze wyrównanie pionowe
     listItem.style.marginBottom = '5px';
     listItem.style.borderBottom = '1px solid #eee';
     listItem.style.paddingBottom = '3px';
 
+    // Kontener na nazwę i cenę jednostkową
+    const namePriceDiv = document.createElement('div');
     const nameSpan = document.createElement('span');
     nameSpan.textContent = item.name;
+    namePriceDiv.appendChild(nameSpan);
+
+    // Dodaj cenę jednostkową pod nazwą (mniejszą czcionką)
+    const unitPriceSpan = document.createElement('span');
+    unitPriceSpan.textContent = ` (${formatPrice(price)}/szt.)`; // Zakładamy cenę za sztukę
+    unitPriceSpan.style.fontSize = '0.9em';
+    unitPriceSpan.style.color = '#666';
+    unitPriceSpan.style.marginLeft = '5px';
+    namePriceDiv.appendChild(unitPriceSpan);
+
+    // Kontener na ilość, cenę pozycji i przycisk usuń
+    const controlsDiv = document.createElement('div');
+    controlsDiv.style.display = 'flex';
+    controlsDiv.style.alignItems = 'center';
+    controlsDiv.style.gap = '8px';
 
     const quantitySpan = document.createElement('span');
-    quantitySpan.textContent = `x ${item.quantity}`;
-    // TODO: Dodać edycję ilości
+    quantitySpan.textContent = `x ${quantity}`;
+    quantitySpan.style.minWidth = '40px'; // Ustawienie minimalnej szerokości
+
+    // Dodaj cenę za całą pozycję
+    const itemTotalSpan = document.createElement('span');
+    itemTotalSpan.textContent = formatPrice(itemTotal);
+    itemTotalSpan.style.fontWeight = 'bold';
+    itemTotalSpan.style.minWidth = '60px'; // Ustawienie minimalnej szerokości
+    itemTotalSpan.style.textAlign = 'right';
 
     const removeBtn = document.createElement('button');
     removeBtn.textContent = '❌';
@@ -1704,62 +1752,71 @@ function renderReceipt() {
     removeBtn.style.padding = '2px 5px';
     removeBtn.title = 'Usuń pozycję';
     removeBtn.onclick = () => {
-      receiptItems.splice(index, 1); // Usuń element z tablicy
-      renderReceipt(); // Odśwież widok
+      receiptItems.splice(index, 1);
+      renderReceipt(); // Przelicz i odśwież
     };
 
-    const controlsDiv = document.createElement('div');
-    controlsDiv.style.display = 'flex';
-    controlsDiv.style.alignItems = 'center';
-    controlsDiv.style.gap = '8px';
     controlsDiv.appendChild(quantitySpan);
+    controlsDiv.appendChild(itemTotalSpan); // Dodano cenę pozycji
     controlsDiv.appendChild(removeBtn);
 
-    listItem.appendChild(nameSpan);
-    listItem.appendChild(controlsDiv);
+    listItem.appendChild(namePriceDiv); // Lewa strona (nazwa + cena jedn.)
+    listItem.appendChild(controlsDiv); // Prawa strona (ilość, cena poz., usuń)
     list.appendChild(listItem);
   });
   receiptDisplay.appendChild(list);
+
+  // Dodaj sumę całkowitą na dole
+  const totalDiv = document.createElement('div');
+  totalDiv.style.textAlign = 'right';
+  totalDiv.style.marginTop = '10px';
+  totalDiv.style.fontWeight = 'bold';
+  totalDiv.style.fontSize = '1.1em';
+  totalDiv.textContent = `Suma: ${formatPrice(receiptTotal)}`;
+  receiptDisplay.appendChild(totalDiv);
 }
 
-// Dodawanie produktu z formularza
+// Funkcja pomocnicza do dodawania lub aktualizowania pozycji
+function addItemToReceipt(productName, quantity) {
+    // Upewnij się, że quantity jest liczbą
+    const numQuantity = Number(quantity) || 0;
+    if (numQuantity <= 0) return; // Nie dodawaj jeśli ilość jest zerowa lub niepoprawna
+
+    const price = mapaCen[productName] || 0; // Pobierz cenę z mapy
+
+    const existingItem = receiptItems.find(item => item.name === productName);
+    if (existingItem) {
+        existingItem.quantity = (Number(existingItem.quantity) || 0) + numQuantity; // Upewnij się, że dodajesz liczby
+    } else {
+        receiptItems.push({ name: productName, quantity: numQuantity, price: price }); // Dodaj z ceną
+    }
+    renderReceipt(); // Przelicz i odśwież
+}
+
+// Dodawanie produktu z formularza (używa addItemToReceipt)
 if (addProductBtn) {
     addProductBtn.addEventListener('click', () => {
       const productName = productSelect ? productSelect.value.trim() : '';
       const quantity = quantityInput ? parseInt(quantityInput.value, 10) : 0;
 
       if (productName && quantity > 0) {
-        // Sprawdź, czy produkt jest na liście leków (prosta walidacja)
-        // Używamy typeof aby upewnić się, że 'nazwyLekow' istnieje
         if (typeof nazwyLekow !== 'undefined' && nazwyLekow.includes(productName)) {
-           // Sprawdź, czy produkt już jest na paragonie
-           const existingItem = receiptItems.find(item => item.name === productName);
-           if(existingItem){
-               existingItem.quantity += quantity; // Zwiększ ilość
-           } else {
-               receiptItems.push({ name: productName, quantity: quantity }); // Dodaj nowy
-           }
-           renderReceipt();
-           if (productSelect) productSelect.value = ''; // Wyczyść pole wyboru
-           if (quantityInput) quantityInput.value = 1; // Zresetuj ilość
-        } else {
-            alert('Wybrany produkt nie znajduje się w bazie leków.');
-        }
-      } else {
-          alert('Wybierz produkt i podaj poprawną ilość.');
-      }
+           addItemToReceipt(productName, quantity); // Użyj funkcji pomocniczej
+           if (productSelect) productSelect.value = '';
+           if (quantityInput) quantityInput.value = 1;
+        } else { alert('Wybrany produkt nie znajduje się w bazie leków.'); }
+      } else { alert('Wybierz produkt i podaj poprawną ilość.'); }
     });
 }
 
-
-// Kopiowanie z karty leczenia
+// Kopiowanie z karty leczenia (używa addItemToReceipt)
 if (copyCheckbox) {
     copyCheckbox.addEventListener('change', () => {
       if (copyCheckbox.checked) {
         receiptItems = []; // Wyczyść obecny paragon
         const rows = document.querySelectorAll('#karta tbody tr');
         rows.forEach(row => {
-          if (row.cells.length === 8) { // Pomijaj wiersz specjalny
+          if (row.cells.length === 8) {
             const lekInput = row.cells[4].querySelector('input[list="listaLekow"]');
             const iloscInput = row.cells[6].querySelector('input.small-input');
 
@@ -1769,25 +1826,23 @@ if (copyCheckbox) {
                  const quantity = quantityValue ? parseInt(quantityValue, 10) : 0;
 
                  if (productName && quantity > 0) {
-                    const existing = receiptItems.find(item => item.name === productName);
-                    if(existing){
-                        existing.quantity += quantity;
+                    if (mapaCen.hasOwnProperty(productName)){
+                       addItemToReceipt(productName, quantity);
                     } else {
-                        receiptItems.push({ name: productName, quantity: quantity });
+                       console.warn(`Pominięto kopiowanie: Produkt "${productName}" nie znaleziony w bazie cen.`);
+                       // Opcjonalnie dodaj z ceną 0
+                       // addItemToReceipt(productName, quantity);
                     }
                  }
             }
           }
         });
-        renderReceipt(); // Pokaż skopiowane
-      } else {
-        // Opcjonalnie: wyczyść paragon
-        // receiptItems = []; renderReceipt();
+        // renderReceipt() jest już w addItemToReceipt
       }
     });
 }
 
-// Zapisywanie paragonu (prosta wersja)
+// Zapisywanie paragonu (dodaje sumę)
 if (saveReceiptBtn) {
     saveReceiptBtn.addEventListener('click', () => {
       if (receiptItems.length > 0) {
@@ -1797,52 +1852,46 @@ if (saveReceiptBtn) {
             list.style.listStyle = 'none'; list.style.paddingLeft = '10px';
             receiptItems.forEach(item => {
               const li = document.createElement('li');
-              li.textContent = `${item.name} x ${item.quantity}`;
+              const quantity = Number(item.quantity) || 0;
+              const price = Number(item.price) || 0;
+              const itemTotal = quantity * price;
+              li.textContent = `${item.name} x ${quantity} = ${formatPrice(itemTotal)}`;
               list.appendChild(li);
             });
             savedReceiptSummary.appendChild(list);
+            const totalP = document.createElement('p');
+            totalP.style.fontWeight = 'bold';
+            totalP.style.textAlign = 'right';
+            totalP.textContent = `Suma: ${formatPrice(receiptTotal)}`;
+            savedReceiptSummary.appendChild(totalP);
         }
         alert('Paragon zapisany (tymczasowo).');
-      } else {
-          alert('Paragon jest pusty, nie ma czego zapisywać.');
-      }
+      } else { alert('Paragon jest pusty, nie ma czego zapisywać.'); }
     });
 }
 
-// Obsługa PLU (bardzo uproszczona)
+// Obsługa PLU (używa addItemToReceipt)
 if (pluBtn) {
     pluBtn.addEventListener('click', () => {
         const code = pluCodeInput ? pluCodeInput.value.trim() : '';
         if(code){
             const productName = code; // Uproszczenie: kod = nazwa
             if (typeof nazwyLekow !== 'undefined' && nazwyLekow.includes(productName)) {
-                const existingItem = receiptItems.find(item => item.name === productName);
-                if(existingItem){
-                    existingItem.quantity += 1; // Domyślnie dodaj 1
-                } else {
-                    receiptItems.push({ name: productName, quantity: 1 });
-                }
-                renderReceipt();
-                if (pluCodeInput) pluCodeInput.value = ''; // Wyczyść pole
-            } else {
-                alert(`Nie znaleziono produktu dla kodu PLU: ${code}`);
-            }
+                addItemToReceipt(productName, 1); // Domyślnie 1 szt.
+                if (pluCodeInput) pluCodeInput.value = '';
+            } else { alert(`Nie znaleziono produktu dla kodu PLU: ${code}`); }
         }
     });
 }
 
-// Pierwsze renderowanie pustego paragonu przy starcie
-// Sprawdź czy DOM jest gotowy, aby uniknąć błędów
+// Pierwsze renderowanie paragonu
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', renderReceipt);
 } else {
-    // Sprawdź czy element istnieje przed wywołaniem
-    if (document.getElementById('receiptDisplay')) {
-       renderReceipt();
-    }
+    if (document.getElementById('receiptDisplay')) { renderReceipt(); }
 }
 
-// ✅ DODANO: KONIEC: Kod dla Kalkulatora Wizyty
+// ✅ KONIEC: Zaktualizowany kod dla Kalkulatora Wizyty (z cenami)
 </script>
 </body>
 </html>
