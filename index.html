@@ -73,7 +73,7 @@
 
   /* Ukryj pole e-mail przy drukowaniu */
   @media print {
-    .email-box, .drukuj-sekcja button#saveEmail, #installPwaBtn { display: none !important; }
+    .email-box, .drukuj-sekcja button#saveEmail { display: none !important; }
   }
 
   body { font-family: Arial, sans-serif; margin: 20px; transform: scale(0.95); transform-origin: top left; }
@@ -476,14 +476,6 @@
   }
 }
 /* ✅ DODANO: KONIEC: Ukryj zapisany paragon podczas drukowania */
-  /* ✅ DODANO: Powiększenie przycisku "Dodaj" w kalkulatorze */
-#addProductBtn {
-  width: 60px;  /* Ustaw stałą szerokość */
-  height: 60px; /* Ustaw wysokość, aby był bardziej kwadratowy */
-  padding: 5px; /* Zresetuj padding, aby tekst się zmieścił */
-  font-size: 14px;
-  line-height: 1.2;
-}
   </style>
 </head>
 
@@ -564,7 +556,6 @@
   <button id="copyBtn" class="btn">Przepisz dane z leczenia na miejscu</button>
   <button id="formBtn" class="btn">📋 Wprowadź poprzez formularz</button>
   <button id="printBtn" class="btn" onclick="window.print()">Drukuj / Zapisz PDF</button>
-  <button id="installPwaBtn" class="btn" style="display: none; background-color: #28a745; color: white; border-color: #28a745;">Zainstaluj Aplikację</button> <div class="email-box">
   <div class="email-box">
   <label for="userEmail">📧 Podaj swój adres e-mail:</label>
   <div class="email-input-wrapper">
@@ -708,19 +699,22 @@
       <label for="copyFromCardCheckbox">Przepisz produkty z karty leczenia</label>
     </div>
 
-<div style="margin-top: 15px;">
-      <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
-        <label for="productQuantityInput" style="margin: 0;">Ilość:</label>
-        <input type="number" id="productQuantityInput" value="1" min="1" style="width: 60px; padding: 5px;">
-        <span id="productUnitDisplay" style="font-size: 0.9em; color: #555;"></span>
+  <div style="margin-top: 15px; display: flex; gap: 10px; align-items: flex-end;">
+          <div style="flex-grow: 1;">
+            <label for="productSelect">Wybierz produkt:</label><br>
+            <input list="listaLekow" id="productSelect" style="width: 100%; padding: 5px;">
+          </div>
+          <div>
+            <label for="productQuantityInput">Ilość:</label><br>
+            <input type="number" id="productQuantityInput" value="1" min="1" style="width: 60px; padding: 5px;">
+            <span id="productUnitDisplay" style="margin-left: 5px; font-size: 0.9em; color: #555;"></span>
+          </div>
+          <button id="addProductBtn" class="btn primary small">Dodaj</button>
+        </div> 
       </div>
-      <div style="margin-bottom: 10px;">
-        <label for="productSelect">Wybierz produkt:</label><br>
-        <input list="listaLekow" id="productSelect" style="width: 100%; padding: 5px; box-sizing: border-box;">
-      </div>
-      <button id="addProductBtn" class="btn primary small" style="width: 100%;">Dodaj</button>
+      <button id="addProductBtn" class="btn primary small">Dodaj</button>
     </div>
- 
+
     <div style="margin-top: 10px; display: flex; gap: 10px; align-items: flex-end;">
        <div>
            <label for="pluCodeInput">Kod PLU:</label><br>
@@ -758,7 +752,7 @@ fetch('data.json')
   })
   .then(data => {
     console.log('✅ Dane pobrane z data.json:', data);
-    initData(data); // ✅ POPRAWKA: Tutaj tylko WYWOŁUJEMY funkcję
+    initData(data); // ✅ POPRAWKA: Tutaj tylko wywołujemy funkcję
   })
   .catch(error => {
     // ✅ POPRAWKA: .catch jest teraz we właściwym miejscu
@@ -1664,7 +1658,6 @@ if (openCalcBtn) {
 
 // --- Logika Kalkulatora (z cenami) ---
 // --- Logika Kalkulatora (początkowa) ---
-// --- Logika Kalkulatora (początkowa) ---
 const copyCheckbox = document.getElementById('copyFromCardCheckbox');
 const productSelect = document.getElementById('productSelect');
 const quantityInput = document.getElementById('productQuantityInput');
@@ -1916,46 +1909,6 @@ if (document.readyState === 'loading') {
 }
 
 // ✅ KONIEC: Zaktualizowany kod dla Kalkulatora Wizyty (z cenami)
-// ✅ DODANO: POCZĄTEK: Logika przycisku instalacji PWA
-let deferredPrompt; // Zmienna do przechwycenia zdarzenia instalacji
-const installButton = document.getElementById('installPwaBtn');
-
-window.addEventListener('beforeinstallprompt', (e) => {
-  // Zapobiegaj automatycznemu wyświetleniu monitu
-  e.preventDefault();
-  // Zapisz zdarzenie, aby móc je wywołać później
-  deferredPrompt = e;
-  // Pokaż przycisk instalacji
-  if (installButton) {
-    installButton.style.display = 'inline-block'; // Pokaż przycisk
-  }
-});
-
-if (installButton) {
-  installButton.addEventListener('click', async () => {
-    // Ukryj przycisk, użytkownik go kliknął
-    installButton.style.display = 'none';
-    // Pokaż monit instalacji
-    if (deferredPrompt) {
-      deferredPrompt.prompt();
-      // Poczekaj na wybór użytkownika
-      const { outcome } = await deferredPrompt.userChoice;
-      console.log(`PWA install outcome: ${outcome}`);
-      // Wyczyść zdarzenie, można je wywołać tylko raz
-      deferredPrompt = null;
-    }
-  });
-}
-
-window.addEventListener('appinstalled', () => {
-  // Zdarzenie wywoływane po pomyślnej instalacji
-  console.log('PWA została pomyślnie zainstalowana!');
-  if (installButton) {
-     installButton.style.display = 'none'; // Ukryj przycisk po instalacji
-  }
-  deferredPrompt = null;
-});
-// ✅ DODANO: KONIEC: Logika przycisku instalacji PWA
 </script>
 </body>
 </html>
