@@ -832,9 +832,19 @@ async function fetchDataFromFirebase() {
     
     console.log(`Pobrano ${klienci.length} klientów (wraz z ID).`);
     // 3. Pobierz leki
+    // 3. Pobierz leki
     const lekiSnapshot = await db.collection("leki").get();
-    const leki = lekiSnapshot.docs.map(doc => doc.data());
-    console.log(`Pobrano ${leki.length} leków.`);
+    
+    // ✅ ZMIANA: Pobierz dane RAZEM z ich unikalnym ID z Firebase
+    const lekiZId = lekiSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    
+    // Zapisz pełną listę (z ID) do naszej nowej zmiennej globalnej DLA BAZY PRODUKTÓW
+    localLekiList = lekiZId; 
+    
+    // Stwórz listę bez ID (tak jak było) dla starej funkcji initData (dla Karty Leczenia)
+    const leki = lekiZId.map(({ id, ...rest }) => rest);
+    
+    console.log(`Pobrano ${leki.length} leków (wraz z ID).`);
 
     // 4. Złóż obiekt danych i przekaż do initData
     const data = { nazwaLecznicy, klienci, leki, doctorSignature };
