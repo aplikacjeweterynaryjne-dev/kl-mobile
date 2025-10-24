@@ -788,11 +788,18 @@ async function fetchDataFromFirebase() {
     const nazwaLecznicy = "Gabinet Weterynaryjny “TAURUS” Magdalena Chojnowska, 19-100 Mońki ul. Białostocka 59"; // Możesz to przenieść do bazy
     const doctorSignature = "https://lh3.googleusercontent.com/d/1heCfm8DWWl6chTAtIKxcOsFZAUZF91Et=s800"; // Możesz to przenieść do bazy
 
-    // 2. Pobierz klientów
+// 2. Pobierz klientów
     const klienciSnapshot = await db.collection("klienci").get();
-    const klienci = klienciSnapshot.docs.map(doc => doc.data());
-    console.log(`Pobrano ${klienci.length} klientów.`);
-
+    // ✅ ZMIANA: Pobierz dane RAZEM z ich unikalnym ID z Firebase
+    const klienciZId = klienciSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    
+    // Zapisz pełną listę (z ID) do naszej nowej zmiennej globalnej
+    localKlienciList = klienciZId; 
+    
+    // Stwórz listę bez ID dla starej funkcji initData (aby nic nie zepsuć)
+    const klienci = klienciZId.map(({ id, ...rest }) => rest);
+    
+    console.log(`Pobrano ${klienci.length} klientów (wraz z ID).`);
     // 3. Pobierz leki
     const lekiSnapshot = await db.collection("leki").get();
     const leki = lekiSnapshot.docs.map(doc => doc.data());
