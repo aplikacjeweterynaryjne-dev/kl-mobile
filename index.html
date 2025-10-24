@@ -1682,7 +1682,206 @@ if (saveEmailBtn && emailInput) {
     }
   });
 }
+// ========================================================
+// ✅ POCZĄTEK: LOGIKA ZAKŁADKI BAZA KLIENTÓW (CRUD)
+// ========================================================
 
+/**
+ * Funkcja do odświeżania list <datalist> w całej aplikacji.
+ * Kluczowe, aby nowi klienci pojawiali się na listach wyboru.
+ */
+async function refreshClientDataLists() {
+    try {
+        const klienciSnapshot = await db.collection("klienci").orderBy("nazwa").get();
+        const klienci = klienciSnapshot.docs.map(doc => doc.data());
+        
+        const klientList = document.getElementById('klientList'); // Główna datalist
+        if (!klientList) return;
+        
+        klientList.innerHTML = ''; // Wyczyść
+        klienci.forEach(k => {
+            const opt = document.createElement('option');
+            opt.value = k.nazwa;
+            opt.dataset.adres = k.adres || '';
+            opt.dataset.nrstada = k.nrStada || '';
+            klientList.appendChild(opt);
+        });
+        console.log('Datalisty klientów zostały zaktualizowane.');
+    } catch (error) {
+        console.error('Błąd odświeżania datalist klientów:', error);
+    }
+}
+
+
+/**
+ * Ładuje klientów z Firestore i buduje tabelę HTML.
+ */
+async function loadClientsToTable() {
+    if (!klientTableBody) return;
+    klientTableBody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 10px;">Ładowanie danych...</td></tr>';
+    
+    try {
+        // Pobierz klientów posortowanych alfabetycznie
+        const snapshot = await db.collection("klienci").orderBy("nazwa").get();
+        klientTableBody.innerHTML = ''; // Wyczyść "Ładowanie..."
+        
+        if (snapshot.empty) {
+            klientTableBody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 10px;">Brak klientów w bazie danych.</td></tr>';
+            return;
+        }
+        
+        snapshot.docs.forEach(doc => {
+            const klient = doc.data();
+            const tr = document.createElement('tr');
+            tr.dataset.id = doc.id; // Zapisz ID dokumentu w wierszu
+            
+            tr.innerHTML = `
+                <td data-label="Nazwa">${klient.nazwa || 'Brak nazwy'}</td>
+                <td data-label="Adres">${klient.adres || ''}</td>
+                <td data-label="Nr Stada">${klient.nrStada || ''}</td>
+                <td>
+                    <button class="btn btn-edit-client" data-id="${doc.id}">Edytuj</button>
+                    <button class="btn warn btn-delete-client" data-id="${doc.id}">Usuń</button>
+                </td>
+            `;
+            klientTableBody.appendChild(tr);
+        });
+    } catch (error) {
+        console.error("Błąd ładowania klientów: ", error);
+        klientTableBody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 10px; color: red;">Wystąpił błąd podczas ładowania danych.</td></tr>';
+    }
+}
+
+/**
+ * Obsługa kliknięć w tabeli (Edycja i Usuwanie) - Delegacja zdarzeń
+ */
+if (klientTableBody) {
+    klientTableBody.addEventListener('click', async (e) => {
+        const target = e.target;
+        
+        // --- EDYCJA KLIENTA ---
+        if (target.classList.contains('btn-edit-client')) {
+            const docId = target.dataset.id;
+            try {
+                const doc = await db.collection("klienci").doc(docId).get();
+                if (!doc.exists) {
+                    alert('Błąd: Nie znaleziono klienta.');
+                    return;
+                }
+                const data = doc.data();
+                
+                // Wypełnij i pokaż modal
+                clientFormTitle.textContent = 'Edytuj klienta';
+                clientFormDocId.value = docId; // Najważniejsze: ustaw ID do edycji
+                clientFormNazwa.value = data.nazwa || '';
+                clientFormAdres.value = data.adres || '';
+                clientFormNrStada.value = data.nrStada || '';
+                clientFormModal.style.display = 'flex';
+                
+            } catch (error) {
+                console.error('Błąd pobierania klienta do edycji: ', error);
+                alert('Wystąpił błąd podczas pobierania danych klienta.');
+            }
+        }
+        
+        // --- USUWANIE KLIENTA ---
+        if (target.classList.contains('btn-delete-client')) {
+            const docId = target.dataset.id;
+            const row = target.closest('tr');
+            const klientName = row.cells[0].textContent;
+            
+            if (confirm(`Czy na pewno chcesz usunąć klienta: "${klientName}"? \n\nTej operacji nie można cofnąć.`)) {
+                try {
+                    await db.collection("klienci").doc(docId).delete();
+                    alert('Klient usunięty pomyślnie.');
+                    loadClientsToTable(); // Odśwież tabelę
+                    refreshClientDataLists(); // Odśwież listy wyboru w apce
+                } catch (error) {
+                    console.error('Błąd usuwania klienta: ', error);
+                    alert('Wystąpił błąd podczas usuwania klienta.');
+                }
+            }
+        }
+    });
+}
+
+/**
+ * Przycisk "Dodaj nowego klienta" - otwiera pusty modal
+ */
+if (addNewClientBtn) {
+    addNewClientBtn.addEventListener('click', () => {
+        clientFormTitle.textContent = 'Dodaj nowego klienta';
+        clientFormDocId.value = ''; // Wyczyść ID - to oznacza "dodawanie"
+        clientFormNazwa.value = '';
+        clientFormAdres.value = '';
+        clientFormNrStada.value = '';
+        clientFormModal.style.display = 'flex';
+        clientFormNazwa.focus();
+    });
+}
+
+/**
+ * Przycisk "Anuluj" w modalu klienta
+ */
+if (cancelClientForm) {
+    cancelClientForm.addEventListener('click', () => {
+        clientFormModal.style.display = 'none';
+    });
+}
+
+/**
+ * Przycisk "Zapisz" w modalu klienta (obsługuje Dodawanie i Aktualizację)
+ */
+if (saveClientBtn) {
+    saveClientBtn.addEventListener('click', async () => {
+        const nazwa = clientFormNazwa.value.trim();
+        const adres = clientFormAdres.value.trim();
+        const nrStada = clientFormNrStada.value.trim();
+        const docId = clientFormDocId.value; // Pobierz ID (będzie puste przy dodawaniu)
+
+        if (!nazwa) {
+            alert('Nazwa klienta jest wymagana.');
+            clientFormNazwa.focus();
+            return;
+        }
+
+        const klientData = {
+            nazwa: nazwa,
+            adres: adres,
+            nrStada: nrStada
+        };
+
+        try {
+            saveClientBtn.disabled = true;
+            saveClientBtn.textContent = 'Zapisywanie...';
+            
+            if (docId) {
+                // --- Tryb Aktualizacji (UPDATE) ---
+                await db.collection("klienci").doc(docId).update(klientData);
+                alert('Dane klienta zostały zaktualizowane.');
+            } else {
+                // --- Tryb Dodawania (CREATE) ---
+                await db.collection("klienci").add(klientData);
+                alert('Nowy klient został dodany.');
+            }
+            
+            clientFormModal.style.display = 'none'; // Zamknij modal
+            loadClientsToTable(); // Odśwież tabelę klientów
+            refreshClientDataLists(); // BARDZO WAŻNE: odśwież listy wyboru w całej aplikacji
+
+        } catch (error) {
+            console.error('Błąd zapisu klienta: ', error);
+            alert('Wystąpił błąd podczas zapisu danych.');
+        } finally {
+            // Zawsze włączaj przycisk z powrotem, nawet po błędzie
+            saveClientBtn.disabled = false;
+            saveClientBtn.textContent = 'Zapisz';
+        }
+    });
+}
+// ========================================================
+// ✅ KONIEC: LOGIKA ZAKŁADKI BAZA KLIENTÓW
+// ========================================================
 </script>
 <script>
   // ✅ POCZĄTEK: ZMIENNE DLA BAZY KLIENTÓW
