@@ -492,36 +492,6 @@
   width: auto !important; 
   height: auto !important;
 }
-  /* ✅ DODANO: Style dla tabeli Bazy Danych */
-#klientTableContainer table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 12px; /* Nieco większa czcionka niż w karcie leczenia */
-}
-#klientTableContainer th, #klientTableContainer td {
-  border: 1px solid #ddd;
-  padding: 8px;
-  text-align: left;
-}
-#klientTableContainer th {
-  background-color: #f2f2f2;
-}
-#klientTableContainer .actions-cell {
-  width: 100px; /* Stała szerokość dla przycisków */
-  text-align: center;
-}
-#klientTableContainer .actions-cell button {
-  margin-right: 5px;
-  padding: 3px 6px;
-  font-size: 12px;
-}
-
-/* Ukryj sekcję Bazy Danych podczas drukowania */
-@media print {
-  #bazaDanychSection {
-    display: none !important;
-  }
-}
   </style>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
@@ -531,7 +501,6 @@
   <div style="text-align: center; margin-bottom: 15px; border-bottom: 1px solid #ccc; padding-bottom: 10px;">
   <button id="tabKartaBtn" class="btn primary">📝 Karta Leczenia</button>
   <button id="tabKalkulatorBtn" class="btn">🧮 Kalkulator Wizyty</button>
-  <button id="tabBazaBtn" class="btn">🗃️ Baza Danych</button> </div>
 </div>
   <div id="kartaLeczeniaSection">
 <h2>KARTA LECZENIA ZWIERZĄT GOSPODARSKICH ORAZ ZWIERZĄT, Z KTÓRYCH POZYSKANE TKANKI LUB PRODUKTY SĄ PRZEZNACZONE DO SPOŻYCIA PRZEZ LUDZI / EWIDENCJA LECZENIA ZWIERZĄT</h2>
@@ -735,7 +704,58 @@
 </div>
 
 <!-- datalist dla leków (tworzone dynamicznie) -->
+<datalist id="listaLekow"></datalist>
+    </div> <div id="kalkulatorWizytySection" style="display: none;">
+  <h2>Kalkulator Wizyty</h2>
+  <div id="calculatorUI">
+    <div id="receiptDisplay" style="border: 1px solid #ccc; min-height: 100px; margin-bottom: 15px; padding: 5px; background: #f9f9f9;">
+      <p style="text-align: center; color: #999;">Paragon jest pusty</p>
+    </div>
+
+    <div>
+      <input type="checkbox" id="copyFromCardCheckbox">
+      <label for="copyFromCardCheckbox">Przepisz produkty z karty leczenia</label>
+    </div>
+
+ <div style="margin-top: 15px; display: flex; gap: 10px; align-items: flex-end;">
+      
+      <div style="flex-grow: 1;">
+        <label for="productSelect">Wybierz produkt:</label><br>
+        <input list="listaLekow" id="productSelect" style="width: 100%; padding: 5px; box-sizing: border-box;">
+      </div>
+      
+      <div>
+        <label for="productQuantityInput">Ilość:</label><br>
+        <input type="number" id="productQuantityInput" value="1" min="1" style="width: 60px; padding: 5px;">
+      </div>
+      
+      <div style="padding-bottom: 5px;"> <span id="productUnitDisplay" style="font-size: 0.9em; color: #555;"></span>
+      </div>
+
+      <div>
+         <button id="addProductBtn" class="btn primary">Dodaj</button>
+      </div>
+
+    </div>
+    <div style="margin-top: 10px; display: flex; gap: 10px; align-items: flex-end;">
+       <div>
+           <label for="pluCodeInput">Kod PLU:</label><br>
+           <input type="text" id="pluCodeInput" style="width: 80px; padding: 5px;">
+       </div>
+       <button id="pluBtn" class="btn small">PLU</button>
+    </div>
+
+
+    <div style="text-align: right; margin-top: 20px;">
+      <button id="saveReceiptBtn" class="btn primary">Zapisz Paragon</button>
+    </div>
   </div>
+
+  <div id="savedReceiptSummary" style="margin-top: 20px; border-top: 1px dashed #ccc; padding-top: 10px;">
+     </div>
+
+</div> ```
+
 <script>
 /* ----- Inicjalizacja Firebase (Uruchamia się na starcie) ----- */
 const firebaseConfig = {
@@ -758,7 +778,7 @@ console.log("Firebase gotowy do działania.");
 let mapaSerii = {}, mapaIlosci = {}, mapaKarencji = {}, nazwyLekow = [];
 let mapaCen = {};
 let receiptTotal = 0;
-let localKlienciList = []; // ✅ DODANO: Globalna lista klientów z ID
+
 // 🌐 Pobieramy dane dynamicznie z Firestore
 async function fetchDataFromFirebase() {
   try {
@@ -768,35 +788,15 @@ async function fetchDataFromFirebase() {
     const nazwaLecznicy = "Gabinet Weterynaryjny “TAURUS” Magdalena Chojnowska, 19-100 Mońki ul. Białostocka 59"; // Możesz to przenieść do bazy
     const doctorSignature = "https://lh3.googleusercontent.com/d/1heCfm8DWWl6chTAtIKxcOsFZAUZF91Et=s800"; // Możesz to przenieść do bazy
 
-// 2. Pobierz klientów
+    // 2. Pobierz klientów
     const klienciSnapshot = await db.collection("klienci").get();
-    // ✅ ZMIANA: Pobierz dane RAZEM z ich unikalnym ID z Firebase
-    const klienciZId = klienciSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    
-// Zapisz pełną listę (z ID) do naszej nowej zmiennej globalnej
-    localKlienciList = klienciZId; 
-    
-    // Stwórz listę bez ID dla starej funkcji initData (aby nic nie zepsuć)
-    const klienci = klienciZId.map(({ id, ...rest }) => rest);
-    
-    console.log(`Pobrano ${klienci.length} klientów (wraz z ID).`);
+    const klienci = klienciSnapshot.docs.map(doc => doc.data());
+    console.log(`Pobrano ${klienci.length} klientów.`);
 
-    // 3. Pobierz leki
-    const lekiSnapshot = await db.collection("leki").get();
-    
-    // Pobierz dane RAZEM z ich unikalnym ID z Firebase
-    const lekiZId = lekiSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    
-    // Zapisz pełną listę (z ID) do naszej nowej zmiennej globalnej DLA BAZY PRODUKTÓW
-    localLekiList = lekiZId; // ✅ POPRAWKA: Używamy poprawnej zmiennej
-    
-    // Stwórz listę bez ID (tak jak było) dla starej funkcji initData (dla Karty Leczenia)
-    const leki = lekiZId.map(({ id, ...rest }) => rest);
-    
-    // Zapisz pełną listę (z ID) do naszej nowej zmiennej globalnej DLA BAZY PRODUKTÓW
-    localLekiList = lekiZId; 
-    
-    console.log(`Pobrano ${leki.length} leków (wraz z ID).`);
+    // 3. Pobierz leki
+    const lekiSnapshot = await db.collection("leki").get();
+    const leki = lekiSnapshot.docs.map(doc => doc.data());
+    console.log(`Pobrano ${leki.length} leków.`);
 
     // 4. Złóż obiekt danych i przekaż do initData
     const data = { nazwaLecznicy, klienci, leki, doctorSignature };
@@ -827,16 +827,16 @@ function initData(data) {
   });
 
   // leki -> mapy i lista
-  nazwyLekow = [];
-  mapaCen = {}; // ✅ DODANO: Wyczyść mapę cen przed wypełnieniem
-  (data.leki||[]).forEach(l=>{
-    mapaSerii[l.nazwa] = l.nrSerii || '';
-    mapaIlosci[l.nazwa] = l.dawkowanie || '';
-    mapaKarencji[l.nazwa] = l.karencja || '';
+  nazwyLekow = [];
+  mapaCen = {}; // Wyczyść mapę cen przed wypełnieniem
+  (data.leki || []).forEach(l => {
+    mapaSerii[l.nazwa] = l.nrSerii || '';
+    mapaIlosci[l.nazwa] = l.dawkowanie || '';
+    mapaKarencji[l.nazwa] = l.karencja || '';
     mapaCen[l.nazwa] = l.cena || 0; // ✅ DODANO: Wypełnij mapę cen
-    nazwyLekow.push(l.nazwa);
-  });
-  rebuildListaLekow();
+    nazwyLekow.push(l.nazwa);
+  });
+  rebuildListaLekow();
 
   // default daty -> today
   const today = new Date().toISOString().split('T')[0];
@@ -857,14 +857,13 @@ function initData(data) {
 
   // Przenieś przycisk #formBtn nad tabelę (jeśli masz ten kod, jest OK)
   const formBtnContainer = document.getElementById('formBtnContainer');
-  const formBtn = document.getElementById('formBtn'); 
-  if (formBtnContainer && formBtn) {
-    formBtnContainer.appendChild(formBtn); // Przenieś przycisk
-  } else {
-     // Logi pomocnicze, gdyby coś poszło nie tak
-     if (!formBtn) console.warn("#formBtn not found, skipping move.");
-     if (!formBtnContainer) console.warn("#formBtnContainer not found, skipping move.");
-  }
+  const formBtn = document.getElementById('formBtn');
+  if (formBtnContainer && formBtn) {
+    formBtnContainer.appendChild(formBtn);
+  } else {
+     if (!formBtn) console.warn("#formBtn not found, skipping move.");
+     if (!formBtnContainer) console.warn("#formBtnContainer not found, skipping move.");
+  }
 
   // Przenieś przycisk #copyBtn do specjalnego wiersza tabeli
   const copyBtn = document.getElementById('copyBtn');
@@ -2061,137 +2060,6 @@ async function importDataToFirebase() {
   }
 }
 // ✅ DODANO: KONIEC: Skrypt importu do Firebase (WERSJA POPRAWIONA dla v8)
-// ✅ DODANO: POCZĄTEK: Logika Bazy Produktów
-
-// --- Rozszerzenie Nawigacji Zakładek ---
-const bazaProduktowSection = document.getElementById('bazaProduktowSection');
-const tabBazaBtn = document.getElementById('tabBazaBtn');
-
-// Modyfikujemy istniejącą funkcję showSection, aby obsługiwała 3 zakładki
-function showSection(sectionToShow) {
-  if (kartaSection) kartaSection.style.display = 'none';
-  if (kalkulatorSection) kalkulatorSection.style.display = 'none';
-  if (bazaProduktowSection) bazaProduktowSection.style.display = 'none'; // Poprawiono
-  
-  if (tabKartaBtn) tabKartaBtn.classList.remove('primary');
-  if (tabKalkulatorBtn) tabKalkulatorBtn.classList.remove('primary');
-  if (tabBazaBtn) tabBazaBtn.classList.remove('primary'); // Poprawiono
-
-  if (sectionToShow === 'karta' && kartaSection) {
-    kartaSection.style.display = 'block';
-    if (tabKartaBtn) tabKartaBtn.classList.add('primary');
-  } else if (sectionToShow === 'kalkulator' && kalkulatorSection) {
-    kalkulatorSection.style.display = 'block';
-    if (tabKalkulatorBtn) tabKalkulatorBtn.classList.add('primary');
-    if (typeof renderReceipt === 'function') {
-       renderReceipt();
-    }
-  } else if (sectionToShow === 'baza-produktow' && bazaProduktowSection) { // Poprawiono
-    bazaProduktowSection.style.display = 'block';
-    if (tabBazaBtn) tabBazaBtn.classList.add('primary');
-    renderProductTable(); // Poprawiono
-  }
-}
-
-// Dodajemy listener do nowego przycisku zakładki
-if (tabBazaBtn) {
-    tabBazaBtn.addEventListener('click', () => showSection('baza-produktow'));
-}
-
-// --- Logika Bazy Produktów (na razie tylko odczyt) ---
-const produktTableContainer = document.getElementById('produktTableContainer');
-const produktFormContainer = document.getElementById('produktFormContainer');
-const addNewProduktBtn = document.getElementById('addNewProduktBtn');
-const cancelProduktBtn = document.getElementById('cancelProduktBtn');
-const saveProduktBtn = document.getElementById('saveProduktBtn');
-const produktFormTitle = document.getElementById('produktFormTitle');
-const produktFormId = document.getElementById('produktFormId');
-const produktFormNazwa = document.getElementById('produktFormNazwa');
-const produktFormCena = document.getElementById('produktFormCena');
-const produktFormDawkowanie = document.getElementById('produktFormDawkowanie');
-const produktFormKarencja = document.getElementById('produktFormKarencja');
-const produktFormNrSerii = document.getElementById('produktFormNrSerii');
-
-// Funkcja budująca tabelę HTML z produktami
-function renderProductTable() {
-  if (!produktTableContainer) return;
-  
-  // ✅ POPRAWKA: Używamy 'localLekiList' zamiast 'localKlienciList'
-  if (typeof localLekiList === 'undefined' || localLekiList.length === 0) {
-    produktTableContainer.innerHTML = "<p>Brak produktów w bazie danych. (localLekiList jest pusta)</p>";
-    return;
-  }
-
-  let tableHTML = '<table>';
-  tableHTML += '<thead><tr><th>Nazwa</th><th>Cena</th><th>Dawkowanie</th><th>Karencja</th><th>Akcje</th></tr></thead>';
-  tableHTML += '<tbody>';
-
-  // Sortuj produkty alfabetycznie wg nazwy
-  localLekiList.sort((a, b) => (a.nazwa || '').localeCompare(b.nazwa || ''));
-
-  localLekiList.forEach(lek => {
-    if (!lek.nazwa) return; // Pomijamy puste
-
-    tableHTML += `
-      <tr data-id="${lek.id}">
-        <td>${lek.nazwa || ''}</td>
-        <td>${(typeof formatPrice === 'function' ? formatPrice(lek.cena) : (lek.cena || 0))}</td>
-        <td>${lek.dawkowanie || ''}</td>
-        <td>${lek.karencja || ''}</td>
-        <td class="actions-cell">
-          <button class="btn small btn-edit-produkt" data-id="${lek.id}">✏️</button>
-          <button class="btn small warn btn-delete-produkt" data-id="${lek.id}" data-name="${lek.nazwa}">❌</button>
-        </td>
-      </tr>
-    `;
-  });
-
-  tableHTML += '</tbody></table>';
-  produktTableContainer.innerHTML = tableHTML;
-
-  // Dodaj listenery do nowych przycisków
-  document.querySelectorAll('.btn-edit-produkt').forEach(btn => {
-    btn.addEventListener('click', () => {
-       alert('Funkcja edycji w budowie. ID: ' + btn.dataset.id);
-    });
-  });
-  
-  document.querySelectorAll('.btn-delete-produkt').forEach(btn => {
-    btn.addEventListener('click', () => {
-        alert('Funkcja usuwania w budowie. ID: ' + btn.dataset.id);
-    });
-  });
-}
-
-// Pokaż formularz dodawania
-if (addNewProduktBtn) {
-  addNewProduktBtn.addEventListener('click', () => {
-    if (produktFormContainer) produktFormContainer.style.display = 'block';
-    if (produktFormId) produktFormId.value = '';
-    if (produktFormNazwa) produktFormNazwa.value = '';
-    if (produktFormCena) produktFormCena.value = '';
-    if (produktFormDawkowanie) produktFormDawkowanie.value = '';
-    if (produktFormKarencja) produktFormKarencja.value = '';
-    if (produktFormNrSerii) produktFormNrSerii.value = '';
-    if (produktFormTitle) produktFormTitle.textContent = 'Dodaj nowy produkt';
-  });
-}
-
-// Ukryj formularz
-if (cancelProduktBtn) {
-  cancelProduktBtn.addEventListener('click', () => {
-    if (produktFormContainer) produktFormContainer.style.display = 'none';
-  });
-}
-
-// Zapisz (na razie tylko alert)
-if (saveProduktBtn) {
-  saveProduktBtn.addEventListener('click', () => {
-    alert('Funkcja zapisu w budowie.');
-  });
-}
-
-// ✅ DODANO: KONIEC: Logika Bazy Produktów
 </script>
 </body>
 </html>
