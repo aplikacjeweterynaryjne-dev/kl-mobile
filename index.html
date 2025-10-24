@@ -2061,21 +2061,21 @@ async function importDataToFirebase() {
   }
 }
 // ✅ DODANO: KONIEC: Skrypt importu do Firebase (WERSJA POPRAWIONA dla v8)
-// ✅ DODANO: POCZĄTEK: Logika Bazy Danych
+// ✅ DODANO: POCZĄTEK: Logika Bazy Produktów
 
 // --- Rozszerzenie Nawigacji Zakładek ---
-const bazaDanychSection = document.getElementById('bazaDanychSection');
+const bazaProduktowSection = document.getElementById('bazaProduktowSection');
 const tabBazaBtn = document.getElementById('tabBazaBtn');
 
-// Modyfikujemy istniejącą funkcję showSection
+// Modyfikujemy istniejącą funkcję showSection, aby obsługiwała 3 zakładki
 function showSection(sectionToShow) {
   if (kartaSection) kartaSection.style.display = 'none';
   if (kalkulatorSection) kalkulatorSection.style.display = 'none';
-  if (bazaDanychSection) bazaDanychSection.style.display = 'none'; // Dodano
-
+  if (bazaProduktowSection) bazaProduktowSection.style.display = 'none'; // Poprawiono
+  
   if (tabKartaBtn) tabKartaBtn.classList.remove('primary');
   if (tabKalkulatorBtn) tabKalkulatorBtn.classList.remove('primary');
-  if (tabBazaBtn) tabBazaBtn.classList.remove('primary'); // Dodano
+  if (tabBazaBtn) tabBazaBtn.classList.remove('primary'); // Poprawiono
 
   if (sectionToShow === 'karta' && kartaSection) {
     kartaSection.style.display = 'block';
@@ -2086,111 +2086,112 @@ function showSection(sectionToShow) {
     if (typeof renderReceipt === 'function') {
        renderReceipt();
     }
-  } else if (sectionToShow === 'baza-danych' && bazaDanychSection) { // Dodano
-    bazaDanychSection.style.display = 'block';
+  } else if (sectionToShow === 'baza-produktow' && bazaProduktowSection) { // Poprawiono
+    bazaProduktowSection.style.display = 'block';
     if (tabBazaBtn) tabBazaBtn.classList.add('primary');
-    // Wywołaj funkcję renderującą tabelę klientów
-    renderCustomerTable(); 
+    renderProductTable(); // Poprawiono
   }
 }
 
 // Dodajemy listener do nowego przycisku zakładki
 if (tabBazaBtn) {
-    tabBazaBtn.addEventListener('click', () => showSection('baza-danych'));
+    tabBazaBtn.addEventListener('click', () => showSection('baza-produktow'));
 }
 
-// --- Logika Bazy Klientów (na razie tylko odczyt) ---
-const klientTableContainer = document.getElementById('klientTableContainer');
-const klientFormContainer = document.getElementById('klientFormContainer');
-const addNewKlientBtn = document.getElementById('addNewKlientBtn');
-const cancelKlientBtn = document.getElementById('cancelKlientBtn');
-const saveKlientBtn = document.getElementById('saveKlientBtn');
-const klientFormTitle = document.getElementById('klientFormTitle');
-const klientFormId = document.getElementById('klientFormId');
-const klientFormNazwa = document.getElementById('klientFormNazwa');
-const klientFormAdres = document.getElementById('klientFormAdres');
-const klientFormNrStada = document.getElementById('klientFormNrStada');
+// --- Logika Bazy Produktów (na razie tylko odczyt) ---
+const produktTableContainer = document.getElementById('produktTableContainer');
+const produktFormContainer = document.getElementById('produktFormContainer');
+const addNewProduktBtn = document.getElementById('addNewProduktBtn');
+const cancelProduktBtn = document.getElementById('cancelProduktBtn');
+const saveProduktBtn = document.getElementById('saveProduktBtn');
+const produktFormTitle = document.getElementById('produktFormTitle');
+const produktFormId = document.getElementById('produktFormId');
+const produktFormNazwa = document.getElementById('produktFormNazwa');
+const produktFormCena = document.getElementById('produktFormCena');
+const produktFormDawkowanie = document.getElementById('produktFormDawkowanie');
+const produktFormKarencja = document.getElementById('produktFormKarencja');
+const produktFormNrSerii = document.getElementById('produktFormNrSerii');
 
-// Funkcja budująca tabelę HTML z klientami
-function renderCustomerTable() {
-  if (!klientTableContainer) return;
-
-  if (localKlienciList.length === 0) {
-    klientTableContainer.innerHTML = "<p>Brak klientów w bazie danych.</p>";
+// Funkcja budująca tabelę HTML z produktami
+function renderProductTable() {
+  if (!produktTableContainer) return;
+  
+  // ✅ POPRAWKA: Używamy 'localLekiList' zamiast 'localKlienciList'
+  if (typeof localLekiList === 'undefined' || localLekiList.length === 0) {
+    produktTableContainer.innerHTML = "<p>Brak produktów w bazie danych. (localLekiList jest pusta)</p>";
     return;
   }
 
   let tableHTML = '<table>';
-  tableHTML += '<thead><tr><th>Nazwa</th><th>Adres</th><th>Nr Stada</th><th>Akcje</th></tr></thead>';
+  tableHTML += '<thead><tr><th>Nazwa</th><th>Cena</th><th>Dawkowanie</th><th>Karencja</th><th>Akcje</th></tr></thead>';
   tableHTML += '<tbody>';
 
-  // Sortuj klientów alfabetycznie wg nazwy
-  localKlienciList.sort((a, b) => a.nazwa.localeCompare(b.nazwa));
+  // Sortuj produkty alfabetycznie wg nazwy
+  localLekiList.sort((a, b) => (a.nazwa || '').localeCompare(b.nazwa || ''));
 
-  localKlienciList.forEach(klient => {
-    // Pomijamy pustych klientów
-    if (!klient.nazwa) return;
+  localLekiList.forEach(lek => {
+    if (!lek.nazwa) return; // Pomijamy puste
 
     tableHTML += `
-      <tr data-id="${klient.id}">
-        <td>${klient.nazwa || ''}</td>
-        <td>${klient.adres || ''}</td>
-        <td>${klient.nrStada || ''}</td>
+      <tr data-id="${lek.id}">
+        <td>${lek.nazwa || ''}</td>
+        <td>${(typeof formatPrice === 'function' ? formatPrice(lek.cena) : (lek.cena || 0))}</td>
+        <td>${lek.dawkowanie || ''}</td>
+        <td>${lek.karencja || ''}</td>
         <td class="actions-cell">
-          <button class="btn small btn-edit-klient" data-id="${klient.id}">✏️</button>
-          <button class="btn small warn btn-delete-klient" data-id="${klient.id}" data-name="${klient.nazwa}">❌</button>
+          <button class="btn small btn-edit-produkt" data-id="${lek.id}">✏️</button>
+          <button class="btn small warn btn-delete-produkt" data-id="${lek.id}" data-name="${lek.nazwa}">❌</button>
         </td>
       </tr>
     `;
   });
 
   tableHTML += '</tbody></table>';
-  klientTableContainer.innerHTML = tableHTML;
+  produktTableContainer.innerHTML = tableHTML;
 
-  // Dodaj listenery do nowych przycisków (zostaną zaimplementowane w następnym kroku)
-  document.querySelectorAll('.btn-edit-klient').forEach(btn => {
+  // Dodaj listenery do nowych przycisków
+  document.querySelectorAll('.btn-edit-produkt').forEach(btn => {
     btn.addEventListener('click', () => {
        alert('Funkcja edycji w budowie. ID: ' + btn.dataset.id);
-       // handleEditCustomer(btn.dataset.id);
     });
   });
-
-  document.querySelectorAll('.btn-delete-klient').forEach(btn => {
+  
+  document.querySelectorAll('.btn-delete-produkt').forEach(btn => {
     btn.addEventListener('click', () => {
         alert('Funkcja usuwania w budowie. ID: ' + btn.dataset.id);
-        // handleDeleteCustomer(btn.dataset.id, btn.dataset.name);
     });
   });
 }
 
 // Pokaż formularz dodawania
-if (addNewKlientBtn) {
-  addNewKlientBtn.addEventListener('click', () => {
-    klientFormId.value = ''; // Wyczyść ID (tryb dodawania)
-    klientFormNazwa.value = '';
-    klientFormAdres.value = '';
-    klientFormNrStada.value = '';
-    klientFormTitle.textContent = 'Dodaj nowego klienta';
-    klientFormContainer.style.display = 'block';
+if (addNewProduktBtn) {
+  addNewProduktBtn.addEventListener('click', () => {
+    if (produktFormContainer) produktFormContainer.style.display = 'block';
+    if (produktFormId) produktFormId.value = '';
+    if (produktFormNazwa) produktFormNazwa.value = '';
+    if (produktFormCena) produktFormCena.value = '';
+    if (produktFormDawkowanie) produktFormDawkowanie.value = '';
+    if (produktFormKarencja) produktFormKarencja.value = '';
+    if (produktFormNrSerii) produktFormNrSerii.value = '';
+    if (produktFormTitle) produktFormTitle.textContent = 'Dodaj nowy produkt';
   });
 }
 
 // Ukryj formularz
-if (cancelKlientBtn) {
-  cancelKlientBtn.addEventListener('click', () => {
-    klientFormContainer.style.display = 'none';
+if (cancelProduktBtn) {
+  cancelProduktBtn.addEventListener('click', () => {
+    if (produktFormContainer) produktFormContainer.style.display = 'none';
   });
 }
 
 // Zapisz (na razie tylko alert)
-if (saveKlientBtn) {
-  saveKlientBtn.addEventListener('click', () => {
+if (saveProduktBtn) {
+  saveProduktBtn.addEventListener('click', () => {
     alert('Funkcja zapisu w budowie.');
-    // handleSaveCustomer();
   });
 }
 
-// ✅ DODANO: KONIEC: Logika Bazy Danych
+// ✅ DODANO: KONIEC: Logika Bazy Produktów
 </script>
 </body>
 </html>
