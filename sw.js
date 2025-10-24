@@ -7,8 +7,6 @@ const urlsToCache = [
   '/index.html',
   '/manifest.json',
   '/sw.js',
-  '/data.json'  // ✅ DODANO KLUCZOWY PLIK Z DANYMI
-  // ❌ USUNIĘTO stary adres Google Script, który powodował błąd
 ];
 
 // ⚙️ Instalacja Service Workera
