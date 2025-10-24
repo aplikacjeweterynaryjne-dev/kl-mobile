@@ -762,25 +762,62 @@ let receiptTotal = 0; // ✅ DODANO: Zmienna do przechowywania sumy paragonu
   // 🔴 ZNAJDŹ I USUŃ TEN BLOK: 🔴
 
 // ✅ WKLEJ TEN BLOK W MIEJSCE USUNIĘTEGO: ✅
+/* ----- Inicjalizacja Firebase (Uruchamia się na starcie) ----- */
+const firebaseConfig = {
+  apiKey: "AIzaSyBFSlW9_i877sdlTfGHV4XKGeYlbKPAoM0",
+  authDomain: "kl-mobile-3536f.firebaseapp.com",
+  projectId: "kl-mobile-3536f",
+  storageBucket: "kl-mobile-3536f.firebasestorage.app",
+  messagingSenderId: "420035668375",
+  appId: "1:420035668375:web:712c93f1765729b39bbcd2"
+};
+
+// Inicjalizuj Firebase tylko raz
+if (!firebase.apps.length) {
+   firebase.initializeApp(firebaseConfig);
+}
+const db = firebase.firestore();
+console.log("Firebase gotowy do działania.");
 
 /* ----- dane map i nazwy leków (będą uzupełnione z serwera) ----- */
 let mapaSerii = {}, mapaIlosci = {}, mapaKarencji = {}, nazwyLekow = [];
+let mapaCen = {};
+let receiptTotal = 0;
+/* ----- dane map i nazwy leków (będą uzupełnione z serwera) ----- */
+let mapaSerii = {}, mapaIlosci = {}, mapaKarencji = {}, nazwyLekow = [];
 
-// 🌐 Tryb GitHub Pages – pobieramy dane z lokalnego pliku data.json
-fetch('data.json')
-  .then(response => {
-    if (!response.ok) throw new Error('Błąd sieci: ' + response.status);
-    return response.json();
-  })
-  .then(data => {
-    console.log('✅ Dane pobrane z data.json:', data);
-    initData(data); // ✅ POPRAWKA: Tutaj tylko wywołujemy funkcję
-  })
-  .catch(error => {
-    // ✅ POPRAWKA: .catch jest teraz we właściwym miejscu
-    console.error('❌ Błąd pobierania pliku data.json:', error);
-    alert('Nie udało się pobrać danych. Spróbuj odświeżyć stronę.');
-  });
+// 🌐 Pobieramy dane dynamicznie z Firestore
+async function fetchDataFromFirebase() {
+  try {
+    console.log("Pobieranie danych z Firestore...");
+
+    // 1. Pobierz dane lecznicy (jeśli masz je w bazie, na razie pomijamy)
+    const nazwaLecznicy = "Gabinet Weterynaryjny “TAURUS” Magdalena Chojnowska, 19-100 Mońki ul. Białostocka 59"; // Możesz to przenieść do bazy
+    const doctorSignature = "https://lh3.googleusercontent.com/d/1heCfm8DWWl6chTAtIKxcOsFZAUZF91Et=s800"; // Możesz to przenieść do bazy
+
+    // 2. Pobierz klientów
+    const klienciSnapshot = await db.collection("klienci").get();
+    const klienci = klienciSnapshot.docs.map(doc => doc.data());
+    console.log(`Pobrano ${klienci.length} klientów.`);
+
+    // 3. Pobierz leki
+    const lekiSnapshot = await db.collection("leki").get();
+    const leki = lekiSnapshot.docs.map(doc => doc.data());
+    console.log(`Pobrano ${leki.length} leków.`);
+
+    // 4. Złóż obiekt danych i przekaż do initData
+    const data = { nazwaLecznicy, klienci, leki, doctorSignature };
+    console.log('✅ Dane pobrane z Firestore:', data);
+    initData(data); // Wywołaj starą funkcję z nowymi danymi
+
+  } catch (error) {
+    console.error('❌ Błąd pobierania danych z Firestore:', error);
+    alert('Nie udało się pobrać danych z bazy. Sprawdź połączenie internetowe.');
+  }
+}
+
+// Uruchom pobieranie danych
+fetchDataFromFirebase();
 function initData(data) {
   // nagłówek
   document.getElementById('nazwaLecznicy').textContent = data.nazwaLecznicy || '';
