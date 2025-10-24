@@ -493,8 +493,8 @@
   height: auto !important;
 }
   </style>
-  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
 </head>
 
 <body>
@@ -1931,7 +1931,7 @@ if (document.readyState === 'loading') {
 }
 
 // ✅ KONIEC: Zaktualizowany kod dla Kalkulatora Wizyty (z cenami)
-// ✅ DODANO: POCZĄTEK: Skrypt importu do Firebase
+// ✅ DODANO: POCZĄTEK: Skrypt importu do Firebase (WERSJA POPRAWIONA dla v8)
 
 /**
  * Funkcja importująca dane z data.json do Firestore.
@@ -1939,96 +1939,97 @@ if (document.readyState === 'loading') {
  * Użyj: importDataToFirebase();
  */
 async function importDataToFirebase() {
-  // 1. Konfiguracja Firebase (dane, które podałeś)
-  const firebaseConfig = {
-    apiKey: "AIzaSyBFSlW9_i877sdlTfGHV4XKGeYlbKPAoM0",
-    authDomain: "kl-mobile-3536f.firebaseapp.com",
-    projectId: "kl-mobile-3536f",
-    storageBucket: "kl-mobile-3536f.firebasestorage.app",
-    messagingSenderId: "420035668375",
-    appId: "1:420035668375:web:712c93f1765729b39bbcd2"
-  };
+  try {
+    // 1. Konfiguracja Firebase (dane, które podałeś)
+    const firebaseConfig = {
+      apiKey: "AIzaSyBFSlW9_i877sdlTfGHV4XKGeYlbKPAoM0",
+      authDomain: "kl-mobile-3536f.firebaseapp.com",
+      projectId: "kl-mobile-3536f",
+      storageBucket: "kl-mobile-3536f.firebasestorage.app",
+      messagingSenderId: "420035668375",
+      appId: "1:420035668375:web:712c93f1765729b39bbcd2"
+    };
 
-  // 2. Inicjalizacja Firebase
-  // Używamy 'firebase.app' i 'firebase.firestore' z globalnego obiektu 'firebase'
-  const app = firebase.initializeApp(firebaseConfig);
-  const db = firebase.firestore.getFirestore(app);
-  console.log("Firebase zainicjowane, połączono z bazą danych.");
-  alert("Połączono z Firebase. Rozpoczynam import... Sprawdź postęp w konsoli (F12).");
+    // 2. Inicjalizacja Firebase (SKŁADNIA v8)
+    if (!firebase.apps.length) {
+       firebase.initializeApp(firebaseConfig);
+    }
+    const db = firebase.firestore(); // ✅ POPRAWKA: Tak wygląda składnia v8
+    console.log("Firebase zainicjowane, połączono z bazą danych.");
+    alert("Połączono z Firebase. Rozpoczynam import... Sprawdź postęp w konsoli (F12).");
 
+    // 3. Pobierz dane z pliku data.json
+    console.log("Pobieranie danych z data.json...");
+    const response = await fetch('data.json');
+    if (!response.ok) {
+       alert("BŁĄD: Nie można pobrać pliku data.json. Sprawdź, czy plik jest na GitHubie.");
+       return;
+    }
+    const data = await response.json();
+    console.log("Dane pobrane:", data);
 
-  // 3. Pobierz dane z pliku data.json
-  console.log("Pobieranie danych z data.json...");
-  const response = await fetch('data.json');
-  if (!response.ok) {
-     alert("BŁĄD: Nie można pobrać pliku data.json. Sprawdź, czy plik jest na GitHubie.");
-     return;
-  }
-  const data = await response.json();
-  console.log("Dane pobrane:", data);
+    // 4. Import klientów (SKŁADNIA v8)
+    if (data.klienci && data.klienci.length > 0) {
+      console.log(`Rozpoczynam import ${data.klienci.length} klientów...`);
+      const klienciRef = db.collection("klienci"); // ✅ POPRAWKA
+      
+      let batch = db.batch(); // ✅ POPRAWKA
+      let counter = 0;
 
-  // 4. Import klientów
-  if (data.klienci && data.klienci.length > 0) {
-    console.log(`Rozpoczynam import ${data.klienci.length} klientów...`);
-    const klienciRef = firebase.firestore.collection(db, "klienci");
-    
-    // Używamy 'writeBatch' do szybszego importu
-    let batch = firebase.firestore.writeBatch(db);
-    let counter = 0;
+      for (const klient of data.klienci) {
+        if (klient.nazwa && klient.nazwa.trim() !== "") {
+          const docRef = klienciRef.doc(); // ✅ POPRAWKA (automatyczne ID)
+          batch.set(docRef, klient); // ✅ POPRAWKA
+          counter++;
 
-    for (const klient of data.klienci) {
-      if (klient.nazwa && klient.nazwa.trim() !== "") {
-        const docRef = firebase.firestore.doc(klienciRef); // Automatyczne ID
-        batch.set(docRef, klient);
-        counter++;
-
-        // Firestore ma limit 500 operacji na batch
-        if (counter % 499 === 0) {
-          await batch.commit();
-          batch = firebase.firestore.writeBatch(db);
-          console.log(`Wysłano partię ${counter} klientów...`);
+          if (counter % 499 === 0) {
+            await batch.commit();
+            batch = db.batch(); // ✅ POPRAWKA
+            console.log(`Wysłano partię ${counter} klientów...`);
+          }
         }
       }
+      await batch.commit();
+      console.log(`✅ Import klientów zakończony (${counter} klientów).`);
+    } else {
+      console.warn("Nie znaleziono klientów w data.json.");
     }
-    await batch.commit(); // Wyślij ostatnią partię
-    console.log(`✅ Import klientów zakończony (${counter} klientów).`);
-  } else {
-    console.warn("Nie znaleziono klientów w data.json.");
-  }
 
-  // 5. Import leków
-  if (data.leki && data.leki.length > 0) {
-    console.log(`Rozpoczynam import ${data.leki.length} leków...`);
-    const lekiRef = firebase.firestore.collection(db, "leki");
-    
-    let batch = firebase.firestore.writeBatch(db);
-    let counter = 0;
+    // 5. Import leków (SKŁADNIA v8)
+    if (data.leki && data.leki.length > 0) {
+      console.log(`Rozpoczynam import ${data.leki.length} leków...`);
+      const lekiRef = db.collection("leki"); // ✅ POPRAWKA
+      
+      let batch = db.batch(); // ✅ POPRAWKA
+      let counter = 0;
 
-    for (const lek of data.leki) {
-      if (lek.nazwa && lek.nazwa.trim() !== "") {
-        // Upewnij się, że cena jest liczbą
-        lek.cena = parseFloat(lek.cena) || 0; 
-        
-        const docRef = firebase.firestore.doc(lekiRef);
-        batch.set(docRef, lek);
-        counter++;
+      for (const lek of data.leki) {
+        if (lek.nazwa && lek.nazwa.trim() !== "") {
+          lek.cena = parseFloat(lek.cena) || 0; 
+          const docRef = lekiRef.doc(); // ✅ POPRAWKA
+          batch.set(docRef, lek); // ✅ POPRAWKA
+          counter++;
 
-        if (counter % 499 === 0) {
-          await batch.commit();
-          batch = firebase.firestore.writeBatch(db);
-          console.log(`Wysłano partię ${counter} leków...`);
+          if (counter % 499 === 0) {
+            await batch.commit();
+            batch = db.batch(); // ✅ POPRAWKA
+            console.log(`Wysłano partię ${counter} leków...`);
+          }
         }
       }
+      await batch.commit();
+      console.log(`✅ Import leków zakończony (${counter} leków).`);
+    } else {
+      console.warn("Nie znaleziono leków w data.json.");
     }
-    await batch.commit(); // Wyślij ostatnią partię
-    console.log(`✅ Import leków zakończony (${counter} leków).`);
-  } else {
-    console.warn("Nie znaleziono leków w data.json.");
-  }
 
-  alert("Import do Firebase zakończony! Sprawdź konsolę Firebase.");
+    alert("Import do Firebase zakończony! Sprawdź konsolę Firebase.");
+  } catch (error) {
+     console.error("KRYTYCZNY BŁĄD podczas importu:", error);
+     alert("Wystąpił krytyczny błąd podczas importu. Sprawdź konsolę (F12).");
+  }
 }
-// ✅ DODANO: KONIEC: Skrypt importu do Firebase
+// ✅ DODANO: KONIEC: Skrypt importu do Firebase (WERSJA POPRAWIONA dla v8)
 </script>
 </body>
 </html>
