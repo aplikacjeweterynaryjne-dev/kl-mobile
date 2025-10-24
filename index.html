@@ -773,19 +773,25 @@ async function fetchDataFromFirebase() {
     // ✅ ZMIANA: Pobierz dane RAZEM z ich unikalnym ID z Firebase
     const klienciZId = klienciSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     
-    // Zapisz pełną listę (z ID) do naszej nowej zmiennej globalnej
-    localKlienciList = klienciZId; 
-    
-    // Stwórz listę bez ID dla starej funkcji initData (aby nic nie zepsuć)
-    const klienci = klienciZId.map(({ id, ...rest }) => rest);
-    
-    console.log(`Pobrano ${klienci.length} klientów (wraz z ID).`);
-    // 3. Pobierz leki
-    // 3. Pobierz leki
-    const lekiSnapshot = await db.collection("leki").get();
-    
-    // ✅ ZMIANA: Pobierz dane RAZEM z ich unikalnym ID z Firebase
-    const lekiZId = lekiSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+// Zapisz pełną listę (z ID) do naszej nowej zmiennej globalnej
+    localKlienciList = klienciZId; 
+    
+    // Stwórz listę bez ID dla starej funkcji initData (aby nic nie zepsuć)
+    const klienci = klienciZId.map(({ id, ...rest }) => rest);
+    
+    console.log(`Pobrano ${klienci.length} klientów (wraz z ID).`);
+
+    // 3. Pobierz leki
+    const lekiSnapshot = await db.collection("leki").get();
+    
+    // Pobierz dane RAZEM z ich unikalnym ID z Firebase
+    const lekiZId = lekiSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    
+    // Zapisz pełną listę (z ID) do naszej nowej zmiennej globalnej DLA BAZY PRODUKTÓW
+    localLekiList = lekiZId; // ✅ POPRAWKA: Używamy poprawnej zmiennej
+    
+    // Stwórz listę bez ID (tak jak było) dla starej funkcji initData (dla Karty Leczenia)
+    const leki = lekiZId.map(({ id, ...rest }) => rest);
     
     // Zapisz pełną listę (z ID) do naszej nowej zmiennej globalnej DLA BAZY PRODUKTÓW
     localLekiList = lekiZId; 
