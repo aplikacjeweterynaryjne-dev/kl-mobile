@@ -2098,6 +2098,136 @@ async function importDataToFirebase() {
   }
 }
 // ✅ DODANO: KONIEC: Skrypt importu do Firebase (WERSJA POPRAWIONA dla v8)
+// ✅ DODANO: POCZĄTEK: Logika Bazy Danych
+
+// --- Rozszerzenie Nawigacji Zakładek ---
+const bazaDanychSection = document.getElementById('bazaDanychSection');
+const tabBazaBtn = document.getElementById('tabBazaBtn');
+
+// Modyfikujemy istniejącą funkcję showSection
+function showSection(sectionToShow) {
+  if (kartaSection) kartaSection.style.display = 'none';
+  if (kalkulatorSection) kalkulatorSection.style.display = 'none';
+  if (bazaDanychSection) bazaDanychSection.style.display = 'none'; // Dodano
+
+  if (tabKartaBtn) tabKartaBtn.classList.remove('primary');
+  if (tabKalkulatorBtn) tabKalkulatorBtn.classList.remove('primary');
+  if (tabBazaBtn) tabBazaBtn.classList.remove('primary'); // Dodano
+
+  if (sectionToShow === 'karta' && kartaSection) {
+    kartaSection.style.display = 'block';
+    if (tabKartaBtn) tabKartaBtn.classList.add('primary');
+  } else if (sectionToShow === 'kalkulator' && kalkulatorSection) {
+    kalkulatorSection.style.display = 'block';
+    if (tabKalkulatorBtn) tabKalkulatorBtn.classList.add('primary');
+    if (typeof renderReceipt === 'function') {
+       renderReceipt();
+    }
+  } else if (sectionToShow === 'baza-danych' && bazaDanychSection) { // Dodano
+    bazaDanychSection.style.display = 'block';
+    if (tabBazaBtn) tabBazaBtn.classList.add('primary');
+    // Wywołaj funkcję renderującą tabelę klientów
+    renderCustomerTable(); 
+  }
+}
+
+// Dodajemy listener do nowego przycisku zakładki
+if (tabBazaBtn) {
+    tabBazaBtn.addEventListener('click', () => showSection('baza-danych'));
+}
+
+// --- Logika Bazy Klientów (na razie tylko odczyt) ---
+const klientTableContainer = document.getElementById('klientTableContainer');
+const klientFormContainer = document.getElementById('klientFormContainer');
+const addNewKlientBtn = document.getElementById('addNewKlientBtn');
+const cancelKlientBtn = document.getElementById('cancelKlientBtn');
+const saveKlientBtn = document.getElementById('saveKlientBtn');
+const klientFormTitle = document.getElementById('klientFormTitle');
+const klientFormId = document.getElementById('klientFormId');
+const klientFormNazwa = document.getElementById('klientFormNazwa');
+const klientFormAdres = document.getElementById('klientFormAdres');
+const klientFormNrStada = document.getElementById('klientFormNrStada');
+
+// Funkcja budująca tabelę HTML z klientami
+function renderCustomerTable() {
+  if (!klientTableContainer) return;
+
+  if (localKlienciList.length === 0) {
+    klientTableContainer.innerHTML = "<p>Brak klientów w bazie danych.</p>";
+    return;
+  }
+
+  let tableHTML = '<table>';
+  tableHTML += '<thead><tr><th>Nazwa</th><th>Adres</th><th>Nr Stada</th><th>Akcje</th></tr></thead>';
+  tableHTML += '<tbody>';
+
+  // Sortuj klientów alfabetycznie wg nazwy
+  localKlienciList.sort((a, b) => a.nazwa.localeCompare(b.nazwa));
+
+  localKlienciList.forEach(klient => {
+    // Pomijamy pustych klientów
+    if (!klient.nazwa) return;
+
+    tableHTML += `
+      <tr data-id="${klient.id}">
+        <td>${klient.nazwa || ''}</td>
+        <td>${klient.adres || ''}</td>
+        <td>${klient.nrStada || ''}</td>
+        <td class="actions-cell">
+          <button class="btn small btn-edit-klient" data-id="${klient.id}">✏️</button>
+          <button class="btn small warn btn-delete-klient" data-id="${klient.id}" data-name="${klient.nazwa}">❌</button>
+        </td>
+      </tr>
+    `;
+  });
+
+  tableHTML += '</tbody></table>';
+  klientTableContainer.innerHTML = tableHTML;
+
+  // Dodaj listenery do nowych przycisków (zostaną zaimplementowane w następnym kroku)
+  document.querySelectorAll('.btn-edit-klient').forEach(btn => {
+    btn.addEventListener('click', () => {
+       alert('Funkcja edycji w budowie. ID: ' + btn.dataset.id);
+       // handleEditCustomer(btn.dataset.id);
+    });
+  });
+
+  document.querySelectorAll('.btn-delete-klient').forEach(btn => {
+    btn.addEventListener('click', () => {
+        alert('Funkcja usuwania w budowie. ID: ' + btn.dataset.id);
+        // handleDeleteCustomer(btn.dataset.id, btn.dataset.name);
+    });
+  });
+}
+
+// Pokaż formularz dodawania
+if (addNewKlientBtn) {
+  addNewKlientBtn.addEventListener('click', () => {
+    klientFormId.value = ''; // Wyczyść ID (tryb dodawania)
+    klientFormNazwa.value = '';
+    klientFormAdres.value = '';
+    klientFormNrStada.value = '';
+    klientFormTitle.textContent = 'Dodaj nowego klienta';
+    klientFormContainer.style.display = 'block';
+  });
+}
+
+// Ukryj formularz
+if (cancelKlientBtn) {
+  cancelKlientBtn.addEventListener('click', () => {
+    klientFormContainer.style.display = 'none';
+  });
+}
+
+// Zapisz (na razie tylko alert)
+if (saveKlientBtn) {
+  saveKlientBtn.addEventListener('click', () => {
+    alert('Funkcja zapisu w budowie.');
+    // handleSaveCustomer();
+  });
+}
+
+// ✅ DODANO: KONIEC: Logika Bazy Danych
 </script>
 </body>
 </html>
