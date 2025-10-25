@@ -828,6 +828,10 @@
       <input type="text" id="clientFormNrStada" placeholder="Wpisz numer stada" style="width:100%; padding:8px; font-size:19px; border:1px solid #ccc; border-radius:6px; box-sizing:border-box;">
     </div>
     <div class="form-row">
+    <label for="clientFormNrTelefonu">Nr telefonu</label>
+    <input type="tel" id="clientFormNrTelefonu" placeholder="Wpisz numer telefonu" style="width:100%; padding:8px; font-size:19px; border:1px solid #ccc; border-radius:6px; box-sizing:border-box;">
+  </div>
+    <div class="form-row">
       <label for="clientFormEmail">Adres e-mail</label>
       <input type="email" id="clientFormEmail" placeholder="Wpisz adres e-mail" style="width:100%; padding:8px; font-size:19px; border:1px solid #ccc; border-radius:6px; box-sizing:border-box;">
     </div>
@@ -846,6 +850,7 @@
     
   </div>
 </div>
+  <script>
   </div> <div id="pasteDataModal" aria-hidden="true" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.48); display: none; z-index: 10001; justify-content: center; align-items: center; overflow: hidden;">
   <div class="form-card" role="dialog" aria-modal="true" style="max-width: 90vw; width: 800px;">
     
@@ -875,7 +880,6 @@
     
   </div>
 </div>
-<script>
 /* ----- Inicjalizacja Firebase (Uruchamia się na starcie) ----- */
 const firebaseConfig = {
   apiKey: "AIzaSyBFSlW9_i877sdlTfGHV4XKGeYlbKPAoM0",
@@ -2472,45 +2476,198 @@ if (savePasteDataBtn) {
         // ... (cała logika importu) ...
     });
 }
-// ========================================================
+  // ========================================================
 // ✅ KONIEC: LOGIKA IMPORTU (WKLEJANIA) DANYCH Z ARKUSZA
 // ========================================================
-</script> ```
+
 
     /**
- * Filtruje tabelę klientów na podstawie wpisanego tekstu.
- * (Wersja zaktualizowana o tel, email i ID Lecznicy)
- */
-function filterClientTable() {
-    if (!clientSearchInput || !klientTableBody) return;
-    
-    const searchTerm = clientSearchInput.value.toLowerCase().trim();
-    const rows = klientTableBody.querySelectorAll('tr');
-    
-    rows.forEach(row => {
-        // Upewnij się, że wiersz ma komórki (teraz 7)
-        if (row.cells.length < 7) return; 
+     * Filtruje tabelę klientów na podstawie wpisanego tekstu.
+     * (Wersja zaktualizowana o tel, email i ID Lecznicy)
+     */
+    function filterClientTable() {
+       // ... (kod funkcji) ...
+    }
 
-        const nazwa = row.cells[0].textContent.toLowerCase();
-        const adres = row.cells[1].textContent.toLowerCase();
-        const nrStada = row.cells[2].textContent.toLowerCase();
-        const nrTelefonu = row.cells[3].textContent.toLowerCase();
-        const email = row.cells[4].textContent.toLowerCase();
-        const idLecznicy = row.cells[5].textContent.toLowerCase(); // ✅ NOWE POLE
-        
-        // Sprawdź czy tekst jest widoczny w którejkolwiek z kolumn
-        const isVisible = nazwa.includes(searchTerm) || 
-                          adres.includes(searchTerm) || 
-                          nrStada.includes(searchTerm) ||
-                          nrTelefonu.includes(searchTerm) ||
-                          email.includes(searchTerm) ||
-                          idLecznicy.includes(searchTerm); // ✅ NOWE POLE
-                          
-        // Pokaż lub ukryj wiersz
-        row.style.display = isVisible ? '' : 'none';
-    });
-}
-    </script>
 
+</script> ```
+
+---
+
+## 5. Poprawka JavaScript: Uzupełnij Brakującą Logikę Importu
+
+W bloku logiki importu (na końcu drugiego skryptu) brakuje części kodu.
+
+* **Znajdź** ten fragment:
+
+    ```javascript
+    // ========================================================
+    // ✅ POCZĄTEK: LOGIKA IMPORTU (WKLEJANIA) DANYCH Z ARKUSZA
+    // ========================================================
+    
+    // Otwieranie modala importu
+    if (importFromSheetBtn) {
+        importFromSheetBtn.addEventListener('click', () => {
+            pasteTextarea.value = ''; // Wyczyść pole tekstowe
+            pasteDataModal.style.display = 'flex';
+            pasteTextarea.focus();
+        });
+    }
+    // ... (reszta kodu importu) ...  <-- TUTAJ BRAKUJE KODU
+
+    // Zapisywanie (przetwarzanie) wklejonych danych
+    if (savePasteDataBtn) {
+        savePasteDataBtn.addEventListener('click', async () => {
+            // ... (cała logika importu) ... <-- TUTAJ BRAKUJE KODU
+        });
+    }
+    // ========================================================
+    // ✅ KONIEC: LOGIKA IMPORTU (WKLEJANIA) DANYCH Z ARKUSZA
+    // ========================================================
+    ```
+
+* **Zastąp** cały ten blok (od `// ... POCZĄTEK` do `// ... KONIEC`) **kompletną** wersją poniżej:
+
+    ```javascript
+    // ========================================================
+    // ✅ POCZĄTEK: LOGIKA IMPORTU (WKLEJANIA) DANYCH Z ARKUSZA
+    // ========================================================
+
+    // Otwieranie modala importu
+    if (importFromSheetBtn) {
+        importFromSheetBtn.addEventListener('click', () => {
+            pasteTextarea.value = ''; // Wyczyść pole tekstowe
+            pasteDataModal.style.display = 'flex';
+            pasteTextarea.focus();
+        });
+    }
+
+    // Anulowanie modala importu
+    if (cancelPasteData) {
+        cancelPasteData.addEventListener('click', () => {
+            pasteDataModal.style.display = 'none';
+        });
+    }
+
+    // Zapisywanie (przetwarzanie) wklejonych danych
+    if (savePasteDataBtn) {
+        savePasteDataBtn.addEventListener('click', async () => {
+            const textData = pasteTextarea.value.trim();
+            if (!textData) {
+                alert('Pole tekstowe jest puste.');
+                return;
+            }
+
+            // Dzielimy tekst na wiersze
+            const rows = textData.split('\n');
+            if (rows.length === 0) {
+                alert('Brak danych do przetworzenia.');
+                return;
+            }
+
+            if (!confirm(`Znaleziono ${rows.length} wierszy do przetworzenia. \n\nKontynuować?`)) {
+                return;
+            }
+            
+            savePasteDataBtn.disabled = true;
+            savePasteDataBtn.textContent = 'Przetwarzanie...';
+
+            let batch = db.batch();
+            let updatedCount = 0;
+            let errorCount = 0;
+            const promises = []; // Tablica na operacje odczytu (find)
+
+            // Krok 1: Przygotuj dane do aktualizacji dla każdego wiersza
+            for (const row of rows) {
+                if (row.trim() === '') continue; // Pomiń puste wiersze
+
+                // Dane z Excela/Sheets są oddzielone TABULATOREM
+                const cells = row.split('\t'); 
+                
+                // ✅ ZMIENIONO WARUNEK (teraz 6 kolumn)
+                if (cells.length < 6) {
+                    console.warn('Pominięto wiersz (za mało kolumn):', row);
+                    errorCount++;
+                    continue;
+                }
+
+                // Zgodnie z instrukcją w modalu:
+                const nazwa = cells[0].trim();
+                const adres = cells[1].trim();
+                const nrStada = cells[2].trim();
+                const nrTelefonu = cells[3].trim();
+                const email = cells[4].trim();
+                const idLecznicy = cells[5].trim(); // ✅ NOWE
+
+                if (!nazwa) {
+                    console.warn('Pominięto wiersz (brak nazwy):', row);
+                    errorCount++;
+                    continue;
+                }
+
+                // Stwórz dane do aktualizacji (bez nazwy, bo po niej szukamy)
+                const dataToUpdate = {
+                    adres: adres,
+                    nrStada: nrStada,
+                    nrTelefonu: nrTelefonu,
+                    email: email,
+                    idLecznicy: idLecznicy // ✅ NOWE
+                };
+
+                // Przygotuj zapytanie do znalezienia dokumentu po nazwie
+                const query = db.collection('klienci').where('nazwa', '==', nazwa).limit(1).get();
+                promises.push({ query, dataToUpdate, nazwa }); // dodajemy nazwa do logowania błędów
+            }
+
+            // Krok 2: Wykonaj wszystkie zapytania i przygotuj batch
+            try {
+                const results = await Promise.all(promises.map(p => p.query));
+                
+                results.forEach((snapshot, index) => {
+                    const dataToUpdate = promises[index].dataToUpdate;
+                    const nazwa = promises[index].nazwa;
+
+                    if (!snapshot.empty) {
+                        // Znaleziono klienta, dodaj aktualizację do batcha
+                        const docId = snapshot.docs[0].id;
+                        const docRef = db.collection('klienci').doc(docId);
+                        batch.update(docRef, dataToUpdate);
+                        updatedCount++;
+                    } else {
+                        // Nie znaleziono klienta o tej nazwie
+                        console.warn(`Nie znaleziono klienta o nazwie: "${nazwa}"`);
+                        errorCount++;
+                    }
+                });
+
+                // Krok 3: Wykonaj wszystkie aktualizacje za jednym razem
+                if (updatedCount > 0) {
+                    await batch.commit();
+                }
+
+                alert(`Import zakończony! \n\nZaktualizowano: ${updatedCount} klientów. \nPominięto (błędy lub brak nazwy): ${errorCount}.`);
+                
+                pasteDataModal.style.display = 'none';
+                loadClientsToTable(); // Odśwież tabelę
+                refreshClientDataLists(); // Odśwież datalisty
+
+            } catch (error) {
+                console.error('Krytyczny błąd podczas importu batch:', error);
+                alert('Wystąpił błąd podczas zapisu danych: ' + error.message);
+            } finally {
+                savePasteDataBtn.disabled = false;
+                savePasteDataBtn.textContent = 'Importuj i Zaktualizuj';
+            }
+        });
+    }
+    // ========================================================
+    // ✅ KONIEC: LOGIKA IMPORTU (WKLEJANIA) DANYCH Z ARKUSZA
+    // ========================================================
+    ```
+
+---
+
+Po tych poprawkach wszystko powinno być na swoim miejscu. Zapisz plik i sprawdź, czy działa. Daj znać! 😊
+</script>
 </body>
 </html>
