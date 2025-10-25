@@ -2207,26 +2207,40 @@ async function refreshClientDataLists() {
 /**
  * Ładuje klientów z Firestore i buduje tabelę HTML.
  */
+/**
+ * Ładuje klientów z Firestore i buduje tabelę HTML.
+ * (Wersja zaktualizowana o licznik klientów)
+ */
 async function loadClientsToTable() {
     if (!klientTableBody) return;
-    if (clientSearchInput) clientSearchInput.value = '';
+    if (clientSearchInput) clientSearchInput.value = ''; // Resetuj filtr
+
+    // Znajdź element licznika
+    const clientCountDisplay = document.getElementById('clientCountDisplay');
+
+    // Ustaw stan ładowania
     klientTableBody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 10px;">Ładowanie danych...</td></tr>';
-    
+    if (clientCountDisplay) clientCountDisplay.textContent = 'Łączna liczba klientów: ...';
+
     try {
         // Pobierz klientów posortowanych alfabetycznie
         const snapshot = await db.collection("klienci").orderBy("nazwa").get();
         klientTableBody.innerHTML = ''; // Wyczyść "Ładowanie..."
-        
+
+        // ✅ TUTAJ AKTUALIZUJEMY LICZNIK
+        const count = snapshot.docs.length;
+        if (clientCountDisplay) clientCountDisplay.textContent = `Łączna liczba klientów: ${count}`;
+
         if (snapshot.empty) {
             klientTableBody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 10px;">Brak klientów w bazie danych.</td></tr>';
             return;
         }
-        
+
         snapshot.docs.forEach(doc => {
             const klient = doc.data();
             const tr = document.createElement('tr');
             tr.dataset.id = doc.id; // Zapisz ID dokumentu w wierszu
-            
+
             tr.innerHTML = `
                 <td data-label="Nazwa">${klient.nazwa || 'Brak nazwy'}</td>
                 <td data-label="Adres">${klient.adres || ''}</td>
@@ -2241,6 +2255,9 @@ async function loadClientsToTable() {
     } catch (error) {
         console.error("Błąd ładowania klientów: ", error);
         klientTableBody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 10px; color: red;">Wystąpił błąd podczas ładowania danych.</td></tr>';
+
+        // Aktualizuj licznik w razie błędu
+        if (clientCountDisplay) clientCountDisplay.textContent = 'Łączna liczba klientów: Błąd';
     }
 }
 
