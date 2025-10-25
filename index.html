@@ -1789,59 +1789,71 @@ if (saveEmailBtn && emailInput) {
 }
 </script>
 <script>
-// ✅ POCZĄTEK: ZMIENNE DLA BAZY KLIENTÓW I MODALI
-  const tabBazaKlientowBtn = document.getElementById('tabBazaKlientowBtn');
-  const bazaKlientowSection = document.getElementById('bazaKlientowSection');
-  const klientTableBody = document.getElementById('klientTableBody');
-  const addNewClientBtn = document.getElementById('addNewClientBtn');
-  const clientSearchInput = document.getElementById('clientSearchInput'); // Wyszukiwarka
-  
-  // Zmienne modala klienta (Edycja/Dodawanie)
-  const clientFormModal = document.getElementById('clientFormModal');
-  const clientFormTitle = document.getElementById('clientFormTitle');
-  const cancelClientForm = document.getElementById('cancelClientForm');
-  const saveClientBtn = document.getElementById('saveClientBtn');
-  const clientFormDocId = document.getElementById('clientFormDocId');
-  const clientFormNazwa = document.getElementById('clientFormNazwa');
-  const clientFormAdres = document.getElementById('clientFormAdres');
-  const clientFormNrStada = document.getElementById('clientFormNrStada');
-  const clientFormNrTelefonu = document.getElementById('clientFormNrTelefonu'); // NOWE
-  const clientFormEmail = document.getElementById('clientFormEmail'); // NOWE
-  const clientFormIdLecznicy = document.getElementById('clientFormIdLecznicy'); // NOWE
-  
-  // Zmienne modala importu (Wklejanie)
-  const importFromSheetBtn = document.getElementById('importFromSheetBtn'); // NOWE
-  const pasteDataModal = document.getElementById('pasteDataModal'); // NOWE
-  const pasteTextarea = document.getElementById('pasteTextarea'); // NOWE
-  const cancelPasteData = document.getElementById('cancelPasteData'); // NOWE
-  const savePasteDataBtn = document.getElementById('savePasteDataBtn'); // NOWE
-  // ✅ KONIEC: ZMIENNE DLA BAZY KLIENTÓW I MODALI
+<script>
+// ========================================================
+// DEKLARACJE GŁÓWNYCH ZMIENNYCH UI (POCZĄTEK SKRYPTU)
+// ========================================================
 
-// --- Nawigacja między zakładkami ---
-// (Reszta twojego kodu...)
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('sw.js')
-      .then(() => console.log('✅ Service Worker zarejestrowany!'))
-      .catch(err => console.error('❌ Błąd rejestracji SW:', err));
-  }
-// ✅ POCZĄTEK: Zaktualizowany kod dla Kalkulatora Wizyty (z cenami)
-
-// --- Nawigacja między zakładkami ---
+// --- Zmienne Sekcji ---
 const kartaSection = document.getElementById('kartaLeczeniaSection');
 const kalkulatorSection = document.getElementById('kalkulatorWizytySection');
+const bazaKlientowSection = document.getElementById('bazaKlientowSection');
+
+// --- Zmienne Przycisków Zakładek ---
 const tabKartaBtn = document.getElementById('tabKartaBtn');
 const tabKalkulatorBtn = document.getElementById('tabKalkulatorBtn');
+const tabBazaKlientowBtn = document.getElementById('tabBazaKlientowBtn');
 
+// --- Zmienne Bazy Klientów ---
+const klientTableBody = document.getElementById('klientTableBody');
+const addNewClientBtn = document.getElementById('addNewClientBtn');
+const clientSearchInput = document.getElementById('clientSearchInput'); // Wyszukiwarka
+const importFromSheetBtn = document.getElementById('importFromSheetBtn'); // Import
+
+// --- Zmienne Modala Klienta (Edycja/Dodawanie) ---
+const clientFormModal = document.getElementById('clientFormModal');
+const clientFormTitle = document.getElementById('clientFormTitle');
+const cancelClientForm = document.getElementById('cancelClientForm');
+const saveClientBtn = document.getElementById('saveClientBtn');
+const clientFormDocId = document.getElementById('clientFormDocId');
+const clientFormNazwa = document.getElementById('clientFormNazwa');
+const clientFormAdres = document.getElementById('clientFormAdres');
+const clientFormNrStada = document.getElementById('clientFormNrStada');
+const clientFormNrTelefonu = document.getElementById('clientFormNrTelefonu');
+const clientFormEmail = document.getElementById('clientFormEmail');
+const clientFormIdLecznicy = document.getElementById('clientFormIdLecznicy');
+
+// --- Zmienne Modala Importu (Wklejanie) ---
+const pasteDataModal = document.getElementById('pasteDataModal');
+const pasteTextarea = document.getElementById('pasteTextarea');
+const cancelPasteData = document.getElementById('cancelPasteData');
+const savePasteDataBtn = document.getElementById('savePasteDataBtn');
+
+// --- Inne zmienne UI ---
+const openCalcBtn = document.getElementById('openCalculatorBtn'); // Przycisk z Karty Leczenia
+
+// ========================================================
+// REJESTRACJA SERVICE WORKERA
+// ========================================================
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js')
+    .then(() => console.log('✅ Service Worker zarejestrowany!'))
+    .catch(err => console.error('❌ Błąd rejestracji SW:', err));
+}
+
+// ========================================================
+// FUNKCJA PRZEŁĄCZANIA ZAKŁADEK
+// ========================================================
 function showSection(sectionToShow) {
   // Ukryj wszystkie sekcje
   if (kartaSection) kartaSection.style.display = 'none';
   if (kalkulatorSection) kalkulatorSection.style.display = 'none';
-  if (bazaKlientowSection) bazaKlientowSection.style.display = 'none'; // ✅ DODANE
+  if (bazaKlientowSection) bazaKlientowSection.style.display = 'none';
 
   // Odznacz wszystkie przyciski
   if (tabKartaBtn) tabKartaBtn.classList.remove('primary');
   if (tabKalkulatorBtn) tabKalkulatorBtn.classList.remove('primary');
-  if (tabBazaKlientowBtn) tabBazaKlientowBtn.classList.remove('primary'); // ✅ DODANE
+  if (tabBazaKlientowBtn) tabBazaKlientowBtn.classList.remove('primary');
 
   // Pokaż wybraną sekcję i zaznacz przycisk
   if (sectionToShow === 'karta' && kartaSection) {
@@ -1850,31 +1862,47 @@ function showSection(sectionToShow) {
   } else if (sectionToShow === 'kalkulator' && kalkulatorSection) {
     kalkulatorSection.style.display = 'block';
     if (tabKalkulatorBtn) tabKalkulatorBtn.classList.add('primary');
-    renderReceipt(); 
-  } else if (sectionToShow === 'baza' && bazaKlientowSection) { // ✅ POCZĄTEK: DODANY BLOK
+    renderReceipt(); // Przelicz sumę po przełączeniu (jeśli istnieje)
+  } else if (sectionToShow === 'baza' && bazaKlientowSection) {
     bazaKlientowSection.style.display = 'block';
     if (tabBazaKlientowBtn) tabBazaKlientowBtn.classList.add('primary');
     // Załaduj dane do tabeli przy każdym przełączeniu na tę zakładkę
-    loadClientsToTable(); 
-  } // ✅ KONIEC: DODANY BLOK
+    loadClientsToTable();
+  }
 }
 
-if (tabKartaBtn && tabKalkulatorBtn) {
+// ========================================================
+// DODAWANIE EVENT LISTENERS (Nasłuchiwanie na kliknięcia/wpisywanie)
+// ========================================================
+
+// --- Listenery Przycisków Zakładek ---
+if (tabKartaBtn) {
     tabKartaBtn.addEventListener('click', () => showSection('karta'));
+}
+if (tabKalkulatorBtn) {
     tabKalkulatorBtn.addEventListener('click', () => showSection('kalkulator'));
 }
 if (tabBazaKlientowBtn) {
     tabBazaKlientowBtn.addEventListener('click', () => showSection('baza'));
 }
-  // ✅ DODAJ TEN BLOK DLA WYSZUKIWARKI
+
+// --- Listener Wyszukiwarki Klientów ---
 if (clientSearchInput) {
     clientSearchInput.addEventListener('input', filterClientTable);
 }
-const openCalcBtn = document.getElementById('openCalculatorBtn');
+
+// --- Listener Przycisku "Otwórz Kalkulator" z Karty Leczenia ---
 if (openCalcBtn) {
     openCalcBtn.addEventListener('click', () => showSection('kalkulator'));
 }
 
+// ========================================================
+// POZOSTAŁA LOGIKA APLIKACJI (Kalkulator, Baza Klientów itd.)
+// ========================================================
+
+// ✅ POCZĄTEK: Zaktualizowany kod dla Kalkulatora Wizyty (z cenami)
+// --- Logika Kalkulatora (z cenami) ---
+// ... (tutaj zaczyna się reszta Twojego kodu dla kalkulatora, importu Firebase, CRUD bazy klientów itd.) ...
 // --- Logika Kalkulatora (z cenami) ---
 // --- Logika Kalkulatora (początkowa) ---
 const copyCheckbox = document.getElementById('copyFromCardCheckbox');
