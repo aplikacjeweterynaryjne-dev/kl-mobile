@@ -2372,10 +2372,38 @@ if (saveClientBtn) {
         }
     });
 }
-// ========================================================
 // ✅ KONIEC: LOGIKA ZAKŁADKI BAZA KLIENTÓW
-// ========================================================
-</script>
+    // ========================================================
+
+
+    /**
+     * Filtruje tabelę klientów na podstawie wpisanego tekstu.
+     * Działa po stronie klienta (filtruje już załadowane wiersze).
+     */
+    function filterClientTable() {
+        if (!clientSearchInput || !klientTableBody) return;
+        
+        const searchTerm = clientSearchInput.value.toLowerCase().trim();
+        const rows = klientTableBody.querySelectorAll('tr');
+        
+        rows.forEach(row => {
+            // Upewnij się, że wiersz ma komórki (nie jest to "Ładowanie..." etc.)
+            if (row.cells.length < 3) return; 
+
+            const nazwa = row.cells[0].textContent.toLowerCase();
+            const adres = row.cells[1].textContent.toLowerCase();
+            const nrStada = row.cells[2].textContent.toLowerCase();
+            
+            // Sprawdź czy tekst jest widoczny w którejkolwiek z kolumn
+            const isVisible = nazwa.includes(searchTerm) || 
+                              adres.includes(searchTerm) || 
+                              nrStada.includes(searchTerm);
+                              
+            // Pokaż lub ukryj wiersz
+            row.style.display = isVisible ? '' : 'none';
+        });
+    }
+    </script>
 
 </body>
 </html>
