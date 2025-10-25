@@ -2466,15 +2466,126 @@ if (importFromSheetBtn) {
         pasteTextarea.focus();
     });
 }
-// ... (reszta kodu importu) ...
+
+// Anulowanie modala importu
+if (cancelPasteData) {
+    cancelPasteData.addEventListener('click', () => {
+        pasteDataModal.style.display = 'none';
+    });
+}
 
 // Zapisywanie (przetwarzanie) wklejonych danych
 if (savePasteDataBtn) {
     savePasteDataBtn.addEventListener('click', async () => {
-        // ... (cała logika importu) ...
+        const textData = pasteTextarea.value.trim();
+        if (!textData) {
+            alert('Pole tekstowe jest puste.');
+            return;
+        }
+
+        // Dzielimy tekst na wiersze
+        const rows = textData.split('\n');
+        if (rows.length === 0) {
+            alert('Brak danych do przetworzenia.');
+            return;
+        }
+
+        if (!confirm(`Znaleziono ${rows.length} wierszy do przetworzenia. \n\nKontynuować?`)) {
+            return;
+        }
+
+        savePasteDataBtn.disabled = true;
+        savePasteDataBtn.textContent = 'Przetwarzanie...';
+
+        let batch = db.batch();
+        let updatedCount = 0;
+        let errorCount = 0;
+        const promises = []; // Tablica na operacje odczytu (find)
+
+        // Krok 1: Przygotuj dane do aktualizacji dla każdego wiersza
+        for (const row of rows) {
+            if (row.trim() === '') continue; // Pomiń puste wiersze
+
+            // Dane z Excela/Sheets są oddzielone TABULATOREM
+            const cells = row.split('\t'); 
+
+            // ✅ ZMIENIONO WARUNEK (teraz 6 kolumn)
+            if (cells.length < 6) {
+                console.warn('Pominięto wiersz (za mało kolumn):', row);
+                errorCount++;
+                continue;
+            }
+
+            // Zgodnie z instrukcją w modalu:
+            const nazwa = cells[0].trim();
+            const adres = cells[1].trim();
+            const nrStada = cells[2].trim();
+            const nrTelefonu = cells[3].trim();
+            const email = cells[4].trim();
+            const idLecznicy = cells[5].trim(); // ✅ NOWE
+
+            if (!nazwa) {
+                console.warn('Pominięto wiersz (brak nazwy):', row);
+                errorCount++;
+                continue;
+            }
+
+            // Stwórz dane do aktualizacji (bez nazwy, bo po niej szukamy)
+            const dataToUpdate = {
+                adres: adres,
+                nrStada: nrStada,
+                nrTelefonu: nrTelefonu,
+                email: email,
+                idLecznicy: idLecznicy // ✅ NOWE
+            };
+
+            // Przygotuj zapytanie do znalezienia dokumentu po nazwie
+            const query = db.collection('klienci').where('nazwa', '==', nazwa).limit(1).get();
+            promises.push({ query, dataToUpdate, nazwa }); // dodajemy nazwa do logowania błędów
+        }
+
+        // Krok 2: Wykonaj wszystkie zapytania i przygotuj batch
+        try {
+            const results = await Promise.all(promises.map(p => p.query));
+
+            results.forEach((snapshot, index) => {
+                const dataToUpdate = promises[index].dataToUpdate;
+                const nazwa = promises[index].nazwa;
+
+                if (!snapshot.empty) {
+                    // Znaleziono klienta, dodaj aktualizację do batcha
+                    const docId = snapshot.docs[0].id;
+                    const docRef = db.collection('klienci').doc(docId);
+                    batch.update(docRef, dataToUpdate);
+                    updatedCount++;
+                } else {
+                    // Nie znaleziono klienta o tej nazwie
+                    console.warn(`Nie znaleziono klienta o nazwie: "${nazwa}"`);
+                    errorCount++;
+                }
+            });
+
+            // Krok 3: Wykonaj wszystkie aktualizacje za jednym razem
+            if (updatedCount > 0) {
+                await batch.commit();
+            }
+
+            alert(`Import zakończony! \n\nZaktualizowano: ${updatedCount} klientów. \nPominięto (błędy lub brak nazwy): ${errorCount}.`);
+
+            pasteDataModal.style.display = 'none';
+            loadClientsToTable(); // Odśwież tabelę
+            refreshClientDataLists(); // Odśwież datalisty
+
+        } catch (error) {
+            console.error('Krytyczny błąd podczas importu batch:', error);
+            alert('Wystąpił błąd podczas zapisu danych: ' + error.message);
+        } finally {
+            savePasteDataBtn.disabled = false;
+            savePasteDataBtn.textContent = 'Importuj i Zaktualizuj';
+        }
     });
 }
-  // ========================================================
+// ========================================================
 // ✅ KONIEC: LOGIKA IMPORTU (WKLEJANIA) DANYCH Z ARKUSZA
 // ========================================================
 
