@@ -2251,25 +2251,29 @@ async function loadClientsToTable() {
             return;
         }
         
-        snapshot.docs.forEach(doc => {
-            const klient = doc.data();
-            const tr = document.createElement('tr');
-            tr.dataset.id = doc.id; // Zapisz ID dokumentu w wierszu
-            
-tr.innerHTML = `
-                <td data-label="Nazwa">${klient.nazwa || 'Brak nazwy'}</td>
-                <td data-label="Adres">${klient.adres || ''}</td>
-                <td data-label="Nr Stada">${klient.nrStada || ''}</td>
-                <td data-label="Nr Telefonu">${klient.telefon || ''}</td>
-                <td data-label="Email">${klient.email || ''}</td>
-                <td data-label="ID Lecznicy">${klient.idLecznicy || ''}</td>
-                <td class="col-akcje">
-                    <button class="btn btn-edit-client" data-id="${doc.id}">Edytuj</button>
-                    <button class="btn warn btn-delete-client" data-id="${doc.id}">Usuń</button>
-                </td>
+        // Poprawiona pętla generująca wiersze
+        snapshot.docs.forEach(doc => {
+            const klient = doc.data();
+            const tr = document.createElement('tr');
+            tr.dataset.id = doc.id; // Zapisz ID dokumentu w wierszu
+            
+            // Ten blok .innerHTML jest teraz poprawnie sformatowany
+            tr.innerHTML = `
+              <td data-label="Nazwa">${klient.nazwa || 'Brak nazwy'}</td>
+              <td data-label="Adres">${klient.adres || ''}</td>
+              <td data-label="Nr Stada">${klient.nrStada || ''}</td>
+              <td data-label="Nr Telefonu">${klient.telefon || ''}</td>
+              <td data-label="Email">${klient.email || ''}</td>
+              <td data-label="ID Lecznicy">${klient.idLecznicy || ''}</td>
+              <td class="col-akcje">
+                  <button class="btn btn-edit-client" data-id="${doc.id}">Edytuj</button>
+                  <button class="btn warn btn-delete-client" data-id="${doc.id}">Usuń</button>
+              </td>
             `;
-            klientTableBody.appendChild(tr);
-        });
+            
+            // Ta linia musi być WEWNĄTRZ pętli forEach
+            klientTableBody.appendChild(tr);
+        });
     } catch (error) {
         console.error("Błąd ładowania klientów: ", error);
         klientTableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 10px; color: red;">Wystąpił błąd podczas ładowania danych.</td></tr>';
