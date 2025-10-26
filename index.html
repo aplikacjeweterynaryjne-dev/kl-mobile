@@ -2600,6 +2600,46 @@ if (saveClientBtn) {
         }
       });
     }
+  // --- Obsługa wklejania (paste) w trybie importu ---
+    if (klientTableBody) {
+      klientTableBody.addEventListener('paste', (event) => {
+        // Sprawdź, czy jesteśmy w trybie importu i czy wklejamy do komórki tabeli
+        const targetCell = event.target.closest('td[contenteditable="true"]');
+        if (!klientTable.classList.contains('import-mode') || !targetCell) {
+          return; // Jeśli nie, pozwól na domyślne wklejanie
+        }
+
+        event.preventDefault(); // Zatrzymaj domyślne wklejanie przeglądarki
+
+        // Pobierz dane ze schowka jako zwykły tekst
+        const clipboardData = event.clipboardData || window.clipboardData;
+        const pastedText = clipboardData.getData('text/plain');
+
+        // Podziel tekst na linie (uwzględniając różne rodzaje końca linii: \n, \r\n)
+        const lines = pastedText.split(/\r?\n/).filter(line => line.trim() !== ''); // Ignoruj puste linie
+
+        // Znajdź wiersz i indeks kolumny, do której wklejamy
+        const startRow = targetCell.closest('tr');
+        const cellIndex = targetCell.cellIndex;
+        const allRows = Array.from(klientTableBody.querySelectorAll('tr'));
+        const startRowIndex = allRows.indexOf(startRow);
+
+        // Wklej każdą linię do odpowiedniej komórki w dół
+        lines.forEach((lineContent, lineIndex) => {
+          const currentRowIndex = startRowIndex + lineIndex;
+          // Upewnij się, że nie wychodzimy poza tabelę
+          if (currentRowIndex < allRows.length) {
+            const targetRow = allRows[currentRowIndex];
+            const cellToUpdate = targetRow.cells[cellIndex];
+            if (cellToUpdate && cellToUpdate.contentEditable === 'true') {
+              cellToUpdate.textContent = lineContent.trim(); // Wstaw zawartość linii
+            }
+          }
+        });
+        
+        console.log(`Wklejono ${lines.length} linii do kolumny ${cellIndex + 1}.`);
+      });
+    }
     // ✅ KONIEC: LOGIKA IMPORTU Z ARKUSZA
     </script>
 
