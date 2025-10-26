@@ -2252,26 +2252,40 @@ async function loadClientsToTable() {
         }
         
         // Poprawiona pętla generująca wiersze
+// Nowa, bezpieczniejsza pętla tworząca wiersze
         snapshot.docs.forEach(doc => {
             const klient = doc.data();
             const tr = document.createElement('tr');
             tr.dataset.id = doc.id; // Zapisz ID dokumentu w wierszu
-            
-            // Ten blok .innerHTML jest teraz poprawnie sformatowany
-            tr.innerHTML = `
-              <td data-label="Nazwa">${klient.nazwa || 'Brak nazwy'}</td>
-              <td data-label="Adres">${klient.adres || ''}</td>
-              <td data-label="Nr Stada">${klient.nrStada || ''}</td>
-              <td data-label="Nr Telefonu">${klient.telefon || ''}</td>
-              <td data-label="Email">${klient.email || ''}</td>
-              <td data-label="ID Lecznicy">${klient.idLecznicy || ''}</td>
-              <td class="col-akcje">
-                  <button class="btn btn-edit-client" data-id="${doc.id}">Edytuj</button>
-                  <button class="btn warn btn-delete-client" data-id="${doc.id}">Usuń</button>
-              </td>
+
+            // Funkcja pomocnicza do tworzenia komórki TD
+            const createCell = (text, dataLabel) => {
+              const td = document.createElement('td');
+              td.textContent = text || ''; // Użyj pustego stringa, jeśli text jest null/undefined
+              if (dataLabel) {
+                td.dataset.label = dataLabel;
+              }
+              return td;
+            };
+
+            // Twórz i dodawaj komórki po kolei
+            tr.appendChild(createCell(klient.nazwa || 'Brak nazwy', 'Nazwa'));
+            tr.appendChild(createCell(klient.adres, 'Adres'));
+            tr.appendChild(createCell(klient.nrStada, 'Nr Stada'));
+            tr.appendChild(createCell(klient.telefon, 'Nr Telefonu'));
+            tr.appendChild(createCell(klient.email, 'Email'));
+            tr.appendChild(createCell(klient.idLecznicy, 'ID Lecznicy'));
+
+            // Komórka Akcje (z przyciskami - tu użyjemy innerHTML dla wygody)
+            const tdAkcje = document.createElement('td');
+            tdAkcje.classList.add('col-akcje');
+            tdAkcje.innerHTML = `
+              <button class="btn btn-edit-client" data-id="${doc.id}">Edytuj</button>
+              <button class="btn warn btn-delete-client" data-id="${doc.id}">Usuń</button>
             `;
-            
-            // Ta linia musi być WEWNĄTRZ pętli forEach
+            tr.appendChild(tdAkcje);
+
+            // Dodaj gotowy wiersz do tabeli
             klientTableBody.appendChild(tr);
         });
     } catch (error) {
