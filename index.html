@@ -2431,21 +2431,158 @@ if (saveClientBtn) {
         
         rows.forEach(row => {
             // Upewnij się, że wiersz ma komórki (nie jest to "Ładowanie..." etc.)
-            if (row.cells.length < 3) return; 
+            if (row.cells.length < 6) return; 
 
             const nazwa = row.cells[0].textContent.toLowerCase();
             const adres = row.cells[1].textContent.toLowerCase();
             const nrStada = row.cells[2].textContent.toLowerCase();
-            
+            const telefon = row.cells[3].textContent.toLowerCase();
+            const email = row.cells[4].textContent.toLowerCase();
+            const idLecznicy = row.cells[5].textContent.toLowerCase();
             // Sprawdź czy tekst jest widoczny w którejkolwiek z kolumn
-            const isVisible = nazwa.includes(searchTerm) || 
-                              adres.includes(searchTerm) || 
-                              nrStada.includes(searchTerm);
+            const isVisible = nazwa.includes(searchTerm) || 
+                              adres.includes(searchTerm) || 
+                              nrStada.includes(searchTerm) ||
+                              telefon.includes(searchTerm) ||
+                              email.includes(searchTerm) ||
+                              idLecznicy.includes(searchTerm);
                               
             // Pokaż lub ukryj wiersz
             row.style.display = isVisible ? '' : 'none';
         });
     }
+  // ========================================================
+    // ✅ POCZĄTEK: LOGIKA IMPORTU Z ARKUSZA (BULK EDIT)
+    // ========================================================
+
+    const startImportBtn = document.getElementById('startImportBtn');
+    const saveImportBtn = document.getElementById('saveImportBtn');
+    const cancelImportBtn = document.getElementById('cancelImportBtn');
+    const klientTable = document.getElementById('klientTable');
+    const importActionsDiv = document.getElementById('importActions');
+
+    // --- Funkcja przełączająca UI w tryb importu ---
+    function toggleImportMode(isImporting) {
+      if (isImporting) {
+        // Włącz tryb importu
+        klientTable.classList.add('import-mode');
+        startImportBtn.style.display = 'none';
+        if (addNewClientBtn) addNewClientBtn.style.display = 'none';
+        if (clientSearchInput) clientSearchInput.style.display = 'none';
+        
+        saveImportBtn.style.display = 'inline-block';
+        cancelImportBtn.style.display = 'inline-block';
+
+        // Ustaw contenteditable dla komórek
+        klientTableBody.querySelectorAll('tr').forEach(row => {
+          // Kolumny 0-5 (Nazwa, Adres, NrStada, Tel, Email, IDLecznicy)
+          for (let i = 0; i <= 5; i++) {
+            if (row.cells[i]) {
+              row.cells[i].contentEditable = true;
+            }
+          }
+        });
+        
+        alert('Tryb importu włączony.\nMożesz teraz edytować komórki i wklejać dane z arkusza (np. całą kolumnę).\n\nKliknij "Zapisz zmiany importu", aby wysłać dane do bazy.');
+        
+      } else {
+        // Wyłącz tryb importu
+        klientTable.classList.remove('import-mode');
+        startImportBtn.style.display = 'inline-block';
+        if (addNewClientBtn) addNewClientBtn.style.display = 'inline-block';
+        if (clientSearchInput) clientSearchInput.style.display = 'inline-block';
+        
+        saveImportBtn.style.display = 'none';
+        cancelImportBtn.style.display = 'none';
+
+        // Wyłącz contenteditable
+        klientTableBody.querySelectorAll('tr').forEach(row => {
+          for (let i = 0; i <= 5; i++) {
+            if (row.cells[i]) {
+              row.cells[i].contentEditable = false;
+            }
+          }
+        });
+      }
+    }
+
+    // --- Przycisk: Rozpocznij Import ---
+    if (startImportBtn) {
+      startImportBtn.addEventListener('click', () => {
+        // Upewnij się, że tabela jest w pełni załadowana
+        if (klientTableBody.querySelectorAll('tr').length === 0) {
+          alert('Tabela jest pusta, nie można rozpocząć importu.');
+          return;
+        }
+        toggleImportMode(true);
+      });
+    }
+
+    // --- Przycisk: Anuluj Import ---
+    if (cancelImportBtn) {
+      cancelImportBtn.addEventListener('click', () => {
+        if (confirm('Czy na pewno chcesz anulować import? Wszystkie niezapisane zmiany w tabeli zostaną utracone.')) {
+          toggleImportMode(false);
+          // Przeładuj tabelę, aby przywrócić oryginalne dane
+          loadClientsToTable(); 
+        }
+      });
+    }
+
+    // --- Przycisk: Zapisz Import (NAJWAŻNIEJSZE) ---
+    if (saveImportBtn) {
+      saveImportBtn.addEventListener('click', async () => {
+        if (!confirm('Czy na pewno chcesz zapisać wszystkie zmiany z tabeli do bazy danych Firestore? Ta operacja nadpisze dane.')) {
+          return;
+        }
+
+        saveImportBtn.disabled = true;
+        saveImportBtn.textContent = 'Zapisywanie...';
+
+        try {
+          const batch = db.batch();
+          const rows = klientTableBody.querySelectorAll('tr');
+          let updateCounter = 0;
+
+          rows.forEach(row => {
+            const docId = row.dataset.id;
+            if (docId) {
+              // Odczytaj dane z edytowalnych komórek
+              const updatedData = {
+                nazwa: row.cells[0] ? row.cells[0].textContent.trim() : '',
+                adres: row.cells[1] ? row.cells[1].textContent.trim() : '',
+                nrStada: row.cells[2] ? row.cells[2].textContent.trim() : '',
+*               telefon: row.cells[3] ? row.cells[3].textContent.trim() : '',
+                email: row.cells[4] ? row.cells[4].textContent.trim() : '',
+                idLecznicy: row.cells[5] ? row.cells[5].textContent.trim() : ''
+              };
+
+              // Dodaj operację 'update' do batcha
+              const docRef = db.collection("klienci").doc(docId);
+              batch.update(docRef, updatedData);
+              updateCounter++;
+            }
+          });
+
+          // Wykonaj wszystkie operacje w batchu
+          await batch.commit();
+          
+          alert(`Pomyślnie zaktualizowano ${updateCounter} klientów!`);
+
+        } catch (error) {
+          console.error("Błąd podczas zapisywania importu: ", error);
+          alert('Wystąpił krytyczny błąd podczas zapisu. Sprawdź konsolę.');
+        } finally {
+          // Przywróć UI
+          saveImportBtn.disabled = false;
+          saveImportBtn.textContent = '💾 Zapisz zmiany importu';
+          toggleImportMode(false); // Wyłącz tryb importu
+          loadClientsToTable(); // Odśwież tabelę z danymi z bazy
+          refreshClientDataLists(); // Odśwież datalisty w całej apce
+        }
+      });
+    }
+    // ✅ KONIEC: LOGIKA IMPORTU Z ARKUSZA
     </script>
 
 </body>
