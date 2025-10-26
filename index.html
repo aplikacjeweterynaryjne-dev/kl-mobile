@@ -2234,36 +2234,56 @@ async function refreshClientDataLists() {
 
 
 /**
- * Ładuje klientów z Firestore i buduje tabelę HTML.
+ * Ładuje klientów z Firestore, sortuje ich w JavaScript wg polskich reguł i buduje tabelę HTML.
  */
 async function loadClientsToTable() {
-    // ... (początek funkcji bez zmian) ...
+    // Upewnij się, że elementy istnieją
+    if (!klientTableBody) {
+        console.error("Nie znaleziono elementu tbody tabeli klientów (#klientTableBody).");
+        return;
+    }
+    if (clientSearchInput) {
+        clientSearchInput.value = ''; // Wyczyść wyszukiwarkę
+    }
+
+    // Wyświetl komunikat ładowania
+    klientTableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 10px;">Ładowanie danych...</td></tr>';
+
     try {
-        // 1. Pobierz WSZYSTKICH klientów (bez sortowania w Firestore lub zignoruj je)
+        // 1. Pobierz WSZYSTKICH klientów z Firestore
+        console.log("Pobieranie klientów z Firestore...");
         const snapshot = await db.collection("klienci").get();
-        klientTableBody.innerHTML = '';
+        klientTableBody.innerHTML = ''; // Wyczyść "Ładowanie..." po pobraniu
 
+        // Sprawdź, czy baza danych nie jest pusta
         if (snapshot.empty) {
-            // ... (obsługa pustej bazy bez zmian) ...
-            return;
+            console.log("Baza klientów jest pusta.");
+            klientTableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 10px;">Brak klientów w bazie danych.</td></tr>';
+            return; // Zakończ funkcję, jeśli brak klientów
         }
+        console.log(`Pobrano ${snapshot.size} klientów.`);
 
-        // 2. Przekształć dokumenty na tablicę obiektów JS
+        // 2. Przekształć dokumenty Firestore na tablicę obiektów JavaScript
         let klienci = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        console.log("Dane klientów przekształcone do tablicy JS.");
 
-        // 3. Posortuj tablicę w JavaScript używając polskiego locale
+        // 3. Posortuj tablicę 'klienci' w JavaScript, używając polskich reguł sortowania
+        console.log("Sortowanie klientów wg polskich reguł...");
         klienci.sort((a, b) => {
-            // Upewnij się, że nazwa istnieje, aby uniknąć błędów
-            const nameA = a.nazwa || '';
-            const nameB = b.nazwa || '';
-            return nameA.localeCompare(nameB, 'pl', { sensitivity: 'base' }); // 'pl' dla polskiego sortowania
+            const nameA = a.nazwa || ''; // Zabezpieczenie przed brakiem nazwy
+            const nameB = b.nazwa || ''; // Zabezpieczenie przed brakiem nazwy
+            // 'pl' - użyj polskich reguł, 'sensitivity: 'base'' - ignoruj wielkość liter przy sortowaniu
+            return nameA.localeCompare(nameB, 'pl', { sensitivity: 'base' });
         });
+        console.log("Sortowanie zakończone.");
 
-        // 4. Wygeneruj wiersze tabeli z POSORTOWANEJ tablicy 'klienci'
-        klienci.forEach(klient => { // Iteruj po posortowanej tablicy 'klienci'
+        // 4. Wygeneruj wiersze tabeli HTML z posortowanej tablicy 'klienci'
+        console.log("Generowanie wierszy tabeli HTML...");
+        klienci.forEach(klient => {
             const tr = document.createElement('tr');
-            tr.dataset.id = klient.id; // Użyj ID z obiektu
+            tr.dataset.id = klient.id; // Zapisz ID dokumentu Firestore w atrybucie data-id wiersza
 
+            // Wypełnij komórki wiersza danymi klienta
             tr.innerHTML = `
               <td data-label="Nazwa">${klient.nazwa || 'Brak nazwy'}</td>
               <td data-label="Adres">${klient.adres || ''}</td>
@@ -2272,21 +2292,22 @@ async function loadClientsToTable() {
               <td data-label="Email">${klient.email || ''}</td>
               <td data-label="ID Lecznicy">${klient.idLecznicy || ''}</td>
               <td class="col-akcje">
-                  <button class="btn btn-edit-client" data-id="${klient.id}">Edytuj</button>
-                  <button class="btn warn btn-delete-client" data-id="${klient.id}">Usuń</button>
+                  <button class="btn btn-edit-client" data-id="${klient.id}" title="Edytuj klienta">Edytuj</button>
+                  <button class="btn warn btn-delete-client" data-id="${klient.id}" title="Usuń klienta">Usuń</button>
               </td>
             `;
+            // Dodaj gotowy wiersz do ciała tabeli
             klientTableBody.appendChild(tr);
         });
+        console.log("Tabela klientów została wygenerowana.");
 
     } catch (error) {
-        // ... (obsługa błędu bez zmian) ...
+        // Obsługa błędów, które mogły wystąpić podczas pobierania, sortowania lub generowania tabeli
+        console.error("Błąd podczas ładowania lub przetwarzania klientów: ", error);
+        // Wyświetl komunikat błędu w tabeli
+        klientTableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 10px; color: red;">Wystąpił błąd podczas ładowania danych. Sprawdź konsolę (F12).</td></tr>';
     }
-}
-        console.error("Błąd ładowania klientów: ", error);
-        klientTableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 10px; color: red;">Wystąpił błąd podczas ładowania danych.</td></tr>';
-    }
-}
+} // Koniec funkcji loadClientsToTable
 
 /**
  * Obsługa kliknięć w tabeli (Edycja i Usuwanie) - Delegacja zdarzeń
