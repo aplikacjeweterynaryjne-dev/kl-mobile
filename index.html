@@ -2627,16 +2627,24 @@ if (saveClientBtn) {
         const allRows = Array.from(klientTableBody.querySelectorAll('tr'));
         const startRowIndex = allRows.indexOf(startRow);
 
-        // Wklej każdą linię do odpowiedniej komórki w dół
+       // Wklej każdą linię do odpowiedniej komórki w dół (Z DODANYM LOGOWANIEM)
         lines.forEach((lineContent, lineIndex) => {
           const currentRowIndex = startRowIndex + lineIndex;
+          console.log(`Próba wklejenia linii ${lineIndex + 1}: "${lineContent}" do wiersza ${currentRowIndex + 1}, komórki ${cellIndex + 1}`); // Log 1
+
           // Upewnij się, że nie wychodzimy poza tabelę
           if (currentRowIndex < allRows.length) {
             const targetRow = allRows[currentRowIndex];
             const cellToUpdate = targetRow.cells[cellIndex];
-            if (cellToUpdate && cellToUpdate.contentEditable === 'true') {
+
+            if (cellToUpdate && cellToUpdate.isContentEditable) { // Używamy .isContentEditable dla pewności
+              console.log(`Znaleziono komórkę docelową w wierszu ${currentRowIndex + 1}. Wklejam...`); // Log 2
               cellToUpdate.textContent = lineContent.trim(); // Wstaw zawartość linii
+            } else {
+              console.warn(`Pominięto wiersz ${currentRowIndex + 1}: Nie znaleziono edytowalnej komórki o indeksie ${cellIndex}.`); // Log 3 (ostrzeżenie)
             }
+          } else {
+            console.warn(`Pominięto linię ${lineIndex + 1}: Wiersz ${currentRowIndex + 1} wykracza poza tabelę.`); // Log 4 (ostrzeżenie)
           }
         });
         
