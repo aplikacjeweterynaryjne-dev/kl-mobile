@@ -507,6 +507,14 @@
 #klientTable .btn.warn:hover {
     background: #a93226;
 }
+  /* Style dla trybu importu tabeli */
+  #klientTable.import-mode td[contenteditable="true"] {
+    background-color: #fef9e7; /* Lekko żółte tło dla edytowalnych komórek */
+    outline: 1px dashed #f39c12; /* Pomarańczowa kropkowana ramka */
+  }
+  #klientTable.import-mode .col-akcje {
+    display: none; /* Ukryj kolumnę akcji w trybie importu */
+  }
   </style>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
@@ -1778,6 +1786,9 @@ const saveClientBtn = document.getElementById('saveClientBtn');
 const clientFormDocId = document.getElementById('clientFormDocId');
 const clientFormNazwa = document.getElementById('clientFormNazwa');
 const clientFormAdres = document.getElementById('clientFormAdres');
+const clientFormTelefon = document.getElementById('clientFormTelefon');
+const clientFormEmail = document.getElementById('clientFormEmail');
+const clientFormIdLecznicy = document.getElementById('clientFormIdLecznicy');
 const clientFormNrStada = document.getElementById('clientFormNrStada'); // Poprawiona, pojedyncza definicja
 // ✅ KONIEC: ZMIENNE DLA BAZY KLIENTÓW I MODALI
 
@@ -2228,7 +2239,7 @@ async function refreshClientDataLists() {
 async function loadClientsToTable() {
     if (!klientTableBody) return;
     if (clientSearchInput) clientSearchInput.value = '';
-    klientTableBody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 10px;">Ładowanie danych...</td></tr>';
+    klientTableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 10px;">Ładowanie danych...</td></tr>';
     
     try {
         // Pobierz klientów posortowanych alfabetycznie
@@ -2236,7 +2247,7 @@ async function loadClientsToTable() {
         klientTableBody.innerHTML = ''; // Wyczyść "Ładowanie..."
         
         if (snapshot.empty) {
-            klientTableBody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 10px;">Brak klientów w bazie danych.</td></tr>';
+            klientTableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 10px;">Brak klientów w bazie danych.</td></tr>';
             return;
         }
         
@@ -2245,15 +2256,18 @@ async function loadClientsToTable() {
             const tr = document.createElement('tr');
             tr.dataset.id = doc.id; // Zapisz ID dokumentu w wierszu
             
-            tr.innerHTML = `
-                <td data-label="Nazwa">${klient.nazwa || 'Brak nazwy'}</td>
-                <td data-label="Adres">${klient.adres || ''}</td>
-                <td data-label="Nr Stada">${klient.nrStada || ''}</td>
-                <td>
-                    <button class="btn btn-edit-client" data-id="${doc.id}">Edytuj</button>
-                    <button class="btn warn btn-delete-client" data-id="${doc.id}">Usuń</button>
-                </td>
-            `;
+tr.innerHTML = `
+                <td data-label="Nazwa">${klient.nazwa || 'Brak nazwy'}</td>
+                <td data-label="Adres">${klient.adres || ''}</td>
+                <td data-label="Nr Stada">${klient.nrStada || ''}</td>
+                <td data-label="Nr Telefonu">${klient.telefon || ''}</td>
+                <td data-label="Email">${klient.email || ''}</td>
+                <td data-label="ID Lecznicy">${klient.idLecznicy || ''}</td>
+                <td class="col-akcje">
+                    <button class="btn btn-edit-client" data-id="${doc.id}">Edytuj</button>
+                    <button class="btn warn btn-delete-client" data-id="${doc.id}">Usuń</button>
+                </td>
+            `;
             klientTableBody.appendChild(tr);
         });
     } catch (error) {
@@ -2286,6 +2300,9 @@ if (klientTableBody) {
                 clientFormNazwa.value = data.nazwa || '';
                 clientFormAdres.value = data.adres || '';
                 clientFormNrStada.value = data.nrStada || '';
+                clientFormTelefon.value = data.telefon || '';
+                clientFormEmail.value = data.email || '';
+                clientFormIdLecznicy.value = data.idLecznicy || '';
                 clientFormModal.style.display = 'flex';
                 
             } catch (error) {
@@ -2325,6 +2342,9 @@ if (addNewClientBtn) {
         clientFormNazwa.value = '';
         clientFormAdres.value = '';
         clientFormNrStada.value = '';
+        clientFormTelefon.value = '';
+        clientFormEmail.value = '';
+        clientFormIdLecznicy.value = '';
         clientFormModal.style.display = 'flex';
         clientFormNazwa.focus();
     });
@@ -2347,6 +2367,9 @@ if (saveClientBtn) {
         const nazwa = clientFormNazwa.value.trim();
         const adres = clientFormAdres.value.trim();
         const nrStada = clientFormNrStada.value.trim();
+        const telefon = clientFormTelefon.value.trim();
+        const email = clientFormEmail.value.trim();
+        const idLecznicy = clientFormIdLecznicy.value.trim();
         const docId = clientFormDocId.value; // Pobierz ID (będzie puste przy dodawaniu)
 
         if (!nazwa) {
@@ -2355,11 +2378,14 @@ if (saveClientBtn) {
             return;
         }
 
-        const klientData = {
-            nazwa: nazwa,
-            adres: adres,
-            nrStada: nrStada
-        };
+      const klientData = {
+            nazwa: nazwa,
+            adres: adres,
+            nrStada: nrStada,
+            telefon: telefon,
+            email: email,
+            idLecznicy: idLecznicy
+        };
 
         try {
             saveClientBtn.disabled = true;
