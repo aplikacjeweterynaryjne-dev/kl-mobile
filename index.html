@@ -783,15 +783,15 @@
   </button>
 
   <div class="table-container">
-    <table id="klientTable">
-      <thead>
-        <tr>
-          <th>Nazwa</th>
-          <th>Adres</th>
-          <th>Nr Stada</th>
-          <th style="width: 130px;">Akcje</th>
-        </tr>
-      </thead>
+   <table id="klientTable">
+      <thead>
+        <tr>
+          <th>Nazwa</th>
+          <th>Adres</th>
+          <th>Nr Stada</th>
+          <th>Nr telefonu</th>           <th>Email</th>           <th>ID Lecznicy</th>           <th style="width: 130px;">Akcje</th>
+        </tr>
+      </thead>
       <tbody id="klientTableBody">
         <tr><td colspan="4" style="text-align: center; padding: 10px;">Ładowanie...</td></tr>
       </tbody>
@@ -819,7 +819,20 @@
       <label for="clientFormNrStada">Nr stada</label>
       <input type="text" id="clientFormNrStada" placeholder="Wpisz numer stada" style="width:100%; padding:8px; font-size:19px; border:1px solid #ccc; border-radius:6px; box-sizing:border-box;">
     </div>
-    
+    <div class="form-row">
+      <label for="clientFormTelefon">Nr telefonu</label>
+      <input type="tel" id="clientFormTelefon" placeholder="Wpisz numer telefonu" style="width:100%; padding:8px; font-size:19px; border:1px solid #ccc; border-radius:6px; box-sizing:border-box;">
+    </div>
+    
+    <div class="form-row">
+      <label for="clientFormEmail">Email</label>
+      <input type="email" id="clientFormEmail" placeholder="Wpisz adres e-mail" style="width:100%; padding:8px; font-size:19px; border:1px solid #ccc; border-radius:6px; box-sizing:border-box;">
+    </div>
+    
+    <div class="form-row">
+      <label for="clientFormIdLecznicy">ID Lecznicy</label>
+      <input type="text" id="clientFormIdLecznicy" placeholder="Wpisz ID lecznicy" style="width:100%; padding:8px; font-size:19px; border:1px solid #ccc; border-radius:6px; box-sizing:border-box;">
+    </div>
     <div class="form-actions">
       <div class="left">
         <button id="cancelClientForm" class="btn ghost small" style="font-size: 19px;">Anuluj</button>
@@ -1759,7 +1772,10 @@ const clientFormDocId = document.getElementById('clientFormDocId');
 const clientFormNazwa = document.getElementById('clientFormNazwa');
 const clientFormAdres = document.getElementById('clientFormAdres');
 const clientFormNrStada = document.getElementById('clientFormNrStada'); // Poprawiona, pojedyncza definicja
-// ✅ KONIEC: ZMIENNE DLA BAZY KLIENTÓW I MODALI
+const clientFormTelefon = document.getElementById('clientFormTelefon');
+const clientFormEmail = document.getElementById('clientFormEmail');
+const clientFormIdLecznicy = document.getElementById('clientFormIdLecznicy');
+  // ✅ KONIEC: ZMIENNE DLA BAZY KLIENTÓW I MODALI
 
 // --- Nawigacja między zakładkami ---
 // (Reszta twojego kodu...)
@@ -2203,111 +2219,129 @@ async function refreshClientDataLists() {
 
 
 /**
- * Ładuje klientów z Firestore i buduje tabelę HTML.
- */
+ * Ładuje klientów z Firestore i buduje tabelę HTML.
+ */
 async function loadClientsToTable() {
-    if (!klientTableBody) return;
-    if (clientSearchInput) clientSearchInput.value = '';
-    klientTableBody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 10px;">Ładowanie danych...</td></tr>';
-    
-    try {
-        // Pobierz klientów posortowanych alfabetycznie
-        const snapshot = await db.collection("klienci").orderBy("nazwa").get();
-        klientTableBody.innerHTML = ''; // Wyczyść "Ładowanie..."
-        
-        if (snapshot.empty) {
-            klientTableBody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 10px;">Brak klientów w bazie danych.</td></tr>';
-            return;
-        }
-        
-        snapshot.docs.forEach(doc => {
-            const klient = doc.data();
-            const tr = document.createElement('tr');
-            tr.dataset.id = doc.id; // Zapisz ID dokumentu w wierszu
-            
-            tr.innerHTML = `
-                <td data-label="Nazwa">${klient.nazwa || 'Brak nazwy'}</td>
-                <td data-label="Adres">${klient.adres || ''}</td>
-                <td data-label="Nr Stada">${klient.nrStada || ''}</td>
-                <td>
-                    <button class="btn btn-edit-client" data-id="${doc.id}">Edytuj</button>
-                    <button class="btn warn btn-delete-client" data-id="${doc.id}">Usuń</button>
-                </td>
-            `;
-            klientTableBody.appendChild(tr);
-        });
-    } catch (error) {
-        console.error("Błąd ładowania klientów: ", error);
-        klientTableBody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 10px; color: red;">Wystąpił błąd podczas ładowania danych.</td></tr>';
-    }
+    if (!klientTableBody) return;
+    if (clientSearchInput) clientSearchInput.value = '';
+    // ✅ ZMIANA: colspan="7" (było 4)
+    klientTableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 10px;">Ładowanie danych...</td></tr>';
+    
+    try {
+        // Pobierz klientów posortowanych alfabetycznie
+        const snapshot = await db.collection("klienci").orderBy("nazwa").get();
+        klientTableBody.innerHTML = ''; // Wyczyść "Ładowanie..."
+        
+        if (snapshot.empty) {
+            // ✅ ZMIANA: colspan="7" (było 4)
+            klientTableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 10px;">Brak klientów w bazie danych.</td></tr>';
+            return;
+        }
+        
+        snapshot.docs.forEach(doc => {
+            const klient = doc.data();
+            const tr = document.createElement('tr');
+            tr.dataset.id = doc.id; // Zapisz ID dokumentu w wierszu
+            
+            // ✅ POCZĄTEK: Zaktualizowany innerHTML tabeli
+            tr.innerHTML = `
+                <td data-label="Nazwa">${klient.nazwa || 'Brak nazwy'}</td>
+                <td data-label="Adres">${klient.adres || ''}</td>
+                <td data-label="Nr Stada">${klient.nrStada || ''}</td>
+                <td data-label="Nr telefonu">${klient.telefon || ''}</td>
+                <td data-label="Email">${klient.email || ''}</td>
+                <td data-label="ID Lecznicy">${klient.idLecznicy || ''}</td>
+                <td>
+                    <button class="btn btn-edit-client" data-id="${doc.id}">Edytuj</button>
+                    <button class="btn warn btn-delete-client" data-id="${doc.id}">Usuń</button>
+                </td>
+            `;
+            // ✅ KONIEC: Zaktualizowany innerHTML tabeli
+            klientTableBody.appendChild(tr);
+        });
+    } catch (error) {
+        console.error("Błąd ładowania klientów: ", error);
+        // ✅ ZMIANA: colspan="7" (było 4)
+        klientTableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 10px; color: red;">Wystąpił błąd podczas ładowania danych.</td></tr>';
+    }
 }
 
 /**
- * Obsługa kliknięć w tabeli (Edycja i Usuwanie) - Delegacja zdarzeń
- */
+ * Obsługa kliknięć w tabeli (Edycja i Usuwanie) - Delegacja zdarzeń
+ */
 if (klientTableBody) {
-    klientTableBody.addEventListener('click', async (e) => {
-        const target = e.target;
-        
-        // --- EDYCJA KLIENTA ---
-        if (target.classList.contains('btn-edit-client')) {
-            const docId = target.dataset.id;
-            try {
-                const doc = await db.collection("klienci").doc(docId).get();
-                if (!doc.exists) {
-                    alert('Błąd: Nie znaleziono klienta.');
-                    return;
-                }
-                const data = doc.data();
-                
-                // Wypełnij i pokaż modal
-                clientFormTitle.textContent = 'Edytuj klienta';
-                clientFormDocId.value = docId; // Najważniejsze: ustaw ID do edycji
-                clientFormNazwa.value = data.nazwa || '';
-                clientFormAdres.value = data.adres || '';
-                clientFormNrStada.value = data.nrStada || '';
-                clientFormModal.style.display = 'flex';
-                
-            } catch (error) {
-                console.error('Błąd pobierania klienta do edycji: ', error);
-                alert('Wystąpił błąd podczas pobierania danych klienta.');
-            }
-        }
-        
-        // --- USUWANIE KLIENTA ---
-        if (target.classList.contains('btn-delete-client')) {
-            const docId = target.dataset.id;
-            const row = target.closest('tr');
-            const klientName = row.cells[0].textContent;
-            
-            if (confirm(`Czy na pewno chcesz usunąć klienta: "${klientName}"? \n\nTej operacji nie można cofnąć.`)) {
-                try {
-                    await db.collection("klienci").doc(docId).delete();
-                    alert('Klient usunięty pomyślnie.');
-                    loadClientsToTable(); // Odśwież tabelę
-                    refreshClientDataLists(); // Odśwież listy wyboru w apce
-                } catch (error) {
-                    console.error('Błąd usuwania klienta: ', error);
-                    alert('Wystąpił błąd podczas usuwania klienta.');
-                }
-            }
-        }
-    });
+    klientTableBody.addEventListener('click', async (e) => {
+        const target = e.target;
+        
+        // --- EDYCJA KLIENTA ---
+        if (target.classList.contains('btn-edit-client')) {
+            const docId = target.dataset.id;
+            try {
+                const doc = await db.collection("klienci").doc(docId).get();
+                if (!doc.exists) {
+                    alert('Błąd: Nie znaleziono klienta.');
+                    return;
+                }
+                const data = doc.data();
+                
+                // Wypełnij i pokaż modal
+                clientFormTitle.textContent = 'Edytuj klienta';
+                clientFormDocId.value = docId; // Najważniejsze: ustaw ID do edycji
+                clientFormNazwa.value = data.nazwa || '';
+                clientFormAdres.value = data.adres || '';
+                clientFormNrStada.value = data.nrStada || '';
+                // ✅ POCZĄTEK: Wypełnij nowe pola
+                clientFormTelefon.value = data.telefon || '';
+                clientFormEmail.value = data.email || '';
+                clientFormIdLecznicy.value = data.idLecznicy || '';
+                // ✅ KONIEC: Wypełnij nowe pola
+                clientFormModal.style.display = 'flex';
+                
+            } catch (error) {
+                console.error('Błąd pobierania klienta do edycji: ', error);
+                alert('Wystąpił błąd podczas pobierania danych klienta.');
+            }
+        }
+        
+        // --- USUWANIE KLIENTA ---
+        if (target.classList.contains('btn-delete-client')) {
+            const docId = target.dataset.id;
+            const row = target.closest('tr');
+            const klientName = row.cells[0].textContent;
+            
+            if (confirm(`Czy na pewno chcesz usunąć klienta: "${klientName}"? \n\nTej operacji nie można cofnąć.`)) {
+                try {
+                    await db.collection("klienci").doc(docId).delete();
+                    alert('Klient usunięty pomyślnie.');
+                    loadClientsToTable(); // Odśwież tabelę
+                    refreshClientDataLists(); // Odśwież listy wyboru w apce
+                } catch (error) {
+                    console.error('Błąd usuwania klienta: ', error);
+                    alert('Wystąpił błąd podczas usuwania klienta.');
+                }
+            }
+        }
+    });
 }
 
 /**
- * Przycisk "Dodaj nowego klienta" - otwiera pusty modal
- */
+ * Przycisk "Dodaj nowego klienta" - otwiera pusty modal
+ */
 if (addNewClientBtn) {
-    addNewClientBtn.addEventListener('click', () => {
-        clientFormTitle.textContent = 'Dodaj nowego klienta';
-        clientFormDocId.value = ''; // Wyczyść ID - to oznacza "dodawanie"
-        clientFormNazwa.value = '';
-        clientFormAdres.value = '';
-        clientFormNrStada.value = '';
-        clientFormModal.style.display = 'flex';
-        clientFormNazwa.focus();
-    });
+    addNewClientBtn.addEventListener('click', () => {
+        clientFormTitle.textContent = 'Dodaj nowego klienta';
+        clientFormDocId.value = ''; // Wyczyść ID - to oznacza "dodawanie"
+        clientFormNazwa.value = '';
+        clientFormAdres.value = '';
+        clientFormNrStada.value = '';
+        // ✅ POCZĄTEK: Wyczyść nowe pola
+        clientFormTelefon.value = '';
+        clientFormEmail.value = '';
+        clientFormIdLecznicy.value = '';
+        // ✅ KONIEC: Wyczyść nowe pola
+        clientFormModal.style.display = 'flex';
+        clientFormNazwa.focus();
+    });
 }
 
 /**
@@ -2320,86 +2354,106 @@ if (cancelClientForm) {
 }
 
 /**
- * Przycisk "Zapisz" w modalu klienta (obsługuje Dodawanie i Aktualizację)
- */
+ * Przycisk "Zapisz" w modalu klienta (obsługuje Dodawanie i Aktualizację)
+ */
 if (saveClientBtn) {
-    saveClientBtn.addEventListener('click', async () => {
-        const nazwa = clientFormNazwa.value.trim();
-        const adres = clientFormAdres.value.trim();
-        const nrStada = clientFormNrStada.value.trim();
-        const docId = clientFormDocId.value; // Pobierz ID (będzie puste przy dodawaniu)
+    saveClientBtn.addEventListener('click', async () => {
+        // ✅ POCZĄTEK: Odczytaj wartości ze wszystkich pól
+        const nazwa = clientFormNazwa.value.trim();
+        const adres = clientFormAdres.value.trim();
+        const nrStada = clientFormNrStada.value.trim();
+        const telefon = clientFormTelefon.value.trim();
+        const email = clientFormEmail.value.trim();
+        const idLecznicy = clientFormIdLecznicy.value.trim();
+        const docId = clientFormDocId.value; // Pobierz ID (będzie puste przy dodawaniu)
+        // ✅ KONIEC: Odczytaj wartości ze wszystkich pól
 
-        if (!nazwa) {
-            alert('Nazwa klienta jest wymagana.');
-            clientFormNazwa.focus();
-            return;
-        }
+        if (!nazwa) {
+            alert('Nazwa klienta jest wymagana.');
+            clientFormNazwa.focus();
+            return;
+        }
 
-        const klientData = {
-            nazwa: nazwa,
-            adres: adres,
-            nrStada: nrStada
-        };
+        // ✅ POCZĄTEK: Zbuduj obiekt danych z nowymi polami
+        const klientData = {
+            nazwa: nazwa,
+            adres: adres,
+            nrStada: nrStada,
+            telefon: telefon,
+            email: email,
+            idLecznicy: idLecznicy
+        };
+        // ✅ KONIEC: Zbuduj obiekt danych z nowymi polami
 
-        try {
-            saveClientBtn.disabled = true;
-            saveClientBtn.textContent = 'Zapisywanie...';
-            
-            if (docId) {
-                // --- Tryb Aktualizacji (UPDATE) ---
-                await db.collection("klienci").doc(docId).update(klientData);
-                alert('Dane klienta zostały zaktualizowane.');
-            } else {
-                // --- Tryb Dodawania (CREATE) ---
-                await db.collection("klienci").add(klientData);
-                alert('Nowy klient został dodany.');
-            }
-            
-            clientFormModal.style.display = 'none'; // Zamknij modal
-            loadClientsToTable(); // Odśwież tabelę klientów
-            refreshClientDataLists(); // BARDZO WAŻNE: odśwież listy wyboru w całej aplikacji
+        try {
+            saveClientBtn.disabled = true;
+            saveClientBtn.textContent = 'Zapisywanie...';
+            
+            if (docId) {
+                // --- Tryb Aktualizacji (UPDATE) ---
+                await db.collection("klienci").doc(docId).update(klientData);
+                alert('Dane klienta zostały zaktualizowane.');
+            } else {
+                // --- Tryb Dodawania (CREATE) ---
+                await db.collection("klienci").add(klientData);
+                alert('Nowy klient został dodany.');
+            }
+            
+            clientFormModal.style.display = 'none'; // Zamknij modal
+            loadClientsToTable(); // Odśwież tabelę klientów
+            refreshClientDataLists(); // BARDZO WAŻNE: odśwież listy wyboru w całej aplikacji
 
-        } catch (error) {
-            console.error('Błąd zapisu klienta: ', error);
-            alert('Wystąpił błąd podczas zapisu danych.');
-        } finally {
-            // Zawsze włączaj przycisk z powrotem, nawet po błędzie
-            saveClientBtn.disabled = false;
-            saveClientBtn.textContent = 'Zapisz';
-        }
-    });
+        } catch (error) {
+            console.error('Błąd zapisu klienta: ', error);
+            alert('Wystąpił błąd podczas zapisu danych.');
+        } finally {
+            // Zawsze włączaj przycisk z powrotem, nawet po błędzie
+            saveClientBtn.disabled = false;
+            saveClientBtn.textContent = 'Zapisz';
+        }
+    });
 }
 // ✅ KONIEC: LOGIKA ZAKŁADKI BAZA KLIENTÓW
     // ========================================================
 
 
-    /**
-     * Filtruje tabelę klientów na podstawie wpisanego tekstu.
-     * Działa po stronie klienta (filtruje już załadowane wiersze).
-     */
-    function filterClientTable() {
-        if (!clientSearchInput || !klientTableBody) return;
-        
-        const searchTerm = clientSearchInput.value.toLowerCase().trim();
-        const rows = klientTableBody.querySelectorAll('tr');
-        
-        rows.forEach(row => {
-            // Upewnij się, że wiersz ma komórki (nie jest to "Ładowanie..." etc.)
-            if (row.cells.length < 3) return; 
+/**
+     * Filtruje tabelę klientów na podstawie wpisanego tekstu.
+     * Działa po stronie klienta (filtruje już załadowane wiersze).
+     */
+    function filterClientTable() {
+        if (!clientSearchInput || !klientTableBody) return;
+        
+        const searchTerm = clientSearchInput.value.toLowerCase().trim();
+        const rows = klientTableBody.querySelectorAll('tr');
+        
+        rows.forEach(row => {
+            // ✅ ZMIANA: Sprawdź czy jest 7 komórek (było 3)
+            if (row.cells.length < 7) return; 
 
-            const nazwa = row.cells[0].textContent.toLowerCase();
-            const adres = row.cells[1].textContent.toLowerCase();
-            const nrStada = row.cells[2].textContent.toLowerCase();
-            
-            // Sprawdź czy tekst jest widoczny w którejkolwiek z kolumn
-            const isVisible = nazwa.includes(searchTerm) || 
-                              adres.includes(searchTerm) || 
-                              nrStada.includes(searchTerm);
-                              
-            // Pokaż lub ukryj wiersz
-            row.style.display = isVisible ? '' : 'none';
-        });
-    }
+            // ✅ POCZĄTEK: Odczytaj dane z nowych komórek
+            const nazwa = row.cells[0].textContent.toLowerCase();
+            const adres = row.cells[1].textContent.toLowerCase();
+            const nrStada = row.cells[2].textContent.toLowerCase();
+            const telefon = row.cells[3].textContent.toLowerCase();
+            const email = row.cells[4].textContent.toLowerCase();
+            const idLecznicy = row.cells[5].textContent.toLowerCase();
+            // ✅ KONIEC: Odczytaj dane z nowych komórek
+            
+            // ✅ POCZĄTEK: Sprawdź czy tekst jest widoczny w którejkolwiek z kolumn
+            const isVisible = nazwa.includes(searchTerm) || 
+                              adres.includes(searchTerm) || 
+                              nrStada.includes(searchTerm) ||
+                              telefon.includes(searchTerm) ||
+                              email.includes(searchTerm) ||
+NT-P-88022-v1-S1-Gemini-1_5-Pro-pl-2024-10-26T07-43-13.882194_000000+0200.json
+                              idLecznicy.includes(searchTerm);
+            // ✅ KONIEC: Sprawdź czy tekst jest widoczny w którejkolwiek z kolumn
+                              
+            // Pokaż lub ukryj wiersz
+            row.style.display = isVisible ? '' : 'none';
+        });
+    }
     </script>
 
 </body>
