@@ -1,5 +1,5 @@
 // 🔒 Nazwa pamięci podręcznej (zmieniona na v2, aby wymusić aktualizację)
-const CACHE_NAME = 'karta-leczenia-cache-v83';
+const CACHE_NAME = 'karta-leczenia-cache-v84';
 
 // 📦 Lista plików do zapamiętania offline (tzw. App Shell)
 const urlsToCache = [
