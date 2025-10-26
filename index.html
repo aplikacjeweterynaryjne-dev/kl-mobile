@@ -2237,58 +2237,52 @@ async function refreshClientDataLists() {
  * Ładuje klientów z Firestore i buduje tabelę HTML.
  */
 async function loadClientsToTable() {
-    if (!klientTableBody) return;
-    if (clientSearchInput) clientSearchInput.value = '';
-    klientTableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 10px;">Ładowanie danych...</td></tr>';
-    
+    // ... (początek funkcji bez zmian) ...
     try {
-        // Pobierz klientów posortowanych alfabetycznie
-        const snapshot = await db.collection("klienci").orderBy("nazwa").get();
-        klientTableBody.innerHTML = ''; // Wyczyść "Ładowanie..."
-        
+        // 1. Pobierz WSZYSTKICH klientów (bez sortowania w Firestore lub zignoruj je)
+        const snapshot = await db.collection("klienci").get();
+        klientTableBody.innerHTML = '';
+
         if (snapshot.empty) {
-            klientTableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 10px;">Brak klientów w bazie danych.</td></tr>';
+            // ... (obsługa pustej bazy bez zmian) ...
             return;
         }
-        
-        // Poprawiona pętla generująca wiersze
-// Nowa, bezpieczniejsza pętla tworząca wiersze
-        snapshot.docs.forEach(doc => {
-            const klient = doc.data();
-            const tr = document.createElement('tr');
-            tr.dataset.id = doc.id; // Zapisz ID dokumentu w wierszu
 
-            // Funkcja pomocnicza do tworzenia komórki TD
-            const createCell = (text, dataLabel) => {
-              const td = document.createElement('td');
-              td.textContent = text || ''; // Użyj pustego stringa, jeśli text jest null/undefined
-              if (dataLabel) {
-                td.dataset.label = dataLabel;
-              }
-              return td;
-            };
+        // 2. Przekształć dokumenty na tablicę obiektów JS
+        let klienci = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-            // Twórz i dodawaj komórki po kolei
-            tr.appendChild(createCell(klient.nazwa || 'Brak nazwy', 'Nazwa'));
-            tr.appendChild(createCell(klient.adres, 'Adres'));
-            tr.appendChild(createCell(klient.nrStada, 'Nr Stada'));
-            tr.appendChild(createCell(klient.telefon, 'Nr Telefonu'));
-            tr.appendChild(createCell(klient.email, 'Email'));
-            tr.appendChild(createCell(klient.idLecznicy, 'ID Lecznicy'));
+        // 3. Posortuj tablicę w JavaScript używając polskiego locale
+        klienci.sort((a, b) => {
+            // Upewnij się, że nazwa istnieje, aby uniknąć błędów
+            const nameA = a.nazwa || '';
+            const nameB = b.nazwa || '';
+            return nameA.localeCompare(nameB, 'pl', { sensitivity: 'base' }); // 'pl' dla polskiego sortowania
+        });
 
-            // Komórka Akcje (z przyciskami - tu użyjemy innerHTML dla wygody)
-            const tdAkcje = document.createElement('td');
-            tdAkcje.classList.add('col-akcje');
-            tdAkcje.innerHTML = `
-              <button class="btn btn-edit-client" data-id="${doc.id}">Edytuj</button>
-              <button class="btn warn btn-delete-client" data-id="${doc.id}">Usuń</button>
-            `;
-            tr.appendChild(tdAkcje);
+        // 4. Wygeneruj wiersze tabeli z POSORTOWANEJ tablicy 'klienci'
+        klienci.forEach(klient => { // Iteruj po posortowanej tablicy 'klienci'
+            const tr = document.createElement('tr');
+            tr.dataset.id = klient.id; // Użyj ID z obiektu
 
-            // Dodaj gotowy wiersz do tabeli
-            klientTableBody.appendChild(tr);
-        });
+            tr.innerHTML = `
+              <td data-label="Nazwa">${klient.nazwa || 'Brak nazwy'}</td>
+              <td data-label="Adres">${klient.adres || ''}</td>
+              <td data-label="Nr Stada">${klient.nrStada || ''}</td>
+              <td data-label="Nr Telefonu">${klient.telefon || ''}</td>
+              <td data-label="Email">${klient.email || ''}</td>
+              <td data-label="ID Lecznicy">${klient.idLecznicy || ''}</td>
+              <td class="col-akcje">
+                  <button class="btn btn-edit-client" data-id="${klient.id}">Edytuj</button>
+                  <button class="btn warn btn-delete-client" data-id="${klient.id}">Usuń</button>
+              </td>
+            `;
+            klientTableBody.appendChild(tr);
+        });
+
     } catch (error) {
+        // ... (obsługa błędu bez zmian) ...
+    }
+}
         console.error("Błąd ładowania klientów: ", error);
         klientTableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 10px; color: red;">Wystąpił błąd podczas ładowania danych.</td></tr>';
     }
