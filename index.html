@@ -782,16 +782,16 @@
     ＋ Dodaj nowego klienta
   </button>
 
-  <div class="table-container">
+ <div class="table-container">
     <table id="klientTable">
       <thead>
         <tr>
           <th>Nazwa</th>
-  	  	  <th>Adres</th>
-  	  	  <th>Nr Stada</th>
-  	  	  <th>Nr telefonu</th>
-  	  	  <th>Email</th>
-  	  	  <th>ID Lecznicy</th>
+          <th>Adres</th>
+          <th>Nr Stada</th>
+          <th>Nr telefonu</th>
+          <th>Email</th>
+          <th>ID Lecznicy</th>
   	  	  <th style="width: 130px;">Akcje</th>
   	  	</tr>
   	  </thead>
@@ -800,7 +800,6 @@
   	  </tbody>
   	</table>
   </div>
-</div>
   <div id="clientFormModal" aria-hidden="true" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.48); display: none; z-index: 10000; justify-content: center; align-items: center; overflow: hidden;">
   <div class="form-card" role="dialog" aria-modal="true">
     
@@ -2221,52 +2220,49 @@ async function refreshClientDataLists() {
 }
 
 
-/**
+//**
  * Ładuje klientów z Firestore i buduje tabelę HTML.
  */
 async function loadClientsToTable() {
     if (!klientTableBody) return;
     if (clientSearchInput) clientSearchInput.value = '';
-    // ✅ ZMIANA: colspan="7" (było 4)
+    // Ustawia "Ładowanie..." na 7 kolumn
     klientTableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 10px;">Ładowanie danych...</td></tr>';
     
     try {
-        // Pobierz klientów posortowanych alfabetycznie
         const snapshot = await db.collection("klienci").orderBy("nazwa").get();
         klientTableBody.innerHTML = ''; // Wyczyść "Ładowanie..."
         
         if (snapshot.empty) {
-            // ✅ ZMIANA: colspan="7" (było 4)
             klientTableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 10px;">Brak klientów w bazie danych.</td></tr>';
             return;
         }
         
-        snapshot.docs.forEach(doc => {
-            const klient = doc.data();
-            const tr = document.createElement('tr');
-            tr.dataset.id = doc.id; // Zapisz ID dokumentu w wierszu
-            
-            // ✅ POCZĄTEK: Zaktualizowany innerHTML tabeli
-            tr.innerHTML = `
-                <td data-label="Nazwa">${klient.nazwa || 'Brak nazwy'}</td>
-                <td data-label="Adres">${klient.adres || ''}</td>
-                <td data-label="Nr Stada">${klient.nrStada || ''}</td>
-                <td data-label="Nr telefonu">${klient.telefon || ''}</td>
-                <td data-label="Email">${klient.email || ''}</td>
-                <td data-label="ID Lecznicy">${klient.idLecznicy || ''}</td>
-                <td>
-                    <button class="btn btn-edit-client" data-id="${doc.id}">Edytuj</button>
-                    <button class="btn warn btn-delete-client" data-id="${doc.id}">Usuń</button>
-                </td>
-            `;
-            // ✅ KONIEC: Zaktualizowany innerHTML tabeli
-            klientTableBody.appendChild(tr);
-        });
-    } catch (error) {
-        console.error("Błąd ładowania klientów: ", error);
-        // ✅ ZMIANA: colspan="7" (było 4)
-        klientTableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 10px; color: red;">Wystąpił błąd podczas ładowania danych.</td></tr>';
-    }
+  	  // Pętla generująca wiersze
+  	  snapshot.docs.forEach(doc => {
+  	    const klient = doc.data();
+  	    const tr = document.createElement('tr');
+  	    tr.dataset.id = doc.id;
+  	    
+  	    // POPRAWNY KOD GENERUJĄCY 7 KOMÓREK (TD)
+  	    tr.innerHTML = `
+  	    	<td data-label="Nazwa">${klient.nazwa || 'Brak nazwy'}</td>
+  	    	<td data-label="Adres">${klient.adres || ''}</td>
+  	    	<td data-label="Nr Stada">${klient.nrStada || ''}</td>
+  	    	<td data-label="Nr telefonu">${klient.telefon || ''}</td>
+  	    	<td data-label="Email">${klient.email || ''}</td>
+  	    	<td data-label="ID Lecznicy">${klient.idLecznicy || ''}</td>
+  	    	<td>
+  	    	  <button class="btn btn-edit-client" data-id="${doc.id}">Edytuj</button>
+  	    	  <button class="btn warn btn-delete-client" data-id="${doc.id}">Usuń</button>
+  	    	</td>
+  	    `;
+  	    klientTableBody.appendChild(tr);
+  	  });
+    } catch (error) {
+  	  console.error("Błąd ładowania klientów: ", error);
+  	  klientTableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 10px; color: red;">Wystąpił błąd podczas ładowania danych.</td></tr>';
+    }
 }
 
 /**
@@ -2424,38 +2420,34 @@ if (saveClientBtn) {
      * Filtruje tabelę klientów na podstawie wpisanego tekstu.
      * Działa po stronie klienta (filtruje już załadowane wiersze).
      */
-    function filterClientTable() {
-        if (!clientSearchInput || !klientTableBody) return;
-        
-        const searchTerm = clientSearchInput.value.toLowerCase().trim();
-        const rows = klientTableBody.querySelectorAll('tr');
-        
-        rows.forEach(row => {
-            // ✅ ZMIANA: Sprawdź czy jest 7 komórek (było 3)
-            if (row.cells.length < 7) return; 
+  	function filterClientTable() {
+  	  if (!clientSearchInput || !klientTableBody) return;
+  	  
+  	  const searchTerm = clientSearchInput.value.toLowerCase().trim();
+  	  const rows = klientTableBody.querySelectorAll('tr');
+  	  
+  	  rows.forEach(row => {
+  	  	// Sprawdza 7 komórek
+  	  	if (row.cells.length < 7) return; 
 
-            // ✅ POCZĄTEK: Odczytaj dane z nowych komórek
-            const nazwa = row.cells[0].textContent.toLowerCase();
-            const adres = row.cells[1].textContent.toLowerCase();
-            const nrStada = row.cells[2].textContent.toLowerCase();
-            const telefon = row.cells[3].textContent.toLowerCase();
-            const email = row.cells[4].textContent.toLowerCase();
-            const idLecznicy = row.cells[5].textContent.toLowerCase();
-            // ✅ KONIEC: Odczytaj dane z nowych komórek
-            
-            // ✅ POCZĄTEK: Sprawdź czy tekst jest widoczny w którejkolwiek z kolumn
-            const isVisible = nazwa.includes(searchTerm) || 
-                              adres.includes(searchTerm) || 
-                              nrStada.includes(searchTerm) ||
-                              telefon.includes(searchTerm) ||
-                              email.includes(searchTerm) ||
-                              idLecznicy.includes(searchTerm);
-            // ✅ KONIEC: Sprawdź czy tekst jest widoczny w którejkolwiek z kolumn
-                              
-            // Pokaż lub ukryj wiersz
-            row.style.display = isVisible ? '' : 'none';
-        });
-    }
+  	  	const nazwa = row.cells[0].textContent.toLowerCase();
+  	  	const adres = row.cells[1].textContent.toLowerCase();
+  	  	const nrStada = row.cells[2].textContent.toLowerCase();
+  	  	const telefon = row.cells[3].textContent.toLowerCase();
+  	  	const email = row.cells[4].textContent.toLowerCase();
+  	  	const idLecznicy = row.cells[5].textContent.toLowerCase();
+  	  	
+  	  	// Poprawne wyszukiwanie w 6 kolumnach
+  	  	const isVisible = nazwa.includes(searchTerm) || 
+  	  					  adres.includes(searchTerm) || 
+  	  					  nrStada.includes(searchTerm) ||
+  	  					  telefon.includes(searchTerm) ||
+  	  					  email.includes(searchTerm) ||
+  	  					  idLecznicy.includes(searchTerm);
+  	  					  
+  	  	row.style.display = isVisible ? '' : 'none';
+  	  });
+  	}
     </script>
 
 </body>
