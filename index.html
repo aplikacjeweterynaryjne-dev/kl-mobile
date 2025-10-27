@@ -3178,6 +3178,224 @@ if (productSearchInput) {
 }
 // ✅ KONIEC: WYSZUKIWARKA DLA BAZY PRODUKTÓW
 // ========================================================
+  // ========================================================
+// ✅ POCZĄTEK: LOGIKA IMPORTU DLA BAZY PRODUKTÓW
+// ========================================================
+
+/**
+ * Przełącza UI tabeli produktów w tryb importu/edycji masowej.
+ */
+function toggleProductImportMode(isImporting) {
+    if (!produktTable || !produktTableBody) return;
+
+    if (isImporting) {
+        // Włącz tryb importu
+        produktTable.classList.add('import-mode');
+        // Ukryj standardowe przyciski i wyszukiwarkę
+        if (startProductImportBtn) startProductImportBtn.style.display = 'none';
+        if (addNewProductBtn) addNewProductBtn.style.display = 'none';
+        if (productSearchRow) productSearchRow.style.display = 'none';
+        if (refreshProductsBtn) refreshProductsBtn.style.display = 'none'; // Ukryj też Odśwież
+
+        // Pokaż przyciski zapisu/anulowania importu
+        if (saveProductImportBtn) saveProductImportBtn.style.display = 'inline-block';
+        if (cancelProductImportBtn) cancelProductImportBtn.style.display = 'inline-block';
+
+        // Ustaw contenteditable dla komórek danych (kolumny 0-5)
+        produktTableBody.querySelectorAll('tr').forEach(row => {
+            if (row.cells.length >= 6) { // Upewnij się, że wiersz ma wystarczająco komórek
+                for (let i = 0; i <= 5; i++) {
+                    row.cells[i].contentEditable = true;
+                    // Dodajmy też styl wskazujący na edytowalność
+                    row.cells[i].style.cursor = 'text';
+                }
+            }
+        });
+
+        alert('Tryb importu produktów włączony.\nMożesz teraz edytować komórki i wklejać dane z arkusza (np. całą kolumnę).\n\nUWAGA: Upewnij się, że wklejane ceny używają kropki (.) jako separatora dziesiętnego, a stany magazynowe są liczbami całkowitymi.\n\nKliknij "Zapisz zmiany importu", aby wysłać dane do bazy.');
+
+    } else {
+        // Wyłącz tryb importu
+        produktTable.classList.remove('import-mode');
+        // Pokaż standardowe przyciski i wyszukiwarkę (jeśli dane są wczytane)
+        if (cachedProducts && cachedProducts.length > 0) {
+             if (startProductImportBtn) startProductImportBtn.style.display = 'inline-block';
+             if (addNewProductBtn) addNewProductBtn.style.display = 'inline-block';
+             if (productSearchRow) productSearchRow.style.display = 'block';
+             if (refreshProductsBtn) refreshProductsBtn.style.display = 'inline-block';
+        } else {
+             // Jeśli dane nie są wczytane, pokaż tylko przycisk wczytywania
+             if (loadProductsBtn) loadProductsBtn.style.display = 'inline-block';
+        }
+
+
+        // Ukryj przyciski zapisu/anulowania importu
+        if (saveProductImportBtn) saveProductImportBtn.style.display = 'none';
+        if (cancelProductImportBtn) cancelProductImportBtn.style.display = 'none';
+
+        // Wyłącz contenteditable i usuń styl kursora
+        produktTableBody.querySelectorAll('tr').forEach(row => {
+             if (row.cells.length >= 6) {
+                for (let i = 0; i <= 5; i++) {
+                    row.cells[i].contentEditable = false;
+                    row.cells[i].style.cursor = 'default';
+                }
+            }
+        });
+    }
+}
+
+// --- Przycisk: Rozpocznij Import Produktów ---
+if (startProductImportBtn) {
+    startProductImportBtn.addEventListener('click', () => {
+        if (!cachedProducts || cachedProducts.length === 0) {
+            alert('Baza produktów nie jest wczytana lub jest pusta. Nie można rozpocząć importu.');
+            return;
+        }
+        toggleProductImportMode(true);
+    });
+}
+
+// --- Przycisk: Anuluj Import Produktów ---
+if (cancelProductImportBtn) {
+    cancelProductImportBtn.addEventListener('click', () => {
+        if (confirm('Czy na pewno chcesz anulować import produktów? Niezapisane zmiany w tabeli zostaną utracone.')) {
+            toggleProductImportMode(false);
+            // Przeładuj tabelę z danych w cache, aby przywrócić stan sprzed edycji
+            if (cachedProducts) {
+                renderProductTable(cachedProducts);
+            } else {
+                // Jeśli jakimś cudem cache jest pusty, pokaż stan początkowy
+                 produktTableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 20px; color: #555;">Kliknij "Wczytaj bazę produktów", aby wyświetlić dane.</td></tr>';
+                 if(productSearchRow) productSearchRow.style.display = 'none';
+                 if(addNewProductBtn) addNewProductBtn.style.display = 'none';
+                 if(productImportActionsContainer) productImportActionsContainer.style.display = 'none';
+                 if(loadProductsBtn) loadProductsBtn.style.display = 'inline-block';
+                 if(refreshProductsBtn) refreshProductsBtn.style.display = 'none';
+            }
+        }
+    });
+}
+
+// --- Przycisk: Zapisz Import Produktów ---
+if (saveProductImportBtn) {
+    saveProductImportBtn.addEventListener('click', async () => {
+        if (!confirm('Czy na pewno chcesz zapisać wszystkie zmiany z tabeli produktów do bazy danych Firestore? Ta operacja nadpisze dane istniejących produktów.')) {
+            return;
+        }
+
+        saveProductImportBtn.disabled = true;
+        saveProductImportBtn.textContent = 'Zapisywanie...';
+
+        try {
+            const batch = db.batch();
+            const rows = produktTableBody.querySelectorAll('tr');
+            let updateCounter = 0;
+            const updatedCache = []; // Tablica do zbudowania nowego cache
+
+            rows.forEach(row => {
+                const docId = row.dataset.id;
+                if (docId && row.cells.length >= 6) {
+                    // Odczytaj dane z edytowanych komórek
+                    const nazwa = row.cells[0].textContent.trim();
+                    const plu = row.cells[1].textContent.trim();
+                    // Próbuj sparsować cenę - użyj kropki jako separatora, domyślnie 0
+                    const cenaStr = row.cells[2].textContent.replace(',', '.').trim(); // Zamień przecinek na kropkę
+                    const cena = parseFloat(cenaStr) || 0;
+                    const dawkowanie = row.cells[3].textContent.trim();
+                    const karencja = row.cells[4].textContent.trim();
+                     // Próbuj sparsować stan - domyślnie 0
+                    const stanMagazynowy = parseInt(row.cells[5].textContent.trim()) || 0;
+
+                    // Stwórz obiekt z danymi do aktualizacji
+                    const updatedData = {
+                        nazwa: nazwa,
+                        plu: plu,
+                        cena: cena,
+                        dawkowanie: dawkowanie,
+                        karencja: karencja,
+                        stanMagazynowy: stanMagazynowy
+                    };
+
+                    // Dodaj operację 'update' do batcha
+                    const docRef = db.collection("leki").doc(docId);
+                    batch.update(docRef, updatedData);
+                    updateCounter++;
+
+                    // Dodaj zaktualizowane dane do nowego cache
+                    updatedCache.push({ id: docId, ...updatedData });
+                } else if(row.cells.length >= 6) {
+                    console.warn("Pominięto wiersz bez data-id podczas zapisu importu:", row.textContent);
+                }
+            });
+
+            // Wykonaj wszystkie operacje w batchu
+            await batch.commit();
+
+            // Zaktualizuj cache nowymi danymi
+            cachedProducts = updatedCache;
+
+            alert(`Pomyślnie zaktualizowano ${updateCounter} produktów!`);
+
+        } catch (error) {
+            console.error("Błąd podczas zapisywania importu produktów: ", error);
+            alert('Wystąpił krytyczny błąd podczas zapisu. Sprawdź konsolę (F12).');
+        } finally {
+            saveProductImportBtn.disabled = false;
+            saveProductImportBtn.textContent = '💾 Zapisz zmiany importu';
+            toggleProductImportMode(false); // Wyłącz tryb importu
+
+            // Odśwież tabelę (z nowego cache) i globalne listy
+            if (cachedProducts) {
+                renderProductTable(cachedProducts);
+                refreshProductDataLists();
+            } else {
+                 loadAndCacheProducts(); // W razie problemów, załaduj na nowo
+            }
+        }
+    });
+}
+
+// --- Obsługa wklejania (paste) w tabeli produktów ---
+if (produktTableBody) {
+    produktTableBody.addEventListener('paste', (event) => {
+        const targetCell = event.target.closest('td[contenteditable="true"]');
+        if (!produktTable.classList.contains('import-mode') || !targetCell) {
+            return;
+        }
+        event.preventDefault();
+        const clipboardData = event.clipboardData || window.clipboardData;
+        const pastedText = clipboardData.getData('text/plain');
+        const lines = pastedText.split(/\r?\n/);
+        if (lines.length > 0 && lines[lines.length - 1] === '') {
+            lines.pop();
+        }
+        const startRow = targetCell.closest('tr');
+        const cellIndex = targetCell.cellIndex;
+        const allRows = Array.from(produktTableBody.querySelectorAll('tr'));
+        const startRowIndex = allRows.indexOf(startRow);
+
+        lines.forEach((lineContent, lineIndex) => {
+            const currentRowIndex = startRowIndex + lineIndex;
+            if (currentRowIndex < allRows.length) {
+                const targetRow = allRows[currentRowIndex];
+                // Upewnij się, że komórka istnieje i jest edytowalna
+                if (targetRow.cells[cellIndex] && targetRow.cells[cellIndex].isContentEditable) {
+                   // Specjalna obsługa dla ceny - zamień przecinek na kropkę PRZED wstawieniem
+                   if (cellIndex === 2) { // Kolumna Ceny
+                       targetRow.cells[cellIndex].textContent = lineContent.replace(',', '.').trim();
+                   } else {
+                       targetRow.cells[cellIndex].textContent = lineContent.trim();
+                   }
+                }
+            }
+        });
+        console.log(`Wklejono ${lines.length} linii do kolumny ${cellIndex + 1} tabeli produktów.`);
+    });
+}
+
+// ✅ KONIEC: LOGIKA IMPORTU DLA BAZY PRODUKTÓW
+// ========================================================
   if (refreshClientsBtn) {
     refreshClientsBtn.addEventListener('click', () => {
         if (confirm('Czy na pewno chcesz odświeżyć dane klientów z bazy?')) {
