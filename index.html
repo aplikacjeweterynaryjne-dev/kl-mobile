@@ -2945,6 +2945,195 @@ if (refreshProductsBtn) {
         }
     });
 }
+  // ========================================================
+// ✅ POCZĄTEK: LOGIKA CRUD DLA BAZY PRODUKTÓW
+// ========================================================
+
+/**
+ * Obsługa kliknięć w tabeli produktów (Edycja i Usuwanie)
+ */
+if (produktTableBody) {
+    produktTableBody.addEventListener('click', async (e) => {
+        const target = e.target;
+
+        // --- EDYCJA PRODUKTU ---
+        if (target.classList.contains('btn-edit-product')) {
+            const docId = target.dataset.id;
+            console.log(`Próba edycji produktu o ID: ${docId}`);
+            try {
+                // Pobierz aktualne dane produktu z Firestore
+                const doc = await db.collection("leki").doc(docId).get();
+                if (!doc.exists) {
+                    alert('Błąd: Nie znaleziono produktu w bazie danych.');
+                    console.error(`Nie znaleziono produktu o ID: ${docId}`);
+                    return;
+                }
+                const data = doc.data();
+                console.log("Pobrano dane produktu do edycji:", data);
+
+                // Wypełnij i pokaż modal
+                productFormTitle.textContent = 'Edytuj produkt';
+                productFormDocId.value = docId; // Ustaw ID do edycji
+                productFormNazwa.value = data.nazwa || '';
+                productFormPlu.value = data.plu || '';
+                // Upewnij się, że cena i stan są liczbami w formularzu
+                productFormCena.value = data.cena !== undefined ? parseFloat(data.cena) : '';
+                productFormDawkowanie.value = data.dawkowanie || '';
+                productFormKarencja.value = data.karencja || '';
+                productFormStan.value = data.stanMagazynowy !== undefined ? parseInt(data.stanMagazynowy) : '';
+
+                productFormModal.style.display = 'flex';
+
+            } catch (error) {
+                console.error('Błąd pobierania produktu do edycji: ', error);
+                alert('Wystąpił błąd podczas pobierania danych produktu.');
+            }
+        }
+
+        // --- USUWANIE PRODUKTU ---
+        if (target.classList.contains('btn-delete-product')) {
+            const docId = target.dataset.id;
+            const row = target.closest('tr');
+            const productName = row.cells[0].textContent;
+
+            if (confirm(`Czy na pewno chcesz usunąć produkt: "${productName}"? \n\nTej operacji nie można cofnąć.`)) {
+                console.log(`Próba usunięcia produktu o ID: ${docId}`);
+                try {
+                    await db.collection("leki").doc(docId).delete();
+                    alert('Produkt usunięty pomyślnie.');
+                    console.log(`Produkt ${docId} usunięty.`);
+                    // Usuń produkt z cache i przeładuj tabelę oraz listy
+                    if (cachedProducts) {
+                        cachedProducts = cachedProducts.filter(p => p.id !== docId);
+                        renderProductTable(cachedProducts); // Odśwież tabelę z cache
+                        refreshProductDataLists(); // Odśwież globalne listy
+                    } else {
+                        loadAndCacheProducts(); // Jeśli cache był pusty, załaduj na nowo
+                    }
+                } catch (error) {
+                    console.error('Błąd usuwania produktu: ', error);
+                    alert('Wystąpił błąd podczas usuwania produktu.');
+                }
+            }
+        }
+    });
+}
+
+/**
+ * Przycisk "Dodaj nowy produkt" - otwiera pusty modal
+ */
+if (addNewProductBtn) {
+    addNewProductBtn.addEventListener('click', () => {
+        console.log("Otwieranie modala dodawania nowego produktu.");
+        productFormTitle.textContent = 'Dodaj nowy produkt';
+        productFormDocId.value = ''; // Wyczyść ID - tryb dodawania
+        productFormNazwa.value = '';
+        productFormPlu.value = '';
+        productFormCena.value = '';
+        productFormDawkowanie.value = '';
+        productFormKarencja.value = '';
+        productFormStan.value = '';
+        productFormModal.style.display = 'flex';
+        productFormNazwa.focus();
+    });
+}
+
+/**
+ * Przycisk "Anuluj" w modalu produktu
+ */
+if (cancelProductForm) {
+    cancelProductForm.addEventListener('click', () => {
+        productFormModal.style.display = 'none';
+        console.log("Anulowano edycję/dodawanie produktu.");
+    });
+}
+
+/**
+ * Przycisk "Zapisz" w modalu produktu (obsługuje Dodawanie i Aktualizację)
+ */
+if (saveProductBtn) {
+    saveProductBtn.addEventListener('click', async () => {
+        const nazwa = productFormNazwa.value.trim();
+        const plu = productFormPlu.value.trim();
+        // Przekształć cenę i stan na liczby, domyślnie 0 jeśli puste lub błędne
+        const cena = parseFloat(productFormCena.value) || 0;
+        const dawkowanie = productFormDawkowanie.value.trim();
+        const karencja = productFormKarencja.value.trim();
+        const stanMagazynowy = parseInt(productFormStan.value) || 0;
+
+        const docId = productFormDocId.value; // ID edytowanego produktu lub pusty
+
+        if (!nazwa) {
+            alert('Nazwa produktu jest wymagana.');
+            productFormNazwa.focus();
+            return;
+        }
+
+        const productData = {
+            nazwa: nazwa,
+            plu: plu,
+            cena: cena, // Zapisz jako liczbę
+            dawkowanie: dawkowanie,
+            karencja: karencja,
+            stanMagazynowy: stanMagazynowy // Zapisz jako liczbę
+            // nrSerii nie jest częścią tej kolekcji
+        };
+
+        console.log(`Próba zapisu produktu. ID: ${docId || '(nowy)'}`, productData);
+        saveProductBtn.disabled = true;
+        saveProductBtn.textContent = 'Zapisywanie...';
+
+        try {
+            let savedDocId = docId; // Zmienna do przechowywania ID po zapisie
+            if (docId) {
+                // --- Tryb Aktualizacji (UPDATE) ---
+                console.log(`Aktualizowanie produktu ${docId}...`);
+                await db.collection("leki").doc(docId).update(productData);
+                alert('Dane produktu zostały zaktualizowane.');
+                console.log(`Produkt ${docId} zaktualizowany.`);
+                // Zaktualizuj wpis w cache
+                if (cachedProducts) {
+                   const index = cachedProducts.findIndex(p => p.id === docId);
+                   if (index !== -1) {
+                       cachedProducts[index] = { id: docId, ...productData };
+                   }
+                }
+            } else {
+                // --- Tryb Dodawania (CREATE) ---
+                console.log("Dodawanie nowego produktu...");
+                const docRef = await db.collection("leki").add(productData);
+                savedDocId = docRef.id; // Pobierz ID nowo dodanego dokumentu
+                alert('Nowy produkt został dodany.');
+                console.log(`Produkt dodany z ID: ${savedDocId}.`);
+                // Dodaj nowy wpis do cache
+                if (cachedProducts) {
+                    cachedProducts.push({ id: savedDocId, ...productData });
+                } else {
+                    cachedProducts = [{ id: savedDocId, ...productData }]; // Zainicjuj cache jeśli był pusty
+                }
+            }
+
+            productFormModal.style.display = 'none'; // Zamknij modal
+
+            // Odśwież tabelę z danych w cache i odśwież globalne listy
+            if (cachedProducts) {
+                renderProductTable(cachedProducts);
+                refreshProductDataLists();
+            } else {
+                loadAndCacheProducts(); // Jeśli cache był pusty, załaduj wszystko
+            }
+
+        } catch (error) {
+            console.error('Błąd zapisu produktu: ', error);
+            alert('Wystąpił błąd podczas zapisu danych produktu.');
+        } finally {
+            saveProductBtn.disabled = false;
+            saveProductBtn.textContent = 'Zapisz';
+        }
+    });
+}
+// ✅ KONIEC: LOGIKA CRUD DLA BAZY PRODUKTÓW
+// ========================================================
 if (refreshClientsBtn) {
     refreshClientsBtn.addEventListener('click', () => {
         if (confirm('Czy na pewno chcesz odświeżyć dane klientów z bazy?')) {
