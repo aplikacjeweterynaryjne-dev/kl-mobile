@@ -2098,7 +2098,7 @@ function showSection(sectionToShow) {
   } // Koniec bloku else if dla 'produkty'
 }
 if(tabKartaBtn && tabKalkulatorBtn) {
-    tabKartaBtn.addEventListener('click', () => { if (metodaModal) metodaModal.style.display = 'flex'; });
+    tabKartaBtn.addEventListener('click', () => showSection('karta')); // <-- Przywrócona wersja
     tabKalkulatorBtn.addEventListener('click', () => showSection('kalkulator'));
 }
 // ✅ POCZĄTEK: LOGIKA DLA NOWEGO MENU GŁÓWNEGO
@@ -2123,10 +2123,23 @@ if (backToMenuBtn) {
   });
 }
 
-// --- Przycisk Menu: Karta Leczenia (pokazuje modal) ---
+// --- Przycisk Menu: Karta Leczenia (Ukrywa menu, pokazuje tab bar i modal) ---
 if (menuKartaBtn) {
   menuKartaBtn.addEventListener('click', () => {
+    // 1. Ukryj menu główne
+    if (mainMenuSection) mainMenuSection.style.display = 'none';
+    // 2. Pokaż pasek zakładek
+    if (mainTabBar) mainTabBar.style.display = 'flex';
+    // 3. Pokaż modal wyboru metody
     if (metodaModal) metodaModal.style.display = 'flex';
+    // WAŻNE: Nie wywołujemy showSection('karta') tutaj, 
+    // bo sekcja karty pokaże się dopiero po wyborze w modalu.
+    // Musimy jednak upewnić się, że zakładka "Karta" jest podświetlona.
+    if (tabKartaBtn) tabKartaBtn.classList.add('primary'); 
+    // I odznaczyć inne zakładki (na wszelki wypadek)
+    if (tabKalkulatorBtn) tabKalkulatorBtn.classList.remove('primary');
+    if (tabBazaKlientowBtn) tabBazaKlientowBtn.classList.remove('primary'); 
+    if (tabBazaProduktowBtn) tabBazaProduktowBtn.classList.remove('primary'); 
   });
 }
 
