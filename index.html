@@ -527,15 +527,63 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
 </head>
+  <style>
+    .menu-btn {
+      width: 90%;
+      max-width: 400px;
+      padding: 18px 15px;
+      font-size: 20px;
+      font-weight: 600;
+      margin-bottom: 15px;
+      border-radius: 12px;
+      border: 1px solid #ccc;
+      background-color: #fff;
+      cursor: pointer;
+      text-align: left;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+    .menu-btn:hover {
+      background-color: #f9f9f9;
+      border-color: #aaa;
+    }
+    
+    .submenu-btn {
+      width: 100%;
+      padding: 14px 15px;
+      font-size: 18px;
+      margin-top: 5px;
+      border-radius: 8px;
+      border: 1px solid #ddd;
+      background-color: #f7f7f7;
+      cursor: pointer;
+      text-align: left;
+    }
+    .submenu-btn:hover {
+      background-color: #eef;
+    }
+  </style>
 
 <body>
-  <div style="text-align: center; margin-bottom: 15px; border-bottom: 1px solid #ccc; padding-bottom: 10px;">
-  <button id="tabKartaBtn" class="btn primary">📝 Karta Leczenia</button>
-  <button id="tabKalkulatorBtn" class="btn">🧮 Kalkulator Wizyty</button>
-  <button id="tabBazaKlientowBtn" class="btn">👥 Baza Klientów</button>
-  <button id="tabBazaProduktowBtn" class="btn">📦 Baza produktów</button>
+  <div id="mainMenuSection" style="display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding-top: 30px; width: 100%; min-height: 100vh; box-sizing: border-box;">
+  <h2 style="font-size: 24px; color: #333; margin-bottom: 25px;">Menu Główne</h2>
+  
+  <button id="menuKartaBtn" class="menu-btn">📝 Generator kart leczenia</button>
+  <button id="menuKalkulatorBtn" class="menu-btn">🧮 Kalkulator wizyty</button>
+  
+  <button id="menuBazaBtn" class="menu-btn">🗃️ Baza</button>
+  <div id="bazaSubMenu" style="display: none; width: 90%; max-width: 400px; margin-top: -10px; margin-bottom: 10px;">
+    <button id="menuBazaKlientowBtn" class="submenu-btn">👥 Baza klientów</button>
+    <button id="menuBazaProduktowBtn" class="submenu-btn">📦 Baza produktów</button>
+  </div>
 </div>
-  <div id="kartaLeczeniaSection">
+  <div id="mainTabBar" style="text-align: center; margin-bottom: 15px; border-bottom: 1px solid #ccc; padding-bottom: 10px; display: none; flex-wrap: wrap; justify-content: center; gap: 8px;">
+  <button id="backToMenuBtn" class="btn ghost small" style="font-size: 16px;">⬅️ Menu</button>
+  <button id="tabKartaBtn" class="btn primary">📝 Karta</button>
+  <button id="tabKalkulatorBtn" class="btn">🧮 Kalkulator</button>
+  <button id="tabBazaKlientowBtn" class="btn">👥 Klienci</button>
+  <button id="tabBazaProduktowBtn" class="btn">📦 Produkty</button>
+</div>
+  <div id="kartaLeczeniaSection" style="display: none;">
 <h2>KARTA LECZENIA ZWIERZĄT GOSPODARSKICH ORAZ ZWIERZĄT, Z KTÓRYCH POZYSKANE TKANKI LUB PRODUKTY SĄ PRZEZNACZONE DO SPOŻYCIA PRZEZ LUDZI / EWIDENCJA LECZENIA ZWIERZĄT</h2>
 
 <div class="top-section">
@@ -735,7 +783,18 @@
 
   </div>
 </div>
-
+<div id="metodaModal" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.48); display: none; z-index: 10001; justify-content: center; align-items: center; overflow: hidden;">
+  <div class="form-card" style="width: 90vw; max-width: 400px; height: auto;">
+    <h3 style="font-size: 22px; text-align: center; margin-top: 0;">Wybierz metodę wypełniania</h3>
+    <div style="display: flex; flex-direction: column; gap: 15px; margin-top: 20px;">
+      <button id="metodaTradycyjnaBtn" class="btn primary" style="font-size: 18px; padding: 12px;">Metoda tradycyjna (Tabela)</button>
+      <button id="metodaFormularzBtn" class="btn" style="font-size: 18px; padding: 12px;">Formularz (Krok po kroku)</button>
+    </div>
+    <div class="form-actions" style="margin-top: 25px;">
+      <button id="cancelMetodaBtn" class="btn ghost small" style="font-size: 16px;">Anuluj</button>
+    </div>
+  </div>
+</div>
 <!-- datalist dla leków (tworzone dynamicznie) -->
 <datalist id="listaLekow"></datalist>
     </div> <div id="kalkulatorWizytySection" style="display: none;">
@@ -1874,6 +1933,22 @@ if (saveEmailBtn && emailInput) {
 </script>
 <script>
 // ✅ POCZĄTEK: ZMIENNE DLA BAZY KLIENTÓW I MODALI
+  // ✅ NOWE ZMIENNE DLA MENU GŁÓWNEGO I MODALI
+const mainMenuSection = document.getElementById('mainMenuSection');
+const mainTabBar = document.getElementById('mainTabBar');
+
+const menuKartaBtn = document.getElementById('menuKartaBtn');
+const menuKalkulatorBtn = document.getElementById('menuKalkulatorBtn');
+const menuBazaBtn = document.getElementById('menuBazaBtn');
+const bazaSubMenu = document.getElementById('bazaSubMenu');
+const menuBazaKlientowBtn = document.getElementById('menuBazaKlientowBtn');
+const menuBazaProduktowBtn = document.getElementById('menuBazaProduktowBtn');
+const backToMenuBtn = document.getElementById('backToMenuBtn');
+
+const metodaModal = document.getElementById('metodaModal');
+const metodaTradycyjnaBtn = document.getElementById('metodaTradycyjnaBtn');
+const metodaFormularzBtn = document.getElementById('metodaFormularzBtn');
+const cancelMetodaBtn = document.getElementById('cancelMetodaBtn');
 const tabBazaKlientowBtn = document.getElementById('tabBazaKlientowBtn');
 const bazaKlientowSection = document.getElementById('bazaKlientowSection');
 const klientTableBody = document.getElementById('klientTableBody');
