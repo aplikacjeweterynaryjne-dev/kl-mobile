@@ -2477,7 +2477,146 @@ async function loadAndCacheClients() {
         if(refreshClientsBtn) refreshClientsBtn.disabled = false;
     }
 }
+/**
+ * Odświeża globalne listy i mapy produktów (używane w Karcie Leczenia i Kalkulatorze).
+ * Należy wywołać po załadowaniu danych lub po każdej zmianie (dodaniu/edycji/usunięciu).
+ */
+function refreshProductDataLists() {
+    if (!cachedProducts) {
+        console.warn("Próba odświeżenia list produktów, ale brak danych w cache.");
+        // Opcjonalnie: można spróbować pobrać dane, jeśli ich nie ma
+        // loadAndCacheProducts(); // Uważaj na potencjalną pętlę
+        return;
+    }
 
+    console.log("Odświeżanie globalnych list i map produktów...");
+    nazwyLekow = [];
+    mapaSerii = {}; // W Firestore leków nie ma nr serii, więc ta mapa będzie pusta
+    mapaIlosci = {}; // Mapa dla dawkowania
+    mapaKarencji = {};
+    mapaCen = {};
+
+    cachedProducts.forEach(p => {
+        if (p.nazwa) { // Upewnij się, że produkt ma nazwę
+            nazwyLekow.push(p.nazwa);
+            // mapaSerii[p.nazwa] = p.nrSerii || ''; // Nr serii nie ma w bazie leków
+            mapaIlosci[p.nazwa] = p.dawkowanie || ''; // Używamy pola dawkowanie
+            mapaKarencji[p.nazwa] = p.karencja || '';
+            // Upewnij się, że cena jest liczbą
+            mapaCen[p.nazwa] = parseFloat(p.cena) || 0;
+        }
+    });
+
+    // Przebuduj <datalist id="listaLekow">
+    rebuildListaLekow(); // Ta funkcja już istnieje i używa globalnej 'nazwyLekow'
+
+    console.log(`Listy odświeżone. Liczba leków: ${nazwyLekow.length}.`);
+    // Opcjonalnie: Zaktualizuj Kalkulator, jeśli jest widoczny
+    if (kalkulatorSection && kalkulatorSection.style.display === 'block') {
+         // Można dodać logikę aktualizacji kalkulatora, np. wyczyszczenie wyboru
+         if(productSelect) productSelect.value = '';
+         if(productUnitDisplay) productUnitDisplay.textContent = '';
+    }
+}
+
+
+/**
+ * Renderuje tabelę produktów na podstawie przekazanej tablicy danych.
+ * Zawiera sortowanie wg nazwy.
+ */
+function renderProductTable(productsData) {
+    if (!produktTableBody) return;
+    produktTableBody.innerHTML = ''; // Wyczyść tabelę
+
+    if (!productsData || productsData.length === 0) {
+        produktTableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 10px;">Brak produktów w bazie danych.</td></tr>';
+        return;
+    }
+
+    // Sortuj dane wg nazwy (polskie znaki)
+    console.log("Sortowanie produktów przed renderowaniem...");
+    productsData.sort((a, b) => {
+        const nameA = a.nazwa || '';
+        const nameB = b.nazwa || '';
+        return nameA.localeCompare(nameB, 'pl', { sensitivity: 'base' });
+    });
+    console.log("Sortowanie zakończone.");
+
+    // Generuj wiersze
+    console.log("Renderowanie tabeli produktów...");
+    productsData.forEach(produkt => {
+        const tr = document.createElement('tr');
+        tr.dataset.id = produkt.id; // ID dokumentu z Firestore
+
+        // Formatowanie ceny
+        const cenaFormatted = formatPrice(parseFloat(produkt.cena) || 0); // Użyj istniejącej funkcji formatPrice
+
+        tr.innerHTML = `
+          <td data-label="Nazwa">${produkt.nazwa || 'Brak nazwy'}</td>
+          <td data-label="PLU">${produkt.plu || ''}</td>
+          <td data-label="Cena (zł)" style="text-align: right;">${cenaFormatted}</td>
+          <td data-label="J.m. / Dawkowanie">${produkt.dawkowanie || ''}</td>
+          <td data-label="Karencja">${produkt.karencja || ''}</td>
+          <td data-label="Stan mag." style="text-align: center;">${produkt.stanMagazynowy || '0'}</td>
+          <td class="col-akcje">
+              <button class="btn btn-edit-product" data-id="${produkt.id}" title="Edytuj produkt">Edytuj</button>
+              <button class="btn warn btn-delete-product" data-id="${produkt.id}" title="Usuń produkt">Usuń</button>
+          </td>
+        `;
+        produktTableBody.appendChild(tr);
+    });
+    console.log("Renderowanie tabeli produktów zakończone.");
+
+    // Pokaż powiązane UI po renderowaniu
+    if(productSearchRow) productSearchRow.style.display = 'block';
+    if(addNewProductBtn) addNewProductBtn.style.display = 'inline-block';
+    if(productImportActionsContainer) productImportActionsContainer.style.display = 'flex';
+    if(loadProductsBtn) loadProductsBtn.style.display = 'none';
+    if(refreshProductsBtn) refreshProductsBtn.style.display = 'inline-block';
+}
+
+/**
+ * Pobiera dane produktów ('leki') z Firestore, zapisuje do cache i wywołuje renderowanie.
+ */
+async function loadAndCacheProducts() {
+    if (!produktTableBody) return;
+
+    produktTableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 10px;">Ładowanie danych produktów... <span class="spinner">⏳</span></td></tr>';
+    if(loadProductsBtn) loadProductsBtn.disabled = true;
+    if(refreshProductsBtn) refreshProductsBtn.disabled = true;
+
+    try {
+        console.log("Pobieranie produktów (leków) z Firestore...");
+        const snapshot = await db.collection("leki").get(); // Pobierz z kolekcji 'leki'
+
+        if (snapshot.empty) {
+            console.log("Baza produktów (leków) jest pusta.");
+            cachedProducts = [];
+            renderProductTable(cachedProducts);
+        } else {
+            console.log(`Pobrano ${snapshot.size} produktów.`);
+            cachedProducts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            console.log("Dane produktów zapisane w cache.");
+            renderProductTable(cachedProducts);
+        }
+        // Po udanym załadowaniu i renderowaniu, odśwież globalne listy
+        refreshProductDataLists();
+
+    } catch (error) {
+        console.error("Błąd podczas ładowania produktów z Firestore: ", error);
+        produktTableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 10px; color: red;">Wystąpił błąd podczas ładowania danych. Spróbuj ponownie lub sprawdź konsolę (F12).</td></tr>';
+        cachedProducts = null;
+        // Pokaż przycisk Wczytaj, ukryj resztę w razie błędu
+         if(productSearchRow) productSearchRow.style.display = 'none';
+         if(addNewProductBtn) addNewProductBtn.style.display = 'none';
+         if(productImportActionsContainer) productImportActionsContainer.style.display = 'none';
+         if(loadProductsBtn) loadProductsBtn.style.display = 'inline-block';
+         if(refreshProductsBtn) refreshProductsBtn.style.display = 'none';
+    } finally {
+        if(loadProductsBtn) loadProductsBtn.disabled = false;
+        if(refreshProductsBtn) refreshProductsBtn.disabled = false;
+    }
+}
 /**
  * Przycisk "Dodaj nowego klienta" - otwiera pusty modal
  */
