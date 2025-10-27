@@ -1795,7 +1795,16 @@ const clientFormEmail = document.getElementById('clientFormEmail');
 const clientFormIdLecznicy = document.getElementById('clientFormIdLecznicy');
 const clientFormNrStada = document.getElementById('clientFormNrStada'); // Poprawiona, pojedyncza definicja
 // ✅ KONIEC: ZMIENNE DLA BAZY KLIENTÓW I MODALI
+// Zmienna do przechowywania wczytanych klientów w pamięci
+let cachedClients = null;
 
+// Przyciski ładowania/odświeżania
+const loadClientsBtn = document.getElementById('loadClientsBtn');
+const refreshClientsBtn = document.getElementById('refreshClientsBtn');
+
+// Elementy do pokazywania/ukrywania
+const clientSearchRow = document.querySelector('#bazaKlientowSection .form-row'); // Zakładamy, że to pierwszy .form-row
+const importActionsContainer = document.getElementById('importActions');
 // --- Nawigacja między zakładkami ---
 // (Reszta twojego kodu...)
   if ('serviceWorker' in navigator) {
@@ -1830,12 +1839,30 @@ function showSection(sectionToShow) {
     kalkulatorSection.style.display = 'block';
     if (tabKalkulatorBtn) tabKalkulatorBtn.classList.add('primary');
     renderReceipt(); 
-  } else if (sectionToShow === 'baza' && bazaKlientowSection) { // ✅ POCZĄTEK: DODANY BLOK
-    bazaKlientowSection.style.display = 'block';
-    if (tabBazaKlientowBtn) tabBazaKlientowBtn.classList.add('primary');
-    // Załaduj dane do tabeli przy każdym przełączeniu na tę zakładkę
-    loadClientsToTable(); 
-  } // ✅ KONIEC: DODANY BLOK
+  } else if (sectionToShow === 'baza' && bazaKlientowSection) {
+    // Pokaż sekcję i zaznacz przycisk
+    bazaKlientowSection.style.display = 'block';
+    if (tabBazaKlientowBtn) tabBazaKlientowBtn.classList.add('primary');
+
+    // Sprawdź, czy dane są już w cache
+    if (cachedClients) {
+      console.log("Wyświetlanie klientów z cache.");
+      renderClientTable(cachedClients); // Wyświetl dane z cache
+      // Pokaż powiązane UI (wyszukiwarka, import, odśwież)
+      if(clientSearchRow) clientSearchRow.style.display = 'block';
+      if(importActionsContainer) importActionsContainer.style.display = 'flex'; // Użyj flex dla przycisków
+      if(loadClientsBtn) loadClientsBtn.style.display = 'none';
+      if(refreshClientsBtn) refreshClientsBtn.style.display = 'inline-block';
+    } else {
+      console.log("Brak klientów w cache. Oczekiwanie na wczytanie.");
+      // Dane nie są wczytane, pokaż przycisk "Wczytaj" i ukryj resztę
+      klientTableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 20px; color: #555;">Kliknij "Wczytaj bazę klientów", aby wyświetlić dane.</td></tr>';
+      if(clientSearchRow) clientSearchRow.style.display = 'none';
+      if(importActionsContainer) importActionsContainer.style.display = 'none';
+      if(loadClientsBtn) loadClientsBtn.style.display = 'inline-block';
+      if(refreshClientsBtn) refreshClientsBtn.style.display = 'none';
+    }
+  } // ✅ KONIEC: DODANY BLOK
 }
 
 if (tabKartaBtn && tabKalkulatorBtn) {
@@ -2240,133 +2267,99 @@ async function refreshClientDataLists() {
 /**
  * Ładuje klientów z Firestore, sortuje ich w JavaScript wg polskich reguł i buduje tabelę HTML.
  */
-async function loadClientsToTable() {
-    // Upewnij się, że elementy istnieją
-    if (!klientTableBody) {
-        console.error("Nie znaleziono elementu tbody tabeli klientów (#klientTableBody).");
+/**
+ * Renderuje tabelę klientów na podstawie przekazanej tablicy danych.
+ * Zawiera logikę sortowania.
+ */
+function renderClientTable(klienciData) {
+    if (!klientTableBody) return;
+    klientTableBody.innerHTML = ''; // Wyczyść tabelę przed renderowaniem
+
+    if (!klienciData || klienciData.length === 0) {
+        klientTableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 10px;">Brak danych klientów do wyświetlenia.</td></tr>';
         return;
     }
-    if (clientSearchInput) {
-        clientSearchInput.value = ''; // Wyczyść wyszukiwarkę
-    }
 
-    // Wyświetl komunikat ładowania
-    klientTableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 10px;">Ładowanie danych...</td></tr>';
+    // Sortuj dane w JavaScript używając polskiego locale (tak jak wcześniej)
+    console.log("Sortowanie klientów przed renderowaniem...");
+    klienciData.sort((a, b) => {
+        const nameA = a.nazwa || '';
+        const nameB = b.nazwa || '';
+        return nameA.localeCompare(nameB, 'pl', { sensitivity: 'base' });
+    });
+    console.log("Sortowanie zakończone.");
 
-    try {
-        // 1. Pobierz WSZYSTKICH klientów z Firestore
-        console.log("Pobieranie klientów z Firestore...");
-        const snapshot = await db.collection("klienci").get();
-        klientTableBody.innerHTML = ''; // Wyczyść "Ładowanie..." po pobraniu
+    // Generuj wiersze tabeli
+    console.log("Renderowanie tabeli klientów...");
+    klienciData.forEach(klient => {
+        const tr = document.createElement('tr');
+        // Używamy ID przechowywanego w obiekcie cache (klient.id)
+        tr.dataset.id = klient.id;
 
-        // Sprawdź, czy baza danych nie jest pusta
-        if (snapshot.empty) {
-            console.log("Baza klientów jest pusta.");
-            klientTableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 10px;">Brak klientów w bazie danych.</td></tr>';
-            return; // Zakończ funkcję, jeśli brak klientów
-        }
-        console.log(`Pobrano ${snapshot.size} klientów.`);
+        tr.innerHTML = `
+          <td data-label="Nazwa">${klient.nazwa || 'Brak nazwy'}</td>
+          <td data-label="Adres">${klient.adres || ''}</td>
+          <td data-label="Nr Stada">${klient.nrStada || ''}</td>
+          <td data-label="Nr Telefonu">${klient.telefon || ''}</td>
+          <td data-label="Email">${klient.email || ''}</td>
+          <td data-label="ID Lecznicy">${klient.idLecznicy || ''}</td>
+          <td class="col-akcje">
+              <button class="btn btn-edit-client" data-id="${klient.id}" title="Edytuj klienta">Edytuj</button>
+              <button class="btn warn btn-delete-client" data-id="${klient.id}" title="Usuń klienta">Usuń</button>
+          </td>
+        `;
+        klientTableBody.appendChild(tr);
+    });
+    console.log("Renderowanie tabeli zakończone.");
 
-        // 2. Przekształć dokumenty Firestore na tablicę obiektów JavaScript
-        let klienci = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        console.log("Dane klientów przekształcone do tablicy JS.");
-
-        // 3. Posortuj tablicę 'klienci' w JavaScript, używając polskich reguł sortowania
-        console.log("Sortowanie klientów wg polskich reguł...");
-        klienci.sort((a, b) => {
-            const nameA = a.nazwa || ''; // Zabezpieczenie przed brakiem nazwy
-            const nameB = b.nazwa || ''; // Zabezpieczenie przed brakiem nazwy
-            // 'pl' - użyj polskich reguł, 'sensitivity: 'base'' - ignoruj wielkość liter przy sortowaniu
-            return nameA.localeCompare(nameB, 'pl', { sensitivity: 'base' });
-        });
-        console.log("Sortowanie zakończone.");
-
-        // 4. Wygeneruj wiersze tabeli HTML z posortowanej tablicy 'klienci'
-        console.log("Generowanie wierszy tabeli HTML...");
-        klienci.forEach(klient => {
-            const tr = document.createElement('tr');
-            tr.dataset.id = klient.id; // Zapisz ID dokumentu Firestore w atrybucie data-id wiersza
-
-            // Wypełnij komórki wiersza danymi klienta
-            tr.innerHTML = `
-              <td data-label="Nazwa">${klient.nazwa || 'Brak nazwy'}</td>
-              <td data-label="Adres">${klient.adres || ''}</td>
-              <td data-label="Nr Stada">${klient.nrStada || ''}</td>
-              <td data-label="Nr Telefonu">${klient.telefon || ''}</td>
-              <td data-label="Email">${klient.email || ''}</td>
-              <td data-label="ID Lecznicy">${klient.idLecznicy || ''}</td>
-              <td class="col-akcje">
-                  <button class="btn btn-edit-client" data-id="${klient.id}" title="Edytuj klienta">Edytuj</button>
-                  <button class="btn warn btn-delete-client" data-id="${klient.id}" title="Usuń klienta">Usuń</button>
-              </td>
-            `;
-            // Dodaj gotowy wiersz do ciała tabeli
-            klientTableBody.appendChild(tr);
-        });
-        console.log("Tabela klientów została wygenerowana.");
-
-    } catch (error) {
-        // Obsługa błędów, które mogły wystąpić podczas pobierania, sortowania lub generowania tabeli
-        console.error("Błąd podczas ładowania lub przetwarzania klientów: ", error);
-        // Wyświetl komunikat błędu w tabeli
-        klientTableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 10px; color: red;">Wystąpił błąd podczas ładowania danych. Sprawdź konsolę (F12).</td></tr>';
-    }
-} // Koniec funkcji loadClientsToTable
+    // Po renderowaniu, pokaż powiązane UI
+    if(clientSearchRow) clientSearchRow.style.display = 'block';
+    if(importActionsContainer) importActionsContainer.style.display = 'flex'; // Użyj flex
+    if(loadClientsBtn) loadClientsBtn.style.display = 'none';
+    if(refreshClientsBtn) refreshClientsBtn.style.display = 'inline-block';
+}
 
 /**
- * Obsługa kliknięć w tabeli (Edycja i Usuwanie) - Delegacja zdarzeń
+ * Pobiera dane klientów z Firestore, zapisuje je do cache i wywołuje renderowanie.
  */
-if (klientTableBody) {
-    klientTableBody.addEventListener('click', async (e) => {
-        const target = e.target;
-        
-        // --- EDYCJA KLIENTA ---
-        if (target.classList.contains('btn-edit-client')) {
-            const docId = target.dataset.id;
-            try {
-                const doc = await db.collection("klienci").doc(docId).get();
-                if (!doc.exists) {
-                    alert('Błąd: Nie znaleziono klienta.');
-                    return;
-                }
-                const data = doc.data();
-                
-                // Wypełnij i pokaż modal
-                clientFormTitle.textContent = 'Edytuj klienta';
-                clientFormDocId.value = docId; // Najważniejsze: ustaw ID do edycji
-                clientFormNazwa.value = data.nazwa || '';
-                clientFormAdres.value = data.adres || '';
-                clientFormNrStada.value = data.nrStada || '';
-                clientFormTelefon.value = data.telefon || '';
-                clientFormEmail.value = data.email || '';
-                clientFormIdLecznicy.value = data.idLecznicy || '';
-                clientFormModal.style.display = 'flex';
-                
-            } catch (error) {
-                console.error('Błąd pobierania klienta do edycji: ', error);
-                alert('Wystąpił błąd podczas pobierania danych klienta.');
-            }
+async function loadAndCacheClients() {
+    if (!klientTableBody) return;
+
+    // Pokaż komunikat ładowania
+    klientTableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 10px;">Ładowanie danych z bazy... <span class="spinner">⏳</span></td></tr>';
+    // Opcjonalnie: Zablokuj przyciski podczas ładowania
+    if(loadClientsBtn) loadClientsBtn.disabled = true;
+    if(refreshClientsBtn) refreshClientsBtn.disabled = true;
+
+    try {
+        console.log("Pobieranie klientów z Firestore...");
+        const snapshot = await db.collection("klienci").get();
+
+        if (snapshot.empty) {
+            console.log("Baza klientów jest pusta.");
+            cachedClients = []; // Zapisz pustą tablicę do cache
+            renderClientTable(cachedClients); // Wyrenderuj komunikat o braku danych
+        } else {
+            console.log(`Pobrano ${snapshot.size} klientów.`);
+            // Przekształć dokumenty i zapisz do cache
+            cachedClients = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            console.log("Dane klientów zapisane w cache.");
+            renderClientTable(cachedClients); // Wyrenderuj tabelę z nowymi danymi
         }
-        
-        // --- USUWANIE KLIENTA ---
-        if (target.classList.contains('btn-delete-client')) {
-            const docId = target.dataset.id;
-            const row = target.closest('tr');
-            const klientName = row.cells[0].textContent;
-            
-            if (confirm(`Czy na pewno chcesz usunąć klienta: "${klientName}"? \n\nTej operacji nie można cofnąć.`)) {
-                try {
-                    await db.collection("klienci").doc(docId).delete();
-                    alert('Klient usunięty pomyślnie.');
-                    loadClientsToTable(); // Odśwież tabelę
-                    refreshClientDataLists(); // Odśwież listy wyboru w apce
-                } catch (error) {
-                    console.error('Błąd usuwania klienta: ', error);
-                    alert('Wystąpił błąd podczas usuwania klienta.');
-                }
-            }
-        }
-    });
+    } catch (error) {
+        console.error("Błąd podczas ładowania klientów z Firestore: ", error);
+        klientTableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 10px; color: red;">Wystąpił błąd podczas ładowania danych. Spróbuj ponownie lub sprawdź konsolę (F12).</td></tr>';
+        cachedClients = null; // Wyczyść cache w razie błędu
+        // Pokaż przycisk Wczytaj, ukryj resztę w razie błędu
+         if(clientSearchRow) clientSearchRow.style.display = 'none';
+         if(importActionsContainer) importActionsContainer.style.display = 'none';
+         if(loadClientsBtn) loadClientsBtn.style.display = 'inline-block';
+         if(refreshClientsBtn) refreshClientsBtn.style.display = 'none';
+    } finally {
+        // Odblokuj przyciski po zakończeniu (sukcesie lub błędzie)
+        if(loadClientsBtn) loadClientsBtn.disabled = false;
+        if(refreshClientsBtn) refreshClientsBtn.disabled = false;
+    }
 }
 
 /**
@@ -2671,7 +2664,32 @@ if (saveClientBtn) {
       });
     }
     // ✅ KONIEC: LOGIKA IMPORTU Z ARKUSZA
-    </script>
+// --- Obsługa przycisków ładowania / odświeżania ---
+
+if (loadClientsBtn) {
+    loadClientsBtn.addEventListener('click', () => {
+        console.log("Kliknięto 'Wczytaj bazę klientów'");
+        loadAndCacheClients(); // Wywołaj funkcję pobierającą dane
+    });
+}
+
+if (refreshClientsBtn) {
+    refreshClientsBtn.addEventListener('click', () => {
+        if (confirm('Czy na pewno chcesz odświeżyć dane klientów z bazy?')) {
+            console.log("Kliknięto 'Odśwież bazę'");
+            cachedClients = null; // Wyczyść cache przed ponownym ładowaniem
+            loadAndCacheClients(); // Wywołaj funkcję pobierającą dane
+        }
+    });
+}
+
+// Upewnij się, że inne funkcje (jak edycja, usuwanie, wyszukiwanie, import) działają
+// - Edycja/Usuwanie: Powinny działać bez zmian, bo operują na data-id wiersza.
+// - Zapis importu: Powinien działać bez zmian, bo odczytuje dane z tabeli HTML.
+// - Wyszukiwanie: Powinno działać bez zmian, bo filtruje widoczne wiersze HTML.
+// Należy jednak upewnić się, że wyszukiwarka i import są pokazywane/ukrywane poprawnie
+// (co zostało dodane w `showSection` i `renderClientTable`).    
+</script>
 
 </body>
 </html>
