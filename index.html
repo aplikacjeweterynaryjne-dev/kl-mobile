@@ -3134,7 +3134,51 @@ if (saveProductBtn) {
 }
 // ✅ KONIEC: LOGIKA CRUD DLA BAZY PRODUKTÓW
 // ========================================================
-if (refreshClientsBtn) {
+// ========================================================
+// ✅ POCZĄTEK: WYSZUKIWARKA DLA BAZY PRODUKTÓW
+// ========================================================
+
+/**
+ * Filtruje tabelę produktów na podstawie wpisanego tekstu.
+ * Działa na danych już wyświetlonych w tabeli (z cache).
+ */
+function filterProductTable() {
+    if (!productSearchInput || !produktTableBody) return;
+
+    const searchTerm = productSearchInput.value.toLowerCase().trim();
+    const rows = produktTableBody.querySelectorAll('tr');
+
+    rows.forEach(row => {
+        // Upewnij się, że wiersz ma komórki (nie jest to komunikat "Ładowanie..." etc.)
+        if (row.cells.length < 6) return; // Mamy 6 kolumn danych + Akcje
+
+        const nazwa = row.cells[0].textContent.toLowerCase();
+        const plu = row.cells[1].textContent.toLowerCase();
+        const cena = row.cells[2].textContent.toLowerCase(); // Cena jako tekst
+        const dawka = row.cells[3].textContent.toLowerCase();
+        const karencja = row.cells[4].textContent.toLowerCase();
+        const stan = row.cells[5].textContent.toLowerCase();
+
+        // Sprawdź czy tekst jest widoczny w którejkolwiek z kolumn
+        const isVisible = nazwa.includes(searchTerm) ||
+                          plu.includes(searchTerm) ||
+                          cena.includes(searchTerm) || // Wyszukuje też w sformatowanej cenie
+                          dawka.includes(searchTerm) ||
+                          karencja.includes(searchTerm) ||
+                          stan.includes(searchTerm);
+
+        // Pokaż lub ukryj wiersz
+        row.style.display = isVisible ? '' : 'none';
+    });
+}
+
+// Podłącz nasłuchiwanie do pola wyszukiwania produktów
+if (productSearchInput) {
+    productSearchInput.addEventListener('input', filterProductTable);
+}
+// ✅ KONIEC: WYSZUKIWARKA DLA BAZY PRODUKTÓW
+// ========================================================
+  if (refreshClientsBtn) {
     refreshClientsBtn.addEventListener('click', () => {
         if (confirm('Czy na pewno chcesz odświeżyć dane klientów z bazy?')) {
             console.log("Kliknięto 'Odśwież bazę'");
