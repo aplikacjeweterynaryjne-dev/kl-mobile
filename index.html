@@ -2025,27 +2025,31 @@ const tabKartaBtn = document.getElementById('tabKartaBtn');
 const tabKalkulatorBtn = document.getElementById('tabKalkulatorBtn');
 
 function showSection(sectionToShow) {
-  // Ukryj wszystkie sekcje
-  if (kartaSection) kartaSection.style.display = 'none';
-  if (kalkulatorSection) kalkulatorSection.style.display = 'none';
-  if (bazaKlientowSection) bazaKlientowSection.style.display = 'none'; // ✅ DODANE
-  if (bazaProduktowSection) bazaProduktowSection.style.display = 'none'; // Nowa linia
+  // ✅ NOWA LOGIKA: Ukryj menu główne i pokaż pasek zakładek
+  if (mainMenuSection) mainMenuSection.style.display = 'none';
+  if (mainTabBar) mainTabBar.style.display = 'flex'; // Używamy flex dla poprawnego zawijania
 
-  // Odznacz wszystkie przyciski
-  if (tabKartaBtn) tabKartaBtn.classList.remove('primary');
-  if (tabKalkulatorBtn) tabKalkulatorBtn.classList.remove('primary');
-  if (tabBazaKlientowBtn) tabBazaKlientowBtn.classList.remove('primary'); // ✅ DODANE
-  if (tabBazaProduktowBtn) tabBazaProduktowBtn.classList.remove('primary'); // Nowa linia
+  // Ukryj wszystkie sekcje
+  if (kartaSection) kartaSection.style.display = 'none';
+  if (kalkulatorSection) kalkulatorSection.style.display = 'none';
+  if (bazaKlientowSection) bazaKlientowSection.style.display = 'none'; 
+  if (bazaProduktowSection) bazaProduktowSection.style.display = 'none'; 
 
-  // Pokaż wybraną sekcję i zaznacz przycisk
-  if (sectionToShow === 'karta' && kartaSection) {
-    kartaSection.style.display = 'block';
-    if (tabKartaBtn) tabKartaBtn.classList.add('primary');
-  } else if (sectionToShow === 'kalkulator' && kalkulatorSection) {
-    kalkulatorSection.style.display = 'block';
-    if (tabKalkulatorBtn) tabKalkulatorBtn.classList.add('primary');
-    renderReceipt(); 
-  } else if (sectionToShow === 'baza' && bazaKlientowSection) {
+  // Odznacz wszystkie przyciski
+  if (tabKartaBtn) tabKartaBtn.classList.remove('primary');
+  if (tabKalkulatorBtn) tabKalkulatorBtn.classList.remove('primary');
+  if (tabBazaKlientowBtn) tabBazaKlientowBtn.classList.remove('primary'); 
+  if (tabBazaProduktowBtn) tabBazaProduktowBtn.classList.remove('primary'); 
+
+  // Pokaż wybraną sekcję i zaznacz przycisk
+  if (sectionToShow === 'karta' && kartaSection) {
+    kartaSection.style.display = 'block';
+    if (tabKartaBtn) tabKartaBtn.classList.add('primary');
+  } else if (sectionToShow === 'kalkulator' && kalkulatorSection) {
+    kalkulatorSection.style.display = 'block';
+    if (tabKalkulatorBtn) tabKalkulatorBtn.classList.add('primary');
+    renderReceipt(); 
+  } else if (sectionToShow === 'baza' && bazaKlientowSection) {
     // Pokaż sekcję i zaznacz przycisk
     bazaKlientowSection.style.display = 'block';
     if (tabBazaKlientowBtn) tabBazaKlientowBtn.classList.add('primary');
@@ -2068,8 +2072,8 @@ function showSection(sectionToShow) {
       if(loadClientsBtn) loadClientsBtn.style.display = 'inline-block';
       if(refreshClientsBtn) refreshClientsBtn.style.display = 'none';
     }
-  } // ✅ KONIEC: DODANY BLOK
-  // Nowy blok dla sekcji 'produkty'
+  } 
+  // Nowy blok dla sekcji 'produkty'
   else if (sectionToShow === 'produkty' && bazaProduktowSection) {
     // Pokaż sekcję i zaznacz przycisk
     bazaProduktowSection.style.display = 'block';
@@ -2098,7 +2102,110 @@ function showSection(sectionToShow) {
   } // Koniec bloku else if dla 'produkty'
 }
 
-if (tabKartaBtn && tabKalkulatorBtn) {
+if// ✅ POCZĄTEK: LOGIKA DLA NOWEGO MENU GŁÓWNEGO
+
+// --- Przycisk Wróć do Menu ---
+if (backToMenuBtn) {
+  backToMenuBtn.addEventListener('click', () => {
+    // Ukryj wszystkie sekcje
+    if (kartaSection) kartaSection.style.display = 'none';
+    if (kalkulatorSection) kalkulatorSection.style.display = 'none';
+    if (bazaKlientowSection) bazaKlientowSection.style.display = 'none'; 
+    if (bazaProduktowSection) bazaProduktowSection.style.display = 'none';
+    
+    // Ukryj pasek zakładek
+    if (mainTabBar) mainTabBar.style.display = 'none';
+    
+    // Pokaż menu główne
+    if (mainMenuSection) mainMenuSection.style.display = 'flex';
+    
+    // Ukryj podmenu bazy
+    if (bazaSubMenu) bazaSubMenu.style.display = 'none';
+  });
+}
+
+// --- Przycisk Menu: Karta Leczenia (pokazuje modal) ---
+if (menuKartaBtn) {
+  menuKartaBtn.addEventListener('click', () => {
+    if (metodaModal) metodaModal.style.display = 'flex';
+  });
+}
+
+// --- Przycisk Menu: Kalkulator ---
+if (menuKalkulatorBtn) {
+  menuKalkulatorBtn.addEventListener('click', () => {
+    showSection('kalkulator');
+  });
+}
+
+// --- Przycisk Menu: Baza (pokazuje podmenu) ---
+if (menuBazaBtn) {
+  menuBazaBtn.addEventListener('click', () => {
+    if (bazaSubMenu) {
+      // Przełącz widoczność podmenu
+      bazaSubMenu.style.display = (bazaSubMenu.style.display === 'none') ? 'block' : 'none';
+    }
+  });
+}
+
+// --- Przycisk Podmenu: Baza Klientów ---
+if (menuBazaKlientowBtn) {
+  menuBazaKlientowBtn.addEventListener('click', () => {
+    showSection('baza');
+  });
+}
+
+// --- Przycisk Podmenu: Baza Produktów ---
+if (menuBazaProduktowBtn) {
+  menuBazaProduktowBtn.addEventListener('click', () => {
+    showSection('produkty');
+  });
+}
+
+// --- LOGIKA MODALA WYBORU METODY ---
+
+// --- Przycisk: Metoda Tradycyjna ---
+if (metodaTradycyjnaBtn) {
+  metodaTradycyjnaBtn.addEventListener('click', () => {
+    if (metodaModal) metodaModal.style.display = 'none';
+    showSection('karta');
+  });
+}
+
+// --- Przycisk: Formularz ---
+if (metodaFormularzBtn) {
+  metodaFormularzBtn.addEventListener('click', () => {
+    if (metodaModal) metodaModal.style.display = 'none';
+    // Pokaż sekcję karty (jest pod spodem)
+    showSection('karta');
+    
+    // Otwórz formularz (logika skopiowana z Twojego listenera #formBtn)
+    if (formModal) {
+      formModal.style.display = 'flex';
+      showStep(1); // Pokaż pierwszy krok formularza
+      populateRowSelect();
+      formRowSelect.dataset.prevIndex = 0; 
+      
+      // Synchronizuj dane z nagłówka (jeśli jakieś są)
+      document.getElementById('formKlient').value = document.getElementById('klientSelect').value || '';
+      document.getElementById('formAdres').value = document.getElementById('adresKlienta').textContent || '';
+      document.getElementById('formNrStada').value = document.getElementById('nrStada').textContent || '';
+      document.getElementById('formDataZgloszenia').value = document.getElementById('dataZgloszenia').value || '';
+      document.getElementById('formDataWykonania').value = document.getElementById('dataWykonania').value || '';
+      document.getElementById('formNrDokumentu').value = document.getElementById('nrDokumentu').value || '';
+    }
+  });
+}
+
+// --- Przycisk: Anuluj w Modalu Metody ---
+if (cancelMetodaBtn) {
+  cancelMetodaBtn.addEventListener('click', () => {
+    if (metodaModal) metodaModal.style.display = 'none';
+  });
+}
+
+// ✅ KONIEC: LOGIKA DLA NOWEGO MENU GŁÓWNEGO 
+  (tabKartaBtn && tabKalkulatorBtn) {
     tabKartaBtn.addEventListener('click', () => showSection('karta'));
     tabKalkulatorBtn.addEventListener('click', () => showSection('kalkulator'));
 }
