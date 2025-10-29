@@ -2395,7 +2395,12 @@ menuBazaProduktowBtn.addEventListener('click', () => {
 showSection('produkty');
 });
 }
-
+// ✅ Listener dla przycisku Konfiguracja w menu
+if (menuKonfiguracjaBtn) {
+  menuKonfiguracjaBtn.addEventListener('click', () => {
+    showSection('konfiguracja');
+  });
+}
 // --- LOGIKA MODALA WYBORU METODY ---
 
 // --- Przycisk: Metoda Tradycyjna ---
@@ -2445,6 +2450,10 @@ tabBazaKlientowBtn.addEventListener('click', () => showSection('baza'));
 // ✅ DODAJ TEN BLOK
 if (tabBazaProduktowBtn) {
 tabBazaProduktowBtn.addEventListener('click', () => showSection('produkty'));
+}
+    // ✅ Listener dla zakładki Konfiguracja
+if (tabKonfiguracjaBtn) {
+  tabKonfiguracjaBtn.addEventListener('click', () => showSection('konfiguracja'));
 }
   // ✅ DODAJ TEN BLOK DLA WYSZUKIWARKI
 if (clientSearchInput) {
@@ -3593,6 +3602,128 @@ saveProductBtn.textContent = 'Zapisz';
 // ✅ KONIEC: LOGIKA CRUD DLA BAZY PRODUKTÓW
 // ========================================================
 // ========================================================
+// ✅ POCZĄTEK: LOGIKA MODALA KONFIGURACJI (CRUD)
+// ========================================================
+
+/**
+ * Obsługa kliknięć w tabeli konfiguracji (Edycja)
+ */
+if (konfiguracjaTableBody) {
+    konfiguracjaTableBody.addEventListener('click', async (e) => {
+        const target = e.target;
+
+        // --- EDYCJA WPISU KONFIGURACJI ---
+        if (target.classList.contains('btn-edit-konfiguracja')) {
+            const docId = target.dataset.id;
+            console.log(`Próba edycji wpisu konfiguracji o ID: ${docId}`);
+            try {
+                let data = null;
+                if (cachedKonfiguracja) {
+                    data = cachedKonfiguracja.find(item => item.id === docId);
+                }
+                if (!data) {
+                   console.log("Nie znaleziono w cache, pobieranie z Firestore...");
+                   const doc = await db.collection("konfiguracja").doc(docId).get();
+                   if (doc.exists) {
+                       data = { id: doc.id, ...doc.data() };
+                   }
+                }
+
+                if (!data) {
+                    alert('Błąd: Nie znaleziono danych konfiguracyjnych do edycji.');
+                    console.error(`Nie znaleziono wpisu o ID: ${docId}`);
+                    return;
+                }
+                console.log("Pobrano dane konfiguracji do edycji:", data);
+
+                konfiguracjaFormTitle.textContent = 'Edytuj dane konfiguracyjne';
+                konfiguracjaFormDocId.value = docId;
+                konfiguracjaFormImie.value = data.Imie || '';
+                konfiguracjaFormNazwisko.value = data.Nazwisko || '';
+                konfiguracjaFormEmail.value = data['Adres email'] || '';
+                konfiguracjaFormTelefon.value = data['Nr telefonu'] || '';
+                konfiguracjaFormPodpis.value = data.Podpis || '';
+                konfiguracjaFormStanowisko.value = data.Stanowisko || '';
+                konfiguracjaFormInicjaly.value = data.Inicjaly || '';
+                konfiguracjaFormIdLecznicy.value = data['ID lecznicy'] || '';
+
+                konfiguracjaFormModal.style.display = 'flex';
+
+            } catch (error) {
+                console.error('Błąd pobierania wpisu konfiguracji do edycji: ', error);
+                alert('Wystąpił błąd podczas pobierania danych.');
+            }
+        }
+    });
+}
+
+/**
+ * Przycisk "Anuluj" w modalu konfiguracji
+ */
+if (cancelKonfiguracjaForm) {
+    cancelKonfiguracjaForm.addEventListener('click', () => {
+        konfiguracjaFormModal.style.display = 'none';
+    });
+}
+
+/**
+ * Przycisk "Zapisz" w modalu konfiguracji (tylko Aktualizacja)
+ */
+if (saveKonfiguracjaBtn) {
+    saveKonfiguracjaBtn.addEventListener('click', async () => {
+        const docId = konfiguracjaFormDocId.value;
+
+        if (!docId) {
+             alert('Błąd: Brak ID dokumentu do zaktualizowania.');
+             return;
+        }
+
+        const konfiguracjaData = {
+            Imie: konfiguracjaFormImie.value.trim(),
+            Nazwisko: konfiguracjaFormNazwisko.value.trim(),
+            'Adres email': konfiguracjaFormEmail.value.trim(),
+            'Nr telefonu': konfiguracjaFormTelefon.value.trim(),
+            Podpis: konfiguracjaFormPodpis.value.trim(),
+            Stanowisko: konfiguracjaFormStanowisko.value.trim(),
+            Inicjaly: konfiguracjaFormInicjaly.value.trim(),
+            'ID lecznicy': konfiguracjaFormIdLecznicy.value.trim()
+        };
+
+        console.log(`Próba aktualizacji konfiguracji. ID: ${docId}`, konfiguracjaData);
+        saveKonfiguracjaBtn.disabled = true;
+        saveKonfiguracjaBtn.textContent = 'Zapisywanie...';
+
+        try {
+            await db.collection("konfiguracja").doc(docId).update(konfiguracjaData);
+            alert('Dane konfiguracyjne zostały zaktualizowane.');
+            console.log(`Wpis ${docId} zaktualizowany.`);
+
+            if (cachedKonfiguracja) {
+                const index = cachedKonfiguracja.findIndex(item => item.id === docId);
+                if (index !== -1) {
+                    cachedKonfiguracja[index] = { id: docId, ...konfiguracjaData };
+                }
+                 renderKonfiguracjaTable(cachedKonfiguracja);
+            } else {
+                 loadAndCacheKonfiguracja();
+            }
+
+            konfiguracjaFormModal.style.display = 'none';
+
+        } catch (error) {
+            console.error('Błąd zapisu konfiguracji: ', error);
+            alert('Wystąpił błąd podczas zapisu danych.');
+        } finally {
+            saveKonfiguracjaBtn.disabled = false;
+            saveKonfiguracjaBtn.textContent = 'Zapisz';
+        }
+    });
+}
+
+// ========================================================
+// ✅ KONIEC: LOGIKA MODALA KONFIGURACJI (CRUD)
+// ========================================================
+// ========================================================
 // ✅ POCZĄTEK: WYSZUKIWARKA DLA BAZY PRODUKTÓW
 // ========================================================
 
@@ -3853,6 +3984,92 @@ console.log(`Wklejono ${lines.length} linii do kolumny ${cellIndex + 1} tabeli p
 }
 
 // ✅ KONIEC: LOGIKA IMPORTU DLA BAZY PRODUKTÓW
+// ========================================================
+// ========================================================
+// ✅ POCZĄTEK: LOGIKA ZAKŁADKI KONFIGURACJA PROGRAMU
+// ========================================================
+
+/**
+ * Renderuje tabelę konfiguracji na podstawie przekazanej tablicy danych.
+ */
+function renderKonfiguracjaTable(konfiguracjaData) {
+    if (!konfiguracjaTableBody) return;
+    konfiguracjaTableBody.innerHTML = ''; // Wyczyść tabelę
+
+    if (!konfiguracjaData || konfiguracjaData.length === 0) {
+        konfiguracjaTableBody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 10px;">Brak danych konfiguracyjnych do wyświetlenia.</td></tr>';
+        return;
+    }
+
+    console.log("Renderowanie tabeli konfiguracji...");
+    konfiguracjaData.forEach(wpis => {
+        const tr = document.createElement('tr');
+        tr.dataset.id = wpis.id; // Przechowujemy ID dokumentu
+
+        const podpisUrl = wpis.Podpis || '';
+        const podpisDisplay = podpisUrl.length > 30 ? podpisUrl.substring(0, 27) + '...' : podpisUrl;
+
+        tr.innerHTML = `
+          <td data-label="Imię">${wpis.Imie || ''}</td>
+          <td data-label="Nazwisko">${wpis.Nazwisko || ''}</td>
+          <td data-label="Email">${wpis['Adres email'] || ''}</td>
+          <td data-label="Telefon">${wpis['Nr telefonu'] || ''}</td>
+          <td data-label="Podpis (URL)" title="${podpisUrl}">${podpisDisplay}</td>
+          <td data-label="Stanowisko">${wpis.Stanowisko || ''}</td>
+          <td data-label="Inicjały">${wpis.Inicjaly || ''}</td>
+          <td data-label="ID Lecznicy">${wpis['ID lecznicy'] || ''}</td>
+          <td class="col-akcje">
+              <button class="btn btn-edit-konfiguracja" data-id="${wpis.id}" title="Edytuj wpis">Edytuj</button>
+          </td>
+        `;
+        konfiguracjaTableBody.appendChild(tr);
+    });
+    console.log("Renderowanie tabeli konfiguracji zakończone.");
+     if(loadKonfiguracjaBtn) loadKonfiguracjaBtn.style.display = 'none'; // Ukryj przycisk po wczytaniu
+}
+
+/**
+ * Pobiera dane konfiguracji z Firestore (kolekcja 'konfiguracja'), zapisuje do cache i wywołuje renderowanie.
+ */
+async function loadAndCacheKonfiguracja() {
+    if (!konfiguracjaTableBody) return;
+
+    konfiguracjaTableBody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 10px;">Ładowanie danych konfiguracyjnych... <span class="spinner">⏳</span></td></tr>';
+    if(loadKonfiguracjaBtn) loadKonfiguracjaBtn.disabled = true;
+
+    try {
+        console.log("Pobieranie konfiguracji z Firestore (kolekcja: konfiguracja)...");
+        const snapshot = await db.collection("konfiguracja").get();
+
+        if (snapshot.empty) {
+            console.log("Kolekcja konfiguracji jest pusta.");
+            cachedKonfiguracja = [];
+            renderKonfiguracjaTable(cachedKonfiguracja);
+        } else {
+            console.log(`Pobrano ${snapshot.size} wpisów konfiguracyjnych.`);
+            cachedKonfiguracja = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            console.log("Dane konfiguracji zapisane w cache:", cachedKonfiguracja);
+            renderKonfiguracjaTable(cachedKonfiguracja);
+        }
+         if(loadKonfiguracjaBtn) loadKonfiguracjaBtn.style.display = 'none';
+
+    } catch (error) {
+        console.error("Błąd podczas ładowania konfiguracji z Firestore: ", error);
+        konfiguracjaTableBody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 10px; color: red;">Wystąpił błąd podczas ładowania danych. Spróbuj ponownie lub sprawdź konsolę (F12).</td></tr>';
+        cachedKonfiguracja = null;
+         if(loadKonfiguracjaBtn) loadKonfiguracjaBtn.style.display = 'inline-block';
+    } finally {
+        if(loadKonfiguracjaBtn) loadKonfiguracjaBtn.disabled = false;
+    }
+}
+
+// Listener dla przycisku "Wczytaj konfigurację"
+if (loadKonfiguracjaBtn) {
+    loadKonfiguracjaBtn.addEventListener('click', loadAndCacheKonfiguracja);
+}
+
+// ========================================================
+// ✅ KONIEC: LOGIKA ZAKŁADKI KONFIGURACJA PROGRAMU
 // ========================================================
 if (refreshClientsBtn) {
 refreshClientsBtn.addEventListener('click', () => {
