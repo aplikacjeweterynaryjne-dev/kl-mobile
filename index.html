@@ -975,7 +975,9 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
   <h2>Konfiguracja Programu</h2>
   <div style="margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 10px;">
     <button id="loadKonfiguracjaBtn" class="btn primary">📥 Wczytaj konfigurację</button> </div>
-
+<button id="addNewKonfiguracjaBtn" class="btn primary" style="margin-bottom: 15px;">
+    ＋ Dodaj nowego pracownika 
+  </button>
   <div class="table-container">
     <table id="konfiguracjaTable">
       <thead>
@@ -1055,7 +1057,7 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
 <input type="search" id="productSearchInput" placeholder="Wpisz nazwę, PLU, cenę..." style="width:100%; padding:8px; font-size:16px; border:1px solid #ccc; border-radius:6px; box-sizing:border-box; margin-top: 4px;">
 </div>
 
-<button id="addNewProductBtn" class="btn primary" style="margin-bottom: 15px; display: none;">
+<button id="addNewProductBtn" class="btn primary" style="margin-bottom: 15px;">
 ＋ Dodaj nowy produkt
 </button>
 
@@ -2176,7 +2178,7 @@ const tabKonfiguracjaBtn = document.getElementById('tabKonfiguracjaBtn');
 const konfiguracjaSection = document.getElementById('konfiguracjaSection');
 const konfiguracjaTableBody = document.getElementById('konfiguracjaTableBody');
 const loadKonfiguracjaBtn = document.getElementById('loadKonfiguracjaBtn'); // Przycisk wczytania
-
+const addNewKonfiguracjaBtn = document.getElementById('addNewKonfiguracjaBtn'); // ✅ DODANA ZMIENNA
 // Zmienne modala konfiguracji
 const konfiguracjaFormModal = document.getElementById('konfiguracjaFormModal');
 const konfiguracjaFormTitle = document.getElementById('konfiguracjaFormTitle');
@@ -2263,47 +2265,52 @@ if (mainTabBar) mainTabBar.style.display = 'flex'; // Używamy flex dla poprawne
     }
   } 
   // Nowy blok dla sekcji 'produkty'
-  else if (sectionToShow === 'produkty' && bazaProduktowSection) {
-    // Pokaż sekcję i zaznacz przycisk
-    bazaProduktowSection.style.display = 'block';
-    if (tabBazaProduktowBtn) tabBazaProduktowBtn.classList.add('primary');
+else if (sectionToShow === 'produkty' && bazaProduktowSection) {
+    bazaProduktowSection.style.display = 'block';
+    if (tabBazaProduktowBtn) tabBazaProduktowBtn.classList.add('primary');
 
-    // Sprawdź, czy dane są już w cache
-    if (cachedProducts) {
-      console.log("Wyświetlanie produktów z cache.");
-      renderProductTable(cachedProducts); // Wyświetl dane z cache
-      // Pokaż powiązane UI
-      if(productSearchRow) productSearchRow.style.display = 'block';
-      if(addNewProductBtn) addNewProductBtn.style.display = 'inline-block';
-      if(productImportActionsContainer) productImportActionsContainer.style.display = 'flex';
-      if(loadProductsBtn) loadProductsBtn.style.display = 'none';
-      if(refreshProductsBtn) refreshProductsBtn.style.display = 'inline-block';
-    } else {
-      console.log("Brak produktów w cache. Oczekiwanie na wczytanie.");
-      // Dane nie są wczytane, pokaż przycisk "Wczytaj" i ukryj resztę
-      produktTableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 20px; color: #555;">Kliknij "Wczytaj bazę produktów", aby wyświetlić dane.</td></tr>';
-      if(productSearchRow) productSearchRow.style.display = 'none';
-      if(addNewProductBtn) addNewProductBtn.style.display = 'none';
-      if(productImportActionsContainer) productImportActionsContainer.style.display = 'none';
-      if(loadProductsBtn) loadProductsBtn.style.display = 'inline-block';
-      if(refreshProductsBtn) refreshProductsBtn.style.display = 'none';
-    }
-  } // Koniec bloku else if dla 'produkty'
+    // ✅ POKAŻ PRZYCISK "Dodaj" OD RAZU
+    if(addNewProductBtn) addNewProductBtn.style.display = 'inline-block'; 
+
+    // Sprawdź cache lub pokaż komunikat "Wczytaj"
+    if (cachedProducts) {
+      console.log("Wyświetlanie produktów z cache.");
+      renderProductTable(cachedProducts); 
+      // Pokaż powiązane UI PO wczytaniu
+      if(productSearchRow) productSearchRow.style.display = 'block';
+      if(productImportActionsContainer) productImportActionsContainer.style.display = 'flex';
+      if(loadProductsBtn) loadProductsBtn.style.display = 'none';
+      if(refreshProductsBtn) refreshProductsBtn.style.display = 'inline-block';
+    } else {
+      console.log("Brak produktów w cache. Oczekiwanie na wczytanie.");
+      produktTableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 20px; color: #555;">Kliknij "Wczytaj bazę produktów", aby wyświetlić dane.</td></tr>';
+      // Ukryj UI zależne od danych
+      if(productSearchRow) productSearchRow.style.display = 'none';
+      if(productImportActionsContainer) productImportActionsContainer.style.display = 'none';
+      // Pokaż przycisk Wczytaj, ukryj Odśwież
+      if(loadProductsBtn) loadProductsBtn.style.display = 'inline-block';
+      if(refreshProductsBtn) refreshProductsBtn.style.display = 'none';
+    }
+  } // Koniec bloku else if dla 'produkty'
 // ✅ POCZĄTEK: NOWY BLOK DLA KONFIGURACJI
-      else if (sectionToShow === 'konfiguracja' && konfiguracjaSection) {
-        konfiguracjaSection.style.display = 'block';
-        if (tabKonfiguracjaBtn) tabKonfiguracjaBtn.classList.add('primary');
+else if (sectionToShow === 'konfiguracja' && konfiguracjaSection) {
+    konfiguracjaSection.style.display = 'block';
+    if (tabKonfiguracjaBtn) tabKonfiguracjaBtn.classList.add('primary');
 
-        // Sprawdź cache lub wczytaj dane
-        if (cachedKonfiguracja) {
-          console.log("Wyświetlanie konfiguracji z cache.");
-          renderKonfiguracjaTable(cachedKonfiguracja);
-        } else {
-          console.log("Brak konfiguracji w cache. Oczekiwanie na wczytanie.");
-          konfiguracjaTableBody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 20px; color: #555;">Kliknij "Wczytaj konfigurację", aby wyświetlić dane.</td></tr>';
-          // Można od razu wczytać dane: loadAndCacheKonfiguracja();
-        }
-      } // ✅ KONIEC: NOWY BLOK DLA KONFIGURACJI
+    // ✅ POKAŻ PRZYCISK "Dodaj" OD RAZU
+    if(addNewKonfiguracjaBtn) addNewKonfiguracjaBtn.style.display = 'inline-block'; 
+
+    // Sprawdź cache lub pokaż komunikat "Wczytaj"
+    if (cachedKonfiguracja) {
+      console.log("Wyświetlanie konfiguracji z cache.");
+      renderKonfiguracjaTable(cachedKonfiguracja);
+      if(loadKonfiguracjaBtn) loadKonfiguracjaBtn.style.display = 'none'; // Ukryj "Wczytaj", jeśli dane są
+    } else {
+      console.log("Brak konfiguracji w cache. Oczekiwanie na wczytanie.");
+      konfiguracjaTableBody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 20px; color: #555;">Kliknij "Wczytaj konfigurację", aby wyświetlić dane.</td></tr>';
+      if(loadKonfiguracjaBtn) loadKonfiguracjaBtn.style.display = 'inline-block'; // Pokaż "Wczytaj"
+    }
+  } // Koniec bloku else if dla 'konfiguracja' // ✅ KONIEC: NOWY BLOK DLA KONFIGURACJI
 }
 if (tabKartaBtn && tabKalkulatorBtn) {
 // ✅ POPRAWIONA LINIA - najpierw pokazuje sekcję, potem modal
@@ -3507,7 +3514,26 @@ productFormModal.style.display = 'flex';
 productFormNazwa.focus();
 });
 }
-
+// ✅ DODANY LISTENER DLA "Dodaj nowego pracownika"
+if (addNewKonfiguracjaBtn) {
+    addNewKonfiguracjaBtn.addEventListener('click', () => {
+        console.log("Otwieranie modala dodawania nowego wpisu konfiguracji (pracownika).");
+        konfiguracjaFormTitle.textContent = 'Dodaj nowego pracownika';
+        konfiguracjaFormDocId.value = ''; // Wyczyść ID - tryb dodawania
+        // Wyczyść wszystkie pola formularza
+        konfiguracjaFormImie.value = '';
+        konfiguracjaFormNazwisko.value = '';
+        konfiguracjaFormEmail.value = '';
+        konfiguracjaFormTelefon.value = '';
+        konfiguracjaFormPodpis.value = '';
+        konfiguracjaFormStanowisko.value = '';
+        konfiguracjaFormInicjaly.value = '';
+        konfiguracjaFormIdLecznicy.value = '';
+        
+        konfiguracjaFormModal.style.display = 'flex';
+        konfiguracjaFormImie.focus(); // Ustaw focus na pierwszym polu
+    });
+}
 /**
 * Przycisk "Anuluj" w modalu produktu
 */
@@ -3674,13 +3700,9 @@ if (cancelKonfiguracjaForm) {
  */
 if (saveKonfiguracjaBtn) {
     saveKonfiguracjaBtn.addEventListener('click', async () => {
-        const docId = konfiguracjaFormDocId.value;
+        const docId = konfiguracjaFormDocId.value; // Pobierz ID (będzie puste przy dodawaniu)
 
-        if (!docId) {
-             alert('Błąd: Brak ID dokumentu do zaktualizowania.');
-             return;
-        }
-
+        // Zbierz dane z formularza (bez zmian)
         const konfiguracjaData = {
             Imie: konfiguracjaFormImie.value.trim(),
             Nazwisko: konfiguracjaFormNazwisko.value.trim(),
@@ -3692,26 +3714,56 @@ if (saveKonfiguracjaBtn) {
             'ID lecznicy': konfiguracjaFormIdLecznicy.value.trim()
         };
 
-        console.log(`Próba aktualizacji konfiguracji. ID: ${docId}`, konfiguracjaData);
+        // ✅ DODANA PROSTA WALIDACJA (np. imię i nazwisko)
+        if (!konfiguracjaData.Imie || !konfiguracjaData.Nazwisko) {
+            alert('Imię i Nazwisko są wymagane.');
+            return;
+        }
+
+        console.log(`Próba zapisu konfiguracji. ID: ${docId || '(nowy)'}`, konfiguracjaData);
         saveKonfiguracjaBtn.disabled = true;
         saveKonfiguracjaBtn.textContent = 'Zapisywanie...';
 
         try {
-            await db.collection("konfiguracja").doc(docId).update(konfiguracjaData);
-            alert('Dane konfiguracyjne zostały zaktualizowane.');
-            console.log(`Wpis ${docId} zaktualizowany.`);
+            let savedDocId = docId; // Zmienna do ID po zapisie
 
-            if (cachedKonfiguracja) {
-                const index = cachedKonfiguracja.findIndex(item => item.id === docId);
-                if (index !== -1) {
-                    cachedKonfiguracja[index] = { id: docId, ...konfiguracjaData };
+            if (docId) {
+                // --- Tryb Aktualizacji (UPDATE) ---
+                console.log(`Aktualizowanie wpisu ${docId}...`);
+                await db.collection("konfiguracja").doc(docId).update(konfiguracjaData);
+                alert('Dane konfiguracyjne zostały zaktualizowane.');
+                console.log(`Wpis ${docId} zaktualizowany.`);
+                // Zaktualizuj wpis w cache
+                if (cachedKonfiguracja) {
+                    const index = cachedKonfiguracja.findIndex(item => item.id === docId);
+                    if (index !== -1) {
+                        cachedKonfiguracja[index] = { id: docId, ...konfiguracjaData };
+                    }
                 }
-                 renderKonfiguracjaTable(cachedKonfiguracja);
             } else {
-                 loadAndCacheKonfiguracja();
+                // --- ✅ Tryb Dodawania (CREATE) ---
+                console.log("Dodawanie nowego wpisu konfiguracji...");
+                const docRef = await db.collection("konfiguracja").add(konfiguracjaData);
+                savedDocId = docRef.id; // Pobierz ID nowego dokumentu
+                alert('Nowy pracownik został dodany.');
+                console.log(`Wpis dodany z ID: ${savedDocId}.`);
+                // Dodaj nowy wpis do cache
+                const newEntry = { id: savedDocId, ...konfiguracjaData };
+                if (cachedKonfiguracja) {
+                    cachedKonfiguracja.push(newEntry);
+                } else {
+                    cachedKonfiguracja = [newEntry]; // Zainicjuj cache, jeśli był pusty
+                }
             }
 
-            konfiguracjaFormModal.style.display = 'none';
+            // Odśwież tabelę z danych w cache
+            if (cachedKonfiguracja) {
+                renderKonfiguracjaTable(cachedKonfiguracja);
+            } else {
+                loadAndCacheKonfiguracja(); // Mało prawdopodobne, ale na wszelki wypadek
+            }
+
+            konfiguracjaFormModal.style.display = 'none'; // Zamknij modal
 
         } catch (error) {
             console.error('Błąd zapisu konfiguracji: ', error);
