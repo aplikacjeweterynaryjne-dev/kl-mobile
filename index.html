@@ -3683,6 +3683,37 @@ if (konfiguracjaTableBody) {
                 alert('Wystąpił błąd podczas pobierania danych.');
             }
         }
+   // ✅ POCZĄTEK: NOWY BLOK DLA PRZYCISKU "Usuń"
+        else if (target.classList.contains('btn-delete-konfiguracja')) {
+            const docId = target.dataset.id;
+            const row = target.closest('tr');
+            // Pobierz nazwę dla potwierdzenia (np. z pierwszej komórki)
+            const wpisName = row.cells[0].textContent + ' ' + row.cells[1].textContent;
+
+            if (confirm(`Czy na pewno chcesz usunąć wpis dla: "${wpisName}"? \n\nTej operacji nie można cofnąć.`)) {
+                console.log(`Próba usunięcia wpisu o ID: ${docId}`);
+                try {
+                    // 1. Usuń z Firebase
+                    await db.collection("konfiguracja").doc(docId).delete();
+                    alert('Wpis usunięty pomyślnie.');
+                    console.log(`Wpis ${docId} usunięty.`);
+
+                    // 2. Usuń z cache
+                    if (cachedKonfiguracja) {
+                        cachedKonfiguracja = cachedKonfiguracja.filter(item => item.id !== docId);
+                        // 3. Odśwież tabelę
+                        renderKonfiguracjaTable(cachedKonfiguracja);
+                    } else {
+                        loadAndCacheKonfiguracja(); // Jeśli cache był pusty, załaduj na nowo
+                    }
+
+                } catch (error) {
+                    console.error('Błąd usuwania wpisu konfiguracji: ', error);
+                    alert('Wystąpił błąd podczas usuwania wpisu.');
+                }
+            }
+        }
+        // ✅ KONIEC: NOWY BLOK DLA PRZYCISKU "Usuń"
     });
 }
 
@@ -4073,9 +4104,8 @@ function renderKonfiguracjaTable(konfiguracjaData) {
           <td data-label="Stanowisko">${wpis.Stanowisko || ''}</td>
           <td data-label="Inicjały">${wpis.Inicjaly || ''}</td>
           <td data-label="ID Lecznicy">${wpis['ID lecznicy'] || ''}</td>
-          <td class="col-akcje">
-              <button class="btn btn-edit-konfiguracja" data-id="${wpis.id}" title="Edytuj wpis">Edytuj</button>
-          </td>
+          <td class="col-akcje" style="width: 130px;"> <button class="btn btn-edit-konfiguracja" data-id="${wpis.id}" title="Edytuj wpis">Edytuj</button>
+              <button class="btn warn btn-delete-konfiguracja" data-id="${wpis.id}" title="Usuń wpis">Usuń</button> </td>
         `;
         konfiguracjaTableBody.appendChild(tr);
     });
