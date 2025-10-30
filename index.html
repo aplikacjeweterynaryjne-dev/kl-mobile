@@ -4092,42 +4092,81 @@ console.log(`Wklejono ${lines.length} linii do kolumny ${cellIndex + 1} tabeli p
 /**
 * Renderuje tabelę konfiguracji na podstawie przekazanej tablicy danych.
 */
+/**
+* Renderuje tabelę konfiguracji na podstawie przekazanej tablicy danych.
+* ✅ WERSJA BEZPIECZNA (używa .textContent)
+*/
 function renderKonfiguracjaTable(konfiguracjaData) {
-if (!konfiguracjaTableBody) return;
-konfiguracjaTableBody.innerHTML = ''; // Wyczyść tabelę
+    if (!konfiguracjaTableBody) return;
+    konfiguracjaTableBody.innerHTML = ''; // Wyczyść tabelę
 
-if (!konfiguracjaData || konfiguracjaData.length === 0) {
-konfiguracjaTableBody.innerHTML = '<tr><td colspan="10" style="text-align: center; padding: 10px;">Brak danych konfiguracyjnych do wyświetlenia.</td></tr>';
-return;
-}
+    if (!konfiguracjaData || konfiguracjaData.length === 0) {
+        konfiguracjaTableBody.innerHTML = '<tr><td colspan="10" style="text-align: center; padding: 10px;">Brak danych konfiguracyjnych do wyświetlenia.</td></tr>';
+        return;
+    }
 
-console.log("Renderowanie tabeli konfiguracji...");
-konfiguracjaData.forEach(wpis => {
-const tr = document.createElement('tr');
-tr.dataset.id = wpis.id; // Przechowujemy ID dokumentu
+    console.log("Renderowanie tabeli konfiguracji (metoda bezpieczna)...");
 
-const podpisUrl = wpis.Podpis || '';
-const podpisDisplay = podpisUrl.length > 30 ? podpisUrl.substring(0, 27) + '...' : podpisUrl;
+    // Funkcja pomocnicza do tworzenia komórek TD
+    const createCell = (text, dataLabel) => {
+        const td = document.createElement('td');
+        // Używamy .textContent zamiast .innerHTML, aby dane były traktowane jako tekst,
+        // co zapobiega psuciu tabeli przez np. niezamknięte tagi HTML w danych.
+        td.textContent = text || ''; 
+        if (dataLabel) {
+            td.dataset.label = dataLabel;
+        }
+        return td;
+    };
 
-tr.innerHTML = `
-         <td data-label="Imię">${wpis.Imie || ''}</td>
-         <td data-label="Nazwisko">${wpis.Nazwisko || ''}</td>
-         <td data-label="Email">${wpis['Adres email'] || ''}</td>
-         <td data-label="Telefon">${wpis['Nr telefonu'] || ''}</td>
-         <td data-label="Podpis (URL)" title="${podpisUrl}">${podpisDisplay}</td>
-          <td data-label="Inicjały">${wpis.Inicjaly || ''}</td>
-     <td data-label="ID Lecznicy">${wpis['ID lecznicy'] || ''}</td>
-         td data-label="Nazwa lecznicy">${wpis['Nazwa lecznicy'] || ''}</td> 
-  <td data-label="Rola">${wpis.Rola || ''}</td> 
-  <td class="col-akcje" style="width: 130px;">
-      <button class="btn btn-edit-konfiguracja" data-id="${wpis.id}" title="Edytuj wpis">Edytuj</button>
-      <button class="btn warn btn-delete-konfiguracja" data-id="${wpis.id}" title="Usuń wpis">Usuń</button> 
-  </td>
-       `;
-konfiguracjaTableBody.appendChild(tr);
-});
-console.log("Renderowanie tabeli konfiguracji zakończone.");
-if(loadKonfiguracjaBtn) loadKonfiguracjaBtn.style.display = 'none'; // Ukryj przycisk po wczytaniu
+    konfiguracjaData.forEach(wpis => {
+        const tr = document.createElement('tr');
+        tr.dataset.id = wpis.id;
+
+        // 1. Imię
+        tr.appendChild(createCell(wpis.Imie, 'Imię'));
+        // 2. Nazwisko
+        tr.appendChild(createCell(wpis.Nazwisko, 'Nazwisko'));
+        // 3. Email
+        tr.appendChild(createCell(wpis['Adres email'], 'Email'));
+        // 4. Telefon
+        tr.appendChild(createCell(wpis['Nr telefonu'], 'Telefon'));
+        
+        // 5. Podpis (URL) - ten ma specjalną logikę skracania
+        const podpisUrl = wpis.Podpis || '';
+        const podpisDisplay = podpisUrl.length > 30 ? podpisUrl.substring(0, 27) + '...' : podpisUrl;
+        const podpisCell = createCell(podpisDisplay, 'Podpis (URL)');
+        podpisCell.title = podpisUrl; // Ustaw title dla podglądu pełnego linku
+        tr.appendChild(podpisCell);
+
+        // 6. Inicjały
+        tr.appendChild(createCell(wpis.Inicjaly, 'Inicjały'));
+        // 7. ID Lecznicy
+        tr.appendChild(createCell(wpis['ID lecznicy'], 'ID Lecznicy'));
+        
+        // 8. Nazwa lecznicy (tutaj był problem)
+        tr.appendChild(createCell(wpis['Nazwa lecznicy'], 'Nazwa lecznicy'));
+
+        // 9. Rola
+        tr.appendChild(createCell(wpis.Rola, 'Rola'));
+        
+        // 10. Akcje (tylko ta komórka musi używać innerHTML dla przycisków)
+        const akcjeCell = document.createElement('td');
+        akcjeCell.className = 'col-akcje';
+        akcjeCell.style.width = '130px';
+        akcjeCell.dataset.label = 'Akcje'; // Dodajemy data-label dla spójności
+        akcjeCell.innerHTML = `
+            <button class="btn btn-edit-konfiguracja" data-id="${wpis.id}" title="Edytuj wpis">Edytuj</button>
+            <button class="btn warn btn-delete-konfiguracja" data-id="${wpis.id}" title="Usuń wpis">Usuń</button>
+        `;
+        tr.appendChild(akcjeCell);
+
+        // Dodaj gotowy wiersz do tabeli
+        konfiguracjaTableBody.appendChild(tr);
+    });
+    
+    console.log("Renderowanie tabeli konfiguracji zakończone.");
+    if(loadKonfiguracjaBtn) loadKonfiguracjaBtn.style.display = 'none'; // Ukryj przycisk po wczytaniu
 }
 
 /**
