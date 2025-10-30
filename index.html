@@ -981,20 +981,20 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
   <div class="table-container">
     <table id="konfiguracjaTable">
       <thead>
-        <tr>
-          <th>Imię</th>
-          <th>Nazwisko</th>
-          <th>Email</th>
-          <th>Telefon</th>
-          <th>Podpis (URL)</th>
-          <th>Stanowisko</th>
-          <th>Inicjały</th>
-          <th>ID Lecznicy</th>
-          <th class="col-akcje" style="width: 100px;">Akcje</th> </tr>
+<tr>
+          <th>Imię</th>
+          <th>Nazwisko</th>
+          <th>Email</th>
+          <th>Telefon</th>
+          <th>Podpis (URL)</th>
+          <th>Stanowisko</th>
+          <th>Inicjały</th>
+          <th>ID Lecznicy</th>
+          <th>Nazwa lecznicy</th>           <th>Rola</th>           <th class="col-akcje" style="width: 130px;">Akcje</th>         </tr>
       </thead>
-      <tbody id="konfiguracjaTableBody">
-        <tr><td colspan="9" style="text-align: center; padding: 20px; color: #555;">Kliknij "Wczytaj konfigurację", aby wyświetlić dane.</td></tr>
-      </tbody>
+<tbody id="konfiguracjaTableBody">
+        <tr><td colspan="11" style="text-align: center; padding: 20px; color: #555;">Kliknij "Wczytaj konfigurację", aby wyświetlić dane.</td></tr>
+      </tbody>
     </table>
   </div>
 
@@ -1168,10 +1168,18 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
       <label for="konfiguracjaFormIdLecznicy">ID Lecznicy</label>
       <input type="text" id="konfiguracjaFormIdLecznicy" placeholder="Wpisz ID lecznicy">
     </div>
-
-    <div class="form-actions">
-      <div class="left">
-        <button id="cancelKonfiguracjaForm" class="btn ghost small" style="font-size: 19px;">Anuluj</button>
+<div class="form-row">
+      <label for="konfiguracjaFormNazwaLecznicy">Nazwa lecznicy</label>
+      <input type="text" id="konfiguracjaFormNazwaLecznicy" placeholder="Wpisz nazwę lecznicy">
+    </div>
+    <div class="form-row">
+      <label for="konfiguracjaFormRola">Rola</label>
+      <select id="konfiguracjaFormRola" style="width:100%; padding:8px; font-size:19px; border:1px solid #ccc; border-radius:6px; box-sizing:border-box;">
+        <option value="pracownik">Pracownik</option>
+        <option value="właściciel">Właściciel</option>
+        <option value="administrator">Administrator</option>
+      </select>
+    </div>
       </div>
       <div class="right">
         <button id="saveKonfiguracjaBtn" class="btn primary small" style="font-size: 19px;">Zapisz</button>
@@ -2193,6 +2201,10 @@ const konfiguracjaFormPodpis = document.getElementById('konfiguracjaFormPodpis')
 const konfiguracjaFormStanowisko = document.getElementById('konfiguracjaFormStanowisko');
 const konfiguracjaFormInicjaly = document.getElementById('konfiguracjaFormInicjaly');
 const konfiguracjaFormIdLecznicy = document.getElementById('konfiguracjaFormIdLecznicy');
+const konfiguracjaFormNazwaLecznicy = document.getElementById('konfiguracjaFormNazwaLecznicy'); // ✅ DODANA ZMIENNA
+const konfiguracjaFormRola = document.getElementById('konfiguracjaFormRola'); // ✅ DODANA ZMIENNA
+
+// Zmienna cache dla konfiguracji
 
 // Zmienna cache dla konfiguracji
 let cachedKonfiguracja = null;
@@ -2404,6 +2416,12 @@ if (menuBazaProduktowBtn) {
 menuBazaProduktowBtn.addEventListener('click', () => {
 showSection('produkty');
 });
+    // ✅ Listener dla przycisku Konfiguracja w menu
+if (menuKonfiguracjaBtn) {
+  menuKonfiguracjaBtn.addEventListener('click', () => {
+    showSection('konfiguracja');
+  });
+}
 }
 // ✅ Listener dla przycisku Konfiguracja w menu
 if (menuKonfiguracjaBtn) {
@@ -3675,8 +3693,10 @@ if (konfiguracjaTableBody) {
                 konfiguracjaFormStanowisko.value = data.Stanowisko || '';
                 konfiguracjaFormInicjaly.value = data.Inicjaly || '';
                 konfiguracjaFormIdLecznicy.value = data['ID lecznicy'] || '';
+                konfiguracjaFormNazwaLecznicy.value = data['Nazwa lecznicy'] || ''; // ✅ DODANA LINIA
+                konfiguracjaFormRola.value = data.Rola || 'pracownik'; // ✅ DODANA LINIA
 
-                konfiguracjaFormModal.style.display = 'flex';
+                konfiguracjaFormModal.style.display = 'flex';
 
             } catch (error) {
                 console.error('Błąd pobierania wpisu konfiguracji do edycji: ', error);
@@ -3743,6 +3763,8 @@ if (saveKonfiguracjaBtn) {
             Stanowisko: konfiguracjaFormStanowisko.value.trim(),
             Inicjaly: konfiguracjaFormInicjaly.value.trim(),
             'ID lecznicy': konfiguracjaFormIdLecznicy.value.trim()
+            'Nazwa lecznicy': konfiguracjaFormNazwaLecznicy.value.trim(), // ✅ DODANA LINIA
+            'Rola': konfiguracjaFormRola.value // ✅ DODANA LINIA
         };
 
         // ✅ DODANA PROSTA WALIDACJA (np. imię i nazwisko)
@@ -4102,8 +4124,10 @@ function renderKonfiguracjaTable(konfiguracjaData) {
           <td data-label="Telefon">${wpis['Nr telefonu'] || ''}</td>
           <td data-label="Podpis (URL)" title="${podpisUrl}">${podpisDisplay}</td>
           <td data-label="Stanowisko">${wpis.Stanowisko || ''}</td>
-          <td data-label="Inicjały">${wpis.Inicjaly || ''}</td>
-          <td data-label="ID Lecznicy">${wpis['ID lecznicy'] || ''}</td>
+         <td data-label="Inicjały">${wpis.Inicjaly || ''}</td>
+          <td data-label="ID Lecznicy">${wpis['ID lecznicy'] || ''}</td>
+          <td data-label="Nazwa lecznicy">${wpis['Nazwa lecznicy'] || ''}</td>           <td data-label="Rola">${wpis.Rola || ''}</td>           <td class="col-akcje" style="width: 130px;">
+              <button class="btn btn-edit-konfiguracja" ...>Edytuj</button>
           <td class="col-akcje" style="width: 130px;"> <button class="btn btn-edit-konfiguracja" data-id="${wpis.id}" title="Edytuj wpis">Edytuj</button>
               <button class="btn warn btn-delete-konfiguracja" data-id="${wpis.id}" title="Usuń wpis">Usuń</button> </td>
         `;
