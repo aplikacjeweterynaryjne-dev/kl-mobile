@@ -1272,7 +1272,10 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
 <div class="form-row">
 <label for="konfiguracjaFormRola">Rola</label>
 <select id="konfiguracjaFormRola" style="width:100%; padding:8px; font-size:19px; border:1px solid #ccc; border-radius:6px; box-sizing:border-box;">
-  </select>
+<option value="pracownik">Pracownik</option>
+<option value="właściciel">Właściciel</option>
+<option value="administrator">Administrator</option>
+</select>
 </div>
 
 <div class="form-actions">
@@ -2207,7 +2210,7 @@ const loginPassword = document.getElementById('loginPassword');
 const loginBtn = document.getElementById('loginBtn');
 const loginError = document.getElementById('loginError');
 const logoutBtn = document.getElementById('logoutBtn'); // Przycisk wyloguj
-const menuLogoutBtn = document.getElementById('menuLogoutBtn');
+const menuLogoutBtn = document.getElementById('menuLogoutBtn'); // ✅ DODAJ TĘ LINIĘ
 const loginSuccess = document.getElementById('loginSuccess');
 const forgotPasswordLink = document.getElementById('forgotPasswordLink');
 // ✅ ZMIENNE DLA REJESTRACJI
@@ -2262,8 +2265,8 @@ const clientFormNrStada = document.getElementById('clientFormNrStada'); // Popra
 // ✅ KONIEC: ZMIENNE DLA BAZY KLIENTÓW I MODALI
 // Zmienna do przechowywania wczytanych klientów w pamięci
 let cachedClients = null;
-let currentUserProfile = null; // Przechowuje profil zalogowanego użytkownika
-const adminRoles = ['administrator', 'właściciel']; // Role z dostępem do konfiguracji
+let currentUserProfile = null; // ✅ DODAJ TĘ LINIĘ
+const adminRoles = ['administrator', 'właściciel'];
 // Przyciski ładowania/odświeżania
 const loadClientsBtn = document.getElementById('loadClientsBtn');
 const refreshClientsBtn = document.getElementById('refreshClientsBtn');
@@ -2341,58 +2344,57 @@ const kartaSection = document.getElementById('kartaLeczeniaSection');
 const kalkulatorSection = document.getElementById('kalkulatorWizytySection');
 const tabKartaBtn = document.getElementById('tabKartaBtn');
 const tabKalkulatorBtn = document.getElementById('tabKalkulatorBtn');
+// ========================================================
+// ✅ GŁÓWNA LOGIKA UWIRZYTELNIANIA
+// ========================================================
 
 // ========================================================
 // ✅ GŁÓWNA LOGIKA UWIRZYTELNIANIA (WERSJA Z PROFILOWANIEM)
 // ========================================================
 
 auth.onAuthStateChanged(user => {
-  if (user) {
-    // Użytkownik JEST zalogowany
-    console.log("Użytkownik zalogowany:", user.email, "UID:", user.uid);
+  if (user) {
+    // Użytkownik JEST zalogowany
+    console.log("Użytkownik zalogowany:", user.email, "UID:", user.uid);
 
-    // ✅ KROK 1: Pobierz profil użytkownika z 'konfiguracja'
-    // Ta funkcja zajmie się pobraniem danych lub wylogowaniem w razie błędu
-    fetchUserProfile(user.uid); 
+    // ✅ KROK 1: Pobierz profil użytkownika z 'konfiguracja'
+    // Ta funkcja zajmie się pobraniem danych lub wylogowaniem w razie błędu
+    fetchUserProfile(user.uid); 
 
-    // ✅ KROK 2: Pobierz dane (klientów, leki)
-    fetchDataFromFirebase();
+    // KROK 2: Pokaż UI (tak jak było)
+    if (loginSection) loginSection.style.display = 'none';
+    if (mainMenuSection) mainMenuSection.style.display = 'flex';
+    if (mainTabBar) mainTabBar.style.display = 'none'; 
 
-    // KROK 3: Pokaż UI (tak jak było)
-    if (loginSection) loginSection.style.display = 'none';
-    if (mainMenuSection) mainMenuSection.style.display = 'flex';
-    if (mainTabBar) mainTabBar.style.display = 'none'; 
+  } else {
+    // Użytkownik NIE JEST zalogowany
+    console.log("Użytkownik wylogowany.");
+    currentUserProfile = null; // ✅ Wyczyść profil użytkownika
+    console.log("Profil użytkownika wyczyszczony.");
 
-  } else {
-    // Użytkownik NIE JEST zalogowany
-    console.log("Użytkownik wylogowany.");
-    currentUserProfile = null; // ✅ Wyczyść profil użytkownika
-    console.log("Profil użytkownika wyczyszczony.");
+    // KROK 2: Ukryj UI (tak jak było)
+    if (loginSection) loginSection.style.display = 'flex';
+    if (mainMenuSection) mainMenuSection.style.display = 'none';
+    if (mainTabBar) mainTabBar.style.display = 'none';
 
-    // KROK 2: Ukryj UI (tak jak było)
-    if (loginSection) loginSection.style.display = 'flex';
-    if (mainMenuSection) mainMenuSection.style.display = 'none';
-    if (mainTabBar) mainTabBar.style.display = 'none';
-
-    if (kartaSection) kartaSection.style.display = 'none';
-    if (kalkulatorSection) kalkulatorSection.style.display = 'none';
-    if (bazaKlientowSection) bazaKlientowSection.style.display = 'none';
-    if (bazaProduktowSection) bazaProduktowSection.style.display = 'none';
-    if (konfiguracjaSection) konfiguracjaSection.style.display = 'none';
-  }
+    if (kartaSection) kartaSection.style.display = 'none';
+    if (kalkulatorSection) kalkulatorSection.style.display = 'none';
+    if (bazaKlientowSection) bazaKlientowSection.style.display = 'none';
+    if (bazaProduktowSection) bazaProduktowSection.style.display = 'none';
+    if (konfiguracjaSection) konfiguracjaSection.style.display = 'none';
+  }
 });
-
 function showSection(sectionToShow) {
-    // ✅ POCZĄTEK ZABEZPIECZENIA
-  // Sprawdź, czy użytkownik próbuje wejść do konfiguracji bez uprawnień
-  if (sectionToShow === 'konfiguracja') {
-    if (!currentUserProfile || !adminRoles.includes(currentUserProfile.Rola)) {
-      console.warn("BLOKADA DOSTĘPU: Próba wejścia do sekcji 'konfiguracja' bez uprawnień.");
-      alert("Nie masz uprawnień, aby uzyskać dostęp do tej sekcji.");
-      return; // Przerwij działanie funkcji, nie pokazuj sekcji
-    }
-  }
-  // ✅ KONIEC ZABEZPIECZENIA
+    // ✅ POCZĄTEK ZABEZPIECZENIA
+  // Sprawdź, czy użytkownik próbuje wejść do konfiguracji bez uprawnień
+  if (sectionToShow === 'konfiguracja') {
+    if (!currentUserProfile || !adminRoles.includes(currentUserProfile.Rola)) {
+      console.warn("BLOKADA DOSTĘPU: Próba wejścia do sekcji 'konfiguracja' bez uprawnień.");
+      alert("Nie masz uprawnień, aby uzyskać dostęp do tej sekcji.");
+      return; // Przerwij działanie funkcji, nie pokazuj sekcji
+    }
+  }
+  // ✅ KONIEC ZABEZPIECZENIA
 // ✅ NOWA LOGIKA: Ukryj menu główne i pokaż pasek zakładek
 if (mainMenuSection) mainMenuSection.style.display = 'none';
 if (mainTabBar) mainTabBar.style.display = 'flex'; // Używamy flex dla poprawnego zawijania
@@ -2443,19 +2445,19 @@ if (tabKonfiguracjaBtn) tabKonfiguracjaBtn.classList.remove('primary'); // ✅ D
       if(loadClientsBtn) loadClientsBtn.style.display = 'inline-block';
       if(refreshClientsBtn) refreshClientsBtn.style.display = 'none';
     }
-  } 
+  } 
   // Nowy blok dla sekcji 'produkty'
 else if (sectionToShow === 'produkty' && bazaProduktowSection) {
 bazaProduktowSection.style.display = 'block';
 if (tabBazaProduktowBtn) tabBazaProduktowBtn.classList.add('primary');
 
 // ✅ POKAŻ PRZYCISK "Dodaj" OD RAZU
-if(addNewProductBtn) addNewProductBtn.style.display = 'inline-block'; 
+if(addNewProductBtn) addNewProductBtn.style.display = 'inline-block'; 
 
 // Sprawdź cache lub pokaż komunikat "Wczytaj"
 if (cachedProducts) {
 console.log("Wyświetlanie produktów z cache.");
-renderProductTable(cachedProducts); 
+renderProductTable(cachedProducts); 
 // Pokaż powiązane UI PO wczytaniu
 if(productSearchRow) productSearchRow.style.display = 'block';
 if(productImportActionsContainer) productImportActionsContainer.style.display = 'flex';
@@ -2478,7 +2480,7 @@ konfiguracjaSection.style.display = 'block';
 if (tabKonfiguracjaBtn) tabKonfiguracjaBtn.classList.add('primary');
 
 // ✅ POKAŻ PRZYCISK "Dodaj" OD RAZU
-if(addNewKonfiguracjaBtn) addNewKonfiguracjaBtn.style.display = 'inline-block'; 
+if(addNewKonfiguracjaBtn) addNewKonfiguracjaBtn.style.display = 'inline-block'; 
 
 // Sprawdź cache lub pokaż komunikat "Wczytaj"
 if (cachedKonfiguracja) {
@@ -2505,9 +2507,8 @@ backToMenuBtn.addEventListener('click', () => {
 // Ukryj wszystkie sekcje
 if (kartaSection) kartaSection.style.display = 'none';
 if (kalkulatorSection) kalkulatorSection.style.display = 'none';
-if (bazaKlientowSection) bazaKlientowSection.style.display = 'none'; 
+if (bazaKlientowSection) bazaKlientowSection.style.display = 'none'; 
 if (bazaProduktowSection) bazaProduktowSection.style.display = 'none';
-if (konfiguracjaSection) konfiguracjaSection.style.display = 'none';
 
 // Ukryj pasek zakładek
 if (mainTabBar) mainTabBar.style.display = 'none';
@@ -2517,7 +2518,6 @@ if (mainMenuSection) mainMenuSection.style.display = 'flex';
 
 // Ukryj podmenu bazy
 if (bazaSubMenu) bazaSubMenu.style.display = 'none';
-if (archiwumSubMenu) archiwumSubMenu.style.display = 'none';
 });
 }
 
@@ -2530,22 +2530,20 @@ if (mainMenuSection) mainMenuSection.style.display = 'none';
 if (mainTabBar) mainTabBar.style.display = 'flex';
 
 // ✅ DODANA LINIA: Pokaż sekcję karty jako tło
-if (kartaSection) kartaSection.style.display = 'block'; 
+if (kartaSection) kartaSection.style.display = 'block'; 
 // Ukryj inne sekcje na wszelki wypadek (choć powinny być ukryte)
 if (kalkulatorSection) kalkulatorSection.style.display = 'none';
-if (bazaKlientowSection) bazaKlientowSection.style.display = 'none'; 
+if (bazaKlientowSection) bazaKlientowSection.style.display = 'none'; 
 if (bazaProduktowSection) bazaProduktowSection.style.display = 'none';
-if (konfiguracjaSection) konfiguracjaSection.style.display = 'none';
 
 // 3. Pokaż modal wyboru metody (nad sekcją karty)
 if (metodaModal) metodaModal.style.display = 'flex';
 
 // 4. Podświetl odpowiednią zakładkę
-if (tabKartaBtn) tabKartaBtn.classList.add('primary'); 
+if (tabKartaBtn) tabKartaBtn.classList.add('primary'); 
 if (tabKalkulatorBtn) tabKalkulatorBtn.classList.remove('primary');
-if (tabBazaKlientowBtn) tabBazaKlientowBtn.classList.remove('primary'); 
-if (tabBazaProduktowBtn) tabBazaProduktowBtn.classList.remove('primary');
-if (tabKonfiguracjaBtn) tabKonfiguracjaBtn.classList.remove('primary');
+if (tabBazaKlientowBtn) tabBazaKlientowBtn.classList.remove('primary'); 
+if (tabBazaProduktowBtn) tabBazaProduktowBtn.classList.remove('primary'); 
 });
 }
 
@@ -2572,7 +2570,7 @@ if (archiwumSubMenu) {
 // Przełącz widoczność podmenu Archiwum
 archiwumSubMenu.style.display = (archiwumSubMenu.style.display === 'none') ? 'block' : 'none';
 // Ukryj inne podmenu, jeśli są otwarte
-if (bazaSubMenu) bazaSubMenu.style.display = 'none'; 
+if (bazaSubMenu) bazaSubMenu.style.display = 'none'; 
 }
 });
 }
@@ -2617,7 +2615,7 @@ if (formModal) {
 formModal.style.display = 'flex';
 showStep(1); // Pokaż pierwszy krok formularza
 populateRowSelect();
-formRowSelect.dataset.prevIndex = 0; 
+formRowSelect.dataset.prevIndex = 0; 
 
 // Synchronizuj dane z nagłówka (jeśli jakieś są)
 document.getElementById('formKlient').value = document.getElementById('klientSelect').value || '';
@@ -2659,68 +2657,493 @@ if (openCalcBtn) {
 }
 
 // --- Logika Kalkulatora (z cenami) ---
-// (Reszta kodu kalkulatora - bez zmian)
-// ...
-// ... (pominięto dla zwięzłości)
-// ...
-function formatPrice(price) {
-// ... (bez zmian)
-}
-function renderReceipt() {
-// ... (bez zmian)
-}
-function addItemToReceipt(productName, quantity) {
-// ... (bez zmian)
-}
-if (addProductBtn) {
-// ... (bez zmian)
-}
-if (copyCheckbox) {
-// ... (bez zmian)
-}
-if (saveReceiptBtn) {
-// ... (bez zmian)
-}
-if (pluBtn) {
-// ... (bez zmian)
-}
-if (productSelect && productUnitDisplay) {
-// ... (bez zmian)
-}
-if (document.readyState === 'loading') {
-// ... (bez zmian)
-} else {
-// ... (bez zmian)
-}
-// ✅ KONIEC: Zaktualizowany kod dla Kalkulatora Wizyty (z cenami)
+// --- Logika Kalkulatora (początkowa) ---
+const copyCheckbox = document.getElementById('copyFromCardCheckbox');
+const productSelect = document.getElementById('productSelect');
+const quantityInput = document.getElementById('productQuantityInput');
+const addProductBtn = document.getElementById('addProductBtn');
+const receiptDisplay = document.getElementById('receiptDisplay');
+const saveReceiptBtn = document.getElementById('saveReceiptBtn');
+const savedReceiptSummary = document.getElementById('savedReceiptSummary');
+const pluCodeInput = document.getElementById('pluCodeInput');
+const pluBtn = document.getElementById('pluBtn');
+const productUnitDisplay = document.getElementById('productUnitDisplay');
+// Tablica przechowuje teraz { name: '...', quantity: 1, price: 10.50 }
+let receiptItems = [];
+// receiptTotal jest teraz zadeklarowany globalnie (wcześniej w kodzie)
 
+// Funkcja formatująca cenę
+function formatPrice(price) {
+// Sprawdź czy price jest liczbą, jeśli nie zwróć "0,00 zł"
+if (isNaN(price) || price === null) {
+return '0,00 zł';
+}
+return price.toFixed(2).replace('.', ',') + ' zł'; // Formatuj jako X,XX zł
+}
+
+
+// Funkcja renderująca paragon z cenami i sumą
+function renderReceipt() {
+if (!receiptDisplay) return;
+
+receiptTotal = 0; // Zresetuj sumę przed przeliczeniem
+receiptDisplay.innerHTML = ''; // Wyczyść
+
+if (receiptItems.length === 0) {
+receiptDisplay.innerHTML = '<p style="text-align: center; color: #999;">Paragon jest pusty</p>';
+// Dodaj div na sumę, nawet gdy paragon jest pusty
+const totalDivEmpty = document.createElement('div');
+totalDivEmpty.style.textAlign = 'right';
+totalDivEmpty.style.marginTop = '10px';
+totalDivEmpty.style.fontWeight = 'bold';
+totalDivEmpty.textContent = `Suma: ${formatPrice(receiptTotal)}`;
+receiptDisplay.appendChild(totalDivEmpty);
+return;
+}
+
+const list = document.createElement('ul');
+list.style.listStyle = 'none'; list.style.padding = '0'; list.style.margin = '0';
+
+receiptItems.forEach((item, index) => {
+// Upewnij się, że quantity i price są liczbami
+const quantity = Number(item.quantity) || 0;
+const price = Number(item.price) || 0;
+const itemTotal = quantity * price;
+receiptTotal += itemTotal; // Dodaj do sumy całkowitej
+
+const listItem = document.createElement('li');
+listItem.style.display = 'flex';
+listItem.style.justifyContent = 'space-between';
+listItem.style.alignItems = 'center'; // Lepsze wyrównanie pionowe
+listItem.style.marginBottom = '5px';
+listItem.style.borderBottom = '1px solid #eee';
+listItem.style.paddingBottom = '3px';
+
+// Kontener na nazwę i cenę jednostkową
+const namePriceDiv = document.createElement('div');
+const nameSpan = document.createElement('span');
+nameSpan.textContent = item.name;
+namePriceDiv.appendChild(nameSpan);
+
+// Dodaj cenę jednostkową pod nazwą (mniejszą czcionką)
+const unitPriceSpan = document.createElement('span');
+unitPriceSpan.textContent = ` (${formatPrice(price)}/szt.)`; // Zakładamy cenę za sztukę
+unitPriceSpan.style.fontSize = '0.9em';
+unitPriceSpan.style.color = '#666';
+unitPriceSpan.style.marginLeft = '5px';
+namePriceDiv.appendChild(unitPriceSpan);
+
+// Kontener na ilość, cenę pozycji i przycisk usuń
+const controlsDiv = document.createElement('div');
+controlsDiv.style.display = 'flex';
+controlsDiv.style.alignItems = 'center';
+controlsDiv.style.gap = '8px';
+
+const quantitySpan = document.createElement('span');
+quantitySpan.textContent = `x ${quantity}`;
+quantitySpan.style.minWidth = '40px'; // Ustawienie minimalnej szerokości
+
+// Dodaj cenę za całą pozycję
+const itemTotalSpan = document.createElement('span');
+itemTotalSpan.textContent = formatPrice(itemTotal);
+itemTotalSpan.style.fontWeight = 'bold';
+itemTotalSpan.style.minWidth = '60px'; // Ustawienie minimalnej szerokości
+itemTotalSpan.style.textAlign = 'right';
+
+const removeBtn = document.createElement('button');
+removeBtn.textContent = '❌';
+removeBtn.className = 'btn small ghost';
+removeBtn.style.padding = '2px 5px';
+removeBtn.title = 'Usuń pozycję';
+removeBtn.onclick = () => {
+receiptItems.splice(index, 1);
+renderReceipt(); // Przelicz i odśwież
+};
+
+controlsDiv.appendChild(quantitySpan);
+controlsDiv.appendChild(itemTotalSpan); // Dodano cenę pozycji
+controlsDiv.appendChild(removeBtn);
+
+listItem.appendChild(namePriceDiv); // Lewa strona (nazwa + cena jedn.)
+listItem.appendChild(controlsDiv); // Prawa strona (ilość, cena poz., usuń)
+list.appendChild(listItem);
+});
+receiptDisplay.appendChild(list);
+
+// Dodaj sumę całkowitą na dole
+const totalDiv = document.createElement('div');
+totalDiv.style.textAlign = 'right';
+totalDiv.style.marginTop = '10px';
+totalDiv.style.fontWeight = 'bold';
+totalDiv.style.fontSize = '1.1em';
+totalDiv.textContent = `Suma: ${formatPrice(receiptTotal)}`;
+receiptDisplay.appendChild(totalDiv);
+}
+
+// Funkcja pomocnicza do dodawania lub aktualizowania pozycji
+function addItemToReceipt(productName, quantity) {
+// Upewnij się, że quantity jest liczbą
+const numQuantity = Number(quantity) || 0;
+if (numQuantity <= 0) return; // Nie dodawaj jeśli ilość jest zerowa lub niepoprawna
+
+const price = mapaCen[productName] || 0; // Pobierz cenę z mapy
+
+const existingItem = receiptItems.find(item => item.name === productName);
+if (existingItem) {
+existingItem.quantity = (Number(existingItem.quantity) || 0) + numQuantity; // Upewnij się, że dodajesz liczby
+} else {
+receiptItems.push({ name: productName, quantity: numQuantity, price: price }); // Dodaj z ceną
+}
+renderReceipt(); // Przelicz i odśwież
+}
+
+// Dodawanie produktu z formularza (używa addItemToReceipt)
+if (addProductBtn) {
+addProductBtn.addEventListener('click', () => {
+const productName = productSelect ? productSelect.value.trim() : '';
+const quantity = quantityInput ? parseInt(quantityInput.value, 10) : 0;
+
+if (productName && quantity > 0) {
+if (typeof nazwyLekow !== 'undefined' && nazwyLekow.includes(productName)) {
+addItemToReceipt(productName, quantity); // Użyj funkcji pomocniczej
+if (productSelect) productSelect.value = '';
+if (quantityInput) quantityInput.value = 1;
+} else { alert('Wybrany produkt nie znajduje się w bazie leków.'); }
+} else { alert('Wybierz produkt i podaj poprawną ilość.'); }
+});
+}
+
+// Kopiowanie z karty leczenia (używa addItemToReceipt)
+if (copyCheckbox) {
+copyCheckbox.addEventListener('change', () => {
+if (copyCheckbox.checked) {
+receiptItems = []; // Wyczyść obecny paragon
+const rows = document.querySelectorAll('#karta tbody tr');
+rows.forEach(row => {
+if (row.cells.length === 8) {
+const lekInput = row.cells[4].querySelector('input[list="listaLekow"]');
+const iloscInput = row.cells[6].querySelector('input.small-input');
+
+if (lekInput && iloscInput) {
+const productName = lekInput.value.trim();
+const quantityValue = iloscInput.value;
+const quantity = quantityValue ? parseInt(quantityValue, 10) : 0;
+
+if (productName && quantity > 0) {
+if (mapaCen.hasOwnProperty(productName)){
+addItemToReceipt(productName, quantity);
+} else {
+console.warn(`Pominięto kopiowanie: Produkt "${productName}" nie znaleziony w bazie cen.`);
+// Opcjonalnie dodaj z ceną 0
+// addItemToReceipt(productName, quantity);
+}
+}
+}
+}
+});
+// renderReceipt() jest już w addItemToReceipt
+}
+});
+}
+
+// Zapisywanie paragonu (dodaje sumę)
+if (saveReceiptBtn) {
+saveReceiptBtn.addEventListener('click', () => {
+if (receiptItems.length > 0) {
+if (savedReceiptSummary) {
+savedReceiptSummary.innerHTML = '<h4>Zapisany Paragon:</h4>';
+const list = document.createElement('ul');
+list.style.listStyle = 'none'; list.style.paddingLeft = '10px';
+receiptItems.forEach(item => {
+const li = document.createElement('li');
+const quantity = Number(item.quantity) || 0;
+const price = Number(item.price) || 0;
+const itemTotal = quantity * price;
+li.textContent = `${item.name} x ${quantity} = ${formatPrice(itemTotal)}`;
+list.appendChild(li);
+});
+savedReceiptSummary.appendChild(list);
+const totalP = document.createElement('p');
+totalP.style.fontWeight = 'bold';
+totalP.style.textAlign = 'right';
+totalP.textContent = `Suma: ${formatPrice(receiptTotal)}`;
+savedReceiptSummary.appendChild(totalP);
+}
+alert('Paragon zapisany (tymczasowo).');
+} else { alert('Paragon jest pusty, nie ma czego zapisywać.'); }
+});
+}
+
+// Obsługa PLU (używa addItemToReceipt)
+if (pluBtn) {
+pluBtn.addEventListener('click', () => {
+const code = pluCodeInput ? pluCodeInput.value.trim() : '';
+if(code){
+const productName = code; // Uproszczenie: kod = nazwa
+if (typeof nazwyLekow !== 'undefined' && nazwyLekow.includes(productName)) {
+addItemToReceipt(productName, 1); // Domyślnie 1 szt.
+if (pluCodeInput) pluCodeInput.value = '';
+} else { alert(`Nie znaleziono produktu dla kodu PLU: ${code}`); }
+}
+});
+}
+// ✅ DODANO: Aktualizacja jednostki/dawkowania po wyborze produktu
+if (productSelect && productUnitDisplay) {
+productSelect.addEventListener('input', () => {
+const selectedProductName = productSelect.value;
+// Sprawdź, czy mapaIlosci istnieje i czy zawiera wybrany produkt
+if (typeof mapaIlosci !== 'undefined' && mapaIlosci.hasOwnProperty(selectedProductName)) {
+// Wyświetl całe dawkowanie jako jednostkę
+productUnitDisplay.textContent = mapaIlosci[selectedProductName] || '';
+} else {
+productUnitDisplay.textContent = ''; // Wyczyść, jeśli nie znaleziono dawkowania
+}
+});
+}
+// ✅ DODANO: KONIEC
+// Pierwsze renderowanie paragonu
+if (document.readyState === 'loading') {
+document.addEventListener('DOMContentLoaded', renderReceipt);
+} else {
+if (document.getElementById('receiptDisplay')) { renderReceipt(); }
+}
+
+// ✅ KONIEC: Zaktualizowany kod dla Kalkulatora Wizyty (z cenami)
 // ✅ DODANO: POCZĄTEK: Skrypt importu do Firebase (WERSJA POPRAWIONA dla v8)
+
+/**
+* Funkcja importująca dane z data.json do Firestore.
+* Wywołaj ją JEDEN RAZ ręcznie z konsoli przeglądarki.
+* Użyj: importDataToFirebase();
+*/
 async function importDataToFirebase() {
-// ... (bez zmian)
+try {
+// 1. Konfiguracja Firebase (dane, które podałeś)
+const firebaseConfig = {
+apiKey: "AIzaSyBFSlW9_i877sdlTfGHV4XKGeYlbKPAoM0",
+authDomain: "kl-mobile-3536f.firebaseapp.com",
+projectId: "kl-mobile-3536f",
+storageBucket: "kl-mobile-3536f.firebasestorage.app",
+messagingSenderId: "420035668375",
+appId: "1:420035668375:web:712c93f1765729b39bbcd2"
+};
+
+// 2. Inicjalizacja Firebase (SKŁADNIA v8)
+if (!firebase.apps.length) {
+firebase.initializeApp(firebaseConfig);
+}
+const db = firebase.firestore(); // ✅ POPRAWKA: Tak wygląda składnia v8
+console.log("Firebase zainicjowane, połączono z bazą danych.");
+alert("Połączono z Firebase. Rozpoczynam import... Sprawdź postęp w konsoli (F12).");
+
+// 3. Pobierz dane z pliku data.json
+console.log("Pobieranie danych z data.json...");
+const response = await fetch('data.json');
+if (!response.ok) {
+alert("BŁĄD: Nie można pobrać pliku data.json. Sprawdź, czy plik jest na GitHubie.");
+return;
+}
+const data = await response.json();
+console.log("Dane pobrane:", data);
+
+// 4. Import klientów (SKŁADNIA v8)
+if (data.klienci && data.klienci.length > 0) {
+console.log(`Rozpoczynam import ${data.klienci.length} klientów...`);
+const klienciRef = db.collection("klienci"); // ✅ POPRAWKA
+
+let batch = db.batch(); // ✅ POPRAWKA
+let counter = 0;
+
+for (const klient of data.klienci) {
+if (klient.nazwa && klient.nazwa.trim() !== "") {
+const docRef = klienciRef.doc(); // ✅ POPRAWKA (automatyczne ID)
+batch.set(docRef, klient); // ✅ POPRAWKA
+counter++;
+
+if (counter % 499 === 0) {
+await batch.commit();
+batch = db.batch(); // ✅ POPRAWKA
+console.log(`Wysłano partię ${counter} klientów...`);
+}
+}
+}
+await batch.commit();
+console.log(`✅ Import klientów zakończony (${counter} klientów).`);
+} else {
+console.warn("Nie znaleziono klientów w data.json.");
+}
+
+// 5. Import leków (SKŁADNIA v8)
+if (data.leki && data.leki.length > 0) {
+console.log(`Rozpoczynam import ${data.leki.length} leków...`);
+const lekiRef = db.collection("leki"); // ✅ POPRAWKA
+
+let batch = db.batch(); // ✅ POPRAWKA
+let counter = 0;
+
+for (const lek of data.leki) {
+if (lek.nazwa && lek.nazwa.trim() !== "") {
+lek.cena = parseFloat(lek.cena) || 0; 
+const docRef = lekiRef.doc(); // ✅ POPRAWKA
+batch.set(docRef, lek); // ✅ POPRAWKA
+counter++;
+
+if (counter % 499 === 0) {
+await batch.commit();
+batch = db.batch(); // ✅ POPRAWKA
+console.log(`Wysłano partię ${counter} leków...`);
+}
+}
+}
+await batch.commit();
+console.log(`✅ Import leków zakończony (${counter} leków).`);
+} else {
+console.warn("Nie znaleziono leków w data.json.");
+}
+
+alert("Import do Firebase zakończony! Sprawdź konsolę Firebase.");
+} catch (error) {
+console.error("KRYTYCZNY BŁĄD podczas importu:", error);
+alert("Wystąpił krytyczny błąd podczas importu. Sprawdź konsolę (F12).");
+}
 }
 // ✅ DODANO: KONIEC: Skrypt importu do Firebase (WERSJA POPRAWIONA dla v8)
-
 // ========================================================
 // ✅ POCZĄTEK: LOGIKA ZAKŁADKI BAZA KLIENTÓW (CRUD)
 // ========================================================
-async function refreshClientDataLists() {
-// ... (bez zmian)
-}
-function renderClientTable(klienciData) {
-// ... (bez zmian)
-}
-// ✅ TUTAJ ZACZYNA SIĘ PIERWSZY BŁĄD -> ZDUPLIKOWANE FUNKCJE
-// Poniższa funkcja fetchUserProfile jest w złym miejscu, a loadAndCacheClients jest zduplikowane
-// USUWAM PONIŻSZE BŁĘDNE FUNKCJE
-/*
-async function fetchUserProfile(uid) {
-// ... (BŁĘDNA ZDUPLIKOWANA ZAWARTOŚĆ) ...
-}
-async function loadAndCacheClients() {
-// ... (BŁĘDNA ZDUPLIKOWANA ZAWARTOŚĆ) ...
-}
+
+/**
+* Funkcja do odświeżania list <datalist> w całej aplikacji.
+* Kluczowe, aby nowi klienci pojawiali się na listach wyboru.
 */
-// ✅ POPRAWNA FUNKCJA loadAndCacheClients POWINNA BYĆ TUTAJ:
+async function refreshClientDataLists() {
+try {
+const klienciSnapshot = await db.collection("klienci").orderBy("nazwa").get();
+const klienci = klienciSnapshot.docs.map(doc => doc.data());
+
+const klientList = document.getElementById('klientList'); // Główna datalist
+if (!klientList) return;
+
+klientList.innerHTML = ''; // Wyczyść
+klienci.forEach(k => {
+const opt = document.createElement('option');
+opt.value = k.nazwa;
+opt.dataset.adres = k.adres || '';
+opt.dataset.nrstada = k.nrStada || '';
+klientList.appendChild(opt);
+});
+console.log('Datalisty klientów zostały zaktualizowane.');
+} catch (error) {
+console.error('Błąd odświeżania datalist klientów:', error);
+}
+}
+
+
+/**
+* Ładuje klientów z Firestore, sortuje ich w JavaScript wg polskich reguł i buduje tabelę HTML.
+*/
+/**
+* Renderuje tabelę klientów na podstawie przekazanej tablicy danych.
+* Zawiera logikę sortowania.
+*/
+function renderClientTable(klienciData) {
+if (!klientTableBody) return;
+klientTableBody.innerHTML = ''; // Wyczyść tabelę przed renderowaniem
+
+if (!klienciData || klienciData.length === 0) {
+klientTableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 10px;">Brak danych klientów do wyświetlenia.</td></tr>';
+return;
+}
+
+// Sortuj dane w JavaScript używając polskiego locale (tak jak wcześniej)
+console.log("Sortowanie klientów przed renderowaniem...");
+klienciData.sort((a, b) => {
+const nameA = a.nazwa || '';
+const nameB = b.nazwa || '';
+return nameA.localeCompare(nameB, 'pl', { sensitivity: 'base' });
+});
+console.log("Sortowanie zakończone.");
+
+// Generuj wiersze tabeli
+console.log("Renderowanie tabeli klientów...");
+klienciData.forEach(klient => {
+const tr = document.createElement('tr');
+// Używamy ID przechowywanego w obiekcie cache (klient.id)
+tr.dataset.id = klient.id;
+
+tr.innerHTML = `
+       <td data-label="Nazwa">${klient.nazwa || 'Brak nazwy'}</td>
+       <td data-label="Adres">${klient.adres || ''}</td>
+       <td data-label="Nr Stada">${klient.nrStada || ''}</td>
+       <td data-label="Nr Telefonu">${klient.telefon || ''}</td>
+       <td data-label="Email">${klient.email || ''}</td>
+       <td data-label="ID Lecznicy">${klient.idLecznicy || ''}</td>
+       <td class="col-akcje">
+           <button class="btn btn-edit-client" data-id="${klient.id}" title="Edytuj klienta">Edytuj</button>
+           <button class="btn warn btn-delete-client" data-id="${klient.id}" title="Usuń klienta">Usuń</button>
+       </td>
+     `;
+klientTableBody.appendChild(tr);
+});
+console.log("Renderowanie tabeli zakończone.");
+
+// Po renderowaniu, pokaż powiązane UI
+if(clientSearchRow) clientSearchRow.style.display = 'block';
+if(importActionsContainer) importActionsContainer.style.display = 'flex'; // Użyj flex
+if(loadClientsBtn) loadClientsBtn.style.display = 'none';
+if(refreshClientsBtn) refreshClientsBtn.style.display = 'inline-block';
+}
+
+/**
+* Pobiera dane klientów z Firestore, zapisuje je do cache i wywołuje renderowanie.
+*/
+/**
+ * Pobiera profil użytkownika z kolekcji 'konfiguracja' na podstawie jego UID.
+ * Zapisuje dane do globalnej zmiennej 'currentUserProfile'.
+ */
+async function fetchUserProfile(uid) {
+  try {
+    console.log(`Pobieranie profilu dla UID: ${uid}...`);
+    // Szukamy dokumentu, gdzie pole 'uid' jest równe UID zalogowanego użytkownika
+    const querySnapshot = await db.collection("konfiguracja").where("uid", "==", uid).limit(1).get();
+
+    if (querySnapshot.empty) {
+      // To jest krytyczny błąd - użytkownik istnieje w Auth, ale nie ma go w 'konfiguracja'
+      console.warn("NIE ZNALEZIONO PROFILU! Użytkownik istnieje w Auth, ale brak go w 'konfiguracja'.");
+      alert("Błąd logowania: Nie można znaleźć powiązanego profilu użytkownika. Skontaktuj się z administratorem.");
+      auth.signOut(); // Wyloguj go, bo aplikacja nie będzie działać
+      return;
+    }
+
+    // Znaleziono profil
+    const doc = querySnapshot.docs[0];
+    currentUserProfile = { id: doc.id, ...doc.data() };
+    
+    console.log("Pomyślnie pobrano profil użytkownika:", currentUserProfile);
+    
+    // === KONTROLA DOSTĘPU (RBAC) ===
+    // Sprawdź, czy przyciski istnieją, zanim spróbujesz ich użyć
+    if (menuKonfiguracjaBtn && tabKonfiguracjaBtn) {
+      if (adminRoles.includes(currentUserProfile.Rola)) {
+        // Użytkownik JEST adminem/właścicielem
+        console.log("Dostęp (Rola): Przyznano dostęp do Konfiguracji.");
+        menuKonfiguracjaBtn.style.display = 'block'; // Pokaż w menu
+        tabKonfiguracjaBtn.style.display = 'inline-block'; // Pokaż w zakładkach
+      } else {
+        // Użytkownik NIE JEST adminem
+        console.log("Dostęp (Rola): Odmówiono dostępu do Konfiguracji.");
+        menuKonfiguracjaBtn.style.display = 'none'; // Ukryj w menu
+        tabKonfiguracjaBtn.style.display = 'none'; // Ukryj w zakładkach
+      }
+    }
+    // === KONIEC KONTROLI DOSTĘPU ===
+
+  } catch (error) {
+    console.error("Krytyczny błąd podczas pobierania profilu użytkownika:", error);
+    alert("Wystąpił błąd podczas ładowania danych użytkownika. Logowanie przerwane.");
+    auth.signOut();
+  }
+}
 async function loadAndCacheClients() {
 if (!klientTableBody) return;
 
@@ -2760,546 +3183,1289 @@ if(loadClientsBtn) loadClientsBtn.disabled = false;
 if(refreshClientsBtn) refreshClientsBtn.disabled = false;
 }
 }
-// ✅ POPRAWIONA WERSJA `fetchUserProfile` POWINNA BYĆ TUTAJ
 /**
- * Pobiera profil użytkownika z kolekcji 'konfiguracja' na podstawie jego UID.
- * Zapisuje dane do globalnej zmiennej 'currentUserProfile'.
- */
-async function fetchUserProfile(uid) {
-  try {
-    console.log(`Pobieranie profilu dla UID: ${uid}...`);
-    // Szukamy dokumentu, gdzie pole 'uid' jest równe UID zalogowanego użytkownika
-    const querySnapshot = await db.collection("konfiguracja").where("uid", "==", uid).limit(1).get();
+* Odświeża globalne listy i mapy produktów (używane w Karcie Leczenia i Kalkulatorze).
+* Należy wywołać po załadowaniu danych lub po każdej zmianie (dodaniu/edycji/usunięciu).
+*/
+function refreshProductDataLists() {
+if (!cachedProducts) {
+console.warn("Próba odświeżenia list produktów, ale brak danych w cache.");
+// Opcjonalnie: można spróbować pobrać dane, jeśli ich nie ma
+// loadAndCacheProducts(); // Uważaj na potencjalną pętlę
+return;
+}
 
-    if (querySnapshot.empty) {
-      // To jest krytyczny błąd - użytkownik istnieje w Auth, ale nie ma go w 'konfiguracja'
-      console.warn("NIE ZNALEZIONO PROFILU! Użytkownik istnieje w Auth, ale brak go w 'konfiguracja'.");
-      alert("Błąd logowania: Nie można znaleźć powiązanego profilu użytkownika. Skontaktuj się z administratorem.");
-      auth.signOut(); // Wyloguj go, bo aplikacja nie będzie działać
-      return;
-    }
+console.log("Odświeżanie globalnych list i map produktów...");
+nazwyLekow = [];
+mapaSerii = {}; // W Firestore leków nie ma nr serii, więc ta mapa będzie pusta
+mapaIlosci = {}; // Mapa dla dawkowania
+mapaKarencji = {};
+mapaCen = {};
 
-    // Znaleziono profil
-    const doc = querySnapshot.docs[0];
-    currentUserProfile = { id: doc.id, ...doc.data() };
-    
-    console.log("Pomyślnie pobrano profil użytkownika:", currentUserProfile);
-    
-    // === KONTROLA DOSTĘPU (RBAC) ===
-    // Sprawdź, czy przyciski istnieją, zanim spróbujesz ich użyć
-    if (menuKonfiguracjaBtn && tabKonfiguracjaBtn) {
-      if (adminRoles.includes(currentUserProfile.Rola)) {
-        // Użytkownik JEST adminem/właścicielem
-        console.log("Dostęp (Rola): Przyznano dostęp do Konfiguracji.");
-        menuKonfiguracjaBtn.style.display = 'block'; // Pokaż w menu
-        tabKonfiguracjaBtn.style.display = 'inline-block'; // Pokaż w zakładkach
+cachedProducts.forEach(p => {
+if (p.nazwa) { // Upewnij się, że produkt ma nazwę
+nazwyLekow.push(p.nazwa);
+// mapaSerii[p.nazwa] = p.nrSerii || ''; // Nr serii nie ma w bazie leków
+mapaIlosci[p.nazwa] = p.dawkowanie || ''; // Używamy pola dawkowanie
+mapaKarencji[p.nazwa] = p.karencja || '';
+// Upewnij się, że cena jest liczbą
+mapaCen[p.nazwa] = parseFloat(p.cena) || 0;
+}
+});
+
+// Przebuduj <datalist id="listaLekow">
+rebuildListaLekow(); // Ta funkcja już istnieje i używa globalnej 'nazwyLekow'
+
+console.log(`Listy odświeżone. Liczba leków: ${nazwyLekow.length}.`);
+// Opcjonalnie: Zaktualizuj Kalkulator, jeśli jest widoczny
+if (kalkulatorSection && kalkulatorSection.style.display === 'block') {
+// Można dodać logikę aktualizacji kalkulatora, np. wyczyszczenie wyboru
+if(productSelect) productSelect.value = '';
+if(productUnitDisplay) productUnitDisplay.textContent = '';
+}
+}
+
+
+/**
+* Renderuje tabelę produktów na podstawie przekazanej tablicy danych.
+* Zawiera sortowanie wg nazwy.
+*/
+function renderProductTable(productsData) {
+if (!produktTableBody) return;
+produktTableBody.innerHTML = ''; // Wyczyść tabelę
+
+if (!productsData || productsData.length === 0) {
+produktTableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 10px;">Brak produktów w bazie danych.</td></tr>';
+return;
+}
+
+// Sortuj dane wg nazwy (polskie znaki)
+console.log("Sortowanie produktów przed renderowaniem...");
+productsData.sort((a, b) => {
+const nameA = a.nazwa || '';
+const nameB = b.nazwa || '';
+return nameA.localeCompare(nameB, 'pl', { sensitivity: 'base' });
+});
+console.log("Sortowanie zakończone.");
+
+// Generuj wiersze
+console.log("Renderowanie tabeli produktów...");
+productsData.forEach(produkt => {
+const tr = document.createElement('tr');
+tr.dataset.id = produkt.id; // ID dokumentu z Firestore
+
+// Formatowanie ceny
+const cenaFormatted = formatPrice(parseFloat(produkt.cena) || 0); // Użyj istniejącej funkcji formatPrice
+
+tr.innerHTML = `
+       <td data-label="Nazwa">${produkt.nazwa || 'Brak nazwy'}</td>
+       <td data-label="PLU">${produkt.plu || ''}</td>
+       <td data-label="Cena (zł)" style="text-align: right;">${cenaFormatted}</td>
+       <td data-label="J.m. / Dawkowanie">${produkt.dawkowanie || ''}</td>
+       <td data-label="Karencja">${produkt.karencja || ''}</td>
+       <td data-label="Stan mag." style="text-align: center;">${produkt.stanMagazynowy || '0'}</td>
+       <td class="col-akcje">
+           <button class="btn btn-edit-product" data-id="${produkt.id}" title="Edytuj produkt">Edytuj</button>
+           <button class="btn warn btn-delete-product" data-id="${produkt.id}" title="Usuń produkt">Usuń</button>
+       </td>
+     `;
+produktTableBody.appendChild(tr);
+});
+console.log("Renderowanie tabeli produktów zakończone.");
+
+// Pokaż powiązane UI po renderowaniu
+if(productSearchRow) productSearchRow.style.display = 'block';
+if(addNewProductBtn) addNewProductBtn.style.display = 'inline-block';
+if(productImportActionsContainer) productImportActionsContainer.style.display = 'flex';
+if(loadProductsBtn) loadProductsBtn.style.display = 'none';
+if(refreshProductsBtn) refreshProductsBtn.style.display = 'inline-block';
+}
+
+/**
+* Pobiera dane produktów ('leki') z Firestore, zapisuje do cache i wywołuje renderowanie.
+*/
+async function loadAndCacheProducts() {
+if (!produktTableBody) return;
+
+produktTableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 10px;">Ładowanie danych produktów... <span class="spinner">⏳</span></td></tr>';
+if(loadProductsBtn) loadProductsBtn.disabled = true;
+if(refreshProductsBtn) refreshProductsBtn.disabled = true;
+
+try {
+console.log("Pobieranie produktów (leków) z Firestore...");
+const snapshot = await db.collection("leki").get(); // Pobierz z kolekcji 'leki'
+
+if (snapshot.empty) {
+console.log("Baza produktów (leków) jest pusta.");
+cachedProducts = [];
+renderProductTable(cachedProducts);
+} else {
+console.log(`Pobrano ${snapshot.size} produktów.`);
+cachedProducts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+console.log("Dane produktów zapisane w cache.");
+renderProductTable(cachedProducts);
+}
+// Po udanym załadowaniu i renderowaniu, odśwież globalne listy
+refreshProductDataLists();
+
+} catch (error) {
+console.error("Błąd podczas ładowania produktów z Firestore: ", error);
+produktTableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 10px; color: red;">Wystąpił błąd podczas ładowania danych. Spróbuj ponownie lub sprawdź konsolę (F12).</td></tr>';
+cachedProducts = null;
+// Pokaż przycisk Wczytaj, ukryj resztę w razie błędu
+if(productSearchRow) productSearchRow.style.display = 'none';
+if(addNewProductBtn) addNewProductBtn.style.display = 'none';
+if(productImportActionsContainer) productImportActionsContainer.style.display = 'none';
+if(loadProductsBtn) loadProductsBtn.style.display = 'inline-block';
+if(refreshProductsBtn) refreshProductsBtn.style.display = 'none';
+} finally {
+if(loadProductsBtn) loadProductsBtn.disabled = false;
+if(refreshProductsBtn) refreshProductsBtn.disabled = false;
+}
+}
+/**
+* Przycisk "Dodaj nowego klienta" - otwiera pusty modal
+*/
+if (addNewClientBtn) {
+addNewClientBtn.addEventListener('click', () => {
+clientFormTitle.textContent = 'Dodaj nowego klienta';
+clientFormDocId.value = ''; // Wyczyść ID - to oznacza "dodawanie"
+clientFormNazwa.value = '';
+clientFormAdres.value = '';
+clientFormNrStada.value = '';
+clientFormTelefon.value = '';
+        clientFormEmail.value = '';
+        clientFormIdLecznicy.value = '';
+clientFormModal.style.display = 'flex';
+clientFormNazwa.focus();
+});
+}
+
+/**
+* Przycisk "Anuluj" w modalu klienta
+*/
+if (cancelClientForm) {
+cancelClientForm.addEventListener('click', () => {
+clientFormModal.style.display = 'none';
+});
+}
+
+/**
+* Przycisk "Zapisz" w modalu klienta (obsługuje Dodawanie i Aktualizację)
+*/
+if (saveClientBtn) {
+saveClientBtn.addEventListener('click', async () => {
+const nazwa = clientFormNazwa.value.trim();
+const adres = clientFormAdres.value.trim();
+const nrStada = clientFormNrStada.value.trim();
+const telefon = clientFormTelefon.value.trim();
+        const email = clientFormEmail.value.trim();
+        const idLecznicy = clientFormIdLecznicy.value.trim();
+const docId = clientFormDocId.value; // Pobierz ID (będzie puste przy dodawaniu)
+
+if (!nazwa) {
+alert('Nazwa klienta jest wymagana.');
+clientFormNazwa.focus();
+return;
+}
+
+const klientData = {
+            nazwa: nazwa,
+            adres: adres,
+            nrStada: nrStada,
+            telefon: telefon,
+            email: email,
+            idLecznicy: idLecznicy
+        };
+
+try {
+saveClientBtn.disabled = true;
+saveClientBtn.textContent = 'Zapisywanie...';
+
+if (docId) {
+// --- Tryb Aktualizacji (UPDATE) ---
+await db.collection("klienci").doc(docId).update(klientData);
+alert('Dane klienta zostały zaktualizowane.');
+} else {
+// --- Tryb Dodawania (CREATE) ---
+await db.collection("klienci").add(klientData);
+alert('Nowy klient został dodany.');
+}
+
+clientFormModal.style.display = 'none'; // Zamknij modal
+loadClientsToTable(); // Odśwież tabelę klientów
+refreshClientDataLists(); // BARDZO WAŻNE: odśwież listy wyboru w całej aplikacji
+
+} catch (error) {
+console.error('Błąd zapisu klienta: ', error);
+alert('Wystąpił błąd podczas zapisu danych.');
+} finally {
+// Zawsze włączaj przycisk z powrotem, nawet po błędzie
+saveClientBtn.disabled = false;
+saveClientBtn.textContent = 'Zapisz';
+}
+});
+}
+// ✅ KONIEC: LOGIKA ZAKŁADKI BAZA KLIENTÓW
+// ========================================================
+
+
+/**
+  * Filtruje tabelę klientów na podstawie wpisanego tekstu.
+  * Działa po stronie klienta (filtruje już załadowane wiersze).
+  */
+function filterClientTable() {
+if (!clientSearchInput || !klientTableBody) return;
+
+const searchTerm = clientSearchInput.value.toLowerCase().trim();
+const rows = klientTableBody.querySelectorAll('tr');
+
+rows.forEach(row => {
+// Upewnij się, że wiersz ma komórki (nie jest to "Ładowanie..." etc.)
+if (row.cells.length < 6) return; 
+
+const nazwa = row.cells[0].textContent.toLowerCase();
+const adres = row.cells[1].textContent.toLowerCase();
+const nrStada = row.cells[2].textContent.toLowerCase();
+const telefon = row.cells[3].textContent.toLowerCase();
+            const email = row.cells[4].textContent.toLowerCase();
+            const idLecznicy = row.cells[5].textContent.toLowerCase();
+// Sprawdź czy tekst jest widoczny w którejkolwiek z kolumn
+const isVisible = nazwa.includes(searchTerm) || 
+                              adres.includes(searchTerm) || 
+                              nrStada.includes(searchTerm) ||
+                              telefon.includes(searchTerm) ||
+                              email.includes(searchTerm) ||
+                              idLecznicy.includes(searchTerm);
+
+// Pokaż lub ukryj wiersz
+row.style.display = isVisible ? '' : 'none';
+});
+}
+// ========================================================
+    // ✅ POCZĄTEK: LOGIKA IMPORTU Z ARKUSZA (BULK EDIT)
+    // ========================================================
+
+    const startImportBtn = document.getElementById('startImportBtn');
+    const saveImportBtn = document.getElementById('saveImportBtn');
+    const cancelImportBtn = document.getElementById('cancelImportBtn');
+    const klientTable = document.getElementById('klientTable');
+    const importActionsDiv = document.getElementById('importActions');
+
+    // --- Funkcja przełączająca UI w tryb importu ---
+    function toggleImportMode(isImporting) {
+      if (isImporting) {
+        // Włącz tryb importu
+        klientTable.classList.add('import-mode');
+        startImportBtn.style.display = 'none';
+        if (addNewClientBtn) addNewClientBtn.style.display = 'none';
+        if (clientSearchInput) clientSearchInput.style.display = 'none';
+
+        saveImportBtn.style.display = 'inline-block';
+        cancelImportBtn.style.display = 'inline-block';
+
+        // Ustaw contenteditable dla komórek
+        klientTableBody.querySelectorAll('tr').forEach(row => {
+          // Kolumny 0-5 (Nazwa, Adres, NrStada, Tel, Email, IDLecznicy)
+          for (let i = 0; i <= 5; i++) {
+            if (row.cells[i]) {
+              row.cells[i].contentEditable = true;
+            }
+          }
+        });
+
+        alert('Tryb importu włączony.\nMożesz teraz edytować komórki i wklejać dane z arkusza (np. całą kolumnę).\n\nKliknij "Zapisz zmiany importu", aby wysłać dane do bazy.');
+
       } else {
-        // Użytkownik NIE JEST adminem
-        console.log("Dostęp (Rola): Odmówiono dostępu do Konfiguracji.");
-        menuKonfiguracjaBtn.style.display = 'none'; // Ukryj w menu
-        tabKonfiguracjaBtn.style.display = 'none'; // Ukryj w zakładkach
+        // Wyłącz tryb importu
+        klientTable.classList.remove('import-mode');
+        startImportBtn.style.display = 'inline-block';
+        if (addNewClientBtn) addNewClientBtn.style.display = 'inline-block';
+        if (clientSearchInput) clientSearchInput.style.display = 'inline-block';
+
+        saveImportBtn.style.display = 'none';
+        cancelImportBtn.style.display = 'none';
+
+        // Wyłącz contenteditable
+        klientTableBody.querySelectorAll('tr').forEach(row => {
+          for (let i = 0; i <= 5; i++) {
+            if (row.cells[i]) {
+              row.cells[i].contentEditable = false;
+            }
+          }
+        });
       }
     }
-    // === KONIEC KONTROLI DOSTĘPU ===
 
-    // ✅ POCZĄTEK: AUTOMATYCZNE WYPEŁNIANIE KARTY
-    // Używamy danych z profilu do wypełnienia nagłówka karty leczenia
-    if (document.getElementById('nazwaLecznicy')) {
-      document.getElementById('nazwaLecznicy').textContent = currentUserProfile['Nazwa lecznicy / Adres'] || 'Brak nazwy lecznicy w profilu';
-    }
-    if (document.getElementById('doctor-signature')) {
-      document.getElementById('doctor-signature').src = currentUserProfile.Podpis || ''; // Użyj pola Podpis (URL)
-    }
-    // Opcjonalnie: Ustawienie imienia i nazwiska lekarza przy podpisie
-    const signatureNameEl = document.querySelector('.signature-box .signature-name');
-    if (signatureNameEl && currentUserProfile.Imie && currentUserProfile.Nazwisko) {
-       signatureNameEl.textContent = `lek. wet. ${currentUserProfile.Imie} ${currentUserProfile.Nazwisko}`;
-    }
-    // ✅ KONIEC: AUTOMATYCZNE WYPEŁNIANIE KARTY
-
-  } catch (error) {
-    console.error("Krytyczny błąd podczas pobierania profilu użytkownika:", error);
-    alert("Wystąpił błąd podczas ładowania danych użytkownika. Logowanie przerwane.");
-    auth.signOut();
-  }
-}
-// (Reszta funkcji - loadAndCacheProducts, CRUD klientów, itp. - bez zmian)
-// ...
-// ... (pominięto dla zwięzłości)
-// ...
-function refreshProductDataLists() {
-// ... (bez zmian)
-}
-function renderProductTable(productsData) {
-// ... (bez zmian)
-}
-async function loadAndCacheProducts() {
-// ... (bez zmian)
-}
-if (addNewClientBtn) {
-// ... (bez zmian)
-}
-if (cancelClientForm) {
-// ... (bez zmian)
-}
-if (saveClientBtn) {
-// ... (bez zmian)
-}
-function filterClientTable() {
-// ... (bez zmian)
-}
-function toggleImportMode(isImporting) {
-// ... (bez zmian)
-}
-if (startImportBtn) {
-// ... (bez zmian)
-}
-if (cancelImportBtn) {
-// ... (bez zmian)
-}
-if (saveImportBtn) {
-// ... (bez zmian)
-}
-if (klientTableBody) {
-// ... (bez zmian)
-}
-if (loadClientsBtn) {
-// ... (bez zmian)
-}
-if (loadProductsBtn) {
-// ... (bez zmian)
-}
-if (refreshProductsBtn) {
-// ... (bez zmian)
-}
-if (produktTableBody) {
-// ... (bez zmian)
-}
-if (addNewProductBtn) {
-// ... (bez zmian)
-}
-if (addNewKonfiguracjaBtn) { // ✅ POPRAWIONA WERSJA
-  addNewKonfiguracjaBtn.addEventListener('click', () => {
-    console.log("Otwieranie modala dodawania nowego pracownika.");
-    konfiguracjaFormTitle.textContent = 'Dodaj nowego pracownika';
-    konfiguracjaFormDocId.value = ''; // Wyczyść ID - tryb dodawania
-
-    // Wyczyść pola, które ma wypełnić użytkownik
-    konfiguracjaFormImie.value = '';
-    konfiguracjaFormNazwisko.value = '';
-    konfiguracjaFormEmail.value = '';
-    konfiguracjaFormTelefon.value = '';
-    konfiguracjaFormPodpis.value = '';
-    konfiguracjaFormInicjaly.value = '';
-
-    // ✅ ZMIANA Z PKT 3.2: Dynamicznie wypełnij listę ról PRZED ustawieniem wartości
-    populateRolaDropdown(); 
-    konfiguracjaFormRola.value = 'pracownik'; // Ustaw domyślną
-
-    // ✅ NOWA LOGIKA: Automatycznie wypełnij ID i Nazwę lecznicy właściciela
-    if (currentUserProfile && currentUserProfile['ID lecznicy'] && currentUserProfile['Nazwa lecznicy / Adres']) {
-      konfiguracjaFormIdLecznicy.value = currentUserProfile['ID lecznicy'];
-      konfiguracjaFormNazwaLecznicy.value = currentUserProfile['Nazwa lecznicy / Adres'];
-    } else {
-      // To sytuacja awaryjna, właściciel musi mieć te dane
-      console.error("Krytyczny błąd: Nie można znaleźć ID lub Nazwy lecznicy zalogowanego właściciela!");
-      alert("Błąd: Nie można pobrać danych Twojej lecznicy. Spróbuj się przelogować.");
-      return; // Nie otwieraj modala, jeśli nie ma kluczowych danych
+    // --- Przycisk: Rozpocznij Import ---
+    if (startImportBtn) {
+      startImportBtn.addEventListener('click', () => {
+        // Upewnij się, że tabela jest w pełni załadowana
+        if (klientTableBody.querySelectorAll('tr').length === 0) {
+          alert('Tabela jest pusta, nie można rozpocząć importu.');
+          return;
+        }
+        toggleImportMode(true);
+      });
     }
-    
-    // ✅ POPRAWKA Z PKT 2: Programowo zablokuj pola w trybie dodawania
-    konfiguracjaFormIdLecznicy.readOnly = true;
-    konfiguracjaFormNazwaLecznicy.readOnly = true;
-    konfiguracjaFormIdLecznicy.style.backgroundColor = '#eee';
-    konfiguracjaFormNazwaLecznicy.style.backgroundColor = '#eee';
-    // ✅ KONIEC POPRAWKI
 
-    konfiguracjaFormModal.style.display = 'flex';
-    konfiguracjaFormImie.focus(); // Ustaw focus na pierwszym polu
-  });
+    // --- Przycisk: Anuluj Import ---
+    if (cancelImportBtn) {
+      cancelImportBtn.addEventListener('click', () => {
+        if (confirm('Czy na pewno chcesz anulować import? Wszystkie niezapisane zmiany w tabeli zostaną utracone.')) {
+          toggleImportMode(false);
+          // Przeładuj tabelę, aby przywrócić oryginalne dane
+          loadClientsToTable(); 
+        }
+      });
+    }
+
+    // --- Przycisk: Zapisz Import (NAJWAŻNIEJSZE) ---
+    if (saveImportBtn) {
+      saveImportBtn.addEventListener('click', async () => {
+        if (!confirm('Czy na pewno chcesz zapisać wszystkie zmiany z tabeli do bazy danych Firestore? Ta operacja nadpisze dane.')) {
+          return;
+        }
+
+        saveImportBtn.disabled = true;
+        saveImportBtn.textContent = 'Zapisywanie...';
+
+        try {
+          const batch = db.batch();
+          const rows = klientTableBody.querySelectorAll('tr');
+          let updateCounter = 0;
+
+          rows.forEach(row => {
+            const docId = row.dataset.id;
+            if (docId) {
+              // Odczytaj dane z edytowalnych komórek
+              const updatedData = {
+                nazwa: row.cells[0] ? row.cells[0].textContent.trim() : '',
+                adres: row.cells[1] ? row.cells[1].textContent.trim() : '',
+                nrStada: row.cells[2] ? row.cells[2].textContent.trim() : '',
+              telefon: row.cells[3] ? row.cells[3].textContent.trim() : '',
+                email: row.cells[4] ? row.cells[4].textContent.trim() : '',
+                idLecznicy: row.cells[5] ? row.cells[5].textContent.trim() : ''
+              };
+
+              // Dodaj operację 'update' do batcha
+              const docRef = db.collection("klienci").doc(docId);
+              batch.update(docRef, updatedData);
+              updateCounter++;
+            }
+          });
+
+          // Wykonaj wszystkie operacje w batchu
+          await batch.commit();
+
+          alert(`Pomyślnie zaktualizowano ${updateCounter} klientów!`);
+
+        } catch (error) {
+          console.error("Błąd podczas zapisywania importu: ", error);
+          alert('Wystąpił krytyczny błąd podczas zapisu. Sprawdź konsolę.');
+        } finally {
+          // Przywróć UI
+          saveImportBtn.disabled = false;
+          saveImportBtn.textContent = '💾 Zapisz zmiany importu';
+          toggleImportMode(false); // Wyłącz tryb importu
+          loadClientsToTable(); // Odśwież tabelę z danymi z bazy
+          refreshClientDataLists(); // Odśwież datalisty w całej apce
+        }
+      });
+    }
+// --- Obsługa wklejania (paste) w trybie importu ---
+    if (klientTableBody) {
+      klientTableBody.addEventListener('paste', (event) => {
+        // Sprawdź, czy jesteśmy w trybie importu i czy wklejamy do komórki tabeli
+        const targetCell = event.target.closest('td[contenteditable="true"]');
+        if (!klientTable.classList.contains('import-mode') || !targetCell) {
+          return; // Jeśli nie, pozwól na domyślne wklejanie
+        }
+
+        event.preventDefault(); // Zatrzymaj domyślne wklejanie przeglądarki
+
+        // Pobierz dane ze schowka jako zwykły tekst
+        const clipboardData = event.clipboardData || window.clipboardData;
+        const pastedText = clipboardData.getData('text/plain');
+
+        // Podziel tekst na linie (uwzględniając różne rodzaje końca linii: \n, \r\n)
+       const lines = pastedText.split(/\r?\n/); // Podziel tekst na linie (zachowaj puste)
+if (lines.length > 0 && lines[lines.length - 1] === '') {
+          lines.pop();
+        }
+
+        // Znajdź wiersz i indeks kolumny, do której wklejamy
+        const startRow = targetCell.closest('tr');
+        const cellIndex = targetCell.cellIndex;
+        const allRows = Array.from(klientTableBody.querySelectorAll('tr'));
+        const startRowIndex = allRows.indexOf(startRow);
+
+       // Wklej każdą linię do odpowiedniej komórki w dół (Z DODANYM LOGOWANIEM)
+        lines.forEach((lineContent, lineIndex) => {
+          const currentRowIndex = startRowIndex + lineIndex;
+          console.log(`Próba wklejenia linii ${lineIndex + 1}: "${lineContent}" do wiersza ${currentRowIndex + 1}, komórki ${cellIndex + 1}`); // Log 1
+
+          // Upewnij się, że nie wychodzimy poza tabelę
+          if (currentRowIndex < allRows.length) {
+            const targetRow = allRows[currentRowIndex];
+            const cellToUpdate = targetRow.cells[cellIndex];
+
+            if (cellToUpdate && cellToUpdate.isContentEditable) { // Używamy .isContentEditable dla pewności
+              console.log(`Znaleziono komórkę docelową w wierszu ${currentRowIndex + 1}. Wklejam...`); // Log 2
+              cellToUpdate.textContent = lineContent.trim(); // Wstaw zawartość linii
+            } else {
+              console.warn(`Pominięto wiersz ${currentRowIndex + 1}: Nie znaleziono edytowalnej komórki o indeksie ${cellIndex}.`); // Log 3 (ostrzeżenie)
+            }
+          } else {
+            console.warn(`Pominięto linię ${lineIndex + 1}: Wiersz ${currentRowIndex + 1} wykracza poza tabelę.`); // Log 4 (ostrzeżenie)
+          }
+        });
+
+        console.log(`Wklejono ${lines.length} linii do kolumny ${cellIndex + 1}.`);
+      });
+    }
+    // ✅ KONIEC: LOGIKA IMPORTU Z ARKUSZA
+// --- Obsługa przycisków ładowania / odświeżania ---
+
+if (loadClientsBtn) {
+loadClientsBtn.addEventListener('click', () => {
+console.log("Kliknięto 'Wczytaj bazę klientów'");
+loadAndCacheClients(); // Wywołaj funkcję pobierającą dane
+});
 }
+// --- Obsługa przycisków ładowania / odświeżania dla Produktów ---
+
+if (loadProductsBtn) {
+loadProductsBtn.addEventListener('click', () => {
+console.log("Kliknięto 'Wczytaj bazę produktów'");
+loadAndCacheProducts(); // Wywołaj funkcję pobierającą dane produktów
+});
+}
+
+if (refreshProductsBtn) {
+refreshProductsBtn.addEventListener('click', () => {
+if (confirm('Czy na pewno chcesz odświeżyć dane produktów z bazy?')) {
+console.log("Kliknięto 'Odśwież bazę produktów'");
+cachedProducts = null; // Wyczyść cache
+loadAndCacheProducts(); // Wywołaj funkcję pobierającą dane produktów
+}
+});
+}
+// ========================================================
+// ✅ POCZĄTEK: LOGIKA CRUD DLA BAZY PRODUKTÓW
+// ========================================================
+
+/**
+* Obsługa kliknięć w tabeli produktów (Edycja i Usuwanie)
+*/
+if (produktTableBody) {
+produktTableBody.addEventListener('click', async (e) => {
+const target = e.target;
+
+// --- EDYCJA PRODUKTU ---
+if (target.classList.contains('btn-edit-product')) {
+const docId = target.dataset.id;
+console.log(`Próba edycji produktu o ID: ${docId}`);
+try {
+// Pobierz aktualne dane produktu z Firestore
+const doc = await db.collection("leki").doc(docId).get();
+if (!doc.exists) {
+alert('Błąd: Nie znaleziono produktu w bazie danych.');
+console.error(`Nie znaleziono produktu o ID: ${docId}`);
+return;
+}
+const data = doc.data();
+console.log("Pobrano dane produktu do edycji:", data);
+
+// Wypełnij i pokaż modal
+productFormTitle.textContent = 'Edytuj produkt';
+productFormDocId.value = docId; // Ustaw ID do edycji
+productFormNazwa.value = data.nazwa || '';
+productFormPlu.value = data.plu || '';
+// Upewnij się, że cena i stan są liczbami w formularzu
+productFormCena.value = data.cena !== undefined ? parseFloat(data.cena) : '';
+productFormDawkowanie.value = data.dawkowanie || '';
+productFormKarencja.value = data.karencja || '';
+productFormStan.value = data.stanMagazynowy !== undefined ? parseInt(data.stanMagazynowy) : '';
+
+productFormModal.style.display = 'flex';
+
+} catch (error) {
+console.error('Błąd pobierania produktu do edycji: ', error);
+alert('Wystąpił błąd podczas pobierania danych produktu.');
+}
+}
+
+// --- USUWANIE PRODUKTU ---
+if (target.classList.contains('btn-delete-product')) {
+const docId = target.dataset.id;
+const row = target.closest('tr');
+const productName = row.cells[0].textContent;
+
+if (confirm(`Czy na pewno chcesz usunąć produkt: "${productName}"? \n\nTej operacji nie można cofnąć.`)) {
+console.log(`Próba usunięcia produktu o ID: ${docId}`);
+try {
+await db.collection("leki").doc(docId).delete();
+alert('Produkt usunięty pomyślnie.');
+console.log(`Produkt ${docId} usunięty.`);
+// Usuń produkt z cache i przeładuj tabelę oraz listy
+if (cachedProducts) {
+cachedProducts = cachedProducts.filter(p => p.id !== docId);
+renderProductTable(cachedProducts); // Odśwież tabelę z cache
+refreshProductDataLists(); // Odśwież globalne listy
+} else {
+loadAndCacheProducts(); // Jeśli cache był pusty, załaduj na nowo
+}
+} catch (error) {
+console.error('Błąd usuwania produktu: ', error);
+alert('Wystąpił błąd podczas usuwania produktu.');
+}
+}
+}
+});
+}
+
+/**
+* Przycisk "Dodaj nowy produkt" - otwiera pusty modal
+*/
+if (addNewProductBtn) {
+addNewProductBtn.addEventListener('click', () => {
+console.log("Otwieranie modala dodawania nowego produktu.");
+productFormTitle.textContent = 'Dodaj nowy produkt';
+productFormDocId.value = ''; // Wyczyść ID - tryb dodawania
+productFormNazwa.value = '';
+productFormPlu.value = '';
+productFormCena.value = '';
+productFormDawkowanie.value = '';
+productFormKarencja.value = '';
+productFormStan.value = '';
+productFormModal.style.display = 'flex';
+productFormNazwa.focus();
+});
+}
+// ✅ DODANY LISTENER DLA "Dodaj nowego pracownika"
+if (addNewKonfiguracjaBtn) {
+  addNewKonfiguracjaBtn.addEventListener('click', () => {
+    console.log("Otwieranie modala dodawania nowego pracownika.");
+    konfiguracjaFormTitle.textContent = 'Dodaj nowego pracownika';
+    konfiguracjaFormDocId.value = ''; // Wyczyść ID - tryb dodawania
+
+    // Wyczyść pola, które ma wypełnić użytkownik
+    konfiguracjaFormImie.value = '';
+    konfiguracjaFormNazwisko.value = '';
+    konfiguracjaFormEmail.value = '';
+    konfiguracjaFormTelefon.value = '';
+    konfiguracjaFormPodpis.value = '';
+    konfiguracjaFormInicjaly.value = '';
+    konfiguracjaFormRola.value = 'pracownik'; // Domyślnie 'pracownik'
+
+    // ✅ NOWA LOGIKA: Automatycznie wypełnij ID i Nazwę lecznicy właściciela
+    if (currentUserProfile && currentUserProfile['ID lecznicy'] && currentUserProfile['Nazwa lecznicy']) {
+      konfiguracjaFormIdLecznicy.value = currentUserProfile['ID lecznicy'];
+      konfiguracjaFormNazwaLecznicy.value = currentUserProfile['Nazwa lecznicy'];
+    } else {
+      // To sytuacja awaryjna, właściciel musi mieć te dane
+      console.error("Krytyczny błąd: Nie można znaleźć ID lub Nazwy lecznicy zalogowanego właściciela!");
+      alert("Błąd: Nie można pobrać danych Twojej lecznicy. Spróbuj się przelogować.");
+      return; // Nie otwieraj modala, jeśli nie ma kluczowych danych
+    }
+    
+    // ✅ POPRAWKA Z PKT 2: Programowo zablokuj pola w trybie dodawania
+    konfiguracjaFormIdLecznicy.readOnly = true;
+    konfiguracjaFormNazwaLecznicy.readOnly = true;
+    konfiguracjaFormIdLecznicy.style.backgroundColor = '#eee';
+    konfiguracjaFormNazwaLecznicy.style.backgroundColor = '#eee';
+    // ✅ KONIEC POPRAWKI
+
+    konfiguracjaFormModal.style.display = 'flex';
+    konfiguracjaFormImie.focus(); // Ustaw focus na pierwszym polu
+  });
+}
+/**
+* Przycisk "Anuluj" w modalu produktu
+*/
 if (cancelProductForm) {
-// ... (bez zmian)
-}
-if (saveProductBtn) {
-// ... (bez zmian)
+cancelProductForm.addEventListener('click', () => {
+productFormModal.style.display = 'none';
+console.log("Anulowano edycję/dodawanie produktu.");
+});
 }
 
+/**
+* Przycisk "Zapisz" w modalu produktu (obsługuje Dodawanie i Aktualizację)
+*/
+if (saveProductBtn) {
+saveProductBtn.addEventListener('click', async () => {
+const nazwa = productFormNazwa.value.trim();
+const plu = productFormPlu.value.trim();
+// Przekształć cenę i stan na liczby, domyślnie 0 jeśli puste lub błędne
+const cena = parseFloat(productFormCena.value) || 0;
+const dawkowanie = productFormDawkowanie.value.trim();
+const karencja = productFormKarencja.value.trim();
+const stanMagazynowy = parseInt(productFormStan.value) || 0;
+
+const docId = productFormDocId.value; // ID edytowanego produktu lub pusty
+
+if (!nazwa) {
+alert('Nazwa produktu jest wymagana.');
+productFormNazwa.focus();
+return;
+}
+
+const productData = {
+nazwa: nazwa,
+plu: plu,
+cena: cena, // Zapisz jako liczbę
+dawkowanie: dawkowanie,
+karencja: karencja,
+stanMagazynowy: stanMagazynowy // Zapisz jako liczbę
+// nrSerii nie jest częścią tej kolekcji
+};
+
+console.log(`Próba zapisu produktu. ID: ${docId || '(nowy)'}`, productData);
+saveProductBtn.disabled = true;
+saveProductBtn.textContent = 'Zapisywanie...';
+
+try {
+let savedDocId = docId; // Zmienna do przechowywania ID po zapisie
+if (docId) {
+// --- Tryb Aktualizacji (UPDATE) ---
+console.log(`Aktualizowanie produktu ${docId}...`);
+await db.collection("leki").doc(docId).update(productData);
+alert('Dane produktu zostały zaktualizowane.');
+console.log(`Produkt ${docId} zaktualizowany.`);
+// Zaktualizuj wpis w cache
+if (cachedProducts) {
+const index = cachedProducts.findIndex(p => p.id === docId);
+if (index !== -1) {
+cachedProducts[index] = { id: docId, ...productData };
+}
+}
+} else {
+// --- Tryb Dodawania (CREATE) ---
+console.log("Dodawanie nowego produktu...");
+const docRef = await db.collection("leki").add(productData);
+savedDocId = docRef.id; // Pobierz ID nowo dodanego dokumentu
+alert('Nowy produkt został dodany.');
+console.log(`Produkt dodany z ID: ${savedDocId}.`);
+// Dodaj nowy wpis do cache
+if (cachedProducts) {
+cachedProducts.push({ id: savedDocId, ...productData });
+} else {
+cachedProducts = [{ id: savedDocId, ...productData }]; // Zainicjuj cache jeśli był pusty
+}
+}
+
+productFormModal.style.display = 'none'; // Zamknij modal
+
+// Odśwież tabelę z danych w cache i odśwież globalne listy
+if (cachedProducts) {
+renderProductTable(cachedProducts);
+refreshProductDataLists();
+} else {
+loadAndCacheProducts(); // Jeśli cache był pusty, załaduj wszystko
+}
+
+} catch (error) {
+console.error('Błąd zapisu produktu: ', error);
+alert('Wystąpił błąd podczas zapisu danych produktu.');
+} finally {
+saveProductBtn.disabled = false;
+saveProductBtn.textContent = 'Zapisz';
+}
+});
+}
+// ✅ KONIEC: LOGIKA CRUD DLA BAZY PRODUKTÓW
+// ========================================================
 // ========================================================
 // ✅ POCZĄTEK: LOGIKA MODALA KONFIGURACJI (CRUD)
 // ========================================================
-if (konfiguracjaTableBody) { // ✅ POPRAWIONY CAŁY BLOK
-  konfiguracjaTableBody.addEventListener('click', async (e) => {
-    const target = e.target;
 
-    // --- EDYCJA WPISU KONFIGURACJI ---
+/**
+* Obsługa kliknięć w tabeli konfiguracji (Edycja)
+*/
+if (konfiguracjaTableBody) {
+  konfiguracjaTableBody.addEventListener('click', async (e) => {
+    const target = e.target;
+
+    // --- EDYCJA WPISU KONFIGURACJI ---
     if (target.classList.contains('btn-edit-konfiguracja')) {
-      const docId = target.dataset.id;
-      console.log(`Próba edycji wpisu konfiguracji o ID: ${docId}`);
-      try {
-        let data = null;
-        if (cachedKonfiguracja) {
-          data = cachedKonfiguracja.find(item => item.id === docId);
-        }
-        if (!data) {
-          console.log("Nie znaleziono w cache, pobieranie z Firestore...");
-          const doc = await db.collection("konfiguracja").doc(docId).get();
-          if (doc.exists) {
-            data = { id: doc.id, ...doc.data() };
-          }
-        }
+      const docId = target.dataset.id;
+      console.log(`Próba edycji wpisu konfiguracji o ID: ${docId}`);
+      try {
+        let data = null;
+        if (cachedKonfiguracja) {
+          data = cachedKonfiguracja.find(item => item.id === docId);
+        }
+        if (!data) {
+          console.log("Nie znaleziono w cache, pobieranie z Firestore...");
+          const doc = await db.collection("konfiguracja").doc(docId).get();
+          if (doc.exists) {
+            data = { id: doc.id, ...doc.data() };
+          }
+        }
 
-        if (!data) {
-          alert('Błąd: Nie znaleziono danych konfiguracyjnych do edycji.');
-          console.error(`Nie znaleziono wpisu o ID: ${docId}`);
-          return;
-        }
-        console.log("Pobrano dane konfiguracji do edycji:", data);
+        if (!data) {
+          alert('Błąd: Nie znaleziono danych konfiguracyjnych do edycji.');
+          console.error(`Nie znaleziono wpisu o ID: ${docId}`);
+          return;
+        }
+        console.log("Pobrano dane konfiguracji do edycji:", data);
 
-        konfiguracjaFormTitle.textContent = 'Edytuj dane konfiguracyjne';
-        konfiguracjaFormDocId.value = docId;
-        konfiguracjaFormImie.value = data.Imie || '';
-        konfiguracjaFormNazwisko.value = data.Nazwisko || '';
-        konfiguracjaFormEmail.value = data['Adres email'] || '';
-        konfiguracjaFormTelefon.value = data['Nr telefonu'] || '';
-        konfiguracjaFormPodpis.value = data.Podpis || '';
-        konfiguracjaFormInicjaly.value = data.Inicjaly || '';
-        konfiguracjaFormIdLecznicy.value = data['ID lecznicy'] || '';
-        konfiguracjaFormNazwaLecznicy.value = data['Nazwa lecznicy / Adres'] || '';
-        
-        // ✅ ZMIANA Z PKT 3.3
-        populateRolaDropdown();
-        konfiguracjaFormRola.value = data.Rola || 'pracownik';
-        
-        // ✅ POCZĄTEK NOWEJ LOGIKI BLOKOWANIA PÓL
-        konfiguracjaFormIdLecznicy.readOnly = true;
-        konfiguracjaFormIdLecznicy.style.backgroundColor = '#eee';
+        konfiguracjaFormTitle.textContent = 'Edytuj dane konfiguracyjne';
+        konfiguracjaFormDocId.value = docId;
+        konfiguracjaFormImie.value = data.Imie || '';
+        konfiguracjaFormNazwisko.value = data.Nazwisko || '';
+        konfiguracjaFormEmail.value = data['Adres email'] || '';
+        konfiguracjaFormTelefon.value = data['Nr telefonu'] || '';
+        konfiguracjaFormPodpis.value = data.Podpis || '';
+        konfiguracjaFormInicjaly.value = data.Inicjaly || '';
+        konfiguracjaFormIdLecznicy.value = data['ID lecznicy'] || '';
+        konfiguracjaFormNazwaLecznicy.value = data['Nazwa lecznicy'] || '';
+        konfiguracjaFormRola.value = data.Rola || 'pracownik';
+        
+        // ✅ POCZĄTEK NOWEJ LOGIKI BLOKOWANIA PÓL
+        // Pole ID Lecznicy jest ZAWSZE zablokowane
+        konfiguracjaFormIdLecznicy.readOnly = true;
+        konfiguracjaFormIdLecznicy.style.backgroundColor = '#eee';
 
-        if (adminRoles.includes(currentUserProfile.Rola)) {
-          konfiguracjaFormNazwaLecznicy.readOnly = false;
-          konfiguracjaFormNazwaLecznicy.style.backgroundColor = '#fff';
-        } else {
-          konfiguracjaFormNazwaLecznicy.readOnly = true;
-          konfiguracjaFormNazwaLecznicy.style.backgroundColor = '#eee';
-        }
-        // ✅ KONIEC NOWEJ LOGIKI BLOKOWANIA PÓL
+        // Sprawdź, czy zalogowany użytkownik jest adminem lub właścicielem
+        if (adminRoles.includes(currentUserProfile.Rola)) {
+          // JEST ADMINEM/WŁAŚCICIELEM: Może edytować nazwę lecznicy
+          konfiguracjaFormNazwaLecznicy.readOnly = false;
+          konfiguracjaFormNazwaLecznicy.style.backgroundColor = '#fff';
+        } else {
+          // JEST PRACOWNIKIEM: Nie może edytować nazwy lecznicy
+          konfiguracjaFormNazwaLecznicy.readOnly = true;
+          konfiguracjaFormNazwaLecznicy.style.backgroundColor = '#eee';
+        }
+        // ✅ KONIEC NOWEJ LOGIKI BLOKOWANIA PÓL
 
-        konfiguracjaFormModal.style.display = 'flex';
+        // ✅ POKAŻ MODAL TERAZ (PO SKONFIGUROWANIU PÓL)
+        konfiguracjaFormModal.style.display = 'flex';
 
-      } catch (error) {
-        console.error('Błąd pobierania wpisu konfiguracji do edycji: ', error);
-        alert('Wystąpił błąd podczas pobierania danych.');
-      }
-    } // ✅ <--- TO JEST POPRAWNIE UMIESZCZONA KLAMRA
+      } catch (error) {
+        // ✅ UZUPEŁNIŁEM TWÓJ PUSTY BLOK 'CATCH'
+        console.error('Błąd pobierania wpisu konfiguracji do edycji: ', error);
+        alert('Wystąpił błąd podczas pobierania danych.');
+      }
+      
+    } // ✅ <--- TO BYŁA BRAKUJĄCA KLAMRA, KTÓRA POWODOWAŁA BŁĄD
 
-    // ✅ POCZĄTEK: NOWY BLOK DLA PRZYCISKU "Usuń"
-    else if (target.classList.contains('btn-delete-konfiguracja')) {
-      const docId = target.dataset.id;
-      const row = target.closest('tr');
-      const wpisName = row.cells[0].textContent + ' ' + row.cells[1].textContent;
+    // ✅ POCZĄTEK: NOWY BLOK DLA PRZYCISKU "Usuń"
+    else if (target.classList.contains('btn-delete-konfiguracja')) {
+      const docId = target.dataset.id;
+      const row = target.closest('tr');
+      // Pobierz nazwę dla potwierdzenia (np. z pierwszej komórki)
+      const wpisName = row.cells[0].textContent + ' ' + row.cells[1].textContent;
 
-      if (confirm(`Czy na pewno chcesz usunąć wpis dla: "${wpisName}"? \n\nTej operacji nie można cofnąć.`)) {
-        console.log(`Próba usunięcia wpisu o ID: ${docId}`);
-        try {
-          await db.collection("konfiguracja").doc(docId).delete();
-          alert('Wpis usunięty pomyślnie.');
-          console.log(`Wpis ${docId} usunięty.`);
+      if (confirm(`Czy na pewno chcesz usunąć wpis dla: "${wpisName}"? \n\nTej operacji nie można cofnąć.`)) {
+        console.log(`Próba usunięcia wpisu o ID: ${docId}`);
+        try {
+          // 1. Usuń z Firebase
+          await db.collection("konfiguracja").doc(docId).delete();
+          alert('Wpis usunięty pomyślnie.');
+          console.log(`Wpis ${docId} usunięty.`);
 
-          if (cachedKonfiguracja) {
-            cachedKonfiguracja = cachedKonfiguracja.filter(item => item.id !== docId);
-            renderKonfiguracjaTable(cachedKonfiguracja);
-          } else {
-            loadAndCacheKonfiguracja();
-          }
-        } catch (error) {
-          console.error('Błąd usuwania wpisu konfiguracji: ', error);
-          alert('Wystąpił błąd podczas usuwania wpisu.');
-        }
-      }
-    }
-    // ✅ KONIEC: NOWY BLOK DLA PRZYCISKU "Usuń"
-  });
+          // 2. Usuń z cache
+          if (cachedKonfiguracja) {
+            cachedKonfiguracja = cachedKonfiguracja.filter(item => item.id !== docId);
+            // 3. Odśwież tabelę
+            renderKonfiguracjaTable(cachedKonfiguracja);
+          } else {
+            loadAndCacheKonfiguracja(); // Jeśli cache był pusty, załaduj na nowo
+          }
+
+        } catch (error) {
+          console.error('Błąd usuwania wpisu konfiguracji: ', error);
+          alert('Wystąpił błąd podczas usuwania wpisu.');
+        }
+      }
+    }
+    // ✅ KONIEC: NOWY BLOK DLA PRZYCISKU "Usuń"
+  });
 }
 /**
 * Przycisk "Anuluj" w modalu konfiguracji
 */
-if (cancelKonfiguracjaForm) { // ✅ DODANA BRAKUJĄCA FUNKCJA
-  cancelKonfiguracjaForm.addEventListener('click', () => {
-    konfiguracjaFormModal.style.display = 'none';
+if (cancelKonfiguracjaForm) {
+  cancelKonfiguracjaForm.addEventListener('click', () => {
+    konfiguracjaFormModal.style.display = 'none';
 
-    // Przywróć domyślną edytowalność pola (ważne!)
-    konfiguracjaFormNazwaLecznicy.readOnly = false;
-    konfiguracjaFormNazwaLecznicy.style.backgroundColor = '#fff';
-  });
+    // Przywróć domyślną edytowalność pola (ważne!)
+    konfiguracjaFormNazwaLecznicy.readOnly = false;
+    konfiguracjaFormNazwaLecznicy.style.backgroundColor = '#fff';
+  });
 }
 /**
 * Przycisk "Zapisz" w modalu konfiguracji (zaktualizowany o logikę kaskadową)
 */
-if (saveKonfiguracjaBtn) { // ✅ POPRAWIONA WERSJA
-  saveKonfiguracjaBtn.addEventListener('click', async () => {
-    const docId = konfiguracjaFormDocId.value;
-    
-    // Pobierz dane z formularza
-    const konfiguracjaData = {
-      Imie: konfiguracjaFormImie.value.trim(),
-      Nazwisko: konfiguracjaFormNazwisko.value.trim(),
-      'Adres email': konfiguracjaFormEmail.value.trim(),
-      'Nr telefonu': konfiguracjaFormTelefon.value.trim(),
-      Podpis: konfiguracjaFormPodpis.value.trim(),
-      Inicjaly: konfiguracjaFormInicjaly.value.trim(),
-      'ID lecznicy': konfiguracjaFormIdLecznicy.value.trim(),
-      'Nazwa lecznicy / Adres': konfiguracjaFormNazwaLecznicy.value.trim(), // ✅ POPRAWIONA NAZWA POLA
-      'Rola': konfiguracjaFormRola.value
-    };
+if (saveKonfiguracjaBtn) {
+  saveKonfiguracjaBtn.addEventListener('click', async () => {
+    const docId = konfiguracjaFormDocId.value;
+    
+    // Pobierz dane z formularza
+    const konfiguracjaData = {
+      Imie: konfiguracjaFormImie.value.trim(),
+      Nazwisko: konfiguracjaFormNazwisko.value.trim(),
+      'Adres email': konfiguracjaFormEmail.value.trim(),
+      'Nr telefonu': konfiguracjaFormTelefon.value.trim(),
+      Podpis: konfiguracjaFormPodpis.value.trim(),
+      Inicjaly: konfiguracjaFormInicjaly.value.trim(),
+      'ID lecznicy': konfiguracjaFormIdLecznicy.value.trim(),
+      'Nazwa lecznicy': konfiguracjaFormNazwaLecznicy.value.trim(),
+      'Rola': konfiguracjaFormRola.value
+    };
 
-    if (!konfiguracjaData.Imie || !konfiguracjaData.Nazwisko) {
-      alert('Imię i Nazwisko są wymagane.');
-      return;
-    }
+    if (!konfiguracjaData.Imie || !konfiguracjaData.Nazwisko) {
+      alert('Imię i Nazwisko są wymagane.');
+      return;
+    }
 
-    console.log(`Próba zapisu konfiguracji. ID: ${docId || '(nowy)'}`, konfiguracjaData);
-    saveKonfiguracjaBtn.disabled = true;
-    saveKonfiguracjaBtn.textContent = 'Zapisywanie...';
+    console.log(`Próba zapisu konfiguracji. ID: ${docId || '(nowy)'}`, konfiguracjaData);
+    saveKonfiguracjaBtn.disabled = true;
+    saveKonfiguracjaBtn.textContent = 'Zapisywanie...';
 
-    // ✅ NOWA LOGIKA SPRAWDZANIA ZMIANY NAZWY
-    let nazwaZmieniona = false;
-    let idLecznicyDoAktualizacji = null;
-    if (docId && adminRoles.includes(currentUserProfile.Rola)) {
-      const staryWpis = cachedKonfiguracja.find(item => item.id === docId);
-      const staraNazwa = staryWpis ? staryWpis['Nazwa lecznicy / Adres'] : ''; // ✅ POPRAWIONA NAZWA POLA
-      if (staraNazwa !== konfiguracjaData['Nazwa lecznicy / Adres']) { // ✅ POPRAWIONA NAZWA POLA
-        nazwaZmieniona = true;
-        idLecznicyDoAktualizacji = konfiguracjaData['ID lecznicy'];
-      }
-    }
-    // ✅ KONIEC NOWEJ LOGIKI
+    // ✅ NOWA LOGIKA SPRAWDZANIA ZMIANY NAZWY
+    let nazwaZmieniona = false;
+    let idLecznicyDoAktualizacji = null;
+    if (docId && adminRoles.includes(currentUserProfile.Rola)) {
+      // Sprawdź, czy nazwa lecznicy się zmieniła
+      const staryWpis = cachedKonfiguracja.find(item => item.id === docId);
+      const staraNazwa = staryWpis ? staryWpis['Nazwa lecznicy'] : '';
+      if (staraNazwa !== konfiguracjaData['Nazwa lecznicy']) {
+        nazwaZmieniona = true;
+        idLecznicyDoAktualizacji = konfiguracjaData['ID lecznicy'];
+      }
+    }
+    // ✅ KONIEC NOWEJ LOGIKI
 
-    try {
-      if (docId) {
-        // --- Tryb Aktualizacji (UPDATE) ---
-        console.log(`Aktualizowanie wpisu ${docId}...`);
-        await db.collection("konfiguracja").doc(docId).update(konfiguracjaData);
-        alert('Dane konfiguracyjne zostały zaktualizowane.');
+    try {
+      if (docId) {
+        // --- Tryb Aktualizacji (UPDATE) ---
+        console.log(`Aktualizowanie wpisu ${docId}...`);
+        await db.collection("konfiguracja").doc(docId).update(konfiguracjaData);
+        alert('Dane konfiguracyjne zostały zaktualizowane.');
 
-        // ✅ WYWOŁANIE AKTUALIZACJI KASKADOWEJ
-        if (nazwaZmieniona) {
-          await updateNazwaLecznicyDlaPracownikow(idLecznicyDoAktualizacji, konfiguracjaData['Nazwa lecznicy / Adres']); // ✅ POPRAWIONA NAZWA POLA
-        }
+        // ✅ WYWOŁANIE AKTUALIZACJI KASKADOWEJ
+        if (nazwaZmieniona) {
+          await updateNazwaLecznicyDlaPracownikow(idLecznicyDoAktualizacji, konfiguracjaData['Nazwa lecznicy']);
+        }
 
-      } else {
-        // --- Tryb Dodawania (CREATE) ---
-        console.log("Dodawanie nowego wpisu konfiguracji...");
-        const docRef = await db.collection("konfiguracja").add(konfiguracjaData);
-        alert('Nowy pracownik został dodany.');
-      }
+      } else {
+        // --- Tryb Dodawania (CREATE) ---
+        // (Logika dodawania nowego pracownika, nie wymaga kaskady)
+        console.log("Dodawanie nowego wpisu konfiguracji...");
+        const docRef = await db.collection("konfiguracja").add(konfiguracjaData);
+        alert('Nowy pracownik został dodany.');
+      }
 
-      // ✅ Odśwież całą tabelę z bazy, aby zobaczyć wszystkie zmiany
-      await loadAndCacheKonfiguracja(); 
-      
-      konfiguracjaFormModal.style.display = 'none';
+      // ✅ Odśwież całą tabelę z bazy, aby zobaczyć wszystkie zmiany
+      await loadAndCacheKonfiguracja(); 
+      
+      konfiguracjaFormModal.style.display = 'none';
 
-    } catch (error) {
-      console.error('Błąd zapisu konfiguracji: ', error);
-      alert('Wystąpił błąd podczas zapisu danych.');
-    } finally {
-      saveKonfiguracjaBtn.disabled = false;
-      saveKonfiguracjaBtn.textContent = 'Zapisz';
-      // Przywróć domyślną edytowalność pola (ważne!)
-      konfiguracjaFormNazwaLecznicy.readOnly = false;
-      konfiguracjaFormNazwaLecznicy.style.backgroundColor = '#fff';
-    }
-  });
+    } catch (error) {
+      console.error('Błąd zapisu konfiguracji: ', error);
+      alert('Wystąpił błąd podczas zapisu danych.');
+    } finally {
+      saveKonfiguracjaBtn.disabled = false;
+      saveKonfiguracjaBtn.textContent = 'Zapisz';
+      // Przywróć domyślną edytowalność pola (ważne!)
+      konfiguracjaFormNazwaLecznicy.readOnly = false;
+      konfiguracjaFormNazwaLecznicy.style.backgroundColor = '#fff';
+    }
+  });
 }
-
 // ========================================================
 // ✅ POCZĄTEK: WYSZUKIWARKA DLA BAZY PRODUKTÓW
 // ========================================================
+
+/**
+* Filtruje tabelę produktów na podstawie wpisanego tekstu.
+* Działa na danych już wyświetlonych w tabeli (z cache).
+*/
 function filterProductTable() {
-// ... (bez zmian)
+if (!productSearchInput || !produktTableBody) return;
+
+const searchTerm = productSearchInput.value.toLowerCase().trim();
+const rows = produktTableBody.querySelectorAll('tr');
+
+rows.forEach(row => {
+// Upewnij się, że wiersz ma komórki (nie jest to komunikat "Ładowanie..." etc.)
+if (row.cells.length < 6) return; // Mamy 6 kolumn danych + Akcje
+
+const nazwa = row.cells[0].textContent.toLowerCase();
+const plu = row.cells[1].textContent.toLowerCase();
+const cena = row.cells[2].textContent.toLowerCase(); // Cena jako tekst
+const dawka = row.cells[3].textContent.toLowerCase();
+const karencja = row.cells[4].textContent.toLowerCase();
+const stan = row.cells[5].textContent.toLowerCase();
+
+// Sprawdź czy tekst jest widoczny w którejkolwiek z kolumn
+const isVisible = nazwa.includes(searchTerm) ||
+plu.includes(searchTerm) ||
+cena.includes(searchTerm) || // Wyszukuje też w sformatowanej cenie
+dawka.includes(searchTerm) ||
+karencja.includes(searchTerm) ||
+stan.includes(searchTerm);
+
+// Pokaż lub ukryj wiersz
+row.style.display = isVisible ? '' : 'none';
+});
 }
+
+// Podłącz nasłuchiwanie do pola wyszukiwania produktów
 if (productSearchInput) {
-// ... (bez zmian)
+productSearchInput.addEventListener('input', filterProductTable);
 }
+// ✅ KONIEC: WYSZUKIWARKA DLA BAZY PRODUKTÓW
+// ========================================================
 // ========================================================
 // ✅ POCZĄTEK: LOGIKA IMPORTU DLA BAZY PRODUKTÓW
 // ========================================================
+
+/**
+* Przełącza UI tabeli produktów w tryb importu/edycji masowej.
+*/
 function toggleProductImportMode(isImporting) {
-// ... (bez zmian)
+if (!produktTable || !produktTableBody) return;
+
+if (isImporting) {
+// Włącz tryb importu
+produktTable.classList.add('import-mode');
+// Ukryj standardowe przyciski i wyszukiwarkę
+if (startProductImportBtn) startProductImportBtn.style.display = 'none';
+if (addNewProductBtn) addNewProductBtn.style.display = 'none';
+if (productSearchRow) productSearchRow.style.display = 'none';
+if (refreshProductsBtn) refreshProductsBtn.style.display = 'none'; // Ukryj też Odśwież
+
+// Pokaż przyciski zapisu/anulowania importu
+if (saveProductImportBtn) saveProductImportBtn.style.display = 'inline-block';
+if (cancelProductImportBtn) cancelProductImportBtn.style.display = 'inline-block';
+
+// Ustaw contenteditable dla komórek danych (kolumny 0-5)
+produktTableBody.querySelectorAll('tr').forEach(row => {
+if (row.cells.length >= 6) { // Upewnij się, że wiersz ma wystarczająco komórek
+for (let i = 0; i <= 5; i++) {
+row.cells[i].contentEditable = true;
+// Dodajmy też styl wskazujący na edytowalność
+row.cells[i].style.cursor = 'text';
 }
-if (startProductImportBtn) {
-// ... (bez zmian)
 }
-if (cancelProductImportBtn) {
-// ... (bez zmian)
-}
-if (saveProductImportBtn) {
-// ... (bez zmian)
-}
-if (produktTableBody) {
-// ... (bez zmian)
+});
+
+alert('Tryb importu produktów włączony.\nMożesz teraz edytować komórki i wklejać dane z arkusza (np. całą kolumnę).\n\nUWAGA: Upewnij się, że wklejane ceny używają kropki (.) jako separatora dziesiętnego, a stany magazynowe są liczbami całkowitymi.\n\nKliknij "Zapisz zmiany importu", aby wysłać dane do bazy.');
+
+} else {
+// Wyłącz tryb importu
+produktTable.classList.remove('import-mode');
+// Pokaż standardowe przyciski i wyszukiwarkę (jeśli dane są wczytane)
+if (cachedProducts && cachedProducts.length > 0) {
+if (startProductImportBtn) startProductImportBtn.style.display = 'inline-block';
+if (addNewProductBtn) addNewProductBtn.style.display = 'inline-block';
+if (productSearchRow) productSearchRow.style.display = 'block';
+if (refreshProductsBtn) refreshProductsBtn.style.display = 'inline-block';
+} else {
+// Jeśli dane nie są wczytane, pokaż tylko przycisk wczytywania
+if (loadProductsBtn) loadProductsBtn.style.display = 'inline-block';
 }
 
+
+// Ukryj przyciski zapisu/anulowania importu
+if (saveProductImportBtn) saveProductImportBtn.style.display = 'none';
+if (cancelProductImportBtn) cancelProductImportBtn.style.display = 'none';
+
+// Wyłącz contenteditable i usuń styl kursora
+produktTableBody.querySelectorAll('tr').forEach(row => {
+if (row.cells.length >= 6) {
+for (let i = 0; i <= 5; i++) {
+row.cells[i].contentEditable = false;
+row.cells[i].style.cursor = 'default';
+}
+}
+});
+}
+}
+
+// --- Przycisk: Rozpocznij Import Produktów ---
+if (startProductImportBtn) {
+startProductImportBtn.addEventListener('click', () => {
+if (!cachedProducts || cachedProducts.length === 0) {
+alert('Baza produktów nie jest wczytana lub jest pusta. Nie można rozpocząć importu.');
+return;
+}
+toggleProductImportMode(true);
+});
+}
+
+// --- Przycisk: Anuluj Import Produktów ---
+if (cancelProductImportBtn) {
+cancelProductImportBtn.addEventListener('click', () => {
+if (confirm('Czy na pewno chcesz anulować import produktów? Niezapisane zmiany w tabeli zostaną utracone.')) {
+toggleProductImportMode(false);
+// Przeładuj tabelę z danych w cache, aby przywrócić stan sprzed edycji
+if (cachedProducts) {
+renderProductTable(cachedProducts);
+} else {
+// Jeśli jakimś cudem cache jest pusty, pokaż stan początkowy
+produktTableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 20px; color: #555;">Kliknij "Wczytaj bazę produktów", aby wyświetlić dane.</td></tr>';
+if(productSearchRow) productSearchRow.style.display = 'none';
+if(addNewProductBtn) addNewProductBtn.style.display = 'none';
+if(productImportActionsContainer) productImportActionsContainer.style.display = 'none';
+if(loadProductsBtn) loadProductsBtn.style.display = 'inline-block';
+if(refreshProductsBtn) refreshProductsBtn.style.display = 'none';
+}
+}
+});
+}
+
+// --- Przycisk: Zapisz Import Produktów ---
+if (saveProductImportBtn) {
+saveProductImportBtn.addEventListener('click', async () => {
+if (!confirm('Czy na pewno chcesz zapisać wszystkie zmiany z tabeli produktów do bazy danych Firestore? Ta operacja nadpisze dane istniejących produktów.')) {
+return;
+}
+
+saveProductImportBtn.disabled = true;
+saveProductImportBtn.textContent = 'Zapisywanie...';
+
+try {
+const batch = db.batch();
+const rows = produktTableBody.querySelectorAll('tr');
+let updateCounter = 0;
+const updatedCache = []; // Tablica do zbudowania nowego cache
+
+rows.forEach(row => {
+const docId = row.dataset.id;
+if (docId && row.cells.length >= 6) {
+// Odczytaj dane z edytowanych komórek
+const nazwa = row.cells[0].textContent.trim();
+const plu = row.cells[1].textContent.trim();
+// Próbuj sparsować cenę - użyj kropki jako separatora, domyślnie 0
+const cenaStr = row.cells[2].textContent.replace(',', '.').trim(); // Zamień przecinek na kropkę
+const cena = parseFloat(cenaStr) || 0;
+const dawkowanie = row.cells[3].textContent.trim();
+const karencja = row.cells[4].textContent.trim();
+// Próbuj sparsować stan - domyślnie 0
+const stanMagazynowy = parseInt(row.cells[5].textContent.trim()) || 0;
+
+// Stwórz obiekt z danymi do aktualizacji
+const updatedData = {
+nazwa: nazwa,
+plu: plu,
+cena: cena,
+dawkowanie: dawkowanie,
+karencja: karencja,
+stanMagazynowy: stanMagazynowy
+};
+
+// Dodaj operację 'update' do batcha
+const docRef = db.collection("leki").doc(docId);
+batch.update(docRef, updatedData);
+updateCounter++;
+
+// Dodaj zaktualizowane dane do nowego cache
+updatedCache.push({ id: docId, ...updatedData });
+} else if(row.cells.length >= 6) {
+console.warn("Pominięto wiersz bez data-id podczas zapisu importu:", row.textContent);
+}
+});
+
+// Wykonaj wszystkie operacje w batchu
+await batch.commit();
+
+// Zaktualizuj cache nowymi danymi
+cachedProducts = updatedCache;
+
+alert(`Pomyślnie zaktualizowano ${updateCounter} produktów!`);
+
+} catch (error) {
+console.error("Błąd podczas zapisywania importu produktów: ", error);
+alert('Wystąpił krytyczny błąd podczas zapisu. Sprawdź konsolę (F12).');
+} finally {
+saveProductImportBtn.disabled = false;
+saveProductImportBtn.textContent = '💾 Zapisz zmiany importu';
+toggleProductImportMode(false); // Wyłącz tryb importu
+
+// Odśwież tabelę (z nowego cache) i globalne listy
+if (cachedProducts) {
+renderProductTable(cachedProducts);
+refreshProductDataLists();
+} else {
+loadAndCacheProducts(); // W razie problemów, załaduj na nowo
+}
+}
+});
+}
+
+// --- Obsługa wklejania (paste) w tabeli produktów ---
+if (produktTableBody) {
+produktTableBody.addEventListener('paste', (event) => {
+const targetCell = event.target.closest('td[contenteditable="true"]');
+if (!produktTable.classList.contains('import-mode') || !targetCell) {
+return;
+}
+event.preventDefault();
+const clipboardData = event.clipboardData || window.clipboardData;
+const pastedText = clipboardData.getData('text/plain');
+const lines = pastedText.split(/\r?\n/);
+if (lines.length > 0 && lines[lines.length - 1] === '') {
+lines.pop();
+}
+const startRow = targetCell.closest('tr');
+const cellIndex = targetCell.cellIndex;
+const allRows = Array.from(produktTableBody.querySelectorAll('tr'));
+const startRowIndex = allRows.indexOf(startRow);
+
+lines.forEach((lineContent, lineIndex) => {
+const currentRowIndex = startRowIndex + lineIndex;
+if (currentRowIndex < allRows.length) {
+const targetRow = allRows[currentRowIndex];
+// Upewnij się, że komórka istnieje i jest edytowalna
+if (targetRow.cells[cellIndex] && targetRow.cells[cellIndex].isContentEditable) {
+// Specjalna obsługa dla ceny - zamień przecinek na kropkę PRZED wstawieniem
+if (cellIndex === 2) { // Kolumna Ceny
+targetRow.cells[cellIndex].textContent = lineContent.replace(',', '.').trim();
+} else {
+targetRow.cells[cellIndex].textContent = lineContent.trim();
+}
+}
+}
+});
+console.log(`Wklejono ${lines.length} linii do kolumny ${cellIndex + 1} tabeli produktów.`);
+});
+}
+
+// ✅ KONIEC: LOGIKA IMPORTU DLA BAZY PRODUKTÓW
+// ========================================================
 // ========================================================
 // ✅ POCZĄTEK: LOGIKA ZAKŁADKI KONFIGURACJA PROGRAMU
 // ========================================================
-/**
- * Dynamicznie wypełnia listę ról w formularzu konfiguracji...
- */
-function populateRolaDropdown() { // ✅ DODANA BRAKUJĄCA FUNKCJA
-  if (!konfiguracjaFormRola || !currentUserProfile) return;
-
-  konfiguracjaFormRola.innerHTML = ''; // Wyczyść stare opcje
-
-  const rola = currentUserProfile.Rola;
-
-  if (rola === 'administrator') {
-    // Admin może tworzyć wszystkie typy kont
-    konfiguracjaFormRola.add(new Option('Pracownik', 'pracownik'));
-    konfiguracjaFormRola.add(new Option('Właściciel', 'właściciel'));
-    konfiguracjaFormRola.add(new Option('Administrator', 'administrator'));
-  } else if (rola === 'właściciel') {
-    // Właściciel może tworzyć Pracowników i innych Właścicieli
-    konfiguracjaFormRola.add(new Option('Pracownik', 'pracownik'));
-    konfiguracjaFormRola.add(new Option('Właściciel', 'właściciel'));
-  }
-  // Pracownik nie ma dostępu do tego formularza, więc nie ma 'else'
-}
 
 /**
-* Renderuje tabelę konfiguracji...
+* Renderuje tabelę konfiguracji na podstawie przekazanej tablicy danych.
 */
-function renderKonfiguracjaTable(konfiguracjaData) { // ✅ NAPRAWIONA ZDUPLIKOWANA DEFINICJA
-    if (!konfiguracjaTableBody) return;
-    konfiguracjaTableBody.innerHTML = ''; // Wyczyść tabelę
+/**
+* Renderuje tabelę konfiguracji na podstawie przekazanej tablicy danych.
+* ✅ WERSJA BEZPIECZNA (używa .textContent)
+*/
+function renderKonfiguracjaTable(konfiguracjaData) {
+    if (!konfiguracjaTableBody) return;
+    konfiguracjaTableBody.innerHTML = ''; // Wyczyść tabelę
 
-    if (!konfiguracjaData || konfiguracjaData.length === 0) {
-        konfiguracjaTableBody.innerHTML = '<tr><td colspan="10" style="text-align: center; padding: 10px;">Brak danych konfiguracyjnych do wyświetlenia.</td></tr>';
-        return;
-    }
+    if (!konfiguracjaData || konfiguracjaData.length === 0) {
+        konfiguracjaTableBody.innerHTML = '<tr><td colspan="10" style="text-align: center; padding: 10px;">Brak danych konfiguracyjnych do wyświetlenia.</td></tr>';
+        return;
+    }
 
-    console.log("Renderowanie tabeli konfiguracji (metoda bezpieczna)...");
+    console.log("Renderowanie tabeli konfiguracji (metoda bezpieczna)...");
 
-    // Funkcja pomocnicza do tworzenia komórek TD
-    const createCell = (text, dataLabel) => {
-        const td = document.createElement('td');
-        td.textContent = text || ''; 
-        if (dataLabel) {
-            td.dataset.label = dataLabel;
-        }
-        return td;
-    };
+    // Funkcja pomocnicza do tworzenia komórek TD
+    const createCell = (text, dataLabel) => {
+        const td = document.createElement('td');
+        // Używamy .textContent zamiast .innerHTML, aby dane były traktowane jako tekst,
+        // co zapobiega psuciu tabeli przez np. niezamknięte tagi HTML w danych.
+        td.textContent = text || ''; 
+        if (dataLabel) {
+            td.dataset.label = dataLabel;
+        }
+        return td;
+    };
 
-    konfiguracjaData.forEach(wpis => {
-        const tr = document.createElement('tr');
-        tr.dataset.id = wpis.id;
+    konfiguracjaData.forEach(wpis => {
+        const tr = document.createElement('tr');
+        tr.dataset.id = wpis.id;
 
-        // 1. Imię
-        tr.appendChild(createCell(wpis.Imie, 'Imię'));
-        // 2. Nazwisko
-        tr.appendChild(createCell(wpis.Nazwisko, 'Nazwisko'));
-        // 3. Email
-        tr.appendChild(createCell(wpis['Adres email'], 'Email'));
-        // 4. Telefon
-        tr.appendChild(createCell(wpis['Nr telefonu'], 'Telefon'));
-        
-        // 5. Podpis (URL)
-        const podpisUrl = wpis.Podpis || '';
-        const podpisDisplay = podpisUrl.length > 30 ? podpisUrl.substring(0, 27) + '...' : podpisUrl;
-        const podpisCell = createCell(podpisDisplay, 'Podpis (URL)');
-        podpisCell.title = podpisUrl;
-        tr.appendChild(podpisCell);
+        // 1. Imię
+        tr.appendChild(createCell(wpis.Imie, 'Imię'));
+        // 2. Nazwisko
+        tr.appendChild(createCell(wpis.Nazwisko, 'Nazwisko'));
+        // 3. Email
+        tr.appendChild(createCell(wpis['Adres email'], 'Email'));
+        // 4. Telefon
+        tr.appendChild(createCell(wpis['Nr telefonu'], 'Telefon'));
+        
+        // 5. Podpis (URL) - ten ma specjalną logikę skracania
+        const podpisUrl = wpis.Podpis || '';
+        const podpisDisplay = podpisUrl.length > 30 ? podpisUrl.substring(0, 27) + '...' : podpisUrl;
+        const podpisCell = createCell(podpisDisplay, 'Podpis (URL)');
+        podpisCell.title = podpisUrl; // Ustaw title dla podglądu pełnego linku
+        tr.appendChild(podpisCell);
 
-        // 6. Inicjały
-        tr.appendChild(createCell(wpis.Inicjaly, 'Inicjały'));
-        // 7. ID Lecznicy
-        tr.appendChild(createCell(wpis['ID lecznicy'], 'ID Lecznicy'));
-        
-        // 8. Nazwa lecznicy / Adres
-        tr.appendChild(createCell(wpis['Nazwa lecznicy / Adres'], 'Nazwa lecznicy / Adres')); // ✅ POPRAWIONA NAZWA POLA
+        // 6. Inicjały
+        tr.appendChild(createCell(wpis.Inicjaly, 'Inicjały'));
+        // 7. ID Lecznicy
+        tr.appendChild(createCell(wpis['ID lecznicy'], 'ID Lecznicy'));
+        
+        // 8. Nazwa lecznicy (tutaj był problem)
+        tr.appendChild(createCell(wpis['Nazwa lecznicy'], 'Nazwa lecznicy / Adres'));
 
-        // 9. Rola
-        tr.appendChild(createCell(wpis.Rola, 'Rola'));
-        
-        // 10. Akcje
-        const akcjeCell = document.createElement('td');
-        akcjeCell.className = 'col-akcje';
-        akcjeCell.style.width = '130px';
-        akcjeCell.dataset.label = 'Akcje';
-        akcjeCell.innerHTML = `
-            <button class="btn btn-edit-konfiguracja" data-id="${wpis.id}" title="Edytuj wpis">Edytuj</button>
-            <button class="btn warn btn-delete-konfiguracja" data-id="${wpis.id}" title="Usuń wpis">Usuń</button>
-        `;
-        tr.appendChild(akcjeCell);
+        // 9. Rola
+        tr.appendChild(createCell(wpis.Rola, 'Rola'));
+        
+        // 10. Akcje (tylko ta komórka musi używać innerHTML dla przycisków)
+        const akcjeCell = document.createElement('td');
+        akcjeCell.className = 'col-akcje';
+        akcjeCell.style.width = '130px';
+        akcjeCell.dataset.label = 'Akcje'; // Dodajemy data-label dla spójności
+        akcjeCell.innerHTML = `
+            <button class="btn btn-edit-konfiguracja" data-id="${wpis.id}" title="Edytuj wpis">Edytuj</button>
+            <button class="btn warn btn-delete-konfiguracja" data-id="${wpis.id}" title="Usuń wpis">Usuń</button>
+        `;
+        tr.appendChild(akcjeCell);
 
-        konfiguracjaTableBody.appendChild(tr);
-    });
-    
-    console.log("Renderowanie tabeli konfiguracji zakończone.");
-    if(loadKonfiguracjaBtn) loadKonfiguracjaBtn.style.display = 'none';
+        // Dodaj gotowy wiersz do tabeli
+        konfiguracjaTableBody.appendChild(tr);
+    });
+    
+    console.log("Renderowanie tabeli konfiguracji zakończone.");
+    if(loadKonfiguracjaBtn) loadKonfiguracjaBtn.style.display = 'none'; // Ukryj przycisk po wczytaniu
 }
 
 /**
- * Pobiera dane konfiguracji z Firestore, FILTRUJĄC je wg roli.
- */
+* Pobiera dane konfiguracji z Firestore (kolekcja 'konfiguracja'), zapisuje do cache i wywołuje renderowanie.
+*/
 async function loadAndCacheKonfiguracja() {
-  if (!konfiguracjaTableBody) return;
+if (!konfiguracjaTableBody) return;
 
-  konfiguracjaTableBody.innerHTML = '<tr><td colspan="10" style="text-align: center; padding: 10px;">Ładowanie danych konfiguracyjnych... <span class="spinner">⏳</span></td></tr>';
-  if(loadKonfiguracjaBtn) loadKonfiguracjaBtn.disabled = true;
+konfiguracjaTableBody.innerHTML = '<tr><td colspan="10" style="text-align: center; padding: 10px;">Ładowanie danych konfiguracyjnych... <span class="spinner">⏳</span></td></tr>';
+if(loadKonfiguracjaBtn) loadKonfiguracjaBtn.disabled = true;
 
-  try {
-    if (!currentUserProfile) {
-      throw new Error("Brak profilu zalogowanego użytkownika. Nie można załadować danych.");
-    }
+try {
+console.log("Pobieranie konfiguracji z Firestore (kolekcja: konfiguracja)...");
+const snapshot = await db.collection("konfiguracja").get();
 
-    let query;
-    const rola = currentUserProfile.Rola;
+if (snapshot.empty) {
+console.log("Kolekcja konfiguracji jest pusta.");
+cachedKonfiguracja = [];
+renderKonfiguracjaTable(cachedKonfiguracja);
+} else {
+console.log(`Pobrano ${snapshot.size} wpisów konfiguracyjnych.`);
+cachedKonfiguracja = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+console.log("Dane konfiguracji zapisane w cache:", cachedKonfiguracja);
+renderKonfiguracjaTable(cachedKonfiguracja);
+}
+if(loadKonfiguracjaBtn) loadKonfiguracjaBtn.style.display = 'none';
 
-    if (rola === 'administrator') {
-      console.log("Ładowanie konfiguracji: Tryb Administratora (wszyscy użytkownicy).");
-      query = db.collection("konfiguracja");
-    } else if (rola === 'właściciel') {
-      const idLecznicy = currentUserProfile['ID lecznicy'];
-      if (!idLecznicy) throw new Error("Profil właściciela nie ma przypisanego ID lecznicy.");
-      console.log(`Ładowanie konfiguracji: Tryb Właściciela (tylko ID lecznicy: ${idLecznicy}).`);
-      query = db.collection("konfiguracja").where("ID lecznicy", "==", idLecznicy);
-    } else {
-      throw new Error("Brak uprawnień do załadowania tej sekcji.");
-    }
-
-    const snapshot = await query.get();
-
-    if (snapshot.empty) {
-      console.log("Kolekcja konfiguracji (filtrowana) jest pusta.");
-      cachedKonfiguracja = [];
-      renderKonfiguracjaTable(cachedKonfiguracja);
-    } else {
-      console.log(`Pobrano ${snapshot.size} wpisów konfiguracyjnych.`);
-      cachedKonfiguracja = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      console.log("Dane konfiguracji zapisane w cache:", cachedKonfiguracja);
-      renderKonfiguracjaTable(cachedKonfiguracja);
-    }
-    if(loadKonfiguracjaBtn) loadKonfiguracjaBtn.style.display = 'none';
-
-  } catch (error) {
-    console.error("Błąd podczas ładowania konfiguracji z Firestore: ", error);
-    // ✅ NAPRAWIONY BŁĄD HTML (brakujący >)
-    konfiguracjaTableBody.innerHTML = `<tr><td colspan="10" style="text-align: center; padding: 10px; color: red;">Wystąpił błąd podczas ładowania danych: ${error.message}</td></tr>`;
-    cachedKonfiguracja = null;
-    if(loadKonfiguracjaBtn) loadKonfiguracjaBtn.style.display = 'inline-block';
-  } finally {
-    if(loadKonfiguracjaBtn) loadKonfiguracjaBtn.disabled = false;
-  }
+} catch (error) {
+console.error("Błąd podczas ładowania konfiguracji z Firestore: ", error);
+konfiguracjaTableBody.innerHTML = '<tr><td colspan="10" style="text-align: center; padding: 10px; color: red;">Wystąpił błąd podczas ładowania danych. Spróbuj ponownie lub sprawdź konsolę (F12).</td></tr>';
+cachedKonfiguracja = null;
+if(loadKonfiguracjaBtn) loadKonfiguracjaBtn.style.display = 'inline-block';
+} finally {
+if(loadKonfiguracjaBtn) loadKonfiguracjaBtn.disabled = false;
+}
 }
 
 // Listener dla przycisku "Wczytaj konfigurację"
 if (loadKonfiguracjaBtn) {
 loadKonfiguracjaBtn.addEventListener('click', loadAndCacheKonfiguracja);
 }
+
 // ========================================================
 // ✅ KONIEC: LOGIKA ZAKŁADKI KONFIGURACJA PROGRAMU
 // ========================================================
-
 if (refreshClientsBtn) {
 refreshClientsBtn.addEventListener('click', () => {
 if (confirm('Czy na pewno chcesz odświeżyć dane klientów z bazy?')) {
@@ -3314,310 +4480,309 @@ loadAndCacheClients(); // Wywołaj funkcję pobierającą dane
 // ========================================================
 // === OBSŁUGA PRZEŁĄCZANIA FORMULARZY ===
 if (showRegisterLink) {
-  showRegisterLink.addEventListener('click', (e) => {
-    e.preventDefault(); // Zatrzymaj przewijanie strony
-    loginSection.style.display = 'none';
-    registerSection.style.display = 'flex';
-    loginError.style.display = 'none'; // Ukryj błędy
-  });
+  showRegisterLink.addEventListener('click', (e) => {
+    e.preventDefault(); // Zatrzymaj przewijanie strony
+    loginSection.style.display = 'none';
+    registerSection.style.display = 'flex';
+    loginError.style.display = 'none'; // Ukryj błędy
+  });
 }
 
 if (showLoginLink) {
-  showLoginLink.addEventListener('click', (e) => {
-    e.preventDefault();
-    registerSection.style.display = 'none';
-    loginSection.style.display = 'flex';
-    registerError.style.display = 'none'; // Ukryj błędy
-  });
+  showLoginLink.addEventListener('click', (e) => {
+    e.preventDefault();
+    registerSection.style.display = 'none';
+    loginSection.style.display = 'flex';
+    registerError.style.display = 'none'; // Ukryj błędy
+  });
 }
-    // ✅ POCZĄTEK: BLOK RESETOWANIA HASŁA
+    // ✅ POCZĄTEK: BLOK RESETOWANIA HASŁA
 if (forgotPasswordLink) {
-  forgotPasswordLink.addEventListener('click', (e) => {
-    e.preventDefault(); // Zatrzymaj link
+  forgotPasswordLink.addEventListener('click', (e) => {
+    e.preventDefault(); // Zatrzymaj link
 
-    // Ukryj stare komunikaty
-    loginError.style.display = 'none';
-    loginSuccess.style.display = 'none';
+    // Ukryj stare komunikaty
+    loginError.style.display = 'none';
+    loginSuccess.style.display = 'none';
 
-    // Pobierz e-mail z pola logowania
-    const email = loginEmail.value.trim();
+    // Pobierz e-mail z pola logowania
+    const email = loginEmail.value.trim();
 
-    if (!email) {
-      loginError.textContent = 'Wpisz swój adres e-mail w polu powyżej, a następnie kliknij "Zapomniałem hasła".';
-      loginError.style.display = 'block';
-      return;
-    }
+    if (!email) {
+      loginError.textContent = 'Wpisz swój adres e-mail w polu powyżej, a następnie kliknij "Zapomniałem hasła".';
+      loginError.style.display = 'block';
+      return;
+    }
 
-    console.log(`Wysyłanie linku resetującego na: ${email}`);
+    console.log(`Wysyłanie linku resetującego na: ${email}`);
 
-    // Wyślij e-mail resetujący przez Firebase
-    auth.sendPasswordResetEmail(email)
-      .then(() => {
-        // Sukces
-        loginSuccess.textContent = 'Link do resetowania hasła został wysłany! Sprawdź swoją skrzynkę e-mail.';
-        loginSuccess.style.display = 'block';
-      })
-      .catch((error) => {
-        // Błąd
-        console.error('Błąd resetowania hasła:', error.code);
-        // Używamy tej samej funkcji do tłumaczenia błędów!
-        loginError.textContent = 'Błąd: ' + translateAuthError(error.code);
-        loginError.style.display = 'block';
-      });
-  });
+    // Wyślij e-mail resetujący przez Firebase
+    auth.sendPasswordResetEmail(email)
+      .then(() => {
+        // Sukces
+        loginSuccess.textContent = 'Link do resetowania hasła został wysłany! Sprawdź swoją skrzynkę e-mail.';
+        loginSuccess.style.display = 'block';
+      })
+      .catch((error) => {
+        // Błąd
+        console.error('Błąd resetowania hasła:', error.code);
+        // Używamy tej samej funkcji do tłumaczenia błędów!
+        loginError.textContent = 'Błąd: ' + translateAuthError(error.code);
+        loginError.style.display = 'block';
+      });
+  });
 }
 // ✅ KONIEC: BLOK RESETOWANIA HASŁA
 // --- Funkcja do "tłumaczenia" błędów Firebase na polski ---
 function translateAuthError(errorCode) {
-  switch (errorCode) {
-    case 'auth/invalid-email':
-      return 'Niepoprawny format adresu e-mail.';
-    case 'auth/user-not-found':
-    case 'auth/wrong-password':
-    case 'auth/invalid-credential':
-      return 'Nieprawidłowy e-mail lub hasło.';
-    case 'auth/too-many-requests':
-      return 'Zbyt wiele prób logowania. Spróbuj ponownie później.';
-    default:
-      return 'Wystąpił nieznany błąd. Spróbuj ponownie.';
-  }
+  switch (errorCode) {
+    case 'auth/invalid-email':
+      return 'Niepoprawny format adresu e-mail.';
+    case 'auth/user-not-found':
+    case 'auth/wrong-password':
+    case 'auth/invalid-credential':
+      return 'Nieprawidłowy e-mail lub hasło.';
+    case 'auth/too-many-requests':
+      return 'Zbyt wiele prób logowania. Spróbuj ponownie później.';
+    default:
+      return 'Wystąpił nieznany błąd. Spróbuj ponownie.';
+  }
 }
 
 // --- Listener dla przycisku "Zaloguj się" ---
 if (loginBtn) {
-  loginBtn.addEventListener('click', () => {
-    const email = loginEmail.value.trim();
-    const password = loginPassword.value;
+  loginBtn.addEventListener('click', () => {
+    const email = loginEmail.value.trim();
+    const password = loginPassword.value;
 
-    // Wyczyść stare błędy
-    loginError.textContent = '';
-    loginError.style.display = 'none';
-    loginSuccess.style.display = 'none'; // Ukryj też sukces
+    // Wyczyść stare błędy
+    loginError.textContent = '';
+    loginError.style.display = 'none';
 
-    // Walidacja
-    if (!email || !password) {
-      loginError.textContent = 'Wprowadź e-mail i hasło.';
-      loginError.style.display = 'block';
-      return;
-    }
+    // Walidacja
+    if (!email || !password) {
+      loginError.textContent = 'Wprowadź e-mail i hasło.';
+      loginError.style.display = 'block';
+      return;
+    }
 
-    console.log(`Próba logowania jako: ${email}`);
-    loginBtn.disabled = true;
-    loginBtn.textContent = 'Logowanie...';
+    console.log(`Próba logowania jako: ${email}`);
+    loginBtn.disabled = true;
+    loginBtn.textContent = 'Logowanie...';
 
-    // Logowanie do Firebase
-    auth.signInWithEmailAndPassword(email, password)
-      .then(userCredential => {
-        // Sukces!
-        console.log("Zalogowano pomyślnie!", userCredential.user.email);
-        // Nie musimy tu nic robić - obserwator (onAuthStateChanged)
-        // automatycznie wykryje zmianę i pokaże aplikację.
-      })
-      .catch(error => {
-        // Błąd logowania
-        console.error("Błąd logowania:", error.code);
-        loginError.textContent = 'Błąd: ' + translateAuthError(error.code);
-        loginError.style.display = 'block';
-      })
-      .finally(() => {
-        // Przywróć przycisk
-        loginBtn.disabled = false;
-        loginBtn.textContent = 'Zaloguj się';
-      });
-  });
+    // Logowanie do Firebase
+    auth.signInWithEmailAndPassword(email, password)
+      .then(userCredential => {
+        // Sukces!
+        console.log("Zalogowano pomyślnie!", userCredential.user.email);
+        // Nie musimy tu nic robić - obserwator (onAuthStateChanged)
+        // automatycznie wykryje zmianę i pokaże aplikację.
+      })
+      .catch(error => {
+        // Błąd logowania
+        console.error("Błąd logowania:", error.code);
+        loginError.textContent = 'Błąd: ' + translateAuthError(error.code);
+        loginError.style.display = 'block';
+      })
+      .finally(() => {
+        // Przywróć przycisk
+        loginBtn.disabled = false;
+        loginBtn.textContent = 'Zaloguj się';
+      });
+  });
 }
 
 // --- Funkcja do obsługi wylogowania ---
 function handleLogout() {
-  if (confirm("Czy na pewno chcesz się wylogować?")) {
-    console.log("Wylogowywanie...");
-    auth.signOut().catch(error => {
-      console.error("Błąd wylogowania:", error);
-      alert("Nie udało się wylogować. Spróbuj ponownie.");
-    });
-    // Obserwator (onAuthStateChanged) automatycznie
-    // wykryje wylogowanie i pokaże ekran logowania.
-  }
+  if (confirm("Czy na pewno chcesz się wylogować?")) {
+    console.log("Wylogowywanie...");
+    auth.signOut().catch(error => {
+      console.error("Błąd wylogowania:", error);
+      alert("Nie udało się wylogować. Spróbuj ponownie.");
+    });
+    // Obserwator (onAuthStateChanged) automatycznie
+    // wykryje wylogowanie i pokaże ekran logowania.
+  }
 }
 
 // --- Listener dla przycisku "Wyloguj" (na pasku zakładek) ---
 if (logoutBtn) {
-  logoutBtn.addEventListener('click', handleLogout);
+  logoutBtn.addEventListener('click', handleLogout); // ✅ ZMIANA
 }
 
 // --- Listener dla przycisku "Wyloguj" (w menu głównym) ---
 if (menuLogoutBtn) {
-  menuLogoutBtn.addEventListener('click', handleLogout);
+  menuLogoutBtn.addEventListener('click', handleLogout); // ✅ DODANY BLOK
 }
 // --- Listener dla przycisku "Zarejestruj się" (INTELIGENTNA REJESTRACJA) ---
 if (registerBtn) {
-  registerBtn.addEventListener('click', async () => {
-    // Wyczyść stare błędy
-    registerError.textContent = '';
-    registerError.style.display = 'none';
+  registerBtn.addEventListener('click', async () => {
+    // Wyczyść stare błędy
+    registerError.textContent = '';
+    registerError.style.display = 'none';
 
-    // Pobierz dane z formularza
-    const email = registerEmail.value.trim();
-    const password = registerPassword.value;
-    const passwordConfirm = registerPasswordConfirm.value;
-    const imie = registerImie.value.trim();
-    const nazwisko = registerNazwisko.value.trim();
-    const nazwaLecznicy = registerNazwaLecznicy.value.trim();
+    // Pobierz dane z formularza
+    const email = registerEmail.value.trim();
+    const password = registerPassword.value;
+    const passwordConfirm = registerPasswordConfirm.value;
+    const imie = registerImie.value.trim();
+    const nazwisko = registerNazwisko.value.trim();
+    const nazwaLecznicy = registerNazwaLecznicy.value.trim();
 
-    // Walidacja (nieco lżejsza, bo Nazwa Lecznicy jest opcjonalna)
-    if (!imie || !nazwisko || !email) {
-      registerError.textContent = 'Imię, Nazwisko i E-mail są wymagane.';
-      registerError.style.display = 'block';
-      return;
-    }
-    if (password.length < 6) {
-      registerError.textContent = 'Hasło musi mieć minimum 6 znaków.';
-      registerError.style.display = 'block';
-      return;
-    }
-    if (password !== passwordConfirm) {
-      registerError.textContent = 'Hasła nie są zgodne.';
-      registerError.style.display = 'block';
-      return;
-    }
+    // Walidacja (nieco lżejsza, bo Nazwa Lecznicy jest opcjonalna)
+    if (!imie || !nazwisko || !email) {
+      registerError.textContent = 'Imię, Nazwisko i E-mail są wymagane.';
+      registerError.style.display = 'block';
+      return;
+    }
+    if (password.length < 6) {
+      registerError.textContent = 'Hasło musi mieć minimum 6 znaków.';
+      registerError.style.display = 'block';
+      return;
+    }
+    if (password !== passwordConfirm) {
+      registerError.textContent = 'Hasła nie są zgodne.';
+      registerError.style.display = 'block';
+      return;
+    }
 
-    console.log(`Próba rejestracji dla: ${email}`);
-    registerBtn.disabled = true;
-    registerBtn.textContent = 'Rejestrowanie...';
+    console.log(`Próba rejestracji dla: ${email}`);
+    registerBtn.disabled = true;
+    registerBtn.textContent = 'Rejestrowanie...';
 
-    let createdUserUid = null;
+    let createdUserUid = null;
 
-    try {
-      // KROK 1: Sprawdź, czy ten e-mail istnieje już w 'konfiguracja'
-      const querySnapshot = await db.collection("konfiguracja").where("Adres email", "==", email).limit(1).get();
+    try {
+      // KROK 1: Sprawdź, czy ten e-mail istnieje już w 'konfiguracja'
+      const querySnapshot = await db.collection("konfiguracja").where("Adres email", "==", email).limit(1).get();
 
-      if (!querySnapshot.empty) {
-        // SCENARIUSZ A: E-MAIL ZNALEZIONY (PRACOWNIK)
-        console.log("E-mail znaleziony. Próba aktywacji konta pracownika...");
-        const doc = querySnapshot.docs[0];
-        const profil = doc.data();
+      if (!querySnapshot.empty) {
+        // SCENARIUSZ A: E-MAIL ZNALEZIONY (PRACOWNIK)
+        console.log("E-mail znaleziony. Próba aktywacji konta pracownika...");
+        const doc = querySnapshot.docs[0];
+        const profil = doc.data();
 
-        // Sprawdź, czy konto nie jest już aktywne (czy ma UID)
-        if (profil.uid) {
-          throw new Error("Konto dla tego adresu e-mail jest już aktywne.");
-        }
+        // Sprawdź, czy konto nie jest już aktywne (czy ma UID)
+        if (profil.uid) {
+          throw new Error("Konto dla tego adresu e-mail jest już aktywne.");
+        }
 
-        // 1. Stwórz użytkownika w Auth
-        const userCredential = await auth.createUserWithEmailAndPassword(email, password);
-        createdUserUid = userCredential.user.uid;
+        // 1. Stwórz użytkownika w Auth
+        const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+        createdUserUid = userCredential.user.uid;
 
-        // 2. Zaktualizuj profil o UID, Imię i Nazwisko
-        await doc.ref.update({
-          uid: createdUserUid,
-          Imie: imie,
-          Nazwisko: nazwisko
-        });
+        // 2. Zaktualizuj profil o UID, Imię i Nazwisko
+        await doc.ref.update({
+          uid: createdUserUid,
+          Imie: imie,
+          Nazwisko: nazwisko
+        });
 
-        console.log(`Pomyślnie aktywowano pracownika i połączono UID: ${createdUserUid}`);
-        alert('Rejestracja pomyślna! Zostałeś dodany do lecznicy. Możesz się teraz zalogować.');
+        console.log(`Pomyślnie aktywowano pracownika i połączono UID: ${createdUserUid}`);
+        alert('Rejestracja pomyślna! Zostałeś dodany do lecznicy. Możesz się teraz zalogować.');
 
-      } else {
-        // SCENARIUSZ B: E-MAIL NIEZNALEZIONY (NOWY WŁAŚCICIEL)
-        console.log("E-mail nieznaleziony. Próba rejestracji nowej lecznicy...");
+      } else {
+        // SCENARIUSZ B: E-MAIL NIEZNALEZIONY (NOWY WŁAŚCICIEL)
+        console.log("E-mail nieznaleziony. Próba rejestracji nowej lecznicy...");
 
-        // Właściciel MUSI podać nazwę lecznicy
-        if (!nazwaLecznicy) {
-          throw new Error("Jako nowy właściciel musisz podać Nazwę Lecznicy.");
-        }
+        // Właściciel MUSI podać nazwę lecznicy
+        if (!nazwaLecznicy) {
+          throw new Error("Jako nowy właściciel musisz podać Nazwę Lecznicy.");
+        }
 
-        // 1. Stwórz użytkownika w Auth
-        const userCredential = await auth.createUserWithEmailAndPassword(email, password);
-        createdUserUid = userCredential.user.uid;
+        // 1. Stwórz użytkownika w Auth
+        const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+        createdUserUid = userCredential.user.uid;
 
-        // 2. Stwórz profil WŁAŚCICIELA (ta sama logika co wcześniej)
-        const userProfileData = {
-          uid: createdUserUid,
-          Imie: imie,
-          Nazwisko: nazwisko,
-          'Adres email': email,
-          Rola: 'właściciel',
-          'Nazwa lecznicy / Adres': nazwaLecznicy, // ✅ POPRAWIONA NAZWA POLA
-          'ID lecznicy': '', // Puste na razie
-          Podpis: '', Inicjaly: '', 'Nr telefonu': ''
-        };
+        // 2. Stwórz profil WŁAŚCICIELA (ta sama logika co wcześniej)
+        const userProfileData = {
+          uid: createdUserUid,
+          Imie: imie,
+          Nazwisko: nazwisko,
+          'Adres email': email,
+          Rola: 'właściciel',
+          'Nazwa lecznicy': nazwaLecznicy,
+          'ID lecznicy': '', // Puste na razie
+          Podpis: '', Inicjaly: '', 'Nr telefonu': ''
+        };
 
-        const docRef = await db.collection("konfiguracja").add(userProfileData);
+        const docRef = await db.collection("konfiguracja").add(userProfileData);
 
-        // 3. Ustaw ID lecznicy
-        await docRef.update({
-          'ID lecznicy': docRef.id
-        });
+        // 3. Ustaw ID lecznicy
+        await docRef.update({
+          'ID lecznicy': docRef.id
+        });
 
-        console.log(`Pomyślnie zarejestrowano nową lecznicę z ID: ${docRef.id}`);
-        alert('Rejestracja lecznicy pomyślna! Możesz się teraz zalogować.');
-      }
+        console.log(`Pomyślnie zarejestrowano nową lecznicę z ID: ${docRef.id}`);
+        alert('Rejestracja lecznicy pomyślna! Możesz się teraz zalogować.');
+      }
 
-      // KROK OSTATNI (dla obu scenariuszy): Wyloguj i przełącz
-      await auth.signOut();
-      registerSection.style.display = 'none';
-      loginSection.style.display = 'flex';
+      // KROK OSTATNI (dla obu scenariuszy): Wyloguj i przełącz
+      await auth.signOut();
+      registerSection.style.display = 'none';
+      loginSection.style.display = 'flex';
 
-      // Wyczyść formularz
-      registerImie.value = ''; registerNazwisko.value = '';
-      registerEmail.value = ''; registerPassword.value = '';
-      registerPasswordConfirm.value = ''; registerNazwaLecznicy.value = '';
+      // Wyczyść formularz
+      registerImie.value = ''; registerNazwisko.value = '';
+      registerEmail.value = ''; registerPassword.value = '';
+      registerPasswordConfirm.value = ''; registerNazwaLecznicy.value = '';
 
-    } catch (error) {
-      // Błąd
-      console.error("Błąd rejestracji:", error.code, error.message);
+    } catch (error) {
+      // Błąd
+      console.error("Błąd rejestracji:", error.code, error.message);
 
-      // Tłumaczenie błędów
-      if (error.message === "Konto dla tego adresu e-mail jest już aktywne.") {
-        registerError.textContent = "To konto jest już aktywne. Spróbuj się zalogować.";
-      } else if (error.message.includes("Jako nowy właściciel")) {
-  S       registerError.textContent = "Aby zarejestrować nową lecznicę, musisz podać jej nazwę.";
-      } else if (error.code === 'auth/email-already-in-use') {
-        registerError.textContent = 'Ten adres e-mail jest już zajęty.';
-      } else if (error.code === 'auth/weak-password') {
-        registerError.textContent = 'Hasło jest zbyt słabe.';
-      } else {
-        registerError.textContent = 'Wystąpił błąd rejestracji.';
-      }
-      registerError.style.display = 'block';
+      // Tłumaczenie błędów
+      if (error.message === "Konto dla tego adresu e-mail jest już aktywne.") {
+        registerError.textContent = "To konto jest już aktywne. Spróbuj się zalogować.";
+      } else if (error.message.includes("Jako nowy właściciel")) {
+        registerError.textContent = "Aby zarejestrować nową lecznicę, musisz podać jej nazwę.";
+      } else if (error.code === 'auth/email-already-in-use') {
+        registerError.textContent = 'Ten adres e-mail jest już zajęty.';
+      } else if (error.code === 'auth/weak-password') {
+        registerError.textContent = 'Hasło jest zbyt słabe.';
+      } else {
+        registerError.textContent = 'Wystąpił błąd rejestracji.';
+      }
+      registerError.style.display = 'block';
 
-    } finally {
-      // Przywróć przycisk
-      registerBtn.disabled = false;
-      registerBtn.textContent = 'Zarejestruj się';
-    }
-  });
+    } finally {
+      // Przywróć przycisk
+      registerBtn.disabled = false;
+      registerBtn.textContent = 'Zarejestruj się';
+    }
+  });
 }
-    /**
- * Aktualizuje pole 'Nazwa lecznicy' dla wszystkich dokumentów
- * pasujących do podanego 'idLecznicy'.
- */
+    /**
+ * Aktualizuje pole 'Nazwa lecznicy' dla wszystkich dokumentów
+ * pasujących do podanego 'idLecznicy'.
+ */
 async function updateNazwaLecznicyDlaPracownikow(idLecznicy, nowaNazwa) {
-  if (!idLecznicy || !nowaNazwa) return;
+  if (!idLecznicy || !nowaNazwa) return;
 
-  console.log(`AKTUALIZACJA KASKADOWA: Zmiana nazwy dla ID Lecznicy ${idLecznicy} na "${nowaNazwa}"`);
-  
-  try {
-    const q = db.collection("konfiguracja").where("ID lecznicy", "==", idLecznicy);
-    const snapshot = await q.get();
-    
-    if (snapshot.empty) {
-      console.log("Nie znaleziono pracowników do aktualizacji.");
-      return;
-    }
+  console.log(`AKTUALIZACJA KASKADOWA: Zmiana nazwy dla ID Lecznicy ${idLecznicy} na "${nowaNazwa}"`);
+  
+  try {
+    const q = db.collection("konfiguracja").where("ID lecznicy", "==", idLecznicy);
+    const snapshot = await q.get();
+    
+    if (snapshot.empty) {
+      console.log("Nie znaleziono pracowników do aktualizacji.");
+      return;
+    }
 
-    const batch = db.batch();
-    snapshot.docs.forEach(doc => {
-      // Aktualizujemy każdego znalezionego pracownika
-      batch.update(doc.ref, { 'Nazwa lecznicy / Adres': nowaNazwa }); // ✅ POPRAWIONA NAZWA POLA
-    });
+    const batch = db.batch();
+    snapshot.docs.forEach(doc => {
+      // Aktualizujemy każdego znalezionego pracownika
+      batch.update(doc.ref, { 'Nazwa lecznicy': nowaNazwa });
+    });
 
-    await batch.commit();
-    console.log(`Pomyślnie zaktualizowano ${snapshot.size} dokumentów.`);
-    
-  } catch (error) {
-    console.error("Błąd podczas kaskadowej aktualizacji nazw lecznicy:", error);
-    alert("Błąd podczas aktualizacji danych pracowników. Odśwież stronę.");
-  }
+    await batch.commit();
+    console.log(`Pomyślnie zaktualizowano ${snapshot.size} dokumentów.`);
+    
+  } catch (error) {
+    console.error("Błąd podczas kaskadowej aktualizacji nazw lecznicy:", error);
+    alert("Błąd podczas aktualizacji danych pracowników. Odśwież stronę.");
+  }
 }
 </script>
 
