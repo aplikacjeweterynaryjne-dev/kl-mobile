@@ -4436,7 +4436,24 @@ loadAndCacheClients(); // Wywołaj funkcję pobierającą dane
 // ========================================================
 // ✅ OBSŁUGA FORMULARZA LOGOWANIA
 // ========================================================
+// === OBSŁUGA PRZEŁĄCZANIA FORMULARZY ===
+if (showRegisterLink) {
+  showRegisterLink.addEventListener('click', (e) => {
+    e.preventDefault(); // Zatrzymaj przewijanie strony
+    loginSection.style.display = 'none';
+    registerSection.style.display = 'flex';
+    loginError.style.display = 'none'; // Ukryj błędy
+  });
+}
 
+if (showLoginLink) {
+  showLoginLink.addEventListener('click', (e) => {
+    e.preventDefault();
+    registerSection.style.display = 'none';
+    loginSection.style.display = 'flex';
+    registerError.style.display = 'none'; // Ukryj błędy
+  });
+}
 // --- Funkcja do "tłumaczenia" błędów Firebase na polski ---
 function translateAuthError(errorCode) {
   switch (errorCode) {
@@ -4518,12 +4535,111 @@ if (logoutBtn) {
 if (menuLogoutBtn) {
   menuLogoutBtn.addEventListener('click', handleLogout); // ✅ DODANY BLOK
 }
-// Upewnij się, że inne funkcje (jak edycja, usuwanie, wyszukiwanie, import) działają
-// - Edycja/Usuwanie: Powinny działać bez zmian, bo operują na data-id wiersza.
-// - Zapis importu: Powinien działać bez zmian, bo odczytuje dane z tabeli HTML.
-// - Wyszukiwanie: Powinno działać bez zmian, bo filtruje widoczne wiersze HTML.
-// Należy jednak upewnić się, że wyszukiwarka i import są pokazywane/ukrywane poprawnie
-// (co zostało dodane w `showSection` i `renderClientTable`).    
+  // --- Listener dla przycisku "Zarejestruj się" (REJESTRACJA WŁAŚCICIELA) ---
+if (registerBtn) {
+  registerBtn.addEventListener('click', async () => {
+    // Wyczyść stare błędy
+    registerError.textContent = '';
+    registerError.style.display = 'none';
+
+    // Pobierz dane z formularza
+    const email = registerEmail.value.trim();
+    const password = registerPassword.value;
+    const passwordConfirm = registerPasswordConfirm.value;
+    const imie = registerImie.value.trim();
+    const nazwisko = registerNazwisko.value.trim();
+    const nazwaLecznicy = registerNazwaLecznicy.value.trim();
+
+    // Walidacja
+    if (!imie || !nazwisko || !email || !nazwaLecznicy) {
+      registerError.textContent = 'Wypełnij wszystkie pola.';
+      registerError.style.display = 'block';
+      return;
+    }
+    if (password.length < 6) {
+      registerError.textContent = 'Hasło musi mieć minimum 6 znaków.';
+      registerError.style.display = 'block';
+      return;
+    }
+    if (password !== passwordConfirm) {
+      registerError.textContent = 'Hasła nie są zgodne.';
+      registerError.style.display = 'block';
+      return;
+    }
+
+    console.log(`Próba rejestracji nowej lecznicy: ${nazwaLecznicy} przez ${email}`);
+    registerBtn.disabled = true;
+    registerBtn.textContent = 'Rejestrowanie...';
+
+    let createdUserUid = null; // Zmienna do przechowania UID na wypadek błędu
+
+    try {
+      // 1. Stwórz użytkownika w Firebase Authentication
+      const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+      createdUserUid = userCredential.user.uid;
+      console.log(`Pomyślnie utworzono konto Auth dla UID: ${createdUserUid}`);
+
+      // 2. Stwórz profil WŁAŚCICIELA w kolekcji 'konfiguracja'
+      const userProfileData = {
+        uid: createdUserUid,
+        Imie: imie,
+        Nazwisko: nazwisko,
+        'Adres email': email,
+        Rola: 'właściciel', // Ustawia rolę na 'właściciel'
+        'Nazwa lecznicy': nazwaLecznicy,
+        'ID lecznicy': '', // Na razie puste, zaraz zaktualizujemy
+        Podpis: '',
+        Inicjaly: '',
+        'Nr telefonu': ''
+      };
+
+      // Dodaj dokument i pobierz jego referencję (aby poznać jego ID)
+      const docRef = await db.collection("konfiguracja").add(userProfileData);
+      console.log(`Utworzono profil w 'konfiguracja' z tymczasowym ID: ${docRef.id}`);
+
+      // 3. Zaktualizuj ten dokument, wpisując jego własne ID jako "ID lecznicy"
+      await docRef.update({
+        'ID lecznicy': docRef.id
+      });
+      console.log(`Pomyślnie ustawiono 'ID lecznicy' na: ${docRef.id}`);
+
+      // 4. Wyloguj użytkownika (aby musiał zalogować się ręcznie)
+      await auth.signOut();
+
+      // 5. Poinformuj o sukcesie i przełącz na logowanie
+      alert('Rejestracja lecznicy pomyślna! Możesz się teraz zalogować.');
+      registerSection.style.display = 'none';
+      loginSection.style.display = 'flex';
+
+      // Wyczyść formularz rejestracji
+      registerImie.value = '';
+      registerNazwisko.value = '';
+      registerEmail.value = '';
+      registerPassword.value = '';
+      registerPasswordConfirm.value = '';
+      registerNazwaLecznicy.value = '';
+
+    } catch (error) {
+      // Błąd
+      console.error("Błąd rejestracji:", error.code, error.message);
+
+      // Podstawowa obsługa błędów
+      if (error.code === 'auth/email-already-in-use') {
+        registerError.textContent = 'Ten adres e-mail jest już zajęty.';
+      } else if (error.code === 'auth/weak-password') {
+        registerError.textContent = 'Hasło jest zbyt słabe.';
+      } else {
+        registerError.textContent = 'Wystąpił błąd rejestracji.';
+      }
+      registerError.style.display = 'block';
+
+    } finally {
+      // Przywróć przycisk
+      registerBtn.disabled = false;
+      registerBtn.textContent = 'Zarejestruj się';
+    }
+  });
+} 
 </script>
 
 </body>
