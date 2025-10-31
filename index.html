@@ -1266,7 +1266,7 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
 
 <div class="form-row">
   <label for="konfiguracjaFormNazwaLecznicy">Nazwa lecznicy</label>
-  <input type="text" id="konfiguracjaFormNazwaLecznicy" placeholder="Auto-uzupełniane..." readonly style="background-color: #eee; cursor: not-allowed;">
+  <input type="text" id="konfiguracjaFormNazwaLecznicy" placeholder="Wpisz nazwę lecznicy">
 </div>
 
 <div class="form-row">
@@ -3769,6 +3769,13 @@ if (addNewKonfiguracjaBtn) {
       alert("Błąd: Nie można pobrać danych Twojej lecznicy. Spróbuj się przelogować.");
       return; // Nie otwieraj modala, jeśli nie ma kluczowych danych
     }
+    
+    // ✅ POPRAWKA Z PKT 2: Programowo zablokuj pola w trybie dodawania
+    konfiguracjaFormIdLecznicy.readOnly = true;
+    konfiguracjaFormNazwaLecznicy.readOnly = true;
+    konfiguracjaFormIdLecznicy.style.backgroundColor = '#eee';
+    konfiguracjaFormNazwaLecznicy.style.backgroundColor = '#eee';
+    // ✅ KONIEC POPRAWKI
 
     konfiguracjaFormModal.style.display = 'flex';
     konfiguracjaFormImie.focus(); // Ustaw focus na pierwszym polu
@@ -3906,22 +3913,41 @@ return;
 console.log("Pobrano dane konfiguracji do edycji:", data);
 
 konfiguracjaFormTitle.textContent = 'Edytuj dane konfiguracyjne';
-konfiguracjaFormDocId.value = docId;
-konfiguracjaFormImie.value = data.Imie || '';
-konfiguracjaFormNazwisko.value = data.Nazwisko || '';
-konfiguracjaFormEmail.value = data['Adres email'] || '';
-konfiguracjaFormTelefon.value = data['Nr telefonu'] || '';
-konfiguracjaFormPodpis.value = data.Podpis || '';
-konfiguracjaFormInicjaly.value = data.Inicjaly || '';
-konfiguracjaFormIdLecznicy.value = data['ID lecznicy'] || '';
-konfiguracjaFormNazwaLecznicy.value = data['Nazwa lecznicy'] || ''; // ✅ DODANA LINIA
-konfiguracjaFormRola.value = data.Rola || 'pracownik'; // ✅ DODANA LINIA
-                konfiguracjaFormModal.style.display = 'flex';
+  konfiguracjaFormDocId.value = docId;
+  konfiguracjaFormImie.value = data.Imie || '';
+  konfiguracjaFormNazwisko.value = data.Nazwisko || '';
+  konfiguracjaFormEmail.value = data['Adres email'] || '';
+  konfiguracjaFormTelefon.value = data['Nr telefonu'] || '';
+  konfiguracjaFormPodpis.value = data.Podpis || '';
+  konfiguracjaFormInicjaly.value = data.Inicjaly || '';
+  konfiguracjaFormIdLecznicy.value = data['ID lecznicy'] || '';
+  konfiguracjaFormNazwaLecznicy.value = data['Nazwa lecznicy'] || '';
+  konfiguracjaFormRola.value = data.Rola || 'pracownik';
+  
+  // ❌ NIE POKAZUJ MODALA JESZCZE ❌
+  // konfiguracjaFormModal.style.display = 'flex'; 
+
+  // ✅ POCZĄTEK NOWEJ LOGIKI BLOKOWANIA PÓL
+  // Pole ID Lecznicy jest ZAWSZE zablokowane
+  konfiguracjaFormIdLecznicy.readOnly = true;
+  konfiguracjaFormIdLecznicy.style.backgroundColor = '#eee';
+
+  // Sprawdź, czy zalogowany użytkownik jest adminem lub właścicielem
+  if (adminRoles.includes(currentUserProfile.Rola)) {
+    // JEST ADMINEM/WŁAŚCICIELEM: Może edytować nazwę lecznicy
+    konfiguracjaFormNazwaLecznicy.readOnly = false;
+    konfiguracjaFormNazwaLecznicy.style.backgroundColor = '#fff';
+  } else {
+    // JEST PRACOWNIKIEM: Nie może edytować nazwy lecznicy
+    konfiguracjaFormNazwaLecznicy.readOnly = true;
+    konfiguracjaFormNazwaLecznicy.style.backgroundColor = '#eee';
+  }
+  // ✅ KONIEC NOWEJ LOGIKI BLOKOWANIA PÓL
+
+  // ✅ POKAŻ MODAL TERAZ (PO SKONFIGUROWANIU PÓL)
+  konfiguracjaFormModal.style.display = 'flex';
 
 } catch (error) {
-console.error('Błąd pobierania wpisu konfiguracji do edycji: ', error);
-alert('Wystąpił błąd podczas pobierania danych.');
-}
 }
 // ✅ POCZĄTEK: NOWY BLOK DLA PRZYCISKU "Usuń"
 else if (target.classList.contains('btn-delete-konfiguracja')) {
