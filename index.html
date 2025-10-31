@@ -3885,102 +3885,105 @@ saveProductBtn.textContent = 'Zapisz';
 * Obsługa kliknięć w tabeli konfiguracji (Edycja)
 */
 if (konfiguracjaTableBody) {
-konfiguracjaTableBody.addEventListener('click', async (e) => {
-const target = e.target;
+  konfiguracjaTableBody.addEventListener('click', async (e) => {
+    const target = e.target;
 
-// --- EDYCJA WPISU KONFIGURACJI ---
-if (target.classList.contains('btn-edit-konfiguracja')) {
-const docId = target.dataset.id;
-console.log(`Próba edycji wpisu konfiguracji o ID: ${docId}`);
-try {
-let data = null;
-if (cachedKonfiguracja) {
-data = cachedKonfiguracja.find(item => item.id === docId);
-}
-if (!data) {
-console.log("Nie znaleziono w cache, pobieranie z Firestore...");
-const doc = await db.collection("konfiguracja").doc(docId).get();
-if (doc.exists) {
-data = { id: doc.id, ...doc.data() };
-}
-}
+    // --- EDYCJA WPISU KONFIGURACJI ---
+    if (target.classList.contains('btn-edit-konfiguracja')) {
+      const docId = target.dataset.id;
+      console.log(`Próba edycji wpisu konfiguracji o ID: ${docId}`);
+      try {
+        let data = null;
+        if (cachedKonfiguracja) {
+          data = cachedKonfiguracja.find(item => item.id === docId);
+        }
+        if (!data) {
+          console.log("Nie znaleziono w cache, pobieranie z Firestore...");
+          const doc = await db.collection("konfiguracja").doc(docId).get();
+          if (doc.exists) {
+            data = { id: doc.id, ...doc.data() };
+          }
+        }
 
-if (!data) {
-alert('Błąd: Nie znaleziono danych konfiguracyjnych do edycji.');
-console.error(`Nie znaleziono wpisu o ID: ${docId}`);
-return;
-}
-console.log("Pobrano dane konfiguracji do edycji:", data);
+        if (!data) {
+          alert('Błąd: Nie znaleziono danych konfiguracyjnych do edycji.');
+          console.error(`Nie znaleziono wpisu o ID: ${docId}`);
+          return;
+        }
+        console.log("Pobrano dane konfiguracji do edycji:", data);
 
-konfiguracjaFormTitle.textContent = 'Edytuj dane konfiguracyjne';
-  konfiguracjaFormDocId.value = docId;
-  konfiguracjaFormImie.value = data.Imie || '';
-  konfiguracjaFormNazwisko.value = data.Nazwisko || '';
-  konfiguracjaFormEmail.value = data['Adres email'] || '';
-  konfiguracjaFormTelefon.value = data['Nr telefonu'] || '';
-  konfiguracjaFormPodpis.value = data.Podpis || '';
-  konfiguracjaFormInicjaly.value = data.Inicjaly || '';
-  konfiguracjaFormIdLecznicy.value = data['ID lecznicy'] || '';
-  konfiguracjaFormNazwaLecznicy.value = data['Nazwa lecznicy'] || '';
-  konfiguracjaFormRola.value = data.Rola || 'pracownik';
-  
-  // ❌ NIE POKAZUJ MODALA JESZCZE ❌
-  // konfiguracjaFormModal.style.display = 'flex'; 
+        konfiguracjaFormTitle.textContent = 'Edytuj dane konfiguracyjne';
+        konfiguracjaFormDocId.value = docId;
+        konfiguracjaFormImie.value = data.Imie || '';
+        konfiguracjaFormNazwisko.value = data.Nazwisko || '';
+        konfiguracjaFormEmail.value = data['Adres email'] || '';
+        konfiguracjaFormTelefon.value = data['Nr telefonu'] || '';
+        konfiguracjaFormPodpis.value = data.Podpis || '';
+        konfiguracjaFormInicjaly.value = data.Inicjaly || '';
+        konfiguracjaFormIdLecznicy.value = data['ID lecznicy'] || '';
+        konfiguracjaFormNazwaLecznicy.value = data['Nazwa lecznicy'] || '';
+        konfiguracjaFormRola.value = data.Rola || 'pracownik';
+        
+        // ✅ POCZĄTEK NOWEJ LOGIKI BLOKOWANIA PÓL
+        // Pole ID Lecznicy jest ZAWSZE zablokowane
+        konfiguracjaFormIdLecznicy.readOnly = true;
+        konfiguracjaFormIdLecznicy.style.backgroundColor = '#eee';
 
-  // ✅ POCZĄTEK NOWEJ LOGIKI BLOKOWANIA PÓL
-  // Pole ID Lecznicy jest ZAWSZE zablokowane
-  konfiguracjaFormIdLecznicy.readOnly = true;
-  konfiguracjaFormIdLecznicy.style.backgroundColor = '#eee';
+        // Sprawdź, czy zalogowany użytkownik jest adminem lub właścicielem
+        if (adminRoles.includes(currentUserProfile.Rola)) {
+          // JEST ADMINEM/WŁAŚCICIELEM: Może edytować nazwę lecznicy
+          konfiguracjaFormNazwaLecznicy.readOnly = false;
+          konfiguracjaFormNazwaLecznicy.style.backgroundColor = '#fff';
+        } else {
+          // JEST PRACOWNIKIEM: Nie może edytować nazwy lecznicy
+          konfiguracjaFormNazwaLecznicy.readOnly = true;
+          konfiguracjaFormNazwaLecznicy.style.backgroundColor = '#eee';
+        }
+        // ✅ KONIEC NOWEJ LOGIKI BLOKOWANIA PÓL
 
-  // Sprawdź, czy zalogowany użytkownik jest adminem lub właścicielem
-  if (adminRoles.includes(currentUserProfile.Rola)) {
-    // JEST ADMINEM/WŁAŚCICIELEM: Może edytować nazwę lecznicy
-    konfiguracjaFormNazwaLecznicy.readOnly = false;
-    konfiguracjaFormNazwaLecznicy.style.backgroundColor = '#fff';
-  } else {
-    // JEST PRACOWNIKIEM: Nie może edytować nazwy lecznicy
-    konfiguracjaFormNazwaLecznicy.readOnly = true;
-    konfiguracjaFormNazwaLecznicy.style.backgroundColor = '#eee';
-  }
-  // ✅ KONIEC NOWEJ LOGIKI BLOKOWANIA PÓL
+        // ✅ POKAŻ MODAL TERAZ (PO SKONFIGUROWANIU PÓL)
+        konfiguracjaFormModal.style.display = 'flex';
 
-  // ✅ POKAŻ MODAL TERAZ (PO SKONFIGUROWANIU PÓL)
-  konfiguracjaFormModal.style.display = 'flex';
+      } catch (error) {
+        // ✅ UZUPEŁNIŁEM TWÓJ PUSTY BLOK 'CATCH'
+        console.error('Błąd pobierania wpisu konfiguracji do edycji: ', error);
+        alert('Wystąpił błąd podczas pobierania danych.');
+      }
+      
+    } // ✅ <--- TO BYŁA BRAKUJĄCA KLAMRA, KTÓRA POWODOWAŁA BŁĄD
 
-} catch (error) {
-}
-// ✅ POCZĄTEK: NOWY BLOK DLA PRZYCISKU "Usuń"
-else if (target.classList.contains('btn-delete-konfiguracja')) {
-const docId = target.dataset.id;
-const row = target.closest('tr');
-// Pobierz nazwę dla potwierdzenia (np. z pierwszej komórki)
-const wpisName = row.cells[0].textContent + ' ' + row.cells[1].textContent;
+    // ✅ POCZĄTEK: NOWY BLOK DLA PRZYCISKU "Usuń"
+    else if (target.classList.contains('btn-delete-konfiguracja')) {
+      const docId = target.dataset.id;
+      const row = target.closest('tr');
+      // Pobierz nazwę dla potwierdzenia (np. z pierwszej komórki)
+      const wpisName = row.cells[0].textContent + ' ' + row.cells[1].textContent;
 
-if (confirm(`Czy na pewno chcesz usunąć wpis dla: "${wpisName}"? \n\nTej operacji nie można cofnąć.`)) {
-console.log(`Próba usunięcia wpisu o ID: ${docId}`);
-try {
-// 1. Usuń z Firebase
-await db.collection("konfiguracja").doc(docId).delete();
-alert('Wpis usunięty pomyślnie.');
-console.log(`Wpis ${docId} usunięty.`);
+      if (confirm(`Czy na pewno chcesz usunąć wpis dla: "${wpisName}"? \n\nTej operacji nie można cofnąć.`)) {
+        console.log(`Próba usunięcia wpisu o ID: ${docId}`);
+        try {
+          // 1. Usuń z Firebase
+          await db.collection("konfiguracja").doc(docId).delete();
+          alert('Wpis usunięty pomyślnie.');
+          console.log(`Wpis ${docId} usunięty.`);
 
-// 2. Usuń z cache
-if (cachedKonfiguracja) {
-cachedKonfiguracja = cachedKonfiguracja.filter(item => item.id !== docId);
-// 3. Odśwież tabelę
-renderKonfiguracjaTable(cachedKonfiguracja);
-} else {
-loadAndCacheKonfiguracja(); // Jeśli cache był pusty, załaduj na nowo
-}
+          // 2. Usuń z cache
+          if (cachedKonfiguracja) {
+            cachedKonfiguracja = cachedKonfiguracja.filter(item => item.id !== docId);
+            // 3. Odśwież tabelę
+            renderKonfiguracjaTable(cachedKonfiguracja);
+          } else {
+            loadAndCacheKonfiguracja(); // Jeśli cache był pusty, załaduj na nowo
+          }
 
-} catch (error) {
-console.error('Błąd usuwania wpisu konfiguracji: ', error);
-alert('Wystąpił błąd podczas usuwania wpisu.');
-}
-}
-}
-// ✅ KONIEC: NOWY BLOK DLA PRZYCISKU "Usuń"
-});
+        } catch (error) {
+          console.error('Błąd usuwania wpisu konfiguracji: ', error);
+          alert('Wystąpił błąd podczas usuwania wpisu.');
+        }
+      }
+    }
+    // ✅ KONIEC: NOWY BLOK DLA PRZYCISKU "Usuń"
+  });
 }
 
 /**
