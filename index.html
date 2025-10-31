@@ -3984,98 +3984,85 @@ alert('Wystąpił błąd podczas usuwania wpisu.');
 }
 
 /**
-* Przycisk "Anuluj" w modalu konfiguracji
-*/
-if (cancelKonfiguracjaForm) {
-cancelKonfiguracjaForm.addEventListener('click', () => {
-konfiguracjaFormModal.style.display = 'none';
-});
-}
-
-/**
-* Przycisk "Zapisz" w modalu konfiguracji (tylko Aktualizacja)
+* Przycisk "Zapisz" w modalu konfiguracji (zaktualizowany o logikę kaskadową)
 */
 if (saveKonfiguracjaBtn) {
-saveKonfiguracjaBtn.addEventListener('click', async () => {
-const docId = konfiguracjaFormDocId.value; // Pobierz ID (będzie puste przy dodawaniu)
+  saveKonfiguracjaBtn.addEventListener('click', async () => {
+    const docId = konfiguracjaFormDocId.value;
+    
+    // Pobierz dane z formularza
+    const konfiguracjaData = {
+      Imie: konfiguracjaFormImie.value.trim(),
+      Nazwisko: konfiguracjaFormNazwisko.value.trim(),
+      'Adres email': konfiguracjaFormEmail.value.trim(),
+      'Nr telefonu': konfiguracjaFormTelefon.value.trim(),
+      Podpis: konfiguracjaFormPodpis.value.trim(),
+      Inicjaly: konfiguracjaFormInicjaly.value.trim(),
+      'ID lecznicy': konfiguracjaFormIdLecznicy.value.trim(),
+      'Nazwa lecznicy': konfiguracjaFormNazwaLecznicy.value.trim(),
+      'Rola': konfiguracjaFormRola.value
+    };
 
-// Zbierz dane z formularza (bez zmian)
-const konfiguracjaData = {
-Imie: konfiguracjaFormImie.value.trim(),
-Nazwisko: konfiguracjaFormNazwisko.value.trim(),
-'Adres email': konfiguracjaFormEmail.value.trim(),
-'Nr telefonu': konfiguracjaFormTelefon.value.trim(),
-Podpis: konfiguracjaFormPodpis.value.trim(),
-Inicjaly: konfiguracjaFormInicjaly.value.trim(),
-'ID lecznicy': konfiguracjaFormIdLecznicy.value.trim(),
-'Nazwa lecznicy': konfiguracjaFormNazwaLecznicy.value.trim(), // ✅ DODANA LINIA
-'Rola': konfiguracjaFormRola.value // ✅ DODANA LINIA     
-};
+    if (!konfiguracjaData.Imie || !konfiguracjaData.Nazwisko) {
+      alert('Imię i Nazwisko są wymagane.');
+      return;
+    }
 
-// ✅ DODANA PROSTA WALIDACJA (np. imię i nazwisko)
-if (!konfiguracjaData.Imie || !konfiguracjaData.Nazwisko) {
-alert('Imię i Nazwisko są wymagane.');
-return;
+    console.log(`Próba zapisu konfiguracji. ID: ${docId || '(nowy)'}`, konfiguracjaData);
+    saveKonfiguracjaBtn.disabled = true;
+    saveKonfiguracjaBtn.textContent = 'Zapisywanie...';
+
+    // ✅ NOWA LOGIKA SPRAWDZANIA ZMIANY NAZWY
+    let nazwaZmieniona = false;
+    let idLecznicyDoAktualizacji = null;
+    if (docId && adminRoles.includes(currentUserProfile.Rola)) {
+      // Sprawdź, czy nazwa lecznicy się zmieniła
+      const staryWpis = cachedKonfiguracja.find(item => item.id === docId);
+      const staraNazwa = staryWpis ? staryWpis['Nazwa lecznicy'] : '';
+      if (staraNazwa !== konfiguracjaData['Nazwa lecznicy']) {
+        nazwaZmieniona = true;
+        idLecznicyDoAktualizacji = konfiguracjaData['ID lecznicy'];
+      }
+    }
+    // ✅ KONIEC NOWEJ LOGIKI
+
+    try {
+      if (docId) {
+        // --- Tryb Aktualizacji (UPDATE) ---
+        console.log(`Aktualizowanie wpisu ${docId}...`);
+        await db.collection("konfiguracja").doc(docId).update(konfiguracjaData);
+        alert('Dane konfiguracyjne zostały zaktualizowane.');
+
+        // ✅ WYWOŁANIE AKTUALIZACJI KASKADOWEJ
+        if (nazwaZmieniona) {
+          await updateNazwaLecznicyDlaPracownikow(idLecznicyDoAktualizacji, konfiguracjaData['Nazwa lecznicy']);
+        }
+
+      } else {
+        // --- Tryb Dodawania (CREATE) ---
+        // (Logika dodawania nowego pracownika, nie wymaga kaskady)
+        console.log("Dodawanie nowego wpisu konfiguracji...");
+        const docRef = await db.collection("konfiguracja").add(konfiguracjaData);
+        alert('Nowy pracownik został dodany.');
+      }
+
+      // ✅ Odśwież całą tabelę z bazy, aby zobaczyć wszystkie zmiany
+      await loadAndCacheKonfiguracja(); 
+      
+      konfiguracjaFormModal.style.display = 'none';
+
+    } catch (error) {
+      console.error('Błąd zapisu konfiguracji: ', error);
+      alert('Wystąpił błąd podczas zapisu danych.');
+    } finally {
+      saveKonfiguracjaBtn.disabled = false;
+      saveKonfiguracjaBtn.textContent = 'Zapisz';
+      // Przywróć domyślną edytowalność pola (ważne!)
+      konfiguracjaFormNazwaLecznicy.readOnly = false;
+      konfiguracjaFormNazwaLecznicy.style.backgroundColor = '#fff';
+    }
+  });
 }
-
-console.log(`Próba zapisu konfiguracji. ID: ${docId || '(nowy)'}`, konfiguracjaData);
-saveKonfiguracjaBtn.disabled = true;
-saveKonfiguracjaBtn.textContent = 'Zapisywanie...';
-
-try {
-let savedDocId = docId; // Zmienna do ID po zapisie
-
-if (docId) {
-// --- Tryb Aktualizacji (UPDATE) ---
-console.log(`Aktualizowanie wpisu ${docId}...`);
-await db.collection("konfiguracja").doc(docId).update(konfiguracjaData);
-alert('Dane konfiguracyjne zostały zaktualizowane.');
-console.log(`Wpis ${docId} zaktualizowany.`);
-// Zaktualizuj wpis w cache
-if (cachedKonfiguracja) {
-const index = cachedKonfiguracja.findIndex(item => item.id === docId);
-if (index !== -1) {
-cachedKonfiguracja[index] = { id: docId, ...konfiguracjaData };
-}
-}
-} else {
-// --- ✅ Tryb Dodawania (CREATE) ---
-console.log("Dodawanie nowego wpisu konfiguracji...");
-const docRef = await db.collection("konfiguracja").add(konfiguracjaData);
-savedDocId = docRef.id; // Pobierz ID nowego dokumentu
-alert('Nowy pracownik został dodany.');
-console.log(`Wpis dodany z ID: ${savedDocId}.`);
-// Dodaj nowy wpis do cache
-const newEntry = { id: savedDocId, ...konfiguracjaData };
-if (cachedKonfiguracja) {
-cachedKonfiguracja.push(newEntry);
-} else {
-cachedKonfiguracja = [newEntry]; // Zainicjuj cache, jeśli był pusty
-}
-}
-
-// Odśwież tabelę z danych w cache
-if (cachedKonfiguracja) {
-renderKonfiguracjaTable(cachedKonfiguracja);
-} else {
-loadAndCacheKonfiguracja(); // Mało prawdopodobne, ale na wszelki wypadek
-}
-
-konfiguracjaFormModal.style.display = 'none'; // Zamknij modal
-
-} catch (error) {
-console.error('Błąd zapisu konfiguracji: ', error);
-alert('Wystąpił błąd podczas zapisu danych.');
-} finally {
-saveKonfiguracjaBtn.disabled = false;
-saveKonfiguracjaBtn.textContent = 'Zapisz';
-}
-});
-}
-
-// ========================================================
-// ✅ KONIEC: LOGIKA MODALA KONFIGURACJI (CRUD)
-// ========================================================
 // ========================================================
 // ✅ POCZĄTEK: WYSZUKIWARKA DLA BAZY PRODUKTÓW
 // ========================================================
