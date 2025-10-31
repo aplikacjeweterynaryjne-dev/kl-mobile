@@ -2201,6 +2201,7 @@ const clientFormNrStada = document.getElementById('clientFormNrStada'); // Popra
 // Zmienna do przechowywania wczytanych klientów w pamięci
 let cachedClients = null;
 let currentUserProfile = null; // ✅ DODAJ TĘ LINIĘ
+const adminRoles = ['administrator', 'właściciel'];
 // Przyciski ładowania/odświeżania
 const loadClientsBtn = document.getElementById('loadClientsBtn');
 const refreshClientsBtn = document.getElementById('refreshClientsBtn');
@@ -2319,6 +2320,16 @@ auth.onAuthStateChanged(user => {
   }
 });
 function showSection(sectionToShow) {
+    // ✅ POCZĄTEK ZABEZPIECZENIA
+  // Sprawdź, czy użytkownik próbuje wejść do konfiguracji bez uprawnień
+  if (sectionToShow === 'konfiguracja') {
+    if (!currentUserProfile || !adminRoles.includes(currentUserProfile.Rola)) {
+      console.warn("BLOKADA DOSTĘPU: Próba wejścia do sekcji 'konfiguracja' bez uprawnień.");
+      alert("Nie masz uprawnień, aby uzyskać dostęp do tej sekcji.");
+      return; // Przerwij działanie funkcji, nie pokazuj sekcji
+    }
+  }
+  // ✅ KONIEC ZABEZPIECZENIA
 // ✅ NOWA LOGIKA: Ukryj menu główne i pokaż pasek zakładek
 if (mainMenuSection) mainMenuSection.style.display = 'none';
 if (mainTabBar) mainTabBar.style.display = 'flex'; // Używamy flex dla poprawnego zawijania
@@ -3042,13 +3053,25 @@ async function fetchUserProfile(uid) {
     // Znaleziono profil
     const doc = querySnapshot.docs[0];
     currentUserProfile = { id: doc.id, ...doc.data() };
-
+    
     console.log("Pomyślnie pobrano profil użytkownika:", currentUserProfile);
-
-    // TODO (na później): Tutaj możemy np. ukryć przycisk "Konfiguracja"
-    // if (currentUserProfile.Rola !== 'administrator') {
-    //   menuKonfiguracjaBtn.style.display = 'none';
-    // }
+    
+    // === KONTROLA DOSTĘPU (RBAC) ===
+    // Sprawdź, czy przyciski istnieją, zanim spróbujesz ich użyć
+    if (menuKonfiguracjaBtn && tabKonfiguracjaBtn) {
+      if (adminRoles.includes(currentUserProfile.Rola)) {
+        // Użytkownik JEST adminem/właścicielem
+        console.log("Dostęp (Rola): Przyznano dostęp do Konfiguracji.");
+        menuKonfiguracjaBtn.style.display = 'block'; // Pokaż w menu
+        tabKonfiguracjaBtn.style.display = 'inline-block'; // Pokaż w zakładkach
+      } else {
+        // Użytkownik NIE JEST adminem
+        console.log("Dostęp (Rola): Odmówiono dostępu do Konfiguracji.");
+        menuKonfiguracjaBtn.style.display = 'none'; // Ukryj w menu
+        tabKonfiguracjaBtn.style.display = 'none'; // Ukryj w zakładkach
+      }
+    }
+    // === KONIEC KONTROLI DOSTĘPU ===
 
   } catch (error) {
     console.error("Krytyczny błąd podczas pobierania profilu użytkownika:", error);
