@@ -666,7 +666,10 @@ background-color: #eef;
       <label for="loginPassword">Hasło</label>
       <input type="password" id="loginPassword" placeholder="Wpisz hasło" autocomplete="current-password">
     </div>
-    
+    <div style="text-align: right; font-size: 15px; margin: 5px 0 10px 0;">
+  <a href="#" id="forgotPasswordLink" style="color: #333; text-decoration: underline;">Zapomniałem hasła</a>
+</div>
+    <p id="loginSuccess" style="color: #27ae60; font-weight: bold; font-size: 16px; text-align: center; display: none; margin: 10px 0;"></p> 
     <p id="loginError" style="color: #c0392b; font-size: 16px; text-align: center; display: none; margin: 10px 0;"></p>
 
     <div class="form-actions" style="margin-top: 15px;">
@@ -2208,6 +2211,8 @@ const loginBtn = document.getElementById('loginBtn');
 const loginError = document.getElementById('loginError');
 const logoutBtn = document.getElementById('logoutBtn'); // Przycisk wyloguj
 const menuLogoutBtn = document.getElementById('menuLogoutBtn'); // ✅ DODAJ TĘ LINIĘ
+const loginSuccess = document.getElementById('loginSuccess');
+const forgotPasswordLink = document.getElementById('forgotPasswordLink');
 // ✅ ZMIENNE DLA REJESTRACJI
 const registerSection = document.getElementById('registerSection');
 const showRegisterLink = document.getElementById('showRegisterLink');
@@ -4453,6 +4458,43 @@ if (showLoginLink) {
     registerError.style.display = 'none'; // Ukryj błędy
   });
 }
+    // ✅ POCZĄTEK: BLOK RESETOWANIA HASŁA
+if (forgotPasswordLink) {
+  forgotPasswordLink.addEventListener('click', (e) => {
+    e.preventDefault(); // Zatrzymaj link
+
+    // Ukryj stare komunikaty
+    loginError.style.display = 'none';
+    loginSuccess.style.display = 'none';
+
+    // Pobierz e-mail z pola logowania
+    const email = loginEmail.value.trim();
+
+    if (!email) {
+      loginError.textContent = 'Wpisz swój adres e-mail w polu powyżej, a następnie kliknij "Zapomniałem hasła".';
+      loginError.style.display = 'block';
+      return;
+    }
+
+    console.log(`Wysyłanie linku resetującego na: ${email}`);
+
+    // Wyślij e-mail resetujący przez Firebase
+    auth.sendPasswordResetEmail(email)
+      .then(() => {
+        // Sukces
+        loginSuccess.textContent = 'Link do resetowania hasła został wysłany! Sprawdź swoją skrzynkę e-mail.';
+        loginSuccess.style.display = 'block';
+      })
+      .catch((error) => {
+        // Błąd
+        console.error('Błąd resetowania hasła:', error.code);
+        // Używamy tej samej funkcji do tłumaczenia błędów!
+        loginError.textContent = 'Błąd: ' + translateAuthError(error.code);
+        loginError.style.display = 'block';
+      });
+  });
+}
+// ✅ KONIEC: BLOK RESETOWANIA HASŁA
 // --- Funkcja do "tłumaczenia" błędów Firebase na polski ---
 function translateAuthError(errorCode) {
   switch (errorCode) {
