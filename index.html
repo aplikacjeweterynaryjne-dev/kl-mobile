@@ -1260,13 +1260,13 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
 </div>
 
 <div class="form-row">
-<label for="konfiguracjaFormIdLecznicy">ID Lecznicy</label>
-<input type="text" id="konfiguracjaFormIdLecznicy" placeholder="Wpisz ID lecznicy">
+  <label for="konfiguracjaFormIdLecznicy">ID Lecznicy</label>
+  <input type="text" id="konfiguracjaFormIdLecznicy" placeholder="Auto-uzupełniane..." readonly style="background-color: #eee; cursor: not-allowed;">
 </div>
 
 <div class="form-row">
-<label for="konfiguracjaFormNazwaLecznicy">Nazwa lecznicy</label>
-<input type="text" id="konfiguracjaFormNazwaLecznicy" placeholder="Wpisz nazwę lecznicy">
+  <label for="konfiguracjaFormNazwaLecznicy">Nazwa lecznicy</label>
+  <input type="text" id="konfiguracjaFormNazwaLecznicy" placeholder="Auto-uzupełniane..." readonly style="background-color: #eee; cursor: not-allowed;">
 </div>
 
 <div class="form-row">
@@ -3745,23 +3745,34 @@ productFormNazwa.focus();
 }
 // ✅ DODANY LISTENER DLA "Dodaj nowego pracownika"
 if (addNewKonfiguracjaBtn) {
-addNewKonfiguracjaBtn.addEventListener('click', () => {
-console.log("Otwieranie modala dodawania nowego wpisu konfiguracji (pracownika).");
-konfiguracjaFormTitle.textContent = 'Dodaj nowego pracownika';
-konfiguracjaFormDocId.value = ''; // Wyczyść ID - tryb dodawania
-// Wyczyść wszystkie pola formularza
-konfiguracjaFormImie.value = '';
-konfiguracjaFormNazwisko.value = '';
-konfiguracjaFormEmail.value = '';
-konfiguracjaFormTelefon.value = '';
-konfiguracjaFormPodpis.value = '';
-konfiguracjaFormInicjaly.value = '';
-konfiguracjaFormIdLecznicy.value = '';
-konfiguracjaFormNazwaLecznicy.value = ''; // ✅ DODANA LINIA
-konfiguracjaFormRola.value = 'pracownik'; // ✅ DODANA LINIA (ustawia domyślnie 'pracownik')
-konfiguracjaFormModal.style.display = 'flex';
-konfiguracjaFormImie.focus(); // Ustaw focus na pierwszym polu
-});
+  addNewKonfiguracjaBtn.addEventListener('click', () => {
+    console.log("Otwieranie modala dodawania nowego pracownika.");
+    konfiguracjaFormTitle.textContent = 'Dodaj nowego pracownika';
+    konfiguracjaFormDocId.value = ''; // Wyczyść ID - tryb dodawania
+
+    // Wyczyść pola, które ma wypełnić użytkownik
+    konfiguracjaFormImie.value = '';
+    konfiguracjaFormNazwisko.value = '';
+    konfiguracjaFormEmail.value = '';
+    konfiguracjaFormTelefon.value = '';
+    konfiguracjaFormPodpis.value = '';
+    konfiguracjaFormInicjaly.value = '';
+    konfiguracjaFormRola.value = 'pracownik'; // Domyślnie 'pracownik'
+
+    // ✅ NOWA LOGIKA: Automatycznie wypełnij ID i Nazwę lecznicy właściciela
+    if (currentUserProfile && currentUserProfile['ID lecznicy'] && currentUserProfile['Nazwa lecznicy']) {
+      konfiguracjaFormIdLecznicy.value = currentUserProfile['ID lecznicy'];
+      konfiguracjaFormNazwaLecznicy.value = currentUserProfile['Nazwa lecznicy'];
+    } else {
+      // To sytuacja awaryjna, właściciel musi mieć te dane
+      console.error("Krytyczny błąd: Nie można znaleźć ID lub Nazwy lecznicy zalogowanego właściciela!");
+      alert("Błąd: Nie można pobrać danych Twojej lecznicy. Spróbuj się przelogować.");
+      return; // Nie otwieraj modala, jeśli nie ma kluczowych danych
+    }
+
+    konfiguracjaFormModal.style.display = 'flex';
+    konfiguracjaFormImie.focus(); // Ustaw focus na pierwszym polu
+  });
 }
 /**
 * Przycisk "Anuluj" w modalu produktu
