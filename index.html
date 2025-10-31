@@ -2200,7 +2200,7 @@ const clientFormNrStada = document.getElementById('clientFormNrStada'); // Popra
 // ✅ KONIEC: ZMIENNE DLA BAZY KLIENTÓW I MODALI
 // Zmienna do przechowywania wczytanych klientów w pamięci
 let cachedClients = null;
-
+let currentUserProfile = null; // ✅ DODAJ TĘ LINIĘ
 // Przyciski ładowania/odświeżania
 const loadClientsBtn = document.getElementById('loadClientsBtn');
 const refreshClientsBtn = document.getElementById('refreshClientsBtn');
@@ -2282,31 +2282,35 @@ const tabKalkulatorBtn = document.getElementById('tabKalkulatorBtn');
 // ✅ GŁÓWNA LOGIKA UWIRZYTELNIANIA
 // ========================================================
 
+// ========================================================
+// ✅ GŁÓWNA LOGIKA UWIRZYTELNIANIA (WERSJA Z PROFILOWANIEM)
+// ========================================================
+
 auth.onAuthStateChanged(user => {
   if (user) {
     // Użytkownik JEST zalogowany
-    console.log("Użytkownik zalogowany:", user.email);
+    console.log("Użytkownik zalogowany:", user.email, "UID:", user.uid);
 
-    // Ukryj ekran logowania
+    // ✅ KROK 1: Pobierz profil użytkownika z 'konfiguracja'
+    // Ta funkcja zajmie się pobraniem danych lub wylogowaniem w razie błędu
+    fetchUserProfile(user.uid); 
+
+    // KROK 2: Pokaż UI (tak jak było)
     if (loginSection) loginSection.style.display = 'none';
-
-    // Pokaż menu główne (zgodnie z Twoją logiką)
     if (mainMenuSection) mainMenuSection.style.display = 'flex';
-    // Pasek zakładek jest domyślnie ukryty, pokaże się po kliknięciu w menu (to jest OK)
     if (mainTabBar) mainTabBar.style.display = 'none'; 
 
   } else {
     // Użytkownik NIE JEST zalogowany
     console.log("Użytkownik wylogowany.");
+    currentUserProfile = null; // ✅ Wyczyść profil użytkownika
+    console.log("Profil użytkownika wyczyszczony.");
 
-    // Pokaż ekran logowania
+    // KROK 2: Ukryj UI (tak jak było)
     if (loginSection) loginSection.style.display = 'flex';
-
-    // Ukryj CAŁĄ resztę aplikacji
     if (mainMenuSection) mainMenuSection.style.display = 'none';
     if (mainTabBar) mainTabBar.style.display = 'none';
 
-    // Ukryj też wszystkie sekcje na wszelki wypadek
     if (kartaSection) kartaSection.style.display = 'none';
     if (kalkulatorSection) kalkulatorSection.style.display = 'none';
     if (bazaKlientowSection) bazaKlientowSection.style.display = 'none';
@@ -3017,6 +3021,41 @@ if(refreshClientsBtn) refreshClientsBtn.style.display = 'inline-block';
 /**
 * Pobiera dane klientów z Firestore, zapisuje je do cache i wywołuje renderowanie.
 */
+/**
+ * Pobiera profil użytkownika z kolekcji 'konfiguracja' na podstawie jego UID.
+ * Zapisuje dane do globalnej zmiennej 'currentUserProfile'.
+ */
+async function fetchUserProfile(uid) {
+  try {
+    console.log(`Pobieranie profilu dla UID: ${uid}...`);
+    // Szukamy dokumentu, gdzie pole 'uid' jest równe UID zalogowanego użytkownika
+    const querySnapshot = await db.collection("konfiguracja").where("uid", "==", uid).limit(1).get();
+
+    if (querySnapshot.empty) {
+      // To jest krytyczny błąd - użytkownik istnieje w Auth, ale nie ma go w 'konfiguracja'
+      console.warn("NIE ZNALEZIONO PROFILU! Użytkownik istnieje w Auth, ale brak go w 'konfiguracja'.");
+      alert("Błąd logowania: Nie można znaleźć powiązanego profilu użytkownika. Skontaktuj się z administratorem.");
+      auth.signOut(); // Wyloguj go, bo aplikacja nie będzie działać
+      return;
+    }
+
+    // Znaleziono profil
+    const doc = querySnapshot.docs[0];
+    currentUserProfile = { id: doc.id, ...doc.data() };
+
+    console.log("Pomyślnie pobrano profil użytkownika:", currentUserProfile);
+
+    // TODO (na później): Tutaj możemy np. ukryć przycisk "Konfiguracja"
+    // if (currentUserProfile.Rola !== 'administrator') {
+    //   menuKonfiguracjaBtn.style.display = 'none';
+    // }
+
+  } catch (error) {
+    console.error("Krytyczny błąd podczas pobierania profilu użytkownika:", error);
+    alert("Wystąpił błąd podczas ładowania danych użytkownika. Logowanie przerwane.");
+    auth.signOut();
+  }
+}
 async function loadAndCacheClients() {
 if (!klientTableBody) return;
 
