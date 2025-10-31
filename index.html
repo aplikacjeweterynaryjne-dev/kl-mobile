@@ -4751,6 +4751,38 @@ if (registerBtn) {
     }
   });
 }
+    /**
+ * Aktualizuje pole 'Nazwa lecznicy' dla wszystkich dokumentów
+ * pasujących do podanego 'idLecznicy'.
+ */
+async function updateNazwaLecznicyDlaPracownikow(idLecznicy, nowaNazwa) {
+  if (!idLecznicy || !nowaNazwa) return;
+
+  console.log(`AKTUALIZACJA KASKADOWA: Zmiana nazwy dla ID Lecznicy ${idLecznicy} na "${nowaNazwa}"`);
+  
+  try {
+    const q = db.collection("konfiguracja").where("ID lecznicy", "==", idLecznicy);
+    const snapshot = await q.get();
+    
+    if (snapshot.empty) {
+      console.log("Nie znaleziono pracowników do aktualizacji.");
+      return;
+    }
+
+    const batch = db.batch();
+    snapshot.docs.forEach(doc => {
+      // Aktualizujemy każdego znalezionego pracownika
+      batch.update(doc.ref, { 'Nazwa lecznicy': nowaNazwa });
+    });
+
+    await batch.commit();
+    console.log(`Pomyślnie zaktualizowano ${snapshot.size} dokumentów.`);
+    
+  } catch (error) {
+    console.error("Błąd podczas kaskadowej aktualizacji nazw lecznicy:", error);
+    alert("Błąd podczas aktualizacji danych pracowników. Odśwież stronę.");
+  }
+}
 </script>
 
 </body>
