@@ -1272,10 +1272,7 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
 <div class="form-row">
 <label for="konfiguracjaFormRola">Rola</label>
 <select id="konfiguracjaFormRola" style="width:100%; padding:8px; font-size:19px; border:1px solid #ccc; border-radius:6px; box-sizing:border-box;">
-<option value="pracownik">Pracownik</option>
-<option value="właściciel">Właściciel</option>
-<option value="administrator">Administrator</option>
-</select>
+  </select>
 </div>
 
 <div class="form-actions">
@@ -3757,7 +3754,10 @@ if (addNewKonfiguracjaBtn) {
     konfiguracjaFormTelefon.value = '';
     konfiguracjaFormPodpis.value = '';
     konfiguracjaFormInicjaly.value = '';
-    konfiguracjaFormRola.value = 'pracownik'; // Domyślnie 'pracownik'
+
+    // ✅ ZMIANA Z PKT 3.2: Dynamicznie wypełnij listę ról PRZED ustawieniem wartości
+    populateRolaDropdown(); 
+    konfiguracjaFormRola.value = 'pracownik'; // Ustaw domyślną
 
     // ✅ NOWA LOGIKA: Automatycznie wypełnij ID i Nazwę lecznicy właściciela
     if (currentUserProfile && currentUserProfile['ID lecznicy'] && currentUserProfile['Nazwa lecznicy']) {
@@ -3888,61 +3888,67 @@ if (konfiguracjaTableBody) {
   konfiguracjaTableBody.addEventListener('click', async (e) => {
     const target = e.target;
 
-    // --- EDYCJA WPISU KONFIGURACJI ---
-    if (target.classList.contains('btn-edit-konfiguracja')) {
-      const docId = target.dataset.id;
-      console.log(`Próba edycji wpisu konfiguracji o ID: ${docId}`);
-      try {
-        let data = null;
-        if (cachedKonfiguracja) {
-          data = cachedKonfiguracja.find(item => item.id === docId);
-        }
-        if (!data) {
-          console.log("Nie znaleziono w cache, pobieranie z Firestore...");
-          const doc = await db.collection("konfiguracja").doc(docId).get();
-          if (doc.exists) {
-            data = { id: doc.id, ...doc.data() };
-          }
-        }
+ // --- EDYCJA WPISU KONFIGURACJI ---
+if (target.classList.contains('btn-edit-konfiguracja')) {
+  const docId = target.dataset.id;
+  console.log(`Próba edycji wpisu konfiguracji o ID: ${docId}`);
+  try {
+    let data = null;
+    if (cachedKonfiguracja) {
+      data = cachedKonfiguracja.find(item => item.id === docId);
+    }
+    if (!data) {
+      console.log("Nie znaleziono w cache, pobieranie z Firestore...");
+      const doc = await db.collection("konfiguracja").doc(docId).get();
+      if (doc.exists) {
+        data = { id: doc.id, ...doc.data() };
+      }
+    }
 
-        if (!data) {
-          alert('Błąd: Nie znaleziono danych konfiguracyjnych do edycji.');
-          console.error(`Nie znaleziono wpisu o ID: ${docId}`);
-          return;
-        }
-        console.log("Pobrano dane konfiguracji do edycji:", data);
+    if (!data) {
+      alert('Błąd: Nie znaleziono danych konfiguracyjnych do edycji.');
+      console.error(`Nie znaleziono wpisu o ID: ${docId}`);
+      return;
+    }
+    console.log("Pobrano dane konfiguracji do edycji:", data);
 
-        konfiguracjaFormTitle.textContent = 'Edytuj dane konfiguracyjne';
-        konfiguracjaFormDocId.value = docId;
-        konfiguracjaFormImie.value = data.Imie || '';
-        konfiguracjaFormNazwisko.value = data.Nazwisko || '';
-        konfiguracjaFormEmail.value = data['Adres email'] || '';
-        konfiguracjaFormTelefon.value = data['Nr telefonu'] || '';
-        konfiguracjaFormPodpis.value = data.Podpis || '';
-        konfiguracjaFormInicjaly.value = data.Inicjaly || '';
-        konfiguracjaFormIdLecznicy.value = data['ID lecznicy'] || '';
-        konfiguracjaFormNazwaLecznicy.value = data['Nazwa lecznicy'] || '';
-        konfiguracjaFormRola.value = data.Rola || 'pracownik';
-        
-        // ✅ POCZĄTEK NOWEJ LOGIKI BLOKOWANIA PÓL
-        // Pole ID Lecznicy jest ZAWSZE zablokowane
-        konfiguracjaFormIdLecznicy.readOnly = true;
-        konfiguracjaFormIdLecznicy.style.backgroundColor = '#eee';
+    konfiguracjaFormTitle.textContent = 'Edytuj dane konfiguracyjne';
+    konfiguracjaFormDocId.value = docId;
+    konfiguracjaFormImie.value = data.Imie || '';
+    konfiguracjaFormNazwisko.value = data.Nazwisko || '';
+    konfiguracjaFormEmail.value = data['Adres email'] || '';
+    konfiguracjaFormTelefon.value = data['Nr telefonu'] || '';
+    konfiguracjaFormPodpis.value = data.Podpis || '';
+    konfiguracjaFormInicjaly.value = data.Inicjaly || '';
+    konfiguracjaFormIdLecznicy.value = data['ID lecznicy'] || '';
+    konfiguracjaFormNazwaLecznicy.value = data['Nazwa lecznicy'] || '';
+    
+    // ✅ ZMIANA Z PKT 3.3: Dynamicznie wypełnij listę ról PRZED ustawieniem wartości
+    populateRolaDropdown();
+    konfiguracjaFormRola.value = data.Rola || 'pracownik'; // Ustaw na edytowaną rolę
+    
+    // ✅ POCZĄTEK NOWEJ LOGIKI BLOKOWANIA PÓL
+    // Pole ID Lecznicy jest ZAWSZE zablokowane
+    konfiguracjaFormIdLecznicy.readOnly = true;
+    konfiguracjaFormIdLecznicy.style.backgroundColor = '#eee';
 
-        // Sprawdź, czy zalogowany użytkownik jest adminem lub właścicielem
-        if (adminRoles.includes(currentUserProfile.Rola)) {
-          // JEST ADMINEM/WŁAŚCICIELEM: Może edytować nazwę lecznicy
-          konfiguracjaFormNazwaLecznicy.readOnly = false;
-          konfiguracjaFormNazwaLecznicy.style.backgroundColor = '#fff';
-        } else {
-          // JEST PRACOWNIKIEM: Nie może edytować nazwy lecznicy
-          konfiguracjaFormNazwaLecznicy.readOnly = true;
-          konfiguracjaFormNazwaLecznicy.style.backgroundColor = '#eee';
-        }
-        // ✅ KONIEC NOWEJ LOGIKI BLOKOWANIA PÓL
+    // Sprawdź, czy zalogowany użytkownik jest adminem lub właścicielem
+    if (adminRoles.includes(currentUserProfile.Rola)) {
+      // JEST ADMINEM/WŁAŚCICIELEM: Może edytować nazwę lecznicy
+      konfiguracjaFormNazwaLecznicy.readOnly = false;
+      konfiguracjaFormNazwaLecznicy.style.backgroundColor = '#fff';
+    } else {
+      // JEST PRACOWNIKIEM: Nie może edytować nazwy lecznicy
+      konfiguracjaFormNazwaLecznicy.readOnly = true;
+      konfiguracjaFormNazwaLecznicy.style.backgroundColor = '#eee';
+    }
+    // ✅ KONIEC NOWEJ LOGIKI BLOKOWANIA PÓL
 
-        // ✅ POKAŻ MODAL TERAZ (PO SKONFIGUROWANIU PÓL)
-        konfiguracjaFormModal.style.display = 'flex';
+    // ✅ POKAŻ MODAL TERAZ (PO SKONFIGUROWANIU PÓL)
+    konfiguracjaFormModal.style.display = 'flex';
+
+  } catch (error) {
+    console.error('Błąd pobierania wpisu konfiguracji do ed
 
       } catch (error) {
         // ✅ UZUPEŁNIŁEM TWÓJ PUSTY BLOK 'CATCH'
@@ -4342,7 +4348,35 @@ console.log(`Wklejono ${lines.length} linii do kolumny ${cellIndex + 1} tabeli p
 // ========================================================
 // ✅ POCZĄTEK: LOGIKA ZAKŁADKI KONFIGURACJA PROGRAMU
 // ========================================================
+/**
+ * Dynamicznie wypełnia listę ról w formularzu konfiguracji
+ * na podstawie roli zalogowanego użytkownika.
+ */
+function populateRolaDropdown() {
+  if (!konfiguracjaFormRola || !currentUserProfile) return;
 
+  konfiguracjaFormRola.innerHTML = ''; // Wyczyść stare opcje
+
+  const rola = currentUserProfile.Rola;
+
+  if (rola === 'administrator') {
+    // Admin może tworzyć wszystkie typy kont
+    konfiguracjaFormRola.add(new Option('Pracownik', 'pracownik'));
+    konfiguracjaFormRola.add(new Option('Właściciel', 'właściciel'));
+    konfiguracjaFormRola.add(new Option('Administrator', 'administrator'));
+  } else if (rola === 'właściciel') {
+    // Właściciel może tworzyć Pracowników i innych Właścicieli
+    konfiguracjaFormRola.add(new Option('Pracownik', 'pracownik'));
+    konfiguracjaFormRola.add(new Option('Właściciel', 'właściciel'));
+  }
+  // Pracownik nie ma dostępu do tego formularza, więc nie ma 'else'
+}
+
+/**
+* Renderuje tabelę konfiguracji...
+*/
+function renderKonfiguracjaTable(konfiguracjaData) {
+// ... (reszta funkcji)
 /**
 * Renderuje tabelę konfiguracji na podstawie przekazanej tablicy danych.
 */
@@ -4424,38 +4458,65 @@ function renderKonfiguracjaTable(konfiguracjaData) {
 }
 
 /**
-* Pobiera dane konfiguracji z Firestore (kolekcja 'konfiguracja'), zapisuje do cache i wywołuje renderowanie.
-*/
+ * Pobiera dane konfiguracji z Firestore, FILTRUJĄC je wg roli.
+ * Admin widzi wszystko, Właściciel widzi tylko swoją lecznicę.
+ */
 async function loadAndCacheKonfiguracja() {
-if (!konfiguracjaTableBody) return;
+  if (!konfiguracjaTableBody) return;
 
-konfiguracjaTableBody.innerHTML = '<tr><td colspan="10" style="text-align: center; padding: 10px;">Ładowanie danych konfiguracyjnych... <span class="spinner">⏳</span></td></tr>';
-if(loadKonfiguracjaBtn) loadKonfiguracjaBtn.disabled = true;
+  konfiguracjaTableBody.innerHTML = '<tr><td colspan="10" style="text-align: center; padding: 10px;">Ładowanie danych konfiguracyjnych... <span class="spinner">⏳</span></td></tr>';
+  if(loadKonfiguracjaBtn) loadKonfiguracjaBtn.disabled = true;
 
-try {
-console.log("Pobieranie konfiguracji z Firestore (kolekcja: konfiguracja)...");
-const snapshot = await db.collection("konfiguracja").get();
+  try {
+    // SPRAWDZENIE PROFILU PRZED ZAPYTANIEM
+    if (!currentUserProfile) {
+      throw new Error("Brak profilu zalogowanego użytkownika. Nie można załadować danych.");
+    }
 
-if (snapshot.empty) {
-console.log("Kolekcja konfiguracji jest pusta.");
-cachedKonfiguracja = [];
-renderKonfiguracjaTable(cachedKonfiguracja);
-} else {
-console.log(`Pobrano ${snapshot.size} wpisów konfiguracyjnych.`);
-cachedKonfiguracja = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-console.log("Dane konfiguracji zapisane w cache:", cachedKonfiguracja);
-renderKonfiguracjaTable(cachedKonfiguracja);
-}
-if(loadKonfiguracjaBtn) loadKonfiguracjaBtn.style.display = 'none';
+    let query;
+    const rola = currentUserProfile.Rola;
 
-} catch (error) {
-console.error("Błąd podczas ładowania konfiguracji z Firestore: ", error);
-konfiguracjaTableBody.innerHTML = '<tr><td colspan="10" style="text-align: center; padding: 10px; color: red;">Wystąpił błąd podczas ładowania danych. Spróbuj ponownie lub sprawdź konsolę (F12).</td></tr>';
-cachedKonfiguracja = null;
-if(loadKonfiguracjaBtn) loadKonfiguracjaBtn.style.display = 'inline-block';
-} finally {
-if(loadKonfiguracjaBtn) loadKonfiguracjaBtn.disabled = false;
-}
+    if (rola === 'administrator') {
+      // ADMIN: Pobierz wszystkich użytkowników ze wszystkich lecznic
+      console.log("Ładowanie konfiguracji: Tryb Administratora (wszyscy użytkownicy).");
+      query = db.collection("konfiguracja");
+
+    } else if (rola === 'właściciel') {
+      // WŁAŚCICIEL: Pobierz tylko użytkowników ze swojej lecznicy
+      const idLecznicy = currentUserProfile['ID lecznicy'];
+      if (!idLecznicy) throw new Error("Profil właściciela nie ma przypisanego ID lecznicy.");
+
+      console.log(`Ładowanie konfiguracji: Tryb Właściciela (tylko ID lecznicy: ${idLecznicy}).`);
+      query = db.collection("konfiguracja").where("ID lecznicy", "==", idLecznicy);
+
+    } else {
+      // Pracownik nie powinien tu dotrzeć, ale na wszelki wypadek
+      throw new Error("Brak uprawnień do załadowania tej sekcji.");
+    }
+
+    // Reszta funkcji (pobranie i renderowanie)
+    const snapshot = await query.get();
+
+    if (snapshot.empty) {
+      console.log("Kolekcja konfiguracji (filtrowana) jest pusta.");
+      cachedKonfiguracja = [];
+      renderKonfiguracjaTable(cachedKonfiguracja);
+    } else {
+      console.log(`Pobrano ${snapshot.size} wpisów konfiguracyjnych.`);
+      cachedKonfiguracja = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      console.log("Dane konfiguracji zapisane w cache:", cachedKonfiguracja);
+      renderKonfiguracjaTable(cachedKonfiguracja);
+    }
+    if(loadKonfiguracjaBtn) loadKonfiguracjaBtn.style.display = 'none';
+
+  } catch (error) {
+    console.error("Błąd podczas ładowania konfiguracji z Firestore: ", error);
+    konfiguracjaTableBody.innerHTML = `<tr<td colspan="10" style="text-align: center; padding: 10px; color: red;">Wystąpił błąd podczas ładowania danych: ${error.message}</td></tr>`;
+    cachedKonfiguracja = null;
+    if(loadKonfiguracjaBtn) loadKonfiguracjaBtn.style.display = 'inline-block';
+  } finally {
+    if(loadKonfiguracjaBtn) loadKonfiguracjaBtn.disabled = false;
+  }
 }
 
 // Listener dla przycisku "Wczytaj konfigurację"
