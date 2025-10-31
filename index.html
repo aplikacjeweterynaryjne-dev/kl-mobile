@@ -4534,7 +4534,7 @@ if (logoutBtn) {
 if (menuLogoutBtn) {
   menuLogoutBtn.addEventListener('click', handleLogout); // ✅ DODANY BLOK
 }
-  // --- Listener dla przycisku "Zarejestruj się" (REJESTRACJA WŁAŚCICIELA) ---
+// --- Listener dla przycisku "Zarejestruj się" (INTELIGENTNA REJESTRACJA) ---
 if (registerBtn) {
   registerBtn.addEventListener('click', async () => {
     // Wyczyść stare błędy
@@ -4549,9 +4549,9 @@ if (registerBtn) {
     const nazwisko = registerNazwisko.value.trim();
     const nazwaLecznicy = registerNazwaLecznicy.value.trim();
 
-    // Walidacja
-    if (!imie || !nazwisko || !email || !nazwaLecznicy) {
-      registerError.textContent = 'Wypełnij wszystkie pola.';
+    // Walidacja (nieco lżejsza, bo Nazwa Lecznicy jest opcjonalna)
+    if (!imie || !nazwisko || !email) {
+      registerError.textContent = 'Imię, Nazwisko i E-mail są wymagane.';
       registerError.style.display = 'block';
       return;
     }
@@ -4566,64 +4566,97 @@ if (registerBtn) {
       return;
     }
 
-    console.log(`Próba rejestracji nowej lecznicy: ${nazwaLecznicy} przez ${email}`);
+    console.log(`Próba rejestracji dla: ${email}`);
     registerBtn.disabled = true;
     registerBtn.textContent = 'Rejestrowanie...';
 
-    let createdUserUid = null; // Zmienna do przechowania UID na wypadek błędu
+    let createdUserUid = null;
 
     try {
-      // 1. Stwórz użytkownika w Firebase Authentication
-      const userCredential = await auth.createUserWithEmailAndPassword(email, password);
-      createdUserUid = userCredential.user.uid;
-      console.log(`Pomyślnie utworzono konto Auth dla UID: ${createdUserUid}`);
+      // KROK 1: Sprawdź, czy ten e-mail istnieje już w 'konfiguracja'
+      const querySnapshot = await db.collection("konfiguracja").where("Adres email", "==", email).limit(1).get();
 
-      // 2. Stwórz profil WŁAŚCICIELA w kolekcji 'konfiguracja'
-      const userProfileData = {
-        uid: createdUserUid,
-        Imie: imie,
-        Nazwisko: nazwisko,
-        'Adres email': email,
-        Rola: 'właściciel', // Ustawia rolę na 'właściciel'
-        'Nazwa lecznicy': nazwaLecznicy,
-        'ID lecznicy': '', // Na razie puste, zaraz zaktualizujemy
-        Podpis: '',
-        Inicjaly: '',
-        'Nr telefonu': ''
-      };
+      if (!querySnapshot.empty) {
+        // SCENARIUSZ A: E-MAIL ZNALEZIONY (PRACOWNIK)
+        console.log("E-mail znaleziony. Próba aktywacji konta pracownika...");
+        const doc = querySnapshot.docs[0];
+        const profil = doc.data();
 
-      // Dodaj dokument i pobierz jego referencję (aby poznać jego ID)
-      const docRef = await db.collection("konfiguracja").add(userProfileData);
-      console.log(`Utworzono profil w 'konfiguracja' z tymczasowym ID: ${docRef.id}`);
+        // Sprawdź, czy konto nie jest już aktywne (czy ma UID)
+        if (profil.uid) {
+          throw new Error("Konto dla tego adresu e-mail jest już aktywne.");
+        }
 
-      // 3. Zaktualizuj ten dokument, wpisując jego własne ID jako "ID lecznicy"
-      await docRef.update({
-        'ID lecznicy': docRef.id
-      });
-      console.log(`Pomyślnie ustawiono 'ID lecznicy' na: ${docRef.id}`);
+        // 1. Stwórz użytkownika w Auth
+        const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+        createdUserUid = userCredential.user.uid;
 
-      // 4. Wyloguj użytkownika (aby musiał zalogować się ręcznie)
+        // 2. Zaktualizuj profil o UID, Imię i Nazwisko
+        await doc.ref.update({
+          uid: createdUserUid,
+          Imie: imie,
+          Nazwisko: nazwisko
+        });
+
+        console.log(`Pomyślnie aktywowano pracownika i połączono UID: ${createdUserUid}`);
+        alert('Rejestracja pomyślna! Zostałeś dodany do lecznicy. Możesz się teraz zalogować.');
+
+      } else {
+        // SCENARIUSZ B: E-MAIL NIEZNALEZIONY (NOWY WŁAŚCICIEL)
+        console.log("E-mail nieznaleziony. Próba rejestracji nowej lecznicy...");
+
+        // Właściciel MUSI podać nazwę lecznicy
+        if (!nazwaLecznicy) {
+          throw new Error("Jako nowy właściciel musisz podać Nazwę Lecznicy.");
+        }
+
+        // 1. Stwórz użytkownika w Auth
+        const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+        createdUserUid = userCredential.user.uid;
+
+        // 2. Stwórz profil WŁAŚCICIELA (ta sama logika co wcześniej)
+        const userProfileData = {
+          uid: createdUserUid,
+          Imie: imie,
+          Nazwisko: nazwisko,
+          'Adres email': email,
+          Rola: 'właściciel',
+          'Nazwa lecznicy': nazwaLecznicy,
+          'ID lecznicy': '', // Puste na razie
+          Podpis: '', Inicjaly: '', 'Nr telefonu': ''
+        };
+
+        const docRef = await db.collection("konfiguracja").add(userProfileData);
+
+        // 3. Ustaw ID lecznicy
+        await docRef.update({
+          'ID lecznicy': docRef.id
+        });
+
+        console.log(`Pomyślnie zarejestrowano nową lecznicę z ID: ${docRef.id}`);
+        alert('Rejestracja lecznicy pomyślna! Możesz się teraz zalogować.');
+      }
+
+      // KROK OSTATNI (dla obu scenariuszy): Wyloguj i przełącz
       await auth.signOut();
-
-      // 5. Poinformuj o sukcesie i przełącz na logowanie
-      alert('Rejestracja lecznicy pomyślna! Możesz się teraz zalogować.');
       registerSection.style.display = 'none';
       loginSection.style.display = 'flex';
 
-      // Wyczyść formularz rejestracji
-      registerImie.value = '';
-      registerNazwisko.value = '';
-      registerEmail.value = '';
-      registerPassword.value = '';
-      registerPasswordConfirm.value = '';
-      registerNazwaLecznicy.value = '';
+      // Wyczyść formularz
+      registerImie.value = ''; registerNazwisko.value = '';
+      registerEmail.value = ''; registerPassword.value = '';
+      registerPasswordConfirm.value = ''; registerNazwaLecznicy.value = '';
 
     } catch (error) {
       // Błąd
       console.error("Błąd rejestracji:", error.code, error.message);
 
-      // Podstawowa obsługa błędów
-      if (error.code === 'auth/email-already-in-use') {
+      // Tłumaczenie błędów
+      if (error.message === "Konto dla tego adresu e-mail jest już aktywne.") {
+        registerError.textContent = "To konto jest już aktywne. Spróbuj się zalogować.";
+      } else if (error.message.includes("Jako nowy właściciel")) {
+        registerError.textContent = "Aby zarejestrować nową lecznicę, musisz podać jej nazwę.";
+      } else if (error.code === 'auth/email-already-in-use') {
         registerError.textContent = 'Ten adres e-mail jest już zajęty.';
       } else if (error.code === 'auth/weak-password') {
         registerError.textContent = 'Hasło jest zbyt słabe.';
@@ -4638,7 +4671,7 @@ if (registerBtn) {
       registerBtn.textContent = 'Zarejestruj się';
     }
   });
-} 
+}
 </script>
 
 </body>
