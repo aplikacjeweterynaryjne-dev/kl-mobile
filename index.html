@@ -4373,19 +4373,27 @@ if (loginBtn) {
   });
 }
 
-// --- Listener dla przycisku "Wyloguj" ---
+// --- Funkcja do obsługi wylogowania ---
+function handleLogout() {
+  if (confirm("Czy na pewno chcesz się wylogować?")) {
+    console.log("Wylogowywanie...");
+    auth.signOut().catch(error => {
+      console.error("Błąd wylogowania:", error);
+      alert("Nie udało się wylogować. Spróbuj ponownie.");
+    });
+    // Obserwator (onAuthStateChanged) automatycznie
+    // wykryje wylogowanie i pokaże ekran logowania.
+  }
+}
+
+// --- Listener dla przycisku "Wyloguj" (na pasku zakładek) ---
 if (logoutBtn) {
-  logoutBtn.addEventListener('click', () => {
-    if (confirm("Czy na pewno chcesz się wylogować?")) {
-      console.log("Wylogowywanie...");
-      auth.signOut().catch(error => {
-        console.error("Błąd wylogowania:", error);
-        alert("Nie udało się wylogować. Spróbuj ponownie.");
-      });
-      // Obserwator (onAuthStateChanged) automatycznie
-      // wykryje wylogowanie i pokaże ekran logowania.
-    }
-  });
+  logoutBtn.addEventListener('click', handleLogout); // ✅ ZMIANA
+}
+
+// --- Listener dla przycisku "Wyloguj" (w menu głównym) ---
+if (menuLogoutBtn) {
+  menuLogoutBtn.addEventListener('click', handleLogout); // ✅ DODANY BLOK
 }
 // Upewnij się, że inne funkcje (jak edycja, usuwanie, wyszukiwanie, import) działają
 // - Edycja/Usuwanie: Powinny działać bez zmian, bo operują na data-id wiersza.
