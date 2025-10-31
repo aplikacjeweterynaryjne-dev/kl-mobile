@@ -712,6 +712,7 @@ background-color: #eef;
 <button id="tabBazaKlientowBtn" class="btn">👥 Klienci</button>
 <button id="tabBazaProduktowBtn" class="btn">📦 Produkty</button>
 <button id="tabKonfiguracjaBtn" class="btn">⚙️ Konfiguracja</button>
+<button id="logoutBtn" class="btn warn small" style="font-size: 16px; margin-left: auto;">Wyloguj ➡️</button>
 </div> <div id="kartaLeczeniaSection" style="display: none;">
 <h2>KARTA LECZENIA ZWIERZĄT GOSPODARSKICH ORAZ ZWIERZĄT, Z KTÓRYCH POZYSKANE TKANKI LUB PRODUKTY SĄ PRZEZNACZONE DO SPOŻYCIA PRZEZ LUDZI / EWIDENCJA LECZENIA ZWIERZĄT</h2>
 
@@ -1252,6 +1253,7 @@ if (!firebase.apps.length) {
 firebase.initializeApp(firebaseConfig);
 }
 const db = firebase.firestore();
+const auth = firebase.auth();
 console.log("Firebase gotowy do działania.");
 
 /* ----- GŁÓWNE ZMIENNE APLIKACJI ----- */
@@ -2150,6 +2152,13 @@ alert('❌ Nie udało się zapisać adresu e-mail lokalnie.');
 <script>
 // ✅ POCZĄTEK: ZMIENNE DLA BAZY KLIENTÓW I MODALI
 // ✅ NOWE ZMIENNE DLA MENU GŁÓWNEGO I MODALI
+// Zmienne dla ekranu logowania
+const loginSection = document.getElementById('loginSection');
+const loginEmail = document.getElementById('loginEmail');
+const loginPassword = document.getElementById('loginPassword');
+const loginBtn = document.getElementById('loginBtn');
+const loginError = document.getElementById('loginError');
+const logoutBtn = document.getElementById('logoutBtn'); // Przycisk wyloguj
 const mainMenuSection = document.getElementById('mainMenuSection');
 const mainTabBar = document.getElementById('mainTabBar');
 
@@ -2268,7 +2277,42 @@ const kartaSection = document.getElementById('kartaLeczeniaSection');
 const kalkulatorSection = document.getElementById('kalkulatorWizytySection');
 const tabKartaBtn = document.getElementById('tabKartaBtn');
 const tabKalkulatorBtn = document.getElementById('tabKalkulatorBtn');
+// ========================================================
+// ✅ GŁÓWNA LOGIKA UWIRZYTELNIANIA
+// ========================================================
 
+auth.onAuthStateChanged(user => {
+  if (user) {
+    // Użytkownik JEST zalogowany
+    console.log("Użytkownik zalogowany:", user.email);
+
+    // Ukryj ekran logowania
+    if (loginSection) loginSection.style.display = 'none';
+
+    // Pokaż menu główne (zgodnie z Twoją logiką)
+    if (mainMenuSection) mainMenuSection.style.display = 'flex';
+    // Pasek zakładek jest domyślnie ukryty, pokaże się po kliknięciu w menu (to jest OK)
+    if (mainTabBar) mainTabBar.style.display = 'none'; 
+
+  } else {
+    // Użytkownik NIE JEST zalogowany
+    console.log("Użytkownik wylogowany.");
+
+    // Pokaż ekran logowania
+    if (loginSection) loginSection.style.display = 'flex';
+
+    // Ukryj CAŁĄ resztę aplikacji
+    if (mainMenuSection) mainMenuSection.style.display = 'none';
+    if (mainTabBar) mainTabBar.style.display = 'none';
+
+    // Ukryj też wszystkie sekcje na wszelki wypadek
+    if (kartaSection) kartaSection.style.display = 'none';
+    if (kalkulatorSection) kalkulatorSection.style.display = 'none';
+    if (bazaKlientowSection) bazaKlientowSection.style.display = 'none';
+    if (bazaProduktowSection) bazaProduktowSection.style.display = 'none';
+    if (konfiguracjaSection) konfiguracjaSection.style.display = 'none';
+  }
+});
 function showSection(sectionToShow) {
 // ✅ NOWA LOGIKA: Ukryj menu główne i pokaż pasek zakładek
 if (mainMenuSection) mainMenuSection.style.display = 'none';
@@ -4265,7 +4309,83 @@ loadAndCacheClients(); // Wywołaj funkcję pobierającą dane
 }
 });
 }
+// ========================================================
+// ✅ OBSŁUGA FORMULARZA LOGOWANIA
+// ========================================================
 
+// --- Funkcja do "tłumaczenia" błędów Firebase na polski ---
+function translateAuthError(errorCode) {
+  switch (errorCode) {
+    case 'auth/invalid-email':
+      return 'Niepoprawny format adresu e-mail.';
+    case 'auth/user-not-found':
+    case 'auth/wrong-password':
+    case 'auth/invalid-credential':
+      return 'Nieprawidłowy e-mail lub hasło.';
+    case 'auth/too-many-requests':
+      return 'Zbyt wiele prób logowania. Spróbuj ponownie później.';
+    default:
+      return 'Wystąpił nieznany błąd. Spróbuj ponownie.';
+  }
+}
+
+// --- Listener dla przycisku "Zaloguj się" ---
+if (loginBtn) {
+  loginBtn.addEventListener('click', () => {
+    const email = loginEmail.value.trim();
+    const password = loginPassword.value;
+
+    // Wyczyść stare błędy
+    loginError.textContent = '';
+    loginError.style.display = 'none';
+
+    // Walidacja
+    if (!email || !password) {
+      loginError.textContent = 'Wprowadź e-mail i hasło.';
+      loginError.style.display = 'block';
+      return;
+    }
+
+    console.log(`Próba logowania jako: ${email}`);
+    loginBtn.disabled = true;
+    loginBtn.textContent = 'Logowanie...';
+
+    // Logowanie do Firebase
+    auth.signInWithEmailAndPassword(email, password)
+      .then(userCredential => {
+        // Sukces!
+        console.log("Zalogowano pomyślnie!", userCredential.user.email);
+        // Nie musimy tu nic robić - obserwator (onAuthStateChanged)
+        // automatycznie wykryje zmianę i pokaże aplikację.
+      })
+      .catch(error => {
+        // Błąd logowania
+        console.error("Błąd logowania:", error.code);
+        loginError.textContent = 'Błąd: ' + translateAuthError(error.code);
+        loginError.style.display = 'block';
+      })
+      .finally(() => {
+        // Przywróć przycisk
+        loginBtn.disabled = false;
+        loginBtn.textContent = 'Zaloguj się';
+      });
+  });
+}
+
+// --- Listener dla przycisku "Wyloguj" ---
+if (logoutBtn) {
+  logoutBtn.addEventListener('click', () => {
+    if (confirm("Czy na pewno chcesz się wylogować?")) {
+      console.log("Wylogowywanie...");
+      auth.signOut().catch(error => {
+        console.error("Błąd wylogowania:", error);
+        alert("Nie udało się wylogować. Spróbuj ponownie.");
+      });
+      // Obserwator (onAuthStateChanged) automatycznie
+      // wykryje wylogowanie i pokaże ekran logowania.
+    }
+  });
+}
 // Upewnij się, że inne funkcje (jak edycja, usuwanie, wyszukiwanie, import) działają
 // - Edycja/Usuwanie: Powinny działać bez zmian, bo operują na data-id wiersza.
 // - Zapis importu: Powinien działać bez zmian, bo odczytuje dane z tabeli HTML.
