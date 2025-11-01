@@ -536,6 +536,25 @@ background: #a93226;
   #produktTable.import-mode .col-akcje {
     display: none; /* Ukryj kolumnę akcji w trybie importu */
   }
+    /* --- Moduł 2: Style Statusu Płatności --- */
+.payment-status-btn {
+  font-size: 16px;
+  padding: 8px 15px;
+  background-color: #f5f5f5;
+  border: 2px solid #ddd; /* Grubsza ramka, aby pokazać stan */
+  opacity: 0.6; /* Domyślnie "wyblakłe" */
+  cursor: pointer;
+}
+.payment-status-btn.active {
+  border-color: #3498db; /* Aktywny ma niebieską ramkę */
+  background-color: #e3f2fd;
+  opacity: 1.0;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+.payment-status-btn span {
+  vertical-align: middle;
+  margin-right: 5px;
+}
 </style>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
@@ -1018,7 +1037,17 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
 <button id="pluBtn" class="btn small">PLU</button>
 </div>
 
-
+<div id="paymentStatusSection" style="margin-top: 20px; border-top: 1px solid #eee; padding-top: 15px;">
+  <h4 style="margin: 0 0 10px 0; font-size: 16px;">Status płatności:</h4>
+  <div style="display: flex; gap: 10px;">
+    <button type="button" id="paymentStatusPaid" class="btn payment-status-btn" data-status="Zapłacone">
+      <span style="font-size: 20px; color: #27ae60; font-weight: bold;">+</span> Zapłacone
+    </button>
+    <button type="button" id="paymentStatusDebt" class="btn payment-status-btn" data-status="Dług">
+      <span style="font-size: 20px; color: #c0392b; font-weight: bold;">-</span> Dług
+    </button>
+  </div>
+</div>
 <div style="text-align: right; margin-top: 20px;">
 <button id="saveReceiptBtn" class="btn primary">Zapisz Paragon</button>
 </div>
@@ -2669,6 +2698,10 @@ const pluCodeInput = document.getElementById('pluCodeInput');
 const pluBtn = document.getElementById('pluBtn');
 const productUnitDisplay = document.getElementById('productUnitDisplay');
 // Tablica przechowuje teraz { name: '...', quantity: 1, price: 10.50 }
+    // ✅ Moduł 2: Zmienne statusu płatności
+const paymentStatusSection = document.getElementById('paymentStatusSection');
+const paymentStatusPaidBtn = document.getElementById('paymentStatusPaid');
+const paymentStatusDebtBtn = document.getElementById('paymentStatusDebt');
 let receiptItems = [];
 // receiptTotal jest teraz zadeklarowany globalnie (wcześniej w kodzie)
 
@@ -2846,32 +2879,65 @@ console.warn(`Pominięto kopiowanie: Produkt "${productName}" nie znaleziony w b
 });
 }
 
+
 // Zapisywanie paragonu (dodaje sumę)
+// ✅ Moduł 2: ZMODYFIKOWANA funkcja zapisu paragonu (dodaje status)
 if (saveReceiptBtn) {
-saveReceiptBtn.addEventListener('click', () => {
-if (receiptItems.length > 0) {
-if (savedReceiptSummary) {
-savedReceiptSummary.innerHTML = '<h4>Zapisany Paragon:</h4>';
-const list = document.createElement('ul');
-list.style.listStyle = 'none'; list.style.paddingLeft = '10px';
-receiptItems.forEach(item => {
-const li = document.createElement('li');
-const quantity = Number(item.quantity) || 0;
-const price = Number(item.price) || 0;
-const itemTotal = quantity * price;
-li.textContent = `${item.name} x ${quantity} = ${formatPrice(itemTotal)}`;
-list.appendChild(li);
-});
-savedReceiptSummary.appendChild(list);
-const totalP = document.createElement('p');
-totalP.style.fontWeight = 'bold';
-totalP.style.textAlign = 'right';
-totalP.textContent = `Suma: ${formatPrice(receiptTotal)}`;
-savedReceiptSummary.appendChild(totalP);
-}
-alert('Paragon zapisany (tymczasowo).');
-} else { alert('Paragon jest pusty, nie ma czego zapisywać.'); }
-});
+  saveReceiptBtn.addEventListener('click', () => {
+    if (receiptItems.length > 0) {
+      if (savedReceiptSummary) {
+        // Wyczyść podsumowanie
+        savedReceiptSummary.innerHTML = '<h4>Zapisany Paragon:</h4>';
+
+        // ✅ START: Logika odczytu statusu
+        let statusText = "Nie wybrano statusu";
+        let statusColor = "#555";
+        if (paymentStatusPaidBtn && paymentStatusPaidBtn.classList.contains('active')) {
+          statusText = paymentStatusPaidBtn.dataset.status; // "Zapłacone"
+          statusColor = "#27ae60"; // zielony
+        } else if (paymentStatusDebtBtn && paymentStatusDebtBtn.classList.contains('active')) {
+          statusText = paymentStatusDebtBtn.dataset.status; // "Dług"
+          statusColor = "#c0392b"; // czerwony
+        }
+
+        // Dodaj element statusu do podsumowania
+        const statusP = document.createElement('p');
+        statusP.style.fontWeight = 'bold';
+        statusP.style.fontSize = '1.1em';
+        statusP.innerHTML = `Status: <span style="color: ${statusColor};">${statusText}</span>`;
+        savedReceiptSummary.appendChild(statusP);
+        // ✅ KONIEC: Logiki statusu
+
+        // Reszta kodu (lista produktów) - bez zmian
+        const list = document.createElement('ul');
+        list.style.listStyle = 'none'; list.style.paddingLeft = '10px';
+        receiptItems.forEach(item => {
+          const li = document.createElement('li');
+          const quantity = Number(item.quantity) || 0;
+          const price = Number(item.price) || 0;
+          const itemTotal = quantity * price;
+          li.textContent = `${item.name} x ${quantity} = ${formatPrice(itemTotal)}`;
+          list.appendChild(li);
+        });
+        savedReceiptSummary.appendChild(list);
+
+        // Reszta kodu (suma) - bez zmian
+        const totalP = document.createElement('p');
+        totalP.style.fontWeight = 'bold';
+        totalP.style.textAlign = 'right';
+        totalP.textContent = `Suma: ${formatPrice(receiptTotal)}`;
+        savedReceiptSummary.appendChild(totalP);
+      }
+      alert('Paragon zapisany (tymczasowo).');
+
+      // ✅ DODANO: Zresetuj status po zapisie
+      if (paymentStatusPaidBtn) paymentStatusPaidBtn.classList.remove('active');
+      if (paymentStatusDebtBtn) paymentStatusDebtBtn.classList.remove('active');
+
+    } else {
+      alert('Paragon jest pusty, nie ma czego zapisywać.');
+    }
+  });
 }
 
 // Obsługa PLU (używa addItemToReceipt)
@@ -2886,6 +2952,18 @@ if (pluCodeInput) pluCodeInput.value = '';
 } else { alert(`Nie znaleziono produktu dla kodu PLU: ${code}`); }
 }
 });
+}
+    // ✅ Moduł 2: Logika przełączania statusu płatności
+if (paymentStatusPaidBtn && paymentStatusDebtBtn) {
+  paymentStatusPaidBtn.addEventListener('click', () => {
+    paymentStatusPaidBtn.classList.add('active');
+    paymentStatusDebtBtn.classList.remove('active');
+  });
+
+  paymentStatusDebtBtn.addEventListener('click', () => {
+    paymentStatusDebtBtn.classList.add('active');
+    paymentStatusPaidBtn.classList.remove('active');
+  });
 }
 // ✅ DODANO: Aktualizacja jednostki/dawkowania po wyborze produktu
 if (productSelect && productUnitDisplay) {
