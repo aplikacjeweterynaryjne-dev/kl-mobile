@@ -3756,8 +3756,10 @@ if (addNewKonfiguracjaBtn) {
     konfiguracjaFormEmail.value = '';
     konfiguracjaFormTelefon.value = '';
     konfiguracjaFormPodpis.value = '';
-    konfiguracjaFormInicjaly.value = '';
-    konfiguracjaFormRola.value = 'pracownik'; // Domyślnie 'pracownik'
+    konfiguracjaFormInicjaly.value = '';
+ // ✅ MODYFIKACJA: Dynamicznie wypełnij role i ustaw domyślną
+    populateRolaSelect(); // Wywołaj nową funkcję
+    konfiguracjaFormRola.value = 'pracownik'; // Ustaw domyślną na 'pracownik'
 
     // ✅ NOWA LOGIKA: Automatycznie wypełnij ID i Nazwę lecznicy właściciela
     if (currentUserProfile && currentUserProfile['ID lecznicy'] && currentUserProfile['Nazwa lecznicy']) {
@@ -3912,17 +3914,20 @@ if (konfiguracjaTableBody) {
         }
         console.log("Pobrano dane konfiguracji do edycji:", data);
 
-        konfiguracjaFormTitle.textContent = 'Edytuj dane konfiguracyjne';
-        konfiguracjaFormDocId.value = docId;
-        konfiguracjaFormImie.value = data.Imie || '';
-        konfiguracjaFormNazwisko.value = data.Nazwisko || '';
-        konfiguracjaFormEmail.value = data['Adres email'] || '';
-        konfiguracjaFormTelefon.value = data['Nr telefonu'] || '';
-        konfiguracjaFormPodpis.value = data.Podpis || '';
-        konfiguracjaFormInicjaly.value = data.Inicjaly || '';
-        konfiguracjaFormIdLecznicy.value = data['ID lecznicy'] || '';
-        konfiguracjaFormNazwaLecznicy.value = data['Nazwa lecznicy'] || '';
-        konfiguracjaFormRola.value = data.Rola || 'pracownik';
+konfiguracjaFormTitle.textContent = 'Edytuj dane konfiguracyjne';
+        konfiguracjaFormDocId.value = docId;
+        konfiguracjaFormImie.value = data.Imie || '';
+        konfiguracjaFormNazwisko.value = data.Nazwisko || '';
+        konfiguracjaFormEmail.value = data['Adres email'] || '';
+        konfiguracjaFormTelefon.value = data['Nr telefonu'] || '';
+        konfiguracjaFormPodpis.value = data.Podpis || '';
+        konfiguracjaFormInicjaly.value = data.Inicjaly || '';
+        konfiguracjaFormIdLecznicy.value = data['ID lecznicy'] || '';
+        konfiguracjaFormNazwaLecznicy.value = data['Nazwa lecznicy'] || '';
+        
+        // ✅ MODYFIKACJA: Dynamicznie wypełnij role PRZED ustawieniem wartości
+        populateRolaSelect();
+        konfiguracjaFormRola.value = data.Rola || 'pracownik';
         
         // ✅ POCZĄTEK NOWEJ LOGIKI BLOKOWANIA PÓL
         // Pole ID Lecznicy jest ZAWSZE zablokowane
@@ -4492,7 +4497,49 @@ async function loadAndCacheKonfiguracja() {
         if(loadKonfiguracjaBtn) loadKonfiguracjaBtn.disabled = false;
     }
 }
+/**
+ * ✅ NOWA FUNKCJA POMOCNICZA
+ * Wypełnia listę rozwijaną ról w formularzu konfiguracji
+ * w zależności od uprawnień zalogowanego użytkownika.
+ */
+function populateRolaSelect() {
+    if (!konfiguracjaFormRola || !currentUserProfile) {
+        console.warn("Nie można wypełnić ról - brak selecta lub profilu użytkownika.");
+        return;
+    }
 
+    konfiguracjaFormRola.innerHTML = ''; // Wyczyść stare opcje
+
+    // Opcje dostępne dla Właściciela
+    const opcjeWlasciciela = [
+        { value: 'pracownik', text: 'Pracownik' },
+        { value: 'właściciel', text: 'Właściciel' }
+    ];
+
+    // Opcje dostępne dla Administratora
+    const opcjeAdministratora = [
+        ...opcjeWlasciciela,
+        { value: 'administrator', text: 'Administrator' }
+    ];
+
+    let opcjeDoDodania = [];
+
+    if (currentUserProfile.Rola === 'administrator') {
+        console.log("Wypełnianie ról: Tryb Administratora (3 role)");
+        opcjeDoDodania = opcjeAdministratora;
+    } else { // Domyślnie (dla właściciela)
+        console.log("Wypełnianie ról: Tryb Właściciela (2 role)");
+        opcjeDoDodania = opcjeWlasciciela;
+    }
+
+    // Dodaj opcje do selecta
+    opcjeDoDodania.forEach(opt => {
+        const optionEl = document.createElement('option');
+        optionEl.value = opt.value;
+        optionEl.textContent = opt.text;
+        konfiguracjaFormRola.appendChild(optionEl);
+    });
+}
 // Listener dla przycisku "Wczytaj konfigurację"
 if (loadKonfiguracjaBtn) {
 loadKonfiguracjaBtn.addEventListener('click', loadAndCacheKonfiguracja);
