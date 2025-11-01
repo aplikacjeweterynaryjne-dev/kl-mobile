@@ -4525,10 +4525,12 @@ async function loadAndCacheKonfiguracja() {
     }
 
     if (currentUserProfile.Rola === 'administrator') {
-        // Administrator widzi wszystkich, posortowanych wg nazwiska
-        console.log("Tryb Administratora: Wczytywanie wszystkich użytkowników.");
-        query = db.collection("konfiguracja").orderBy("Nazwisko");
+        // ✅ MODUŁ 3: Administrator widzi wszystkich, sortowanych wg ID lecznicy, a potem nazwiska
+        console.log("Tryb Administratora: Wczytywanie wszystkich użytkowników (sortowanie wg ID Lecz./Nazwiska).");
+        query = db.collection("konfiguracja").orderBy(new firebase.firestore.FieldPath("ID lecznicy")).orderBy("Nazwisko");
     } else {
+        // Właściciel (lub pracownik) widzi tylko swoją lecznicę
+// ... (reszta kodu)
         // Właściciel (lub pracownik) widzi tylko swoją lecznicę
         const userClinicId = currentUserProfile['ID lecznicy'];
         if (!userClinicId) {
