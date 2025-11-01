@@ -4425,37 +4425,72 @@ function renderKonfiguracjaTable(konfiguracjaData) {
 
 /**
 * Pobiera dane konfiguracji z Firestore (kolekcja 'konfiguracja'), zapisuje do cache i wywołuje renderowanie.
+* ✅ WERSJA Z FILTROWANIEM NA PODSTAWIE ROLI
 */
 async function loadAndCacheKonfiguracja() {
-if (!konfiguracjaTableBody) return;
+    if (!konfiguracjaTableBody) return;
 
-konfiguracjaTableBody.innerHTML = '<tr><td colspan="10" style="text-align: center; padding: 10px;">Ładowanie danych konfiguracyjnych... <span class="spinner">⏳</span></td></tr>';
-if(loadKonfiguracjaBtn) loadKonfiguracjaBtn.disabled = true;
+    konfiguracjaTableBody.innerHTML = '<tr><td colspan="10" style="text-align: center; padding: 10px;">Ładowanie danych konfiguracyjnych... <span class="spinner">⏳</span></td></tr>';
+    if(loadKonfiguracjaBtn) loadKonfiguracjaBtn.disabled = true;
 
-try {
-console.log("Pobieranie konfiguracji z Firestore (kolekcja: konfiguracja)...");
-const snapshot = await db.collection("konfiguracja").get();
+    // ✅ START MODYFIKACJI: Dynamiczne zapytanie (query)
+    let query;
+    if (!currentUserProfile) {
+        console.error("Brak profilu użytkownika. Nie można wczytać konfiguracji.");
+        konfiguracjaTableBody.innerHTML = '<tr><td colspan="10" style="text-align: center; padding: 10px; color: red;">Błąd: Brak profilu użytkownika. Zaloguj się ponownie.</td></tr>';
+        return;
+    }
 
-if (snapshot.empty) {
-console.log("Kolekcja konfiguracji jest pusta.");
-cachedKonfiguracja = [];
-renderKonfiguracjaTable(cachedKonfiguracja);
-} else {
-console.log(`Pobrano ${snapshot.size} wpisów konfiguracyjnych.`);
-cachedKonfiguracja = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-console.log("Dane konfiguracji zapisane w cache:", cachedKonfiguracja);
-renderKonfiguracjaTable(cachedKonfiguracja);
-}
-if(loadKonfiguracjaBtn) loadKonfiguracjaBtn.style.display = 'none';
+    if (currentUserProfile.Rola === 'administrator') {
+        // Administrator widzi wszystkich, posortowanych wg nazwiska
+        console.log("Tryb Administratora: Wczytywanie wszystkich użytkowników.");
+        query = db.collection("konfiguracja").orderBy("Nazwisko");
+    } else {
+        // Właściciel (lub pracownik) widzi tylko swoją lecznicę
+        const userClinicId = currentUserProfile['ID lecznicy'];
+        if (!userClinicId) {
+            console.error("Błąd: Właściciel nie ma przypisanego ID lecznicy!");
+            konfiguracjaTableBody.innerHTML = '<tr><td colspan="10" style="text-align: center; padding: 10px; color: red;">Błąd: Twój profil nie ma przypisanego ID lecznicy.</td></tr>';
+            return;
+        }
+        console.log(`Tryb Właściciela/Pracownika: Wczytywanie użytkowników dla ID lecznicy: ${userClinicId}`);
+        // Wymaga indeksu w Firestore: (ID lecznicy [ASC], Nazwisko [ASC])
+        query = db.collection("konfiguracja").where("ID lecznicy", "==", userClinicId).orderBy("Nazwisko");
+    }
+    // ✅ KONIEC MODYFIKACJI
 
-} catch (error) {
-console.error("Błąd podczas ładowania konfiguracji z Firestore: ", error);
-konfiguracjaTableBody.innerHTML = '<tr><td colspan="10" style="text-align: center; padding: 10px; color: red;">Wystąpił błąd podczas ładowania danych. Spróbuj ponownie lub sprawdź konsolę (F12).</td></tr>';
-cachedKonfiguracja = null;
-if(loadKonfiguracjaBtn) loadKonfiguracjaBtn.style.display = 'inline-block';
-} finally {
-if(loadKonfiguracjaBtn) loadKonfiguracjaBtn.disabled = false;
-}
+    try {
+        // ✅ MODYFIKACJA: Użyj dynamicznego 'query'
+        console.log("Wykonywanie zapytania o konfigurację...");
+        const snapshot = await query.get();
+
+        if (snapshot.empty) {
+            console.log("Kolekcja konfiguracji jest pusta lub brak wyników dla tego filtra.");
+            cachedKonfiguracja = [];
+            renderKonfiguracjaTable(cachedKonfiguracja); // Pokaże komunikat "Brak danych"
+        } else {
+            console.log(`Pobrano ${snapshot.size} wpisów konfiguracyjnych.`);
+            cachedKonfiguracja = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            console.log("Dane konfiguracji zapisane w cache:", cachedKonfiguracja);
+            renderKonfiguracjaTable(cachedKonfiguracja);
+        }
+        if(loadKonfiguracjaBtn) loadKonfiguracjaBtn.style.display = 'none';
+
+    } catch (error) {
+        console.error("Błąd podczas ładowania konfiguracji z Firestore: ", error);
+        // ✅ Ulepszony komunikat o błędzie indeksu
+        if (error.code === 'failed-precondition') {
+            alert("BŁĄD BAZY DANYCH: Wymagany jest indeks Firestore. Sprawdź konsolę (F12) i instrukcję (Krok 2).");
+            console.error("BŁĄD: Prawdopodobnie brakuje indeksu kompozytowego w Firestore. Utwórz indeks dla kolekcji 'konfiguracja' dla pól: 'ID lecznicy' (Rosnąco) i 'Nazwisko' (Rosnąco).");
+            konfiguracjaTableBody.innerHTML = '<tr><td colspan="10" style="text-align: center; padding: 10px; color: red;">Błąd konfiguracji bazy danych (brak indeksu). Skontaktuj się z administratorem.</td></tr>';
+        } else {
+            konfiguracjaTableBody.innerHTML = '<tr><td colspan="10" style="text-align: center; padding: 10px; color: red;">Wystąpił błąd podczas ładowania danych. Spróbuj ponownie.</td></tr>';
+        }
+        cachedKonfiguracja = null;
+        if(loadKonfiguracjaBtn) loadKonfiguracjaBtn.style.display = 'inline-block';
+    } finally {
+        if(loadKonfiguracjaBtn) loadKonfiguracjaBtn.disabled = false;
+    }
 }
 
 // Listener dla przycisku "Wczytaj konfigurację"
