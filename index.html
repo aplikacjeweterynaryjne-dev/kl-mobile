@@ -5101,13 +5101,16 @@ function initSignatureKonfig() {
 
     // --- Funkcje pomocnicze dla rysowania ---
 
-    function getPos(canvas, e) {
-        const rect = canvas.getBoundingClientRect();
-        const clientX = (e.touches && e.touches[0]) ? e.touches[0].clientX : e.clientX;
-        const clientY = (e.touches && e.touches[0]) ? e.touches[0].clientY : e.clientY;
-        return { x: clientX - rect.left, y: clientY - rect.top };
-    }
-
+   function getPos(canvas, e) {
+    const rect = canvas.getBoundingClientRect();
+    const clientX = (e.touches && e.touches[0]) ? e.touches[0].clientX : e.clientX;
+    const clientY = (e.touches && e.touches[0]) ? e.touches[0].clientY : e.clientY;
+    // ✅ POPRAWKA: Dzielimy przez skalę, aby zniwelować transformację body
+    return { 
+        x: (clientX - rect.left) / 0.95, 
+        y: (clientY - rect.top) / 0.95 
+    };
+}
     // Rysowanie na małym płótnie
     const startDrawingSmall = e => { sDrawing = true; const pos = getPos(canvasSmall, e); ctxSmall.beginPath(); ctxSmall.moveTo(pos.x, pos.y); };
     const drawSmall = e => { if(sDrawing){ const pos=getPos(canvasSmall, e); ctxSmall.lineTo(pos.x,pos.y); ctxSmall.stroke(); }};
