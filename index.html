@@ -5164,10 +5164,22 @@ function getPos(canvas, e) {
     };
     
     // Rysowanie na dużym płótnie
-    const startDrawingFull = e => { fDrawing = true; const pos = getPos(canvasFull, e); ctxFull.beginPath(); ctxFull.moveTo(pos.x, pos.y); };
-    const drawFull = e => { if(fDrawing){ const pos=getPos(canvasFull, e); ctxFull.lineTo(pos.x,pos.y); ctxFull.stroke(); }};
-    const stopDrawingFull = () => { fDrawing = false; };
+    const startDrawingFull = e => {
+        // ✅ START DODANEJ LOGIKI
+        if (window.innerHeight > window.innerWidth) {
+            alert("Proszę obrócić urządzenie do pozycji poziomej, aby podpisać.");
+            fDrawing = false; // Zablokuj rysowanie
+            return; // Zakończ
+        }
+        // ✅ KONIEC DODANEJ LOGIKI
 
+        fDrawing = true; 
+        const pos = getPos(canvasFull, e); 
+        ctxFull.beginPath(); 
+        ctxFull.moveTo(pos.x, pos.y); 
+    };
+    const drawFull = e => { if(fDrawing){ const pos=getPos(canvasFull, e); ctxFull.lineTo(pos.x,pos.y); ctxFull.stroke(); }};
+    const stopDrawingFull = () => { fDrawing = false; };
     // --- Podpięcie listenerów ---
 
     // Małe płótno
