@@ -5077,65 +5077,49 @@ async function updateNazwaLecznicyDlaPracownikow(idLecznicy, nowaNazwa) {
     alert("Błąd podczas aktualizacji danych pracowników. Odśwież stronę.");
   }
 }
-    // ========================================================
-// ✅ POCZĄTEK: Moduł 6 - Logika podpisu lekarza
+// ========================================================
+// ✅ POCZĄTEK: Moduł 6 (POPRAWIONY) - Logika podpisu lekarza
 // ========================================================
 
 /**
  * Inicjalizuje mechanizm podpisu dla formularza konfiguracji.
+ * (Wzorowany na 'idealnym' podpisie posiadacza)
  */
 function initSignatureKonfig() {
-    console.log("Moduł 6: Inicjalizacja logiki podpisu lekarza.");
+    console.log("Moduł 6 (Poprawiony): Inicjalizacja logiki podpisu lekarza.");
     
-    // Zmienne dla małego płótna w formularzu
+    // Zmienne dla małego płótna (teraz tylko do podglądu)
     let canvasSmall = konfigFormCanvas;
     let ctxSmall = canvasSmall.getContext('2d');
-    ctxSmall.lineWidth = 2;
-    ctxSmall.lineCap = 'round';
-    let sDrawing = false;
+    
+    // ✅ POPRAWKA: Blokujemy rysowanie na małym płótnie (dla precyzji)
+    // Użytkownik musi kliknąć przycisk
+    canvasSmall.style.pointerEvents = 'none'; 
+    canvasSmall.style.cursor = 'not-allowed';
+    canvasSmall.style.backgroundColor = '#eee'; // Pokaż, że jest wyłączone
     
     // Zmienne dla dużego płótna (pełny ekran)
     let canvasFull = konfigCanvas;
     let ctxFull;
     let fDrawing = false;
 
-    // --- Funkcje pomocnicze dla rysowania ---
+    // --- Funkcje pomocnicze dla rysowania (tylko dla pełnego ekranu) ---
 
     function getPos(canvas, e) {
         const rect = canvas.getBoundingClientRect();
         const clientX = (e.touches && e.touches[0]) ? e.touches[0].clientX : e.clientX;
-        const clientY = (e.touches && e.touches[0]) ? e.touches[0].clientY : e.clientY;
-        return { x: clientX - rect.left, y: clientY - rect.top };
+        const clientY = (e.touches && e.touches[0]) ? e.touches[0].clientY : e.clientX;
+        // Korekta błędu z poprzedniej wersji (było clientX zamiast clientY)
+        return { x: clientX - rect.left, y: clientY - rect.top }; 
     }
-
-    // Rysowanie na małym płótnie
-    const startDrawingSmall = e => { sDrawing = true; const pos = getPos(canvasSmall, e); ctxSmall.beginPath(); ctxSmall.moveTo(pos.x, pos.y); };
-    const drawSmall = e => { if(sDrawing){ const pos=getPos(canvasSmall, e); ctxSmall.lineTo(pos.x,pos.y); ctxSmall.stroke(); }};
-    const stopDrawingSmall = () => { 
-        if (sDrawing) {
-            // Po zakończeniu rysowania, zapisz jako Base64 do ukrytego pola
-            document.getElementById('konfiguracjaFormPodpis').value = canvasSmall.toDataURL();
-            // Pokaż też podgląd
-            konfigPreviewImg.src = canvasSmall.toDataURL();
-            konfigPreviewImg.style.display = 'block';
-        }
-        sDrawing = false; 
-    };
     
-    // Rysowanie na dużym płótnie
     const startDrawingFull = e => { fDrawing = true; const pos = getPos(canvasFull, e); ctxFull.beginPath(); ctxFull.moveTo(pos.x, pos.y); };
-    const drawFull = e => { if(fDrawing){ const pos=getPos(canvasFull, e); ctxFull.lineTo(pos.x,pos.y); ctxFull.stroke(); }};
+    const drawFull = e => { if(fDrawing){ e.preventDefault(); const pos=getPos(canvasFull, e); ctxFull.lineTo(pos.x,pos.y); ctxFull.stroke(); }};
     const stopDrawingFull = () => { fDrawing = false; };
 
     // --- Podpięcie listenerów ---
 
-    // Małe płótno
-    canvasSmall.addEventListener('pointerdown', startDrawingSmall);
-    canvasSmall.addEventListener('pointermove', drawSmall);
-    canvasSmall.addEventListener('pointerup', stopDrawingSmall);
-    canvasSmall.addEventListener('pointerleave', stopDrawingSmall);
-
-    // Przycisk "Wyczyść" (mały)
+    // Przycisk "Wyczyść" (mały) - czyści wszystko
     konfigSignClearBtn.addEventListener('click', () => {
         ctxSmall.clearRect(0, 0, canvasSmall.width, canvasSmall.height);
         document.getElementById('konfiguracjaFormPodpis').value = ''; // Wyczyść zapisany link
@@ -5143,7 +5127,7 @@ function initSignatureKonfig() {
         konfigPreviewImg.style.display = 'none';
     });
 
-    // Przycisk "Podpisz na pełnym ekranie"
+    // Przycisk "Podpisz na pełnym ekranie" - GŁÓWNA NAPRAWA
     konfigSignFullscreenBtn.addEventListener('click', async () => {
         konfigOverlay.style.display = 'flex';
         try {
@@ -5154,31 +5138,52 @@ function initSignatureKonfig() {
             console.warn("Nie udało się zablokować orientacji:", error);
         }
 
-        // Ustaw wymiary dużego płótna
+        // ✅ POPRAWKA: Logika musi być WEWNĄTRZ requestAnimationFrame
         requestAnimationFrame(() => {
             canvasFull.width = konfigCanvas.offsetWidth;
             canvasFull.height = konfigCanvas.offsetHeight;
             ctxFull = canvasFull.getContext('2d');
             ctxFull.lineWidth = 6;
             ctxFull.lineCap = 'round';
-            // Przenieś istniejący rysunek z małego płótna
-            ctxFull.drawImage(canvasSmall, 0, 0, canvasFull.width, canvasFull.height);
+            
+            // Wyczyść duże płótno
+            ctxFull.clearRect(0, 0, canvasFull.width, canvasFull.height);
+
+            // Spróbuj wczytać istniejący podpis z podglądu (jeśli jest)
+            if (konfigPreviewImg.src && konfigPreviewImg.style.display !== 'none') {
+                 try {
+                    // Narysuj istniejący obraz z podglądu na dużym płótnie
+                    ctxFull.drawImage(konfigPreviewImg, 0, 0, canvasFull.width, canvasFull.height);
+                 } catch (e) {
+                    console.warn("Nie udało się wczytać podglądu do canvasa:", e);
+                 }
+            } else {
+                // Alternatywnie, wczytaj z małego płótna (jeśli coś tam było)
+                ctxFull.drawImage(canvasSmall, 0, 0, canvasFull.width, canvasFull.height);
+            }
+
+            // ✅ POPRAWKA: Listenery muszą być dodane TUTAJ
+            canvasFull.addEventListener('pointerdown', startDrawingFull);
+            canvasFull.addEventListener('pointermove', drawFull);
+            canvasFull.addEventListener('pointerup', stopDrawingFull);
+            canvasFull.addEventListener('pointerleave', stopDrawingFull);
+            
+            // Obsługa dotyku (ważne dla precyzji)
+            canvasFull.addEventListener('touchstart', startDrawingFull);
+            canvasFull.addEventListener('touchmove', drawFull);
+            canvasFull.addEventListener('touchend', stopDrawingFull);
+            canvasFull.addEventListener('touchcancel', stopDrawingFull);
         });
-        
-        canvasFull.addEventListener('pointerdown', startDrawingFull);
-        canvasFull.addEventListener('pointermove', drawFull);
-        canvasFull.addEventListener('pointerup', stopDrawingFull);
-        canvasFull.addEventListener('pointerleave', stopDrawingFull);
     });
 
     // Przycisk "Zapisz i Zamknij" (pełny ekran)
     closeKonfigSignBtn.addEventListener('click', () => {
-        // Przenieś obraz z dużego płótna na małe
+        // Przenieś obraz z dużego płótna na małe (jako podgląd)
         ctxSmall.clearRect(0, 0, canvasSmall.width, canvasSmall.height);
         ctxSmall.drawImage(canvasFull, 0, 0, canvasSmall.width, canvasSmall.height);
         
         // Zapisz dane do ukrytego pola i podglądu
-        const dataUrl = canvasSmall.toDataURL(); // Zapisz jako Base64
+        const dataUrl = canvasFull.toDataURL(); // Zapisz jako Base64 (z DUŻEGO płótna)
         document.getElementById('konfiguracjaFormPodpis').value = dataUrl;
         konfigPreviewImg.src = dataUrl;
         konfigPreviewImg.style.display = 'block';
@@ -5194,6 +5199,11 @@ function initSignatureKonfig() {
         canvasFull.removeEventListener('pointermove', drawFull);
         canvasFull.removeEventListener('pointerup', stopDrawingFull);
         canvasFull.removeEventListener('pointerleave', stopDrawingFull);
+        
+        canvasFull.removeEventListener('touchstart', startDrawingFull);
+        canvasFull.removeEventListener('touchmove', drawFull);
+        canvasFull.removeEventListener('touchend', stopDrawingFull);
+        canvasFull.removeEventListener('touchcancel', stopDrawingFull);
     });
 
     // Przycisk "Wyczyść" (pełny ekran)
@@ -5203,6 +5213,16 @@ function initSignatureKonfig() {
         }
     });
 }
+
+// Uruchom funkcję inicjalizującą po załadowaniu strony
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initSignatureKonfig);
+} else {
+    initSignatureKonfig();
+}
+// ========================================================
+// ✅ KONIEC: Moduł 6 (POPRAWIONY)
+// ========================================================
 
 // Uruchom funkcję inicjalizującą po załadowaniu strony
 if (document.readyState === 'loading') {
