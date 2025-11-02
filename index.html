@@ -3277,25 +3277,25 @@ if(refreshClientsBtn) refreshClientsBtn.style.display = 'inline-block';
  * Zapisuje dane do globalnej zmiennej 'currentUserProfile'.
  */
 async function fetchUserProfile(uid) {
-  try {
-    console.log(`Pobieranie profilu dla UID: ${uid}...`);
-    // Szukamy dokumentu, gdzie pole 'uid' jest równe UID zalogowanego użytkownika
-    const querySnapshot = await db.collection("konfiguracja").where("uid", "==", uid).limit(1).get();
+  try {
+    console.log(`Pobieranie profilu dla UID: ${uid}...`);
+    // Szukamy dokumentu, gdzie pole 'uid' jest równe UID zalogowanego użytkownika
+    const querySnapshot = await db.collection("konfiguracja").where("uid", "==", uid).limit(1).get();
 
-    if (querySnapshot.empty) {
-      // To jest krytyczny błąd - użytkownik istnieje w Auth, ale nie ma go w 'konfiguracja'
-      console.warn("NIE ZNALEZIONO PROFILU! Użytkownik istnieje w Auth, ale brak go w 'konfiguracja'.");
-      alert("Błąd logowania: Nie można znaleźć powiązanego profilu użytkownika. Skontaktuj się z administratorem.");
-      auth.signOut(); // Wyloguj go, bo aplikacja nie będzie działać
-      return;
-    }
+    if (querySnapshot.empty) {
+      // To jest krytyczny błąd - użytkownik istnieje w Auth, ale nie ma go w 'konfiguracja'
+      console.warn("NIE ZNALEZIONO PROFILU! Użytkownik istnieje w Auth, ale brak go w 'konfiguracja'.");
+      alert("Błąd logowania: Nie można znaleźć powiązanego profilu użytkownika. Skontaktuj się z administratorem.");
+      auth.signOut(); // Wyloguj go, bo aplikacja nie będzie działać
+      return false; // <-- ✅ DODANA ZMIANA
+    }
 
-    // Znaleziono profil
-    const doc = querySnapshot.docs[0];
-    currentUserProfile = { id: doc.id, ...doc.data() };
-    
-    console.log("Pomyślnie pobrano profil użytkownika:", currentUserProfile);
-    // ✅ POCZĄTEK: Moduł 4 - Ustawienie nazwy lecznicy w karcie leczenia
+    // Znaleziono profil
+    const doc = querySnapshot.docs[0];
+    currentUserProfile = { id: doc.id, ...doc.data() };
+    
+    console.log("Pomyślnie pobrano profil użytkownika:", currentUserProfile);
+    // ✅ POCZĄTEK: Moduł 4 - Ustawienie nazwy lecznicy w karcie leczenia
     const nazwaLecznicySpan = document.getElementById('nazwaLecznicy');
     const nazwaLecznicyZProfilu = currentUserProfile['Nazwa lecznicy'];
     if (nazwaLecznicySpan && nazwaLecznicyZProfilu) {
@@ -3308,7 +3308,7 @@ async function fetchUserProfile(uid) {
    // ✅ POCZĄTEK: Moduł 6 - Ustawienie dynamicznego podpisu lekarza
     const doctorSigImg = document.getElementById('doctor-signature');
     const doctorSigNameSpan = document.getElementById('doctor-signature-name');
-    
+    
     const podpisDataUrl = currentUserProfile['Podpis'];
     const podpisLinia = currentUserProfile['PodpisLinia'];
 
@@ -3324,29 +3324,32 @@ async function fetchUserProfile(uid) {
       doctorSigNameSpan.textContent = ''; // Wyczyść, jeśli nie ma
     }
     // ✅ KONIEC: Moduł 6
-      // ✅ KONIEC: Moduł 4
-    // === KONTROLA DOSTĘPU (RBAC) ===
-    // Sprawdź, czy przyciski istnieją, zanim spróbujesz ich użyć
-    if (menuKonfiguracjaBtn && tabKonfiguracjaBtn) {
-      if (adminRoles.includes(currentUserProfile.Rola)) {
-        // Użytkownik JEST adminem/właścicielem
-        console.log("Dostęp (Rola): Przyznano dostęp do Konfiguracji.");
-        menuKonfiguracjaBtn.style.display = 'block'; // Pokaż w menu
-        tabKonfiguracjaBtn.style.display = 'inline-block'; // Pokaż w zakładkach
-      } else {
-        // Użytkownik NIE JEST adminem
-        console.log("Dostęp (Rola): Odmówiono dostępu do Konfiguracji.");
-        menuKonfiguracjaBtn.style.display = 'none'; // Ukryj w menu
-        tabKonfiguracjaBtn.style.display = 'none'; // Ukryj w zakładkach
-      }
-    }
-    // === KONIEC KONTROLI DOSTĘPU ===
+      // ✅ KONIEC: Moduł 4
+    // === KONTROLA DOSTĘPU (RBAC) ===
+    // Sprawdź, czy przyciski istnieją, zanim spróbujesz ich użyć
+    if (menuKonfiguracjaBtn && tabKonfiguracjaBtn) {
+      if (adminRoles.includes(currentUserProfile.Rola)) {
+        // Użytkownik JEST adminem/właścicielem
+        console.log("Dostęp (Rola): Przyznano dostęp do Konfiguracji.");
+        menuKonfiguracjaBtn.style.display = 'block'; // Pokaż w menu
+        tabKonfiguracjaBtn.style.display = 'inline-block'; // Pokaż w zakładkach
+      } else {
+        // Użytkownik NIE JEST adminem
+        console.log("Dostęp (Rola): Odmówiono dostępu do Konfiguracji.");
+        menuKonfiguracjaBtn.style.display = 'none'; // Ukryj w menu
+        tabKonfiguracjaBtn.style.display = 'none'; // Ukryj w zakładkach
+      }
+    }
+    // === KONIEC KONTROLI DOSTĘPU ===
 
-  } catch (error) {
-    console.error("Krytyczny błąd podczas pobierania profilu użytkownika:", error);
-    alert("Wystąpił błąd podczas ładowania danych użytkownika. Logowanie przerwane.");
-    auth.signOut();
-  }
+    return true; // <-- ✅ DODANA ZMIANA
+
+  } catch (error) {
+    console.error("Krytyczny błąd podczas pobierania profilu użytkownika:", error);
+    alert("Wystąpił błąd podczas ładowania danych użytkownika. Logowanie przerwane.");
+    auth.signOut();
+    return false; // <-- ✅ DODANA ZMIANA
+  }
 }
 async function loadAndCacheClients() {
 if (!klientTableBody) return;
