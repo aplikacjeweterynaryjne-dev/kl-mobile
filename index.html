@@ -4124,14 +4124,35 @@ konfiguracjaFormTitle.textContent = 'Edytuj dane konfiguracyjne';
    
         konfiguracjaFormIdLecznicy.value = data['ID lecznicy'] || '';
         konfiguracjaFormNazwaLecznicy.value = data['Nazwa lecznicy'] || '';
-       // ✅ Moduł 6: Czyszczenie pól podpisu
-        konfiguracjaFormPodpis.value = ''; // Ukryte pole
-        konfigFormPodpisLinia.value = ''; // Linia tekstu
-        konfigPreviewImg.src = ''; // Podgląd
-        konfigPreviewImg.style.display = 'none';
-        const ctxSmall = konfigFormCanvas.getContext('2d'); // Wyczyść płótno
-        ctxSmall.clearRect(0, 0, konfigFormCanvas.width, konfigFormCanvas.height);
-    // ✅ Koniec Moduł 6
+/* ✅ POPRAWIONY KOD (wczytuje dane) */
+// --- Wczytywanie podpisu i inicjałów ---
+konfiguracjaFormInicjaly.value = data.Inicjaly || ''; // Wczytaj inicjały
+konfigFormPodpisLinia.value = data.PodpisLinia || ''; // Wczytaj linię podpisu
+
+const zapisanyPodpisBase64 = data.Podpis || '';
+konfiguracjaFormPodpis.value = zapisanyPodpisBase64; // Zapisz Base64 w ukrytym polu
+
+const ctxSmall = konfigFormCanvas.getContext('2d');
+ctxSmall.clearRect(0, 0, konfigFormCanvas.width, konfigFormCanvas.height); // Wyczyść płótno
+
+if (zapisanyPodpisBase64) {
+    // Jeśli jest zapisany podpis, wczytaj go do podglądu I na płótno
+    konfigPreviewImg.src = zapisanyPodpisBase64;
+    konfigPreviewImg.style.display = 'block';
+
+    // Narysuj zapisany podpis na małym płótnie
+    const img = new Image();
+    img.onload = function() {
+        ctxSmall.drawImage(img, 0, 0, canvasSmall.width, canvasSmall.height);
+    };
+    img.src = zapisanyPodpisBase64;
+
+} else {
+    // Jeśli nie ma podpisu, ukryj podgląd
+    konfigPreviewImg.src = '';
+    konfigPreviewImg.style.display = 'none';
+}
+// --- Koniec wczytywania podpisu ---
     
     konfiguracjaFormInicjaly.value = ''; 
         // ✅ MODYFIKACJA: Dynamicznie wypełnij role PRZED ustawieniem wartości
