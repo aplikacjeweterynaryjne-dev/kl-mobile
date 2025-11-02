@@ -2419,7 +2419,19 @@ const konfiguracjaSection = document.getElementById('konfiguracjaSection');
 const konfiguracjaTableBody = document.getElementById('konfiguracjaTableBody');
 const loadKonfiguracjaBtn = document.getElementById('loadKonfiguracjaBtn'); // Przycisk wczytania
 const addNewKonfiguracjaBtn = document.getElementById('addNewKonfiguracjaBtn'); // ✅ DODANA ZMIENNA
-// Zmienne modala konfiguracji
+// ✅ POCZĄTEK: Moduł 6 - Zmienne dla podpisu lekarza
+const konfigFormPodpisLinia = document.getElementById('konfiguracjaFormPodpisLinia');
+const konfigPreviewImg = document.getElementById('konfigPreviewImg');
+const konfigFormCanvas = document.getElementById('konfigFormCanvas');
+const konfigSignFullscreenBtn = document.getElementById('konfigSignFullscreenBtn');
+const konfigSignClearBtn = document.getElementById('konfigSignClearBtn');
+// Zmienne dla modala pełnoekranowego
+const konfigOverlay = document.getElementById('konfigOverlay');
+const konfigCanvas = document.getElementById('konfigCanvas');
+const closeKonfigSignBtn = document.getElementById('closeKonfigSignBtn');
+const clearKonfigSignBtn = document.getElementById('clearKonfigSignBtn');
+// ✅ KONIEC: Moduł 6 - Zmienne
+    // Zmienne modala konfiguracji
 const konfiguracjaFormModal = document.getElementById('konfiguracjaFormModal');
 const konfiguracjaFormTitle = document.getElementById('konfiguracjaFormTitle');
 const cancelKonfiguracjaForm = document.getElementById('cancelKonfiguracjaForm');
@@ -3287,7 +3299,26 @@ async function fetchUserProfile(uid) {
       if (!nazwaLecznicySpan) console.warn("Moduł 4: Nie znaleziono elementu #nazwaLecznicy");
       if (!nazwaLecznicyZProfilu) console.warn("Moduł 4: Brak 'Nazwa lecznicy' w profilu użytkownika.");
     }
-    // ✅ KONIEC: Moduł 4
+   // ✅ POCZĄTEK: Moduł 6 - Ustawienie dynamicznego podpisu lekarza
+    const doctorSigImg = document.getElementById('doctor-signature');
+    const doctorSigNameSpan = document.getElementById('doctor-signature-name');
+    
+    const podpisDataUrl = currentUserProfile['Podpis'];
+    const podpisLinia = currentUserProfile['PodpisLinia'];
+
+    if (doctorSigImg && podpisDataUrl) {
+      doctorSigImg.src = podpisDataUrl; // Ustaw obrazek podpisu (Base64)
+    } else if (doctorSigImg) {
+      doctorSigImg.src = ''; // Wyczyść, jeśli nie ma
+    }
+
+    if (doctorSigNameSpan && podpisLinia) {
+      doctorSigNameSpan.textContent = podpisLinia; // Ustaw linię tekstu (np. lek. wet. ...)
+    } else if (doctorSigNameSpan) {
+      doctorSigNameSpan.textContent = ''; // Wyczyść, jeśli nie ma
+    }
+    // ✅ KONIEC: Moduł 6
+      // ✅ KONIEC: Moduł 4
     // === KONTROLA DOSTĘPU (RBAC) ===
     // Sprawdź, czy przyciski istnieją, zanim spróbujesz ich użyć
     if (menuKonfiguracjaBtn && tabKonfiguracjaBtn) {
@@ -4087,11 +4118,19 @@ konfiguracjaFormTitle.textContent = 'Edytuj dane konfiguracyjne';
         konfiguracjaFormNazwisko.value = data.Nazwisko || '';
         konfiguracjaFormEmail.value = data['Adres email'] || '';
         konfiguracjaFormTelefon.value = data['Nr telefonu'] || '';
-        konfiguracjaFormPodpis.value = data.Podpis || '';
-        konfiguracjaFormInicjaly.value = data.Inicjaly || '';
+   
         konfiguracjaFormIdLecznicy.value = data['ID lecznicy'] || '';
         konfiguracjaFormNazwaLecznicy.value = data['Nazwa lecznicy'] || '';
-        
+       // ✅ Moduł 6: Czyszczenie pól podpisu
+        konfiguracjaFormPodpis.value = ''; // Ukryte pole
+        konfigFormPodpisLinia.value = ''; // Linia tekstu
+        konfigPreviewImg.src = ''; // Podgląd
+        konfigPreviewImg.style.display = 'none';
+        const ctxSmall = konfigFormCanvas.getContext('2d'); // Wyczyść płótno
+        ctxSmall.clearRect(0, 0, konfigFormCanvas.width, konfigFormCanvas.height);
+    // ✅ Koniec Moduł 6
+    
+    konfiguracjaFormInicjaly.value = ''; 
         // ✅ MODYFIKACJA: Dynamicznie wypełnij role PRZED ustawieniem wartości
         populateRolaSelect();
         konfiguracjaFormRola.value = data.Rola || 'pracownik';
@@ -4177,17 +4216,21 @@ if (saveKonfiguracjaBtn) {
     const docId = konfiguracjaFormDocId.value;
     
     // Pobierz dane z formularza
-    const konfiguracjaData = {
-      Imie: konfiguracjaFormImie.value.trim(),
-      Nazwisko: konfiguracjaFormNazwisko.value.trim(),
-      'Adres email': konfiguracjaFormEmail.value.trim(),
-      'Nr telefonu': konfiguracjaFormTelefon.value.trim(),
-      Podpis: konfiguracjaFormPodpis.value.trim(),
-      Inicjaly: konfiguracjaFormInicjaly.value.trim(),
-      'ID lecznicy': konfiguracjaFormIdLecznicy.value.trim(),
-      'Nazwa lecznicy': konfiguracjaFormNazwaLecznicy.value.trim(),
-      'Rola': konfiguracjaFormRola.value
-    };
+   const konfiguracjaData = {
+      Imie: konfiguracjaFormImie.value.trim(),
+      Nazwisko: konfiguracjaFormNazwisko.value.trim(),
+      'Adres email': konfiguracjaFormEmail.value.trim(),
+      'Nr telefonu': konfiguracjaFormTelefon.value.trim(),
+      // ✅ Moduł 6: Zapisywanie danych podpisu
+      // Zapisujemy dane Base64 z ukrytego pola (nie .trim()!)
+      Podpis: konfiguracjaFormPodpis.value, 
+      PodpisLinia: konfigFormPodpisLinia.value.trim(), // Zapisujemy linię tekstu
+      // ✅ Koniec Moduł 6
+      Inicjaly: konfiguracjaFormInicjaly.value.trim(),
+      'ID lecznicy': konfiguracjaFormIdLecznicy.value.trim(),
+      'Nazwa lecznicy': konfiguracjaFormNazwaLecznicy.value.trim(),
+      'Rola': konfiguracjaFormRola.value
+    };
 
     if (!konfiguracjaData.Imie || !konfiguracjaData.Nazwisko) {
       alert('Imię i Nazwisko są wymagane.');
@@ -5033,6 +5076,142 @@ async function updateNazwaLecznicyDlaPracownikow(idLecznicy, nowaNazwa) {
     alert("Błąd podczas aktualizacji danych pracowników. Odśwież stronę.");
   }
 }
+    // ========================================================
+// ✅ POCZĄTEK: Moduł 6 - Logika podpisu lekarza
+// ========================================================
+
+/**
+ * Inicjalizuje mechanizm podpisu dla formularza konfiguracji.
+ */
+function initSignatureKonfig() {
+    console.log("Moduł 6: Inicjalizacja logiki podpisu lekarza.");
+    
+    // Zmienne dla małego płótna w formularzu
+    let canvasSmall = konfigFormCanvas;
+    let ctxSmall = canvasSmall.getContext('2d');
+    ctxSmall.lineWidth = 2;
+    ctxSmall.lineCap = 'round';
+    let sDrawing = false;
+    
+    // Zmienne dla dużego płótna (pełny ekran)
+    let canvasFull = konfigCanvas;
+    let ctxFull;
+    let fDrawing = false;
+
+    // --- Funkcje pomocnicze dla rysowania ---
+
+    function getPos(canvas, e) {
+        const rect = canvas.getBoundingClientRect();
+        const clientX = (e.touches && e.touches[0]) ? e.touches[0].clientX : e.clientX;
+        const clientY = (e.touches && e.touches[0]) ? e.touches[0].clientY : e.clientY;
+        return { x: clientX - rect.left, y: clientY - rect.top };
+    }
+
+    // Rysowanie na małym płótnie
+    const startDrawingSmall = e => { sDrawing = true; const pos = getPos(canvasSmall, e); ctxSmall.beginPath(); ctxSmall.moveTo(pos.x, pos.y); };
+    const drawSmall = e => { if(sDrawing){ const pos=getPos(canvasSmall, e); ctxSmall.lineTo(pos.x,pos.y); ctxSmall.stroke(); }};
+    const stopDrawingSmall = () => { 
+        if (sDrawing) {
+            // Po zakończeniu rysowania, zapisz jako Base64 do ukrytego pola
+            document.getElementById('konfiguracjaFormPodpis').value = canvasSmall.toDataURL();
+            // Pokaż też podgląd
+            konfigPreviewImg.src = canvasSmall.toDataURL();
+            konfigPreviewImg.style.display = 'block';
+        }
+        sDrawing = false; 
+    };
+    
+    // Rysowanie na dużym płótnie
+    const startDrawingFull = e => { fDrawing = true; const pos = getPos(canvasFull, e); ctxFull.beginPath(); ctxFull.moveTo(pos.x, pos.y); };
+    const drawFull = e => { if(fDrawing){ const pos=getPos(canvasFull, e); ctxFull.lineTo(pos.x,pos.y); ctxFull.stroke(); }};
+    const stopDrawingFull = () => { fDrawing = false; };
+
+    // --- Podpięcie listenerów ---
+
+    // Małe płótno
+    canvasSmall.addEventListener('pointerdown', startDrawingSmall);
+    canvasSmall.addEventListener('pointermove', drawSmall);
+    canvasSmall.addEventListener('pointerup', stopDrawingSmall);
+    canvasSmall.addEventListener('pointerleave', stopDrawingSmall);
+
+    // Przycisk "Wyczyść" (mały)
+    konfigSignClearBtn.addEventListener('click', () => {
+        ctxSmall.clearRect(0, 0, canvasSmall.width, canvasSmall.height);
+        document.getElementById('konfiguracjaFormPodpis').value = ''; // Wyczyść zapisany link
+        konfigPreviewImg.src = '';
+        konfigPreviewImg.style.display = 'none';
+    });
+
+    // Przycisk "Podpisz na pełnym ekranie"
+    konfigSignFullscreenBtn.addEventListener('click', async () => {
+        konfigOverlay.style.display = 'flex';
+        try {
+            if (screen.orientation && screen.orientation.lock) {
+                await screen.orientation.lock('landscape');
+            }
+        } catch (error) {
+            console.warn("Nie udało się zablokować orientacji:", error);
+        }
+
+        // Ustaw wymiary dużego płótna
+        requestAnimationFrame(() => {
+            canvasFull.width = konfigCanvas.offsetWidth;
+            canvasFull.height = konfigCanvas.offsetHeight;
+            ctxFull = canvasFull.getContext('2d');
+            ctxFull.lineWidth = 6;
+            ctxFull.lineCap = 'round';
+            // Przenieś istniejący rysunek z małego płótna
+            ctxFull.drawImage(canvasSmall, 0, 0, canvasFull.width, canvasFull.height);
+        });
+        
+        canvasFull.addEventListener('pointerdown', startDrawingFull);
+        canvasFull.addEventListener('pointermove', drawFull);
+        canvasFull.addEventListener('pointerup', stopDrawingFull);
+        canvasFull.addEventListener('pointerleave', stopDrawingFull);
+    });
+
+    // Przycisk "Zapisz i Zamknij" (pełny ekran)
+    closeKonfigSignBtn.addEventListener('click', () => {
+        // Przenieś obraz z dużego płótna na małe
+        ctxSmall.clearRect(0, 0, canvasSmall.width, canvasSmall.height);
+        ctxSmall.drawImage(canvasFull, 0, 0, canvasSmall.width, canvasSmall.height);
+        
+        // Zapisz dane do ukrytego pola i podglądu
+        const dataUrl = canvasSmall.toDataURL(); // Zapisz jako Base64
+        document.getElementById('konfiguracjaFormPodpis').value = dataUrl;
+        konfigPreviewImg.src = dataUrl;
+        konfigPreviewImg.style.display = 'block';
+
+        // Zamknij overlay
+        konfigOverlay.style.display = 'none';
+        if (screen.orientation && screen.orientation.unlock) {
+            screen.orientation.unlock();
+        }
+        
+        // Odłącz listenery od dużego płótna
+        canvasFull.removeEventListener('pointerdown', startDrawingFull);
+        canvasFull.removeEventListener('pointermove', drawFull);
+        canvasFull.removeEventListener('pointerup', stopDrawingFull);
+        canvasFull.removeEventListener('pointerleave', stopDrawingFull);
+    });
+
+    // Przycisk "Wyczyść" (pełny ekran)
+    clearKonfigSignBtn.addEventListener('click', () => {
+        if (ctxFull) {
+            ctxFull.clearRect(0, 0, canvasFull.width, canvasFull.height);
+        }
+    });
+}
+
+// Uruchom funkcję inicjalizującą po załadowaniu strony
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initSignatureKonfig);
+} else {
+    initSignatureKonfig();
+}
+// ========================================================
+// ✅ KONIEC: Moduł 6 - Logika podpisu lekarza
+// ========================================================
 </script>
 
 </body>
