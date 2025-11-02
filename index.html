@@ -973,8 +973,10 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
 <div class="form-actions" style="margin-top:12px;">
 <div class="left">
 <button id="backToHeader" class="btn ghost small">⬅ Cofnij</button>
+<button type="button" id="formPrevRowBtn" class="btn small">Poprzedni wiersz</button>
 </div>
 <div class="right">
+<button type="button" id="formNextRowBtn" class="btn small">Następny wiersz</button>
 <button id="saveRow" class="btn primary small">Zapisz wiersz</button>
 <button id="formCopyBtn" class="btn small">Przepisz dane z leczenia na miejscu</button>
 </div>
@@ -1730,23 +1732,68 @@ opt.textContent = (idx+1) + '.';
 sel.appendChild(opt);
 });
 }
+/* ✅ POCZĄTEK: Moduł 5 - Funkcje wielokrotnego użytku do nawigacji po wierszach */
 
+/**
+ * Zapisuje bieżący wiersz i przechodzi do poprzedniego wiersza w formularzu.
+ */
+function goToPrevRow() {
+    console.log("Moduł 5: goToPrevRow");
+    const sel = formRowSelect;
+    const prevIdx = parseInt(sel.dataset.prevIndex, 10);
+    
+    // 1. Autozapis bieżącego wiersza
+    if (!isNaN(prevIdx)) {
+        saveRow(prevIdx);
+    }
+    
+    // 2. Przejdź do poprzedniego indeksu
+    if (sel.selectedIndex > 0) {
+        sel.selectedIndex--;
+    }
+    
+    // 3. Wywołaj zdarzenie 'change', aby odświeżyć formularz
+    sel.dispatchEvent(new Event('change'));
+}
+
+/**
+ * Zapisuje bieżący wiersz i przechodzi do następnego wiersza w formularzu.
+ */
+function goToNextRow() {
+    console.log("Moduł 5: goToNextRow");
+    const sel = formRowSelect;
+    const prevIdx = parseInt(sel.dataset.prevIndex, 10);
+    
+    // 1. Autozapis bieżącego wiersza
+    if (!isNaN(prevIdx)) {
+        saveRow(prevIdx);
+    }
+    
+    // 2. Przejdź do następnego indeksu
+    if (sel.selectedIndex < sel.options.length - 1) {
+        sel.selectedIndex++;
+    }
+    
+    // 3. Wywołaj zdarzenie 'change', aby odświeżyć formularz
+    sel.dispatchEvent(new Event('change'));
+}
+/* ✅ KONIEC: Moduł 5 - Funkcje */
 /* ---- wybierz kolejny/poprzedni w formularzu ---- */
-document.getElementById('nextRow').addEventListener('click', ()=>{
-const sel = formRowSelect;
-const prevIdx = parseInt(sel.dataset.prevIndex,10);
-if (!isNaN(prevIdx)) saveRow(prevIdx); // autozapis obecnego wiersza
-if (sel.selectedIndex < sel.options.length - 1) sel.selectedIndex++;
-sel.dispatchEvent(new Event('change'));
-});
 
-document.getElementById('prevRow').addEventListener('click', ()=>{
-const sel = formRowSelect;
-const prevIdx = parseInt(sel.dataset.prevIndex,10);
-if (!isNaN(prevIdx)) saveRow(prevIdx); // autozapis obecnego wiersza
-if (sel.selectedIndex > 0) sel.selectedIndex--;
-sel.dispatchEvent(new Event('change'));
-});
+// ✅ Moduł 5: Podłączenie starych przycisków (strzałek) do nowych funkcji
+document.getElementById('nextRow').addEventListener('click', goToNextRow);
+document.getElementById('prevRow').addEventListener('click', goToPrevRow);
+
+// ✅ Moduł 5: Podłączenie nowych przycisków (na dole formularza) do nowych funkcji
+const formPrevRowBtn = document.getElementById('formPrevRowBtn');
+const formNextRowBtn = document.getElementById('formNextRowBtn');
+
+if (formPrevRowBtn) {
+    formPrevRowBtn.addEventListener('click', goToPrevRow);
+}
+if (formNextRowBtn) {
+    formNextRowBtn.addEventListener('click', goToNextRow);
+}
 
 // dodatkowo przy ręcznym wyborze wiersza w dropdown autozapis
 formRowSelect.addEventListener('change', ()=>{
