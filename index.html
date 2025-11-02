@@ -1403,7 +1403,8 @@ alert('Nie udało się pobrać danych z bazy. Sprawdź połączenie internetowe.
 }
 }
 
-
+// Uruchom pobieranie danych
+fetchDataFromFirebase();
 function initData(data) {
 // nagłówek
 //document.getElementById('nazwaLecznicy').textContent = data.nazwaLecznicy || '';
@@ -2467,53 +2468,23 @@ const tabKalkulatorBtn = document.getElementById('tabKalkulatorBtn');
 // ✅ GŁÓWNA LOGIKA UWIRZYTELNIANIA (WERSJA Z PROFILOWANIEM)
 // ========================================================
 
-// ZMIENIONO: Dodano 'async' i nową logikę ładowania danych
-auth.onAuthStateChanged(async (user) => {
-  if (user) {
-    // Użytkownik JEST zalogowany
-    console.log("Użytkownik zalogowany:", user.email, "UID:", user.uid);
-    
-    // ✅ KROK 1: Pobierz profil i ZAPISZ WYNIK (true/false)
-    const profilPobrany = await fetchUserProfile(user.uid); 
-    
-    // ✅ KROK 2: Sprawdź zapisany wynik, a nie globalną zmienną
-    if (profilPobrany === true) { 
-        console.log("Profil załadowany pomyślnie, pobieranie danych aplikacji...");
-        
-        // ✅ KROK 3: Pobierz dane aplikacji
-        await fetchDataFromFirebase(); // Czekaj na dane (klienci, leki)
-        
-        // ✅ KROK 4: Pokaż UI
-      if (loginSection) loginSection.style.display = 'none';
-      if (mainMenuSection) mainMenuSection.style.display = 'flex';
-      if (mainTabBar) mainTabBar.style.display = 'none'; 
-    } else {
-        // fetchUserProfile zwrócił false, obsłużył już błąd i wylogowanie
-        console.warn("Logowanie przerwane, profil użytkownika nie został załadowany (fetchUserProfile zwrócił false).");
-    }
+auth.onAuthStateChanged(user => {
+  if (user) {
+    // Użytkownik JEST zalogowany
+    console.log("Użytkownik zalogowany:", user.email, "UID:", user.uid);
 
-  } else {
-    // Użytkownik NIE JEST zalogowany
-    console.log("Użytkownik wylogowany.");
-    currentUserProfile = null; // ✅ Wyczyść profil użytkownika
-    console.log("Profil użytkownika wyczyszczony.");
+    // ✅ KROK 1: Pobierz profil użytkownika z 'konfiguracja'
+    // Ta funkcja zajmie się pobraniem danych lub wylogowaniem w razie błędu
+    fetchUserProfile(user.uid); 
 
-    // KROK 2: Ukryj UI (tak jak było)
-    if (loginSection) loginSection.style.display = 'flex';
-    if (mainMenuSection) mainMenuSection.style.display = 'none';
-    if (mainTabBar) mainTabBar.style.display = 'none';
+    // KROK 2: Pokaż UI (tak jak było)
+    if (loginSection) loginSection.style.display = 'none';
+    if (mainMenuSection) mainMenuSection.style.display = 'flex';
+    if (mainTabBar) mainTabBar.style.display = 'none'; 
 
-    if (kartaSection) kartaSection.style.display = 'none';
-    if (kalkulatorSection) kalkulatorSection.style.display = 'none';
-    if (bazaKlientowSection) bazaKlientowSection.style.display = 'none';
-    if (bazaProduktowSection) bazaProduktowSection.style.display = 'none';
-    if (konfiguracjaSection) konfiguracjaSection.style.display = 'none';
-  }
-});
-
-  } else {
-    // Użytkownik NIE JEST zalogowany
-    console.log("Użytkownik wylogowany.");
+  } else {
+    // Użytkownik NIE JEST zalogowany
+    console.log("Użytkownik wylogowany.");
     currentUserProfile = null; // ✅ Wyczyść profil użytkownika
     console.log("Profil użytkownika wyczyszczony.");
 
@@ -3296,25 +3267,25 @@ if(refreshClientsBtn) refreshClientsBtn.style.display = 'inline-block';
  * Zapisuje dane do globalnej zmiennej 'currentUserProfile'.
  */
 async function fetchUserProfile(uid) {
-  try {
-    console.log(`Pobieranie profilu dla UID: ${uid}...`);
-    // Szukamy dokumentu, gdzie pole 'uid' jest równe UID zalogowanego użytkownika
-    const querySnapshot = await db.collection("konfiguracja").where("uid", "==", uid).limit(1).get();
+  try {
+    console.log(`Pobieranie profilu dla UID: ${uid}...`);
+    // Szukamy dokumentu, gdzie pole 'uid' jest równe UID zalogowanego użytkownika
+    const querySnapshot = await db.collection("konfiguracja").where("uid", "==", uid).limit(1).get();
 
-    if (querySnapshot.empty) {
-      // To jest krytyczny błąd - użytkownik istnieje w Auth, ale nie ma go w 'konfiguracja'
-      console.warn("NIE ZNALEZIONO PROFILU! Użytkownik istnieje w Auth, ale brak go w 'konfiguracja'.");
-      alert("Błąd logowania: Nie można znaleźć powiązanego profilu użytkownika. Skontaktuj się z administratorem.");
-      auth.signOut(); // Wyloguj go, bo aplikacja nie będzie działać
-      return false; // <-- ✅ DODANA ZMIANA
-    }
+    if (querySnapshot.empty) {
+      // To jest krytyczny błąd - użytkownik istnieje w Auth, ale nie ma go w 'konfiguracja'
+      console.warn("NIE ZNALEZIONO PROFILU! Użytkownik istnieje w Auth, ale brak go w 'konfiguracja'.");
+      alert("Błąd logowania: Nie można znaleźć powiązanego profilu użytkownika. Skontaktuj się z administratorem.");
+      auth.signOut(); // Wyloguj go, bo aplikacja nie będzie działać
+      return;
+    }
 
-    // Znaleziono profil
-    const doc = querySnapshot.docs[0];
-    currentUserProfile = { id: doc.id, ...doc.data() };
-    
-    console.log("Pomyślnie pobrano profil użytkownika:", currentUserProfile);
-    // ✅ POCZĄTEK: Moduł 4 - Ustawienie nazwy lecznicy w karcie leczenia
+    // Znaleziono profil
+    const doc = querySnapshot.docs[0];
+    currentUserProfile = { id: doc.id, ...doc.data() };
+    
+    console.log("Pomyślnie pobrano profil użytkownika:", currentUserProfile);
+    // ✅ POCZĄTEK: Moduł 4 - Ustawienie nazwy lecznicy w karcie leczenia
     const nazwaLecznicySpan = document.getElementById('nazwaLecznicy');
     const nazwaLecznicyZProfilu = currentUserProfile['Nazwa lecznicy'];
     if (nazwaLecznicySpan && nazwaLecznicyZProfilu) {
@@ -3327,7 +3298,7 @@ async function fetchUserProfile(uid) {
    // ✅ POCZĄTEK: Moduł 6 - Ustawienie dynamicznego podpisu lekarza
     const doctorSigImg = document.getElementById('doctor-signature');
     const doctorSigNameSpan = document.getElementById('doctor-signature-name');
-    
+    
     const podpisDataUrl = currentUserProfile['Podpis'];
     const podpisLinia = currentUserProfile['PodpisLinia'];
 
@@ -3343,32 +3314,29 @@ async function fetchUserProfile(uid) {
       doctorSigNameSpan.textContent = ''; // Wyczyść, jeśli nie ma
     }
     // ✅ KONIEC: Moduł 6
-      // ✅ KONIEC: Moduł 4
-    // === KONTROLA DOSTĘPU (RBAC) ===
-    // Sprawdź, czy przyciski istnieją, zanim spróbujesz ich użyć
-    if (menuKonfiguracjaBtn && tabKonfiguracjaBtn) {
-      if (adminRoles.includes(currentUserProfile.Rola)) {
-        // Użytkownik JEST adminem/właścicielem
-        console.log("Dostęp (Rola): Przyznano dostęp do Konfiguracji.");
-        menuKonfiguracjaBtn.style.display = 'block'; // Pokaż w menu
-        tabKonfiguracjaBtn.style.display = 'inline-block'; // Pokaż w zakładkach
-      } else {
-        // Użytkownik NIE JEST adminem
-        console.log("Dostęp (Rola): Odmówiono dostępu do Konfiguracji.");
-        menuKonfiguracjaBtn.style.display = 'none'; // Ukryj w menu
-        tabKonfiguracjaBtn.style.display = 'none'; // Ukryj w zakładkach
-      }
-    }
-    // === KONIEC KONTROLI DOSTĘPU ===
+      // ✅ KONIEC: Moduł 4
+    // === KONTROLA DOSTĘPU (RBAC) ===
+    // Sprawdź, czy przyciski istnieją, zanim spróbujesz ich użyć
+    if (menuKonfiguracjaBtn && tabKonfiguracjaBtn) {
+      if (adminRoles.includes(currentUserProfile.Rola)) {
+        // Użytkownik JEST adminem/właścicielem
+        console.log("Dostęp (Rola): Przyznano dostęp do Konfiguracji.");
+        menuKonfiguracjaBtn.style.display = 'block'; // Pokaż w menu
+        tabKonfiguracjaBtn.style.display = 'inline-block'; // Pokaż w zakładkach
+      } else {
+        // Użytkownik NIE JEST adminem
+        console.log("Dostęp (Rola): Odmówiono dostępu do Konfiguracji.");
+        menuKonfiguracjaBtn.style.display = 'none'; // Ukryj w menu
+        tabKonfiguracjaBtn.style.display = 'none'; // Ukryj w zakładkach
+      }
+    }
+    // === KONIEC KONTROLI DOSTĘPU ===
 
-    return true; // <-- ✅ DODANA ZMIANA
-
-  } catch (error) {
-    console.error("Krytyczny błąd podczas pobierania profilu użytkownika:", error);
-    alert("Wystąpił błąd podczas ładowania danych użytkownika. Logowanie przerwane.");
-    auth.signOut();
-    return false; // <-- ✅ DODANA ZMIANA
-  }
+  } catch (error) {
+    console.error("Krytyczny błąd podczas pobierania profilu użytkownika:", error);
+    alert("Wystąpił błąd podczas ładowania danych użytkownika. Logowanie przerwane.");
+    auth.signOut();
+  }
 }
 async function loadAndCacheClients() {
 if (!klientTableBody) return;
