@@ -2472,25 +2472,44 @@ auth.onAuthStateChanged(async (user) => {
   if (user) {
     // Użytkownik JEST zalogowany
     console.log("Użytkownik zalogowany:", user.email, "UID:", user.uid);
-
-    // ✅ KROK 1: Pobierz profil użytkownika (CZEKAMY na to)
-    await fetchUserProfile(user.uid); 
     
-    // ✅ KROK 2: Sprawdź, czy profil się załadował
-    if (currentUserProfile) {
-        // ✅ KROK 3: Dopiero TERAZ pobierz dane aplikacji (klientów, leki)
-        console.log("Profil załadowany, pobieranie danych aplikacji...");
-        await fetchDataFromFirebase(); // CZEKAMY na pobranie danych
+    // ✅ KROK 1: Pobierz profil i ZAPISZ WYNIK (true/false)
+    const profilPobrany = await fetchUserProfile(user.uid); 
+    
+    // ✅ KROK 2: Sprawdź zapisany wynik, a nie globalną zmienną
+    if (profilPobrany === true) { 
+        console.log("Profil załadowany pomyślnie, pobieranie danych aplikacji...");
+        
+        // ✅ KROK 3: Pobierz dane aplikacji
+        await fetchDataFromFirebase(); // Czekaj na dane (klienci, leki)
         
         // ✅ KROK 4: Pokaż UI
       if (loginSection) loginSection.style.display = 'none';
       if (mainMenuSection) mainMenuSection.style.display = 'flex';
       if (mainTabBar) mainTabBar.style.display = 'none'; 
     } else {
-        // Profil nie załadował się poprawnie (np. błąd uprawnień)
-        // fetchUserProfile powinien sam obsłużyć wylogowanie
-        console.warn("Logowanie przerwane, profil użytkownika nie został załadowany.");
+        // fetchUserProfile zwrócił false, obsłużył już błąd i wylogowanie
+        console.warn("Logowanie przerwane, profil użytkownika nie został załadowany (fetchUserProfile zwrócił false).");
     }
+
+  } else {
+    // Użytkownik NIE JEST zalogowany
+    console.log("Użytkownik wylogowany.");
+    currentUserProfile = null; // ✅ Wyczyść profil użytkownika
+    console.log("Profil użytkownika wyczyszczony.");
+
+    // KROK 2: Ukryj UI (tak jak było)
+    if (loginSection) loginSection.style.display = 'flex';
+    if (mainMenuSection) mainMenuSection.style.display = 'none';
+    if (mainTabBar) mainTabBar.style.display = 'none';
+
+    if (kartaSection) kartaSection.style.display = 'none';
+    if (kalkulatorSection) kalkulatorSection.style.display = 'none';
+    if (bazaKlientowSection) bazaKlientowSection.style.display = 'none';
+    if (bazaProduktowSection) bazaProduktowSection.style.display = 'none';
+    if (konfiguracjaSection) konfiguracjaSection.style.display = 'none';
+  }
+});
 
   } else {
     // Użytkownik NIE JEST zalogowany
