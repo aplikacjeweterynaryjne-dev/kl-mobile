@@ -5103,12 +5103,25 @@ function initSignatureKonfig() {
 
     // --- Funkcje pomocnicze dla rysowania ---
 
-    function getPos(canvas, e) {
-        const rect = canvas.getBoundingClientRect();
-        const clientX = (e.touches && e.touches[0]) ? e.touches[0].clientX : e.clientX;
-        const clientY = (e.touches && e.touches[0]) ? e.touches[0].clientY : e.clientY;
-        return { x: clientX - rect.left, y: clientY - rect.top };
-    }
+    /* ❌ TWÓJ OBECNY KOD (ok. linii 1777) */
+function getPos(canvas, e) {
+    const rect = canvas.getBoundingClientRect();
+    const clientX = (e.touches && e.touches[0]) ? e.touches[0].clientX : e.clientX;
+    const clientY = (e.touches && e.touches[0]) ? e.touches[0].clientY : e.clientY;
+    return { x: clientX - rect.left, y: clientY - rect.top };
+}
+
+/* ✅ POPRAWIONY KOD (tylko dla getPos) */
+function getPos(canvas, e) {
+    const rect = canvas.getBoundingClientRect();
+    const clientX = (e.touches && e.touches[0]) ? e.touches[0].clientX : e.clientX;
+    const clientY = (e.touches && e.touches[0]) ? e.touches[0].clientY : e.clientY;
+    // ✅ POPRAWKA: Dzielimy przez skalę, aby zniwelować transformację body
+    return { 
+        x: (clientX - rect.left) / 0.95, 
+        y: (clientY - rect.top) / 0.95 
+    };
+}
 
     // Rysowanie na małym płótnie
     const startDrawingSmall = e => { sDrawing = true; const pos = getPos(canvasSmall, e); ctxSmall.beginPath(); ctxSmall.moveTo(pos.x, pos.y); };
