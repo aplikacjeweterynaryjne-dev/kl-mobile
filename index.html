@@ -2552,6 +2552,8 @@ auth.onAuthStateChanged(user => {
 });
 /* Plik: index.html (zastąp całą funkcję showSection, ok. linii 1170) */
 
+/* ⬇️ WKLEJ TEN KOD ⬇️ */
+
 function showSection(sectionToShow) {
     // ✅ POCZĄTEK ZABEZPIECZENIA
   // Sprawdź, czy użytkownik próbuje wejść do konfiguracji bez uprawnień
@@ -2593,56 +2595,76 @@ if (archiwumParagonySection) archiwumParagonySection.style.display = 'none'; // 
     if (tabKalkulatorBtn) tabKalkulatorBtn.classList.add('primary');
     renderReceipt(); 
   } else if (sectionToShow === 'baza' && bazaKlientowSection) {
-    // ... (logika dla 'baza' - bez zmian) ...
-    bazaKlientowSection.style.display = 'block';
+    // Pokaż sekcję i zaznacz przycisk
+    bazaKlientowSection.style.display = 'block';
     if (tabBazaKlientowBtn) tabBazaKlientowBtn.classList.add('primary');
-    if (cachedClients) {
-        renderClientTable(cachedClients);
-        if(clientSearchRow) clientSearchRow.style.display = 'block';
-        if(importActionsContainer) importActionsContainer.style.display = 'flex';
-        if(loadClientsBtn) loadClientsBtn.style.display = 'none';
-        if(refreshClientsBtn) refreshClientsBtn.style.display = 'inline-block';
-    } else {
-        klientTableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 20px; color: #555;">Kliknij "Wczytaj bazę klientów", aby wyświetlić dane.</td></tr>';
-        if(clientSearchRow) clientSearchRow.style.display = 'none';
-        if(importActionsContainer) importActionsContainer.style.display = 'none';
-        if(loadClientsBtn) loadClientsBtn.style.display = 'inline-block';
-        if(refreshClientsBtn) refreshClientsBtn.style.display = 'none';
-    }
+
+    // Sprawdź, czy dane są już w cache
+    if (cachedClients) {
+      console.log("Wyświetlanie klientów z cache.");
+      renderClientTable(cachedClients); // Wyświetl dane z cache
+      // Pokaż powiązane UI (wyszukiwarka, import, odśwież)
+      if(clientSearchRow) clientSearchRow.style.display = 'block';
+      if(importActionsContainer) importActionsContainer.style.display = 'flex'; // Użyj flex dla przycisków
+      if(loadClientsBtn) loadClientsBtn.style.display = 'none';
+      if(refreshClientsBtn) refreshClientsBtn.style.display = 'inline-block';
+    } else {
+      console.log("Brak klientów w cache. Oczekiwanie na wczytanie.");
+      // Dane nie są wczytane, pokaż przycisk "Wczytaj" i ukryj resztę
+      klientTableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 20px; color: #555;">Kliknij "Wczytaj bazę klientów", aby wyświetlić dane.</td></tr>';
+      if(clientSearchRow) clientSearchRow.style.display = 'none';
+      if(importActionsContainer) importActionsContainer.style.display = 'none';
+      if(loadClientsBtn) loadClientsBtn.style.display = 'inline-block';
+      if(refreshClientsBtn) refreshClientsBtn.style.display = 'none';
+    }
   } 
+  // Nowy blok dla sekcji 'produkty'
 else if (sectionToShow === 'produkty' && bazaProduktowSection) {
-// ... (logika dla 'produkty' - bez zmian) ...
-    bazaProduktowSection.style.display = 'block';
-    if (tabBazaProduktowBtn) tabBazaProduktowBtn.classList.add('primary');
-    if(addNewProductBtn) addNewProductBtn.style.display = 'inline-block'; 
-    if (cachedProducts) {
-        renderProductTable(cachedProducts); 
-        if(productSearchRow) productSearchRow.style.display = 'block';
-        if(productImportActionsContainer) productImportActionsContainer.style.display = 'flex';
-        if(loadProductsBtn) loadProductsBtn.style.display = 'none';
-        if(refreshProductsBtn) refreshProductsBtn.style.display = 'inline-block';
-    } else {
-        produktTableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 20px; color: #555;">Kliknij "Wczytaj bazę produktów", aby wyświetlić dane.</td></tr>';
-        if(productSearchRow) productSearchRow.style.display = 'none';
-        if(productImportActionsContainer) productImportActionsContainer.style.display = 'none';
-        if(loadProductsBtn) loadProductsBtn.style.display = 'inline-block';
-        if(refreshProductsBtn) refreshProductsBtn.style.display = 'none';
-    }
-} 
+bazaProduktowSection.style.display = 'block';
+if (tabBazaProduktowBtn) tabBazaProduktowBtn.classList.add('primary');
+
+// ✅ POKAŻ PRZYCISK "Dodaj" OD RAZU
+if(addNewProductBtn) addNewProductBtn.style.display = 'inline-block'; 
+
+// Sprawdź cache lub pokaż komunikat "Wczytaj"
+if (cachedProducts) {
+console.log("Wyświetlanie produktów z cache.");
+renderProductTable(cachedProducts); 
+// Pokaż powiązane UI PO wczytaniu
+if(productSearchRow) productSearchRow.style.display = 'block';
+if(productImportActionsContainer) productImportActionsContainer.style.display = 'flex';
+if(loadProductsBtn) loadProductsBtn.style.display = 'none';
+if(refreshProductsBtn) refreshProductsBtn.style.display = 'inline-block';
+} else {
+console.log("Brak produktów w cache. Oczekiwanie na wczytanie.");
+produktTableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 20px; color: #555;">Kliknij "Wczytaj bazę produktów", aby wyświetlić dane.</td></tr>';
+// Ukryj UI zależne od danych
+if(productSearchRow) productSearchRow.style.display = 'none';
+if(productImportActionsContainer) productImportActionsContainer.style.display = 'none';
+// Pokaż przycisk Wczytaj, ukryj Odśwież
+if(loadProductsBtn) loadProductsBtn.style.display = 'inline-block';
+if(refreshProductsBtn) refreshProductsBtn.style.display = 'none';
+}
+} // Koniec bloku else if dla 'produkty'
 // ✅ MODYFIKACJA: 'konfiguracja' jest teraz wywoływana bez zakładki
 else if (sectionToShow === 'konfiguracja' && konfiguracjaSection) {
-    konfiguracjaSection.style.display = 'block';
-    // (nie podświetlamy już zakładki, bo jej nie ma)
+konfiguracjaSection.style.display = 'block';
+// (nie podświetlamy już zakładki, bo jej nie ma)
 
-    if(addNewKonfiguracjaBtn) addNewKonfiguracjaBtn.style.display = 'inline-block'; 
-    if (cachedKonfiguracja) {
-        renderKonfiguracjaTable(cachedKonfiguracja);
-        if(loadKonfiguracjaBtn) loadKonfiguracjaBtn.style.display = 'none'; 
-    } else {
-        konfiguracjaTableBody.innerHTML = '<tr><td colspan="10" style="text-align: center; padding: 20px; color: #555;">Kliknij "Wczytaj konfigurację", aby wyświetlić dane.</td></tr>';
-        if(loadKonfiguracjaBtn) loadKonfiguracjaBtn.style.display = 'inline-block';
-    }
-} 
+// ✅ POKAŻ PRZYCISK "Dodaj" OD RAZU
+if(addNewKonfiguracjaBtn) addNewKonfiguracjaBtn.style.display = 'inline-block'; 
+
+// Sprawdź cache lub pokaż komunikat "Wczytaj"
+if (cachedKonfiguracja) {
+console.log("Wyświetlanie konfiguracji z cache.");
+renderKonfiguracjaTable(cachedKonfiguracja);
+if(loadKonfiguracjaBtn) loadKonfiguracjaBtn.style.display = 'none'; // Ukryj "Wczytaj", jeśli dane są
+} else {
+console.log("Brak konfiguracji w cache. Oczekiwanie na wczytanie.");
+konfiguracjaTableBody.innerHTML = '<tr><td colspan="10" style="text-align: center; padding: 20px; color: #555;">Kliknij "Wczytaj konfigurację", aby wyświetlić dane.</td></tr>';
+if(loadKonfiguracjaBtn) loadKonfiguracjaBtn.style.display = 'inline-block'; // Pokaż "Wczytaj"
+}
+} // Koniec bloku else if dla 'konfiguracja'
 
 /* ✅ POCZĄTEK: NOWE BLOKI DLA ARCHIWUM (Pkt 6, 8) */
 
@@ -2670,8 +2692,8 @@ else if (sectionToShow === 'archiwumParagony' && archiwumParagonySection) {
     }
 }
 /* ✅ KONIEC: NOWE BLOKI DLA ARCHIWUM */
+}
 
-} // <-- Koniec funkcji showSection
 if (tabKartaBtn && tabKalkulatorBtn) {
 // ✅ POPRAWIONA LINIA - najpierw pokazuje sekcję, potem modal
 tabKartaBtn.addEventListener('click', () => { showSection('karta'); if (metodaModal) metodaModal.style.display = 'flex'; });
