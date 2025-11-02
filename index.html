@@ -3079,62 +3079,131 @@ if (copyCheckbox) {
 
 // Zapisywanie paragonu (dodaje sumę)
 // ✅ Moduł 2: ZMODYFIKOWANA funkcja zapisu paragonu (dodaje status)
+/* Plik: index.html (zastąp cały blok saveReceiptBtn, ok. linii 1475) */
+
+// Zapisywanie paragonu
 if (saveReceiptBtn) {
-  saveReceiptBtn.addEventListener('click', () => {
-    if (receiptItems.length > 0) {
-      if (savedReceiptSummary) {
-        // Wyczyść podsumowanie
+  saveReceiptBtn.addEventListener('click', async () => { // Zmieniono na async
+    if (receiptItems.length === 0) {
+      alert('Paragon jest pusty, nie ma czego zapisywać.');
+      return;
+    }
+
+    // --- 1. Pobranie danych do zapisu ---
+    let statusText = "Nie wybrano statusu";
+    let statusColor = "#555";
+    if (paymentStatusPaidBtn && paymentStatusPaidBtn.classList.contains('active')) {
+      statusText = paymentStatusPaidBtn.dataset.status; // "Zapłacone"
+      statusColor = "#27ae60"; // zielony
+    } else if (paymentStatusDebtBtn && paymentStatusDebtBtn.classList.contains('active')) {
+      statusText = paymentStatusDebtBtn.dataset.status; // "Dług"
+      statusColor = "#c0392b"; // czerwony
+    }
+
+    // Obiekt danych do archiwum
+    const receiptData = {
+        klient: calcKlientInput.value || 'Brak klienta',
+        data: calcDataInput.value || new Date().toISOString().split('T')[0],
+        nrDokumentu: calcNrDokInput.value || '',
+        status: statusText,
+        suma: receiptTotal,
+        pozycje: receiptItems, // Tablica obiektów { name, quantity, price }
+        lekarz_uid: currentUserProfile ? currentUserProfile.uid : null, // ID lekarza
+        lekarz_nazwisko: currentUserProfile ? `${currentUserProfile.Imie} ${currentUserProfile.Nazwisko}` : 'Nieznany',
+        id_lecznicy: currentUserProfile ? currentUserProfile['ID lecznicy'] : null
+    };
+
+    // --- 2. Logika podsumowania (zgodnie z Twoją prośbą) ---
+    if (savedReceiptSummary) {
         savedReceiptSummary.innerHTML = '<h4>Zapisany Paragon:</h4>';
 
-        // ✅ START: Logika odczytu statusu
-        let statusText = "Nie wybrano statusu";
-        let statusColor = "#555";
-        if (paymentStatusPaidBtn && paymentStatusPaidBtn.classList.contains('active')) {
-          statusText = paymentStatusPaidBtn.dataset.status; // "Zapłacone"
-          statusColor = "#27ae60"; // zielony
-        } else if (paymentStatusDebtBtn && paymentStatusDebtBtn.classList.contains('active')) {
-          statusText = paymentStatusDebtBtn.dataset.status; // "Dług"
-          statusColor = "#c0392b"; // czerwony
-        }
+        // ✅ NOWOŚĆ: Dodanie danych klienta do podsumowania
+        const infoP = document.createElement('p');
+        infoP.style.fontSize = '0.9em';
+        infoP.style.color = '#333';
+        infoP.innerHTML = `
+            <strong>Klient:</strong> ${receiptData.klient}<br>
+            <strong>Data:</strong> ${receiptData.data}<br>
+            <strong>Nr dokumentu:</strong> ${receiptData.nrDokumentu}
+        `;
+        savedReceiptSummary.appendChild(infoP);
 
-        // Dodaj element statusu do podsumowania
+        // Dodanie statusu (jak wcześniej, ale z odstępem)
         const statusP = document.createElement('p');
         statusP.style.fontWeight = 'bold';
         statusP.style.fontSize = '1.1em';
+        statusP.style.marginTop = '10px';
         statusP.innerHTML = `Status: <span style="color: ${statusColor};">${statusText}</span>`;
         savedReceiptSummary.appendChild(statusP);
-        // ✅ KONIEC: Logiki statusu
 
-        // Reszta kodu (lista produktów) - bez zmian
+        // Lista produktów (bez zmian)
         const list = document.createElement('ul');
         list.style.listStyle = 'none'; list.style.paddingLeft = '10px';
         receiptItems.forEach(item => {
-          const li = document.createElement('li');
-          const quantity = Number(item.quantity) || 0;
-          const price = Number(item.price) || 0;
-          const itemTotal = quantity * price;
-          li.textContent = `${item.name} x ${quantity} = ${formatPrice(itemTotal)}`;
-          list.appendChild(li);
+            const li = document.createElement('li');
+            const quantity = Number(item.quantity) || 0;
+            const price = Number(item.price) || 0;
+            const itemTotal = quantity * price;
+            li.textContent = `${item.name} x ${quantity} = ${formatPrice(itemTotal)}`;
+            list.appendChild(li);
         });
         savedReceiptSummary.appendChild(list);
 
-        // Reszta kodu (suma) - bez zmian
+        // Suma (bez zmian)
         const totalP = document.createElement('p');
         totalP.style.fontWeight = 'bold';
         totalP.style.textAlign = 'right';
         totalP.textContent = `Suma: ${formatPrice(receiptTotal)}`;
         savedReceiptSummary.appendChild(totalP);
-      }
-      alert('Paragon zapisany (tymczasowo).');
-
-      // ✅ DODANO: Zresetuj status po zapisie
-      if (paymentStatusPaidBtn) paymentStatusPaidBtn.classList.remove('active');
-      if (paymentStatusDebtBtn) paymentStatusDebtBtn.classList.remove('active');
-
-    } else {
-      alert('Paragon jest pusty, nie ma czego zapisywać.');
     }
+
+    // --- 3. NOWA LOGIKA ZAPISU DO ARCHIWUM (Pkt 3) ---
+    // Zapytaj użytkownika
+    if (confirm("Paragon został wygenerowany.\n\nCzy chcesz zapisać ten paragon w ARCHIWUM?")) {
+        try {
+            saveReceiptBtn.disabled = true;
+            saveReceiptBtn.textContent = 'Zapisywanie...';
+
+            // Wywołaj funkcję zapisującą do Firestore (dodamy ją w Kroku 2)
+            await saveReceiptToArchive(receiptData);
+
+            alert('Paragon został pomyślnie zapisany w archiwum.');
+
+        } catch (error) {
+            console.error("Błąd zapisu paragonu do archiwum:", error);
+            alert("Wystąpił błąd podczas zapisu do archiwum. Sprawdź konsolę.");
+        } finally {
+            saveReceiptBtn.disabled = false;
+            saveReceiptBtn.textContent = 'Zapisz Paragon';
+        }
+    } else {
+         alert('Paragon zapisany (tymczasowo), ale NIE został dodany do archiwum.');
+    }
+
+    // Resetowanie statusu (bez zmian)
+    if (paymentStatusPaidBtn) paymentStatusPaidBtn.classList.remove('active');
+    if (paymentStatusDebtBtn) paymentStatusDebtBtn.classList.remove('active');
   });
+}
+/* Plik: index.html (wklej ok. linii 1527) */
+
+/**
+ * ✅ NOWA FUNKCJA: Zapisuje obiekt paragonu do kolekcji 'archiwumParagony'
+ */
+async function saveReceiptToArchive(receiptData) {
+    if (!receiptData.lekarz_uid) {
+        throw new Error("Nie można zapisać paragonu. Brak zalogowanego użytkownika (lekarz_uid).");
+    }
+
+    // Dodajemy sygnaturę czasową
+    const dataDoZapisu = {
+        ...receiptData,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp() // Data serwera
+    };
+
+    console.log("Zapisywanie paragonu do archiwum:", dataDoZapisu);
+    // Zapisz do nowej kolekcji w Firestore
+    await db.collection("archiwumParagony").add(dataDoZapisu);
 }
 
 // Obsługa PLU (używa addItemToReceipt)
