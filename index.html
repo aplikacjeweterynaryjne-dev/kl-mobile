@@ -5100,7 +5100,41 @@ function initSignatureKonfig() {
     let canvasFull = konfigCanvas;
     let ctxFull;
     let fDrawing = false;
+/* ✅ WKLEJ TEN BLOK (ok. linii 1781) */
+    const handleResizeFull = () => {
+        // Sprawdź, czy overlay jest w ogóle widoczny
+        if (konfigOverlay.style.display !== 'flex') {
+            window.removeEventListener('resize', handleResizeFull);
+            return;
+        }
+        
+        console.log("Moduł 6: Wykryto zmianę rozmiaru/orientacji.");
+        // Zapisz stary obrazek tymczasowo
+        const tempCanvas = document.createElement('canvas');
+        const tempCtx = tempCanvas.getContext('2d');
+        tempCanvas.width = canvasFull.width;
+        tempCanvas.height = canvasFull.height;
+        if (canvasFull.width > 0 && canvasFull.height > 0) {
+            tempCtx.drawImage(canvasFull, 0, 0);
+        }
 
+        // Ustaw nowe, fizyczne wymiary płótna
+        const newWidth = canvasFull.offsetWidth;
+        const newHeight = canvasFull.offsetHeight;
+        canvasFull.width = newWidth;
+        canvasFull.height = newHeight;
+
+        // Ustaw kontekst rysowania od nowa
+        ctxFull = canvasFull.getContext('2d');
+        ctxFull.lineWidth = 6;
+        ctxFull.lineCap = 'round';
+
+        // Wrysuj stary obrazek z powrotem
+        if (tempCanvas.width > 0 && tempCanvas.height > 0) {
+            ctxFull.drawImage(tempCanvas, 0, 0, newWidth, newHeight);
+        }
+    };
+    /* ✅ KONIEC WKLEJONEGO BLOKU */
     // --- Funkcje pomocnicze dla rysowania ---
 
 /* ✅ POPRAWIONY KOD (tylko dla getPos) */
