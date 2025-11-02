@@ -1347,7 +1347,6 @@ try {
 console.log("Pobieranie danych z Firestore...");
 
 // 1. Pobierz dane lecznicy (jeśli masz je w bazie, na razie pomijamy)
-const nazwaLecznicy = "Gabinet Weterynaryjny “TAURUS” Magdalena Chojnowska, 19-100 Mońki ul. Białostocka 59"; // Możesz to przenieść do bazy
 const doctorSignature = "https://lh3.googleusercontent.com/d/1heCfm8DWWl6chTAtIKxcOsFZAUZF91Et=s800"; // Możesz to przenieść do bazy
 
 // 2. Pobierz klientów
@@ -1360,10 +1359,12 @@ const lekiSnapshot = await db.collection("leki").get();
 const leki = lekiSnapshot.docs.map(doc => doc.data());
 console.log(`Pobrano ${leki.length} leków.`);
 
+// ...
 // 4. Złóż obiekt danych i przekaż do initData
-const data = { nazwaLecznicy, klienci, leki, doctorSignature };
+const data = { klienci, leki, doctorSignature }; // ✅ Moduł 4: Usunięto 'nazwaLecznicy'
 console.log('✅ Dane pobrane z Firestore:', data);
 initData(data); // Wywołaj starą funkcję z nowymi danymi
+// ...
 
 } catch (error) {
 console.error('❌ Błąd pobierania danych z Firestore:', error);
@@ -3198,7 +3199,17 @@ async function fetchUserProfile(uid) {
     currentUserProfile = { id: doc.id, ...doc.data() };
     
     console.log("Pomyślnie pobrano profil użytkownika:", currentUserProfile);
-    
+    // ✅ POCZĄTEK: Moduł 4 - Ustawienie nazwy lecznicy w karcie leczenia
+    const nazwaLecznicySpan = document.getElementById('nazwaLecznicy');
+    const nazwaLecznicyZProfilu = currentUserProfile['Nazwa lecznicy'];
+    if (nazwaLecznicySpan && nazwaLecznicyZProfilu) {
+      nazwaLecznicySpan.textContent = nazwaLecznicyZProfilu;
+      console.log(`Moduł 4: Ustawiono nazwę lecznicy na: "${nazwaLecznicyZProfilu}"`);
+    } else {
+      if (!nazwaLecznicySpan) console.warn("Moduł 4: Nie znaleziono elementu #nazwaLecznicy");
+      if (!nazwaLecznicyZProfilu) console.warn("Moduł 4: Brak 'Nazwa lecznicy' w profilu użytkownika.");
+    }
+    // ✅ KONIEC: Moduł 4
     // === KONTROLA DOSTĘPU (RBAC) ===
     // Sprawdź, czy przyciski istnieją, zanim spróbujesz ich użyć
     if (menuKonfiguracjaBtn && tabKonfiguracjaBtn) {
