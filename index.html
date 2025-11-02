@@ -107,7 +107,7 @@ position: fixed;
 top: 0; left: 0; right: 0; bottom: 0; /* Pokryj cały ekran */
 background: #fff;
 display: none; /* ✅ POPRAWKA: Ukryj overlay na starcie */
-z-index: 10001;
+z-index: 9999;
 /* Użyj flexbox DOPIERO gdy jest widoczny (JS ustawi display: flex) */
 flex-direction: column;
 padding: 10px;
@@ -1346,12 +1346,12 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
 
 </div>
 </div> 
-    <div class="fullscreen-overlay" id="konfigOverlay">
+<div class="fullscreen-overlay" id="konfigOverlay">
 <canvas id="konfigCanvas" class="fullscreen-canvas"></canvas>
 <button id="closeKonfigSignBtn">Zapisz i zamknij podpis</button>
 <button id="clearKonfigSignBtn">Wyczyść podpis</button>
 </div>
-    <script>
+<script>
 /* ----- Inicjalizacja Firebase (Uruchamia się na starcie) ----- */
 // ... reszta kodu pierwszego bloku script ...
 const firebaseConfig = {
@@ -5102,16 +5102,13 @@ function initSignatureKonfig() {
 
     // --- Funkcje pomocnicze dla rysowania ---
 
-   function getPos(canvas, e) {
-    const rect = canvas.getBoundingClientRect();
-    const clientX = (e.touches && e.touches[0]) ? e.touches[0].clientX : e.clientX;
-    const clientY = (e.touches && e.touches[0]) ? e.touches[0].clientY : e.clientY;
-    // ✅ POPRAWKA: Dzielimy przez skalę, aby zniwelować transformację body
-    return { 
-        x: (clientX - rect.left) / 0.95, 
-        y: (clientY - rect.top) / 0.95 
-    };
-}
+    function getPos(canvas, e) {
+        const rect = canvas.getBoundingClientRect();
+        const clientX = (e.touches && e.touches[0]) ? e.touches[0].clientX : e.clientX;
+        const clientY = (e.touches && e.touches[0]) ? e.touches[0].clientY : e.clientY;
+        return { x: clientX - rect.left, y: clientY - rect.top };
+    }
+
     // Rysowanie na małym płótnie
     const startDrawingSmall = e => { sDrawing = true; const pos = getPos(canvasSmall, e); ctxSmall.beginPath(); ctxSmall.moveTo(pos.x, pos.y); };
     const drawSmall = e => { if(sDrawing){ const pos=getPos(canvasSmall, e); ctxSmall.lineTo(pos.x,pos.y); ctxSmall.stroke(); }};
