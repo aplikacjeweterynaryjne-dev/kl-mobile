@@ -1403,8 +1403,7 @@ alert('Nie udało się pobrać danych z bazy. Sprawdź połączenie internetowe.
 }
 }
 
-// Uruchom pobieranie danych
-fetchDataFromFirebase();
+
 function initData(data) {
 // nagłówek
 //document.getElementById('nazwaLecznicy').textContent = data.nazwaLecznicy || '';
@@ -2468,23 +2467,34 @@ const tabKalkulatorBtn = document.getElementById('tabKalkulatorBtn');
 // ✅ GŁÓWNA LOGIKA UWIRZYTELNIANIA (WERSJA Z PROFILOWANIEM)
 // ========================================================
 
-auth.onAuthStateChanged(user => {
-  if (user) {
-    // Użytkownik JEST zalogowany
-    console.log("Użytkownik zalogowany:", user.email, "UID:", user.uid);
+// ZMIENIONO: Dodano 'async' i nową logikę ładowania danych
+auth.onAuthStateChanged(async (user) => {
+  if (user) {
+    // Użytkownik JEST zalogowany
+    console.log("Użytkownik zalogowany:", user.email, "UID:", user.uid);
 
-    // ✅ KROK 1: Pobierz profil użytkownika z 'konfiguracja'
-    // Ta funkcja zajmie się pobraniem danych lub wylogowaniem w razie błędu
-    fetchUserProfile(user.uid); 
+    // ✅ KROK 1: Pobierz profil użytkownika (CZEKAMY na to)
+    await fetchUserProfile(user.uid); 
+    
+    // ✅ KROK 2: Sprawdź, czy profil się załadował
+    if (currentUserProfile) {
+        // ✅ KROK 3: Dopiero TERAZ pobierz dane aplikacji (klientów, leki)
+        console.log("Profil załadowany, pobieranie danych aplikacji...");
+        await fetchDataFromFirebase(); // CZEKAMY na pobranie danych
+        
+        // ✅ KROK 4: Pokaż UI
+      if (loginSection) loginSection.style.display = 'none';
+      if (mainMenuSection) mainMenuSection.style.display = 'flex';
+      if (mainTabBar) mainTabBar.style.display = 'none'; 
+    } else {
+        // Profil nie załadował się poprawnie (np. błąd uprawnień)
+        // fetchUserProfile powinien sam obsłużyć wylogowanie
+        console.warn("Logowanie przerwane, profil użytkownika nie został załadowany.");
+    }
 
-    // KROK 2: Pokaż UI (tak jak było)
-    if (loginSection) loginSection.style.display = 'none';
-    if (mainMenuSection) mainMenuSection.style.display = 'flex';
-    if (mainTabBar) mainTabBar.style.display = 'none'; 
-
-  } else {
-    // Użytkownik NIE JEST zalogowany
-    console.log("Użytkownik wylogowany.");
+  } else {
+    // Użytkownik NIE JEST zalogowany
+    console.log("Użytkownik wylogowany.");
     currentUserProfile = null; // ✅ Wyczyść profil użytkownika
     console.log("Profil użytkownika wyczyszczony.");
 
