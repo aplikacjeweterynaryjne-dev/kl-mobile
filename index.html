@@ -2362,6 +2362,12 @@ const archiveReceiptListContainer = document.getElementById('archiveReceiptListC
 
 // Zmienna stanu dla Pkt 4 (zapytanie przy wyjściu)
 let isCurrentCardSaved = false; // Domyślnie karta jest "brudna" (niezapisana)
+let currentCardData = { // Metadane do zapisu (Pkt 7)
+    nextCounter: 1,
+    currentMonth: new Date().getMonth() + 1,
+    currentYear: new Date().getFullYear(),
+    initials: ""
+};
 
 /* ✅ KONIEC: Nowe zmienne */
 // ✅ ZMIENNE DLA REJESTRACJI
@@ -5478,7 +5484,7 @@ function onShowKarta() {
     }
 
     // (W kolejnym module dodamy tu logikę generowania numeru dokumentu)
-    // generateAndSetDocumentNumber();
+     generateAndSetDocumentNumber();
 }
 
 // Zmodyfikuj oryginalny listener dla tabKartaBtn
@@ -5503,6 +5509,79 @@ if (menuKartaBtn) {
 /* ✅ KONIEC: NOWY BLOK KODU */
 
 /* ⬆️ ======================================================= ⬆️ */
+async function generateAndSetDocumentNumber() {
+    if (!currentUserProfile || !currentUserProfile.uid) {
+        console.warn("Auto-numeracja wstrzymana: brak profilu użytkownika.");
+        return;
+    }
 
+    const nrDokInput = document.getElementById('nrDokumentu');
+    // Nie generuj, jeśli pole jest już wypełnione przez użytkownika
+    if (nrDokInput.value.trim() !== "") {
+        console.log("Auto-numeracja pominięta: pole 'Nr Dokumentu' jest już wypełnione.");
+        // Mimo to, spróbuj sparsować numer, aby uzyskać licznik dla zapisu
+        try {
+            const parts = nrDokInput.value.split('/');
+            if (parts.length === 4) {
+                currentCardData.nextCounter = parseInt(parts[0]) || 1;
+                currentCardData.currentMonth = parseInt(parts[1]) || (new Date().getMonth() + 1);
+                currentCardData.currentYear = parseInt(parts[2]) || (new Date().getFullYear());
+                currentCardData.initials = parts[3] || (currentUserProfile.Inicjaly || 'NN');
+            }
+        } catch(e) {
+            console.warn("Nie udało się sparsować istniejącego numeru dokumentu.");
+        }
+        return;
+    }
+
+    // Ustaw metadane
+    const d = new Date();
+    currentCardData.currentMonth = d.getMonth() + 1; // JS liczy miesiące 0-11
+    currentCardData.currentYear = d.getFullYear();
+    currentCardData.initials = currentUserProfile.Inicjaly || 'NN';
+
+    // Jeśli brakuje inicjałów, ostrzeż, ale kontynuuj
+    if (!currentUserProfile.Inicjaly) {
+        console.warn("Brak inicjałów w profilu użytkownika. Używam 'NN'.");
+    }
+
+    console.log(`Pobieranie ostatniego numeru dla: Uid=${currentUserProfile.uid}, Rok=${currentCardData.currentYear}, Miesiąc=${currentCardData.currentMonth}`);
+
+    try {
+        // Zapytanie o ostatni dokument DANEGO LEKARZA w DANYM MIESIĄCU i ROKU
+        const q = db.collection("archiwumKarty")
+            .where("lekarz_uid", "==", currentUserProfile.uid)
+            .where("rok", "==", currentCardData.currentYear)
+            .where("miesiac", "==", currentCardData.currentMonth)
+            .orderBy("counter", "desc") // Sortuj wg licznika malejąco
+            .limit(1);
+
+        const snapshot = await q.get();
+
+        if (snapshot.empty) {
+            // To pierwszy dokument w tym miesiącu
+            currentCardData.nextCounter = 1;
+        } else {
+            // Znaleziono poprzedni dokument, pobierz jego licznik i dodaj 1
+            const lastCounter = snapshot.docs[0].data().counter;
+            currentCardData.nextCounter = lastCounter + 1;
+        }
+
+        // Zbuduj finalny numer dokumentu
+        const newDocNumber = `${currentCardData.nextCounter}/${currentCardData.currentMonth}/${currentCardData.currentYear}/${currentCardData.initials}`;
+
+        nrDokInput.value = newDocNumber; // Wstaw do pola
+        console.log(`Wygenerowano nowy numer dokumentu: ${newDocNumber}`);
+        isCurrentCardSaved = false; // Nowy numer = "brudna" karta
+
+    } catch (error) {
+        console.error("Błąd podczas generowania numeru dokumentu:", error);
+        // Błąd indeksu Firestore?
+        if (error.code === 'failed-precondition') {
+             alert("BŁĄD KRYTYCZNY: Aby archiwum działało, administrator musi utworzyć indeks w bazie danych Firestore.\n\n(Kolekcja: 'archiwumKarty', Pola: 'lekarz_uid' ASC, 'rok' ASC, 'miesiac' ASC, 'counter' DESC)");
+             console.error("BŁĄD INDEKSU: Wejdź w konsolę Firebase i utwórz indeks kompozytowy dla 'archiwumKarty': [lekarz_uid(ASC), rok(ASC), miesiac(ASC), counter(DESC)]");
+        }
+    }
+}
 </script> </body>
 </html>
