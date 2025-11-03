@@ -5562,156 +5562,158 @@ if (document.readyState === 'loading') {
 } else {
     initSignatureKonfig();
 }
-// ========================================================
-// ✅ KONIEC: Moduł 6 - Logika podpisu lekarza
-// ========================================================
 /* ⬇️ ======================================================= ⬇️ */
+/* ✅ POCZĄTEK: NOWY, POPRAWIONY BLOK (Moduł 5 i 6) */
 
 /**
- * ✅ NOWA FUNKCJA (Pkt 4): Wywoływana przy każdym wejściu do sekcji 'karta'.
- * Resetuje stan zapisu i przycisk 'Zapisz w Archiwum'.
+ * Pkt 4: Sprawdza, czy karta jest zapisana przy próbie zmiany zakładki.
  */
+function confirmOnTabChange() {
+    // Sprawdzamy, czy karta jest widoczna i czy NIE jest zapisana
+    if (kartaSection.style.display === 'block' && !isCurrentCardSaved) {
+        if (!confirm("Karta nie została zapisana w archiwum.\n\nCzy na pewno chcesz opuścić tę zakładkę? Niezapisane zmiany zostaną utracone.")) {
+            return false; // Anuluj zmianę zakładki
+        }
+    }
+    return true; // Kontynuuj zmianę zakładki
+}
+
+// Musimy "przechwycić" kliknięcia na WSZYSTKIE przyciski nawigacyjne
+const navButtonsToCheck = [
+    tabKalkulatorBtn, tabBazaKlientowBtn, tabBazaProduktowBtn, // Zakładki
+    backToMenuBtn, logoutBtn, menuLogoutBtn, // Przyciski paska i menu
+    menuKalkulatorBtn, menuBazaKlientowBtn, menuBazaProduktowBtn, // Przyciski podmenu
+    menuRaportyBtn, menuArchiwumKartyBtn, menuArchiwumParagonyBtn, menuKonfiguracjaBtn, // Przyciski menu
+    openCalculatorBtn, // Przycisk na karcie
+    metodaTradycyjnaBtn, metodaFormularzBtn // Przyciski z modala metody
+];
+
+navButtonsToCheck.forEach(btn => {
+    if (btn) { // Sprawdź, czy przycisk istnieje
+        btn.addEventListener('click', (e) => {
+            if (!confirmOnTabChange()) {
+                e.stopImmediatePropagation(); // Zatrzymaj inne listenery (np. showSection)
+                e.preventDefault(); // Zatrzymaj domyślną akcję
+            }
+        }, true); // <-- WAŻNE: 'true' uruchamia ten kod w pierwszej kolejności
+    }
+});
+
+/**
+ * Pkt 7: Generuje i wstawia nowy numer dokumentu do pola w Karcie Leczenia.
+ */
+async function generateAndSetDocumentNumber() {
+    if (!currentUserProfile || !currentUserProfile.uid) {
+        console.warn("Auto-numeracja wstrzymana: brak profilu użytkownika.");
+        return;
+    }
+
+    const nrDokInput = document.getElementById('nrDokumentu');
+    // Nie generuj, jeśli pole jest już wypełnione przez użytkownika
+    if (nrDokInput.value.trim() !== "") {
+        console.log("Auto-numeracja pominięta: pole 'Nr Dokumentu' jest już wypełnione.");
+        // Mimo to, spróbuj sparsować numer, aby uzyskać licznik dla zapisu
+        try {
+            const parts = nrDokInput.value.split('/');
+            if (parts.length === 4) {
+                currentCardData.nextCounter = parseInt(parts[0]) || 1;
+                currentCardData.currentMonth = parseInt(parts[1]) || (new Date().getMonth() + 1);
+                currentCardData.currentYear = parseInt(parts[2]) || (new Date().getFullYear());
+                currentCardData.initials = parts[3] || (currentUserProfile.Inicjaly || 'NN');
+            }
+        } catch(e) {
+            console.warn("Nie udało się sparsować istniejącego numeru dokumentu.");
+        }
+        return;
+    }
+
+    // Ustaw metadane
+    const d = new Date();
+    currentCardData.currentMonth = d.getMonth() + 1; // JS liczy miesiące 0-11
+    currentCardData.currentYear = d.getFullYear();
+    currentCardData.initials = currentUserProfile.Inicjaly || 'NN';
+
+    // Jeśli brakuje inicjałów, ostrzeż, ale kontynuuj
+    if (!currentUserProfile.Inicjaly) {
+        console.warn("Brak inicjałów w profilu użytkownika. Używam 'NN'.");
+    }
+
+    console.log(`Pobieranie ostatniego numeru dla: Uid=${currentUserProfile.uid}, Rok=${currentCardData.currentYear}, Miesiąc=${currentCardData.currentMonth}`);
+
+    try {
+        // Zapytanie o ostatni dokument DANEGO LEKARZA w DANYM MIESIĄCU i ROKU
+        const q = db.collection("archiwumKarty")
+            .where("lekarz_uid", "==", currentUserProfile.uid)
+            .where("rok", "==", currentCardData.currentYear)
+            .where("miesiac", "==", currentCardData.currentMonth)
+            .orderBy("counter", "desc") // Sortuj wg licznika malejąco
+            .limit(1);
+
+        const snapshot = await q.get();
+
+        if (snapshot.empty) {
+            // To pierwszy dokument w tym miesiącu
+            currentCardData.nextCounter = 1;
+        } else {
+            // Znaleziono poprzedni dokument, pobierz jego licznik i dodaj 1
+            const lastCounter = snapshot.docs[0].data().counter;
+            currentCardData.nextCounter = lastCounter + 1;
+        }
+
+        // Zbuduj finalny numer dokumentu
+        const newDocNumber = `${currentCardData.nextCounter}/${currentCardData.currentMonth}/${currentCardData.currentYear}/${currentCardData.initials}`;
+
+        nrDokInput.value = newDocNumber; // Wstaw do pola
+        console.log(`Wygenerowano nowy numer dokumentu: ${newDocNumber}`);
+        isCurrentCardSaved = false; // Nowy numer = "brudna" karta
+
+    } catch (error) {
+        console.error("Błąd podczas generowania numeru dokumentu:", error);
+        // Błąd indeksu Firestore?
+        if (error.code === 'failed-precondition') {
+             alert("BŁĄD KRYTYCZNY: Aby archiwum działało, administrator musi utworzyć indeks w bazie danych Firestore.\n\n(Kolekcja: 'archiwumKarty', Pola: 'lekarz_uid' ASC, 'rok' ASC, 'miesiac' ASC, 'counter' DESC)");
+             console.error("BŁĄD INDEKSU: Wejdź w konsolę Firebase i utwórz indeks kompozytowy dla 'archiwumKarty': [lekarz_uid(ASC), rok(ASC), miesiac(ASC), counter(DESC)]");
+        }
+    }
+}
+
+/**
+ * ✅ NOWA FUNKCJA (Pkt 4): Wywoływana przy każdym wejściu do sekcji 'karta'.
+ * Resetuje stan zapisu i przycisk 'Zapisz w Archiwum'.
+ */
 function onShowKarta() {
-    isCurrentCardSaved = false; // Karta jest "brudna" (niezapisana) po wejściu
+    isCurrentCardSaved = false; // Karta jest "brudna" (niezapisana) po wejściu
 
-    // Przywróć domyślny wygląd przycisku zapisu
-    if (saveCardToArchiveBtn) {
-        saveCardToArchiveBtn.disabled = false;
-        saveCardToArchiveBtn.textContent = '💾 Zapisz w Archiwim';
-    }
+    // Przywróć domyślny wygląd przycisku zapisu
+    if (saveCardToArchiveBtn) {
+        saveCardToArchiveBtn.disabled = false;
+        saveCardToArchiveBtn.textContent = '💾 Zapisz w Archiwum'; // Poprawiona literówka
+    }
 
-    // (W kolejnym module dodamy tu logikę generowania numeru dokumentu)
-     generateAndSetDocumentNumber();
+    // Wywołaj generowanie numeru
+    generateAndSetDocumentNumber();
 }
 
 // Zmodyfikuj oryginalny listener dla tabKartaBtn
 if (tabKartaBtn) {
-    tabKartaBtn.addEventListener('click', () => {
-        showSection('karta'); 
-        if (metodaModal) metodaModal.style.display = 'flex';
-        onShowKarta(); // Wywołaj nową funkcję
-    });
+    tabKartaBtn.addEventListener('click', () => {
+        showSection('karta'); 
+        if (metodaModal) metodaModal.style.display = 'flex';
+        onShowKarta(); // Wywołaj nową funkcję
+    });
 }
 
 // Zmodyfikuj też listener dla menuKartaBtn
 if (menuKartaBtn) {
-    menuKartaBtn.addEventListener('click', () => {
-        // ... (stara logika pokazywania modala) ...
-        showSection('karta'); // Pokaż sekcję karty
-        if (metodaModal) metodaModal.style.display = 'flex'; // Pokaż modal
-        onShowKarta(); // Wywołaj nową funkcję
-    });
+    menuKartaBtn.addEventListener('click', () => {
+        // ... (stara logika pokazywania modala) ...
+        showSection('karta'); // Pokaż sekcję karty
+        if (metodaModal) metodaModal.style.display = 'flex'; // Pokaż modal
+        onShowKarta(); // Wywołaj nową funkcję
+    });
 }
 
 /* ✅ KONIEC: NOWY BLOK KODU */
-
 /* ⬆️ ======================================================= ⬆️ */
-function confirmOnTabChange() {
-    // Sprawdzamy, czy karta jest widoczna i czy NIE jest zapisana
-    if (kartaSection.style.display === 'block' && !isCurrentCardSaved) {
-        if (!confirm("Karta nie została zapisana w archiwum.\n\nCzy na pewno chcesz opuścić tę zakładkę? Niezapisane zmiany zostaną utracone.")) {
-            return false; // Anuluj zmianę zakładki
-        }
-    }
-    return true; // Kontynuuj zmianę zakładki
-}
-
-// Musimy "przechwycić" kliknięcia na WSZYSTKIE przyciski nawigacyjne,
-// które prowadzą POZA sekcję Karty Leczenia.
-// Używamy "true" (capture phase), aby ten listener uruchomił się PIERWSZY.
-
-const navButtonsToCheck = [
-    tabKalkulatorBtn, tabBazaKlientowBtn, tabBazaProduktowBtn, // Zakładki
-    backToMenuBtn, logoutBtn, menuLogoutBtn, // Przyciski paska i menu
-    menuKalkulatorBtn, menuBazaKlientowBtn, menuBazaProduktowBtn, // Przyciski podmenu
-    menuRaportyBtn, menuArchiwumKartyBtn, menuArchiwumParagonyBtn, menuKonfiguracjaBtn, // Przyciski menu
-    openCalculatorBtn, // Przycisk na karcie
-    metodaTradycyjnaBtn, metodaFormularzBtn // Przyciski z modala metody
-];
-
-navButtonsToCheck.forEach(btn => {
-    if (btn) { // Sprawdź, czy przycisk istnieje
-        btn.addEventListener('click', (e) => {
-            if (!confirmOnTabChange()) {
-                e.stopImmediatePropagation(); // Zatrzymaj inne listenery (np. showSection)
-                e.preventDefault(); // Zatrzymaj domyślną akcję
-            }
-        }, true); // <-- WAŻNE: 'true' uruchamia ten kod w pierwszej kolejności
-    }
-});
-    async function generateAndSetDocumentNumber() {
-    if (!currentUserProfile || !currentUserProfile.uid) {
-        console.warn("Auto-numeracja wstrzymana: brak profilu użytkownika.");
-        return;
-    }
-
-    const nrDokInput = document.getElementById('nrDokumentu');
-    // Nie generuj, jeśli pole jest już wypełnione przez użytkownika
-    if (nrDokInput.value.trim() !== "") {
-        console.log("Auto-numeracja pominięta: pole 'Nr Dokumentu' jest już wypełnione.");
-        // Mimo to, spróbuj sparsować numer, aby uzyskać licznik dla zapisu
-        try {
-            const parts = nrDokInput.value.split('/');
-            if (parts.length === 4) {
-                currentCardData.nextCounter = parseInt(parts[0]) || 1;
-                currentCardData.currentMonth = parseInt(parts[1]) || (new Date().getMonth() + 1);
-                currentCardData.currentYear = parseInt(parts[2]) || (new Date().getFullYear());
-                currentCardData.initials = parts[3] || (currentUserProfile.Inicjaly || 'NN');
-            }
-        } catch(e) {
-            console.warn("Nie udało się sparsować istniejącego numeru dokumentu.");
-        }
-        return;
-    }
-
-    // Ustaw metadane
-    const d = new Date();
-    currentCardData.currentMonth = d.getMonth() + 1; // JS liczy miesiące 0-11
-    currentCardData.currentYear = d.getFullYear();
-    currentCardData.initials = currentUserProfile.Inicjaly || 'NN';
-
-    // Jeśli brakuje inicjałów, ostrzeż, ale kontynuuj
-    if (!currentUserProfile.Inicjaly) {
-        console.warn("Brak inicjałów w profilu użytkownika. Używam 'NN'.");
-    }
-
-    console.log(`Pobieranie ostatniego numeru dla: Uid=${currentUserProfile.uid}, Rok=${currentCardData.currentYear}, Miesiąc=${currentCardData.currentMonth}`);
-
-    try {
-        // Zapytanie o ostatni dokument DANEGO LEKARZA w DANYM MIESIĄCU i ROKU
-        const q = db.collection("archiwumKarty")
-            .where("lekarz_uid", "==", currentUserProfile.uid)
-            .where("rok", "==", currentCardData.currentYear)
-            .where("miesiac", "==", currentCardData.currentMonth)
-            .orderBy("counter", "desc") // Sortuj wg licznika malejąco
-            .limit(1);
-
-        const snapshot = await q.get();
-
-        if (snapshot.empty) {
-            // To pierwszy dokument w tym miesiącu
-            currentCardData.nextCounter = 1;
-        } else {
-            // Znaleziono poprzedni dokument, pobierz jego licznik i dodaj 1
-            const lastCounter = snapshot.docs[0].data().counter;
-            currentCardData.nextCounter = lastCounter + 1;
-        }
-
-        // Zbuduj finalny numer dokumentu
-        const newDocNumber = `${currentCardData.nextCounter}/${currentCardData.currentMonth}/${currentCardData.currentYear}/${currentCardData.initials}`;
-
-        nrDokInput.value = newDocNumber; // Wstaw do pola
-        console.log(`Wygenerowano nowy numer dokumentu: ${newDocNumber}`);
-        isCurrentCardSaved = false; // Nowy numer = "brudna" karta
-
-    } catch (error) {
-        console.error("Błąd podczas generowania numeru dokumentu:", error);
-        // Błąd indeksu Firestore?
-        if (error.code === 'failed-precondition') {
-             alert("BŁĄD KRYTYCZNY: Aby archiwum działało, administrator musi utworzyć indeks w bazie danych Firestore.\n\n(Kolekcja: 'archiwumKarty', Pola: 'lekarz_uid' ASC, 'rok' ASC, 'miesiac' ASC, 'counter' DESC)");
-             console.error("BŁĄD INDEKSU: Wejdź w konsolę Firebase i utwórz indeks kompozytowy dla 'archiwumKarty': [lekarz_uid(ASC), rok(ASC), miesiac(ASC), counter(DESC)]");
-        }
-    }
-}
 </script> </body>
 </html>
