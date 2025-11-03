@@ -623,7 +623,31 @@ background: #a93226;
 
 /* ✅ KONIEC: Moduł 7 - Style dla Archiwum */
 /* ⬆️ ======================================================= ⬆️ */
+/* ⬇️ DODAJ TEN BLOK NA KOŃCU GŁÓWNEGO STYLU ⬇️ */
 
+/* Poprawki dla tabeli w podglądzie archiwum */
+#archive_karta {
+    table-layout: fixed; /* Kluczowe dla poprawnego łamania */
+    width: 100%;
+}
+
+#archive_karta th,
+#archive_karta td {
+    word-break: break-word; /* Zezwól na łamanie długich słów */
+    vertical-align: middle;
+}
+
+/* Ustawienie szerokości kolumn (możesz dostosować) */
+#archive_karta th:nth-child(1) { width: 35px; } /* Lp. */
+#archive_karta th:nth-child(2) { width: 18%; }  /* Opis */
+#archive_karta th:nth-child(3) { width: 50px; } /* Liczba */
+#archive_karta th:nth-child(4) { width: 15%; }  /* Rozpoznanie */
+#archive_karta th:nth-child(5) { width: 15%; }  /* Nazwa produktu */
+#archive_karta th:nth-child(6) { width: 10%; }  /* Seria */
+#archive_karta th:nth-child(7) { width: 12%; }  /* Ilość */
+#archive_karta th:nth-child(8) { width: auto; }  /* Karencja */
+
+/* ⬆️ ============================================== ⬆️ */
 </style>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
@@ -6076,6 +6100,12 @@ if (archiveCardListContainer) {
 /**
  * Pkt 6: Funkcja pomocnicza budująca HTML dla podglądu (Wersja Poprawiona)
  */
+/* ⬇️ ======================================================= ⬇️ */
+/* ✅ ZASTĄP CAŁĄ FUNKCJĘ "buildArchivedCardView" TYM KODEM: */
+
+/**
+ * Pkt 6: Funkcja pomocnicza budująca HTML dla podglądu (Wersja Poprawiona)
+ */
 function buildArchivedCardView(card) {
     const header = card.header;
 
@@ -6088,53 +6118,81 @@ function buildArchivedCardView(card) {
     document.getElementById('archive_dataZgloszenia').textContent = header.dataZgloszenia || '';
     document.getElementById('archive_nrDokumentu').textContent = header.nrDokumentu || '';
 
-    // 2. Wypełnij Tabelę
+    // 2. Wypełnij Tabelę (NOWA, POPRAWNA LOGIKA)
     const tbody = document.querySelector('#archive_karta tbody');
     tbody.innerHTML = ''; // Wyczyść stare wiersze
 
-    // Wypełnij wierszami z zapisanych danych
-    card.table.forEach((row, index) => {
+    // Stwórz mapę z zapisanymi danymi, aby mieć do nich szybki dostęp po kluczu (Lp.)
+    // Kluczem jest np. "1." lub "10."
+    const savedRowsMap = new Map();
+    if (card.table) {
+        card.table.forEach(row => {
+            if (row.lp) {
+                savedRowsMap.set(row.lp.trim(), row);
+            }
+        });
+    }
+
+    // Funkcja pomocnicza do tworzenia wiersza (pustego lub z danymi)
+    const createRow = (lp) => {
+        const lpKey = lp + '.'; // Np. "1."
         const tr = tbody.insertRow();
-        tr.innerHTML = `
-            <td>${row.lp || (index + 1) + '.'}</td>
-            <td>${row.opis || ''}</td>
-            <td style="text-align: center;">${row.liczba || ''}</td>
-            <td>${row.rozpoznanie || ''}</td>
-            <td>${row.lek || ''}</td>
-            <td>${row.seria || ''}</td>
-            <td>${row.iloscDawka || ''}</td> <td>${row.karencja || ''}</td>
-        `;
-    });
+        
+        if (savedRowsMap.has(lpKey)) {
+            // Jeśli mamy dane dla tego wiersza, wypełnij go
+            const row = savedRowsMap.get(lpKey);
+            tr.innerHTML = `
+                <td>${row.lp || lpKey}</td>
+                <td>${row.opis || ''}</td>
+                <td style="text-align: center;">${row.liczba || ''}</td>
+                <td>${row.rozpoznanie || ''}</td>
+                <td>${row.lek || ''}</td>
+                <td>${row.seria || ''}</td>
+                <td>${row.iloscDawka || ''}</td>
+                <td>${row.karencja || ''}</td>
+            `;
+        } else {
+            // Jeśli nie ma danych, wstaw pusty wiersz
+            tr.innerHTML = `
+                <td>${lpKey}</td>
+                <td></td>
+                <td style="text-align: center;"></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+            `;
+        }
+    };
 
-    // Znajdź numer ostatniego wiersza (np. "1.") i przekształć na liczbę
-    let lastRowIndex = 0;
-    if (card.table.length > 0) {
-        try {
-            // Usuwamy kropkę z "1." i parsujemy na liczbę
-            lastRowIndex = parseInt(card.table[card.table.length - 1].lp) || card.table.length;
-        } catch(e) { lastRowIndex = card.table.length; }
+    // Odtwórz strukturę 13 wierszy, tak jak w generatorze
+    
+    // Wiersze 1-9 (Leczenie na miejscu)
+    for (let i = 1; i <= 9; i++) {
+        createRow(i);
     }
 
-    // Dopełnij pustymi wierszami do 9 (tak jak w generatorze)
-    for (let i = lastRowIndex + 1; i <= 9; i++) {
-         tbody.insertRow().innerHTML = `<td>${i}.</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>`;
-    }
-
-    // Wiersz specjalny
-    tbody.insertRow().innerHTML = `
-        <tr><td colspan="8" style="font-weight: bold; padding: 3px 2px;">Potwierdzenie nabycia produktu...</td></tr>
+    // Wiersz specjalny (Potwierdzenie nabycia)
+    const specialRow = tbody.insertRow();
+    specialRow.innerHTML = `
+        <td colspan="8" style="font-weight: bold; padding: 4px 5px; text-align: left; background: #e8eefc;">
+            Potwierdzenie nabycia produktu leczniczego weterynaryjnego/paszy leczniczej
+        </td>
     `;
-
-    // Wiersze 10, 11, 12 (tak jak w generatorze)
-     for (let i = 10; i <= 12; i++) {
-         tbody.insertRow().innerHTML = `<td>${i}.</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>`;
+    
+    // Wiersze 10-12 (Produkty pozostawione)
+    for (let i = 10; i <= 12; i++) {
+        createRow(i);
     }
 
     // 3. Wypełnij Podpisy
-    document.getElementById('archive_doctor-signature').src = header.podpisLekarzaImg || '';
+    document.getElementById('archive_doctor-signature').src = header.podpisLeczarzaImg || (header.podpisLekarzaImg || '');
     document.getElementById('archive_doctor-signature-name').textContent = header.podpisLekarzaLinia || '';
     document.getElementById('archive_podpisPosiadacza').src = card.podpisPosiadacza || '';
 }
+
+/* ⬆️ ======================================================= ⬆️ */
 // Listenery dla przycisków modala podglądu
 if(archiveCloseBtn) archiveCloseBtn.addEventListener('click', () => {
     archiveCardViewerModal.style.display = 'none';
@@ -6161,69 +6219,139 @@ if(archiveCloseBtn) archiveCloseBtn.addEventListener('click', () => {
 });
 
 // Lepsza funkcja drukowania (bez przeładowania strony)
+/* ⬇️ ZASTĄP CAŁY BLOK 'archivePrintBtn' TYM KODEM ⬇️ */
+
+// Lepsza funkcja drukowania (bez przeładowania strony)
 if(archivePrintBtn) archivePrintBtn.addEventListener('click', () => {
-    // 1. Dodaj styl do <head>, który ukryje wszystko poza modalem
-    const printStyle = document.createElement('style');
-    printStyle.id = 'print-modal-style';
-    printStyle.innerHTML = `
-        @media print {
-            /* Ukryj całą stronę */
-            body > * { 
-                display: none !important; 
-                visibility: hidden !important;
-            }
+    // 1. Dodaj styl do <head>, który ukryje wszystko poza modalem
+    const printStyle = document.createElement('style');
+    printStyle.id = 'print-modal-style';
+    
+    // ✅ UŻYWAMY DOKŁADNIE TYCH SAMYCH STYLÓW CO W GŁÓWNYM @media print
+    printStyle.innerHTML = `
+        @media print {
+            /* --- Ukryj wszystko POZA modalem --- */
+            body > * {
+                display: none !important;
+                visibility: hidden !important;
+            }
+            #archiveCardViewerModal, #archiveCardViewerModal * {
+                display: block !important;
+                visibility: visible !important;
+            }
+            #archiveCardViewerModal {
+                position: static !important; /* Usuń pozycjonowanie modala */
+                width: 100% !important;
+                height: auto !important;
+                background: #fff !important;
+                padding: 0 !important;
+                margin: 0 !important;
+                overflow: visible !important;
+            }
+            #archiveCardViewerModal > div:first-child {
+                display: none !important; /* UKRYJ NAGŁÓWEK MODALA (tytuł + przyciski) */
+            }
+            #archiveCardViewerModal > div[style*="box-shadow"] {
+                 box-shadow: none !important;
+                 border: none !important;
+                 width: 100% !important;
+                 height: auto !important;
+            }
+            #archiveCardContent {
+                overflow: visible !important;
+                height: auto !important;
+                background: #fff !important;
+                padding: 0 !important;
+            }
 
-            /* Pokaż tylko modal i jego zawartość */
-            #archiveCardViewerModal, #archiveCardViewerModal * {
-                display: block !important;
-                visibility: visible !important;
-            }
+            /* --- SKOPIOWANE STYLE GŁÓWNE @media print (linie 224-335) --- */
+            
+            @page {
+                size: A4 landscape;
+                margin: 1cm; 
+            }
+            
+            /* Zastosuj te style DO WEWNĄTRZ #archiveCardContent */
+            #archiveCardContent {
+                font-size: 10pt !important;
+                margin: 0 !important;
+                transform: none !important; /* WYŁĄCZ SKALOWANIE JS */
+                width: 100% !important;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+            
+            #archiveCardContent h2 {
+                font-size: 13pt !important;
+                margin-bottom: 5px !important;
+            }
+            
+            #archiveCardContent .top-section {
+                font-size: 9pt !important;
+                margin-bottom: 5px !important;
+                grid-template-columns: 1fr 1fr 1fr !important;
+            }
+            #archiveCardContent .top-section div {
+                padding: 2px !important;
+            }
+            
+            #archiveCardContent .table-container {
+                margin-bottom: 5px !important;
+            }
+            #archiveCardContent table {
+                font-size: 8pt !important; /* Mniejsza czcionka w tabeli */
+                table-layout: fixed !important; /* Użyj poprawki CSS stąd */
+            }
+            #archiveCardContent th, 
+            #archiveCardContent td {
+                padding: 1px 2px !important; /* Minimalny padding */
+                word-break: break-word !important; /* Łamanie słów */
+            }
+            
+            /* Nagłówki tabeli muszą mieć tło (bo je skopiowaliśmy) */
+            #archiveCardContent th {
+                background: #e8eefc !important;
+            }
 
-            /* Ustaw modal na całą szerokość */
-            #archiveCardViewerModal {
-                position: absolute !important;
-                left: 0 !important;
-                top: 0 !important;
-                width: 100% !important;
-                height: auto !important;
-                z-index: 99999 !important;
-            }
+            #archiveCardContent p {
+                margin-top: 4px !important;
+                margin-bottom: 4px !important;
+                font-size: 9pt !important;
+            }
+            
+            #archiveCardContent .signatures {
+                margin-top: 10px !important;
+            }
+            #archiveCardContent .signature-box {
+                width: 48% !important;
+            }
+            #archiveCardContent .signature-label {
+                font-size: 9pt !important;
+                margin-bottom: 0 !important;
+            }
+            #archiveCardContent .signature-img {
+                height: 40px !important; /* Zmniejsz wysokość podpisu */
+                margin-top: 2px !important;
+            }
+            #archiveCardContent .signature-name {
+                font-size: 9pt !important;
+                margin-top: 1px !important;
+            }
+        }
+    `;
+    document.head.appendChild(printStyle);
 
-            /* Usuń cienie i tło z modala */
-            #archiveCardViewerModal > div {
-                 width: 100% !important; height: auto !important;
-                 box-shadow: none !important; border: none !important;
-            }
+    // 2. Wywołaj druk
+    window.print();
 
-            /* Pokaż całą przewijaną zawartość */
-            #archiveCardContent {
-                overflow: visible !important;
-                background: #fff !important;
-                padding: 0 !important;
-                /* Użyj transformacji, aby zmieścić na stronie A4 */
-                transform: scale(0.9) !important;
-                transform-origin: top left !important;
-                width: 111% !important; /* Kompensacja dla skali 0.9 */
-            }
-
-            /* Ukryj przyciski w modalu */
-            #archiveCardViewerModal h3, #archivePrintBtn, #archiveCloseBtn {
-                display: none !important;
-            }
-        }
-    `;
-    document.head.appendChild(printStyle);
-
-    // 2. Wywołaj druk
-    window.print();
-
-    // 3. Usuń ten styl (z małym opóźnieniem, aby drukarka zdążyła)
-    setTimeout(() => {
-        document.head.removeChild(printStyle);
-    }, 500);
+    // 3. Usuń ten styl (z małym opóźnieniem)
+    setTimeout(() => {
+        if (document.getElementById('print-modal-style')) {
+            document.head.removeChild(printStyle);
+        }
+    }, 500);
 });
 
-/* ⬆️ ======================================================= ⬆️ */
 /* ⬆️ ======================================================= ⬆️ */
 
 
