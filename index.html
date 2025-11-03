@@ -77,22 +77,7 @@ padding: 5px 8px;
 .email-box, .drukuj-sekcja button#saveEmail { display: none !important; }
 }
 
-body { font-family: Arial, sans-serif; margin: 20px; }
-    /* ✅ WKLEJ TEN BLOK (ok. linii 65) */
-
-/* Stosujemy skalowanie 0.95 tylko do głównych sekcji, aby nie psuć modali */
-#kartaLeczeniaSection,
-#kalkulatorWizytySection,
-#bazaKlientowSection,
-#bazaProduktowSection,
-#konfiguracjaSection,
-#archiwumKartySection,
-#archiwumParagonySection {
-    transform: scale(0.95);
-    transform-origin: top left;
-    /* Kompensacja szerokości (100 / 0.95 = 105.26) */
-    width: 105.26%; 
-}
+body { font-family: Arial, sans-serif; margin: 20px; transform: scale(0.95); transform-origin: top left; }
 h2 { text-align: center; font-size: 15px; text-transform: uppercase; margin-bottom: 10px; }
 .top-section { display: grid; grid-template-columns: 1fr 1fr 1fr; font-size: 12px; margin-bottom: 10px; }
 .top-section div { padding: 5px; }
@@ -6176,57 +6161,53 @@ if(archiveCloseBtn) archiveCloseBtn.addEventListener('click', () => {
 });
 
 // Lepsza funkcja drukowania (bez przeładowania strony)
-/* ⬇️ ======================================================= ⬇️ */
-/* ✅ ZASTĄP CAŁY BLOK 'archivePrintBtn' TYM KODEM: */
-
-// Lepsza funkcja drukowania (bez przeładowania strony)
 if(archivePrintBtn) archivePrintBtn.addEventListener('click', () => {
-    // 1. Dodaj styl do <head>, który ukryje wszystko POZA zawartością karty
+    // 1. Dodaj styl do <head>, który ukryje wszystko poza modalem
     const printStyle = document.createElement('style');
     printStyle.id = 'print-modal-style';
     printStyle.innerHTML = `
         @media print {
-            /* 1. Ukryj całą stronę */
+            /* Ukryj całą stronę */
             body > * { 
+                display: none !important; 
                 visibility: hidden !important;
-                display: none !important;
             }
 
-            /* 2. Pokaż tylko kontener z zawartością karty i jego rodziców */
-            #archiveCardViewerModal, 
-            #archiveCardViewerModal > div, 
-            #archiveCardContent, 
-            #archiveCardContent * {
-                visibility: visible !important;
+            /* Pokaż tylko modal i jego zawartość */
+            #archiveCardViewerModal, #archiveCardViewerModal * {
                 display: block !important;
+                visibility: visible !important;
             }
 
-            /* 3. Ustaw modal na całą stronę */
+            /* Ustaw modal na całą szerokość */
             #archiveCardViewerModal {
                 position: absolute !important;
                 left: 0 !important;
                 top: 0 !important;
                 width: 100% !important;
+                height: auto !important;
+                z-index: 99999 !important;
             }
-            
-            /* 4. Usuń style wizualne modala (ramki, tło, padding) */
+
+            /* Usuń cienie i tło z modala */
             #archiveCardViewerModal > div {
-                 box-shadow: none !important;
-                 border: none !important;
+                 width: 100% !important; height: auto !important;
+                 box-shadow: none !important; border: none !important;
             }
+
+            /* Pokaż całą przewijaną zawartość */
             #archiveCardContent {
-                padding: 0 !important;
-                background: #fff !important;
-                /* RESETUJ transformację z modala, aby strona przejęła kontrolę */
-                transform: none !important;
-                width: 100% !important;
                 overflow: visible !important;
+                background: #fff !important;
+                padding: 0 !important;
+                /* Użyj transformacji, aby zmieścić na stronie A4 */
+                transform: scale(0.9) !important;
+                transform-origin: top left !important;
+                width: 111% !important; /* Kompensacja dla skali 0.9 */
             }
-            
-            /* 5. Ukryj nagłówek modala (tytuł i przyciski) */
-            #archiveCardViewerModal h3, 
-            #archivePrintBtn, 
-            #archiveCloseBtn {
+
+            /* Ukryj przyciski w modalu */
+            #archiveCardViewerModal h3, #archivePrintBtn, #archiveCloseBtn {
                 display: none !important;
             }
         }
@@ -6236,13 +6217,11 @@ if(archivePrintBtn) archivePrintBtn.addEventListener('click', () => {
     // 2. Wywołaj druk
     window.print();
 
-    // 3. Usuń ten styl po drukowaniu
+    // 3. Usuń ten styl (z małym opóźnieniem, aby drukarka zdążyła)
     setTimeout(() => {
         document.head.removeChild(printStyle);
     }, 500);
 });
-
-/* ⬆️ ======================================================= ⬆️ */
 
 /* ⬆️ ======================================================= ⬆️ */
 /* ⬆️ ======================================================= ⬆️ */
