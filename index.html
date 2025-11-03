@@ -6092,12 +6092,13 @@ if (archiveCardListContainer) {
  * Ta wersja poprawnie odtwarza 13-wierszową strukturę i szuka danych po 'logicalIndex'.
  */
 /* ⬇️ ======================================================= ⬇️ */
+/* ⬇️ ======================================================= ⬇️ */
 /* ✅ ZASTĄP CAŁĄ FUNKCJĘ "buildArchivedCardView" TYM KODEM: */
 
 /**
- * Pkt 6: Funkcja pomocnicza budująca HTML dla podglądu (Wersja Poprawiona v2)
- * Ta wersja poprawnie odtwarza 13-wierszową strukturę i szuka danych po 'logicalIndex'.
-* NAPRAWIA błąd z zagnieżdżonym <tr>.
+ * Pkt 6: Funkcja pomocnicza budująca HTML dla podglądu (Wersja Poprawiona v3 - KULOODPORNA)
+ * Ta wersja odtwarza 13-wierszową strukturę.
+ * Potrafi odczytać NOWE dane (po logicalIndex) i STARE dane (szukając po pasującym 'lp').
  */
 function buildArchivedCardView(card) {
     const header = card.header;
@@ -6118,30 +6119,32 @@ function buildArchivedCardView(card) {
     const savedRows = card.table || [];
     
     // Funkcja pomocnicza do wyszukiwania danych dla wiersza
-    // Sprawdza teraz, czy stary i nowy format zapisu istnieje
     const findRowData = (logicalIndex, lpFallback) => {
-        // 1. Szukaj po nowemu (preferowane)
+        // 1. Szukaj po nowemu (preferowane) - szuka { logicalIndex: 0 }
         let row = savedRows.find(r => r.logicalIndex === logicalIndex);
         if (row) return row;
         
-        // 2. Szukaj po staremu (dla kart zapisanych przed tą poprawką)
-        // To szuka wiersza, którego 'lp' (np. "1." lub "2.") pasuje do oczekiwanego
-        return savedRows.find(r => r.lp === lpFallback);
+        // 2. Szukaj po staremu (fallback dla danych bez logicalIndex)
+        // Szuka wiersza, którego 'lp' (np. "1. ➡️") zaczyna się od lpFallback (np. "1.")
+        row = savedRows.find(r => r.lp && r.lp.startsWith(lpFallback));
+        if (row) return row;
+
+        // 3. Ostatni fallback (jeśli lp też zawiedzie) - nie powinien być potrzebny
+        return null; 
     };
 
     // Odtwarzamy DOKŁADNIE 13-wierszową strukturę
     for (let i = 1; i <= 13; i++) {
         const tr = tbody.insertRow(); // Tworzymy <tr>
         let logicalIndex = -1;
-        let displayLp = '';
+        let displayLp = ''; // To jest nasz "lpFallback", np. "1."
 
         if (i < 10) {
             // --- Wiersze 1-9 ---
             logicalIndex = i - 1; // 0 do 8
             displayLp = `${i}.`;
-        } else if (i === 10) {
+    _} else if (i === 10) {
             // --- Wiersz specjalny (Potwierdzenie) ---
-            // NAPRAWIONY BŁĄD: wstawiamy <td> wewnątrz <tr>
             tr.innerHTML = `<td colspan="8" style="font-weight: bold; padding: 3px 2px;">Potwierdzenie nabycia produktu leczniczego weterynaryjnego/paszy leczniczej</td>`;
             continue; // Przejdź do następnej iteracji
         } else {
@@ -6156,8 +6159,7 @@ function buildArchivedCardView(card) {
         if (rowData) {
             // Mamy zapisane dane dla tego wiersza
             tr.innerHTML = `
-                <td>${rowData.lp}</td>
-                <td>${rowData.opis || ''}</td>
+                <td>${displayLp}</td>                 <td>${rowData.opis || ''}</td>
                 <td style="text-align: center;">${rowData.liczba || ''}</td>
                 <td>${rowData.rozpoznanie || ''}</td>
                 <td>${rowData.lek || ''}</td>
@@ -6178,7 +6180,6 @@ function buildArchivedCardView(card) {
 }
 /* ⬆️ ======================================================= ⬆️ */
 
-/* ⬆️ ======================================================= ⬆️ */
 // Listenery dla przycisków modala podglądu
 if(archiveCloseBtn) archiveCloseBtn.addEventListener('click', () => {
     archiveCardViewerModal.style.display = 'none';
