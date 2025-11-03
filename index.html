@@ -3,7 +3,6 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-
 <title>KARTA LECZENIA ZWIERZĄT</title>
 
     
@@ -6215,60 +6214,37 @@ if(archiveCloseBtn) archiveCloseBtn.addEventListener('click', () => {
 
 // Lepsza funkcja drukowania (bez przeładowania strony)
 if(archivePrintBtn) archivePrintBtn.addEventListener('click', () => {
-    // 1. Dodaj styl do <head>
-    const printStyle = document.createElement('style');
-    printStyle.id = 'print-modal-style';
-    printStyle.innerHTML = `
-        @media print {
-            /* 1. Ukryj całą stronę */
-            body > * {
-                display: none !important;
-                visibility: hidden !important;
-            }
+    // 1. Znajdź element, który ma być wydrukowany
+    // To jest ten DIV, który zawiera nagłówek, tabelę i podpisy
+    const contentToPrint = document.getElementById('archiveCardContent');
+    
+    if (!contentToPrint) {
+        console.error('Nie znaleziono elementu #archiveCardContent do wydruku.');
+        return;
+    }
 
-            /* 2. Pokaż *tylko* blok z zawartością karty */
-            #archiveCardContent {
-                display: block !important;
-                visibility: visible !important;
-                position: absolute !important;
-                left: 0 !important;
-                top: 0 !important;
-                width: 100% !important;
-                height: auto !important;
-                overflow: visible !important; /* Usuń scrollbar */
-                background: #fff !important;
-                padding: 0 !important;
-            }
+    // 2. Programistycznie "zaznacz" ten element
+    const selection = window.getSelection();
+    const range = document.createRange();
+    
+    range.selectNode(contentToPrint); // Zaznacz cały DIV z jego zawartością
+    selection.removeAllRanges(); // Wyczyść stare zaznaczenia (jeśli jakieś były)
+    selection.addRange(range); // Dodaj nasze nowe zaznaczenie
+    
+    // 3. Wywołaj systemowe okno drukowania
+    // Przeglądarka automatycznie wykryje "zaznaczenie"
+    // i domyślnie ustawi tryb "Drukuj zaznaczone"
+    try {
+        document.execCommand('print'); // Starsza, ale bardziej niezawodna metoda
+    } catch (e) {
+        window.print(); // Standardowa metoda
+    }
 
-            /* 3. Upewnij się, że modal i jego rodzice też są widoczni */
-            #archiveCardViewerModal, #archiveCardViewerModal > div {
-                display: block !important;
-                visibility: visible !important;
-                position: static !important;
-                box-shadow: none !important;
-                border: none !important;
-                background: none !important;
-            }
-
-            /* 4. UKRYJ nagłówek modala (z przyciskami Drukuj/Zamknij) */
-            /* Zakładamy, że jest to pierwszy <div> wewnątrz #archiveCardViewerModal > div */
-            #archiveCardViewerModal > div > div:first-child {
-                display: none !important;
-                visibility: hidden !important;
-            }
-        }
-    `;
-    document.head.appendChild(printStyle);
-
-    // 2. Wywołaj druk
-    window.print();
-
-    // 3. Usuń ten styl (z małym opóźnieniem, aby drukarka zdążyła)
+    // 4. Wyczyść zaznaczenie po chwili (po zamknięciu okna druku)
+    // Używamy setTimeout, aby dać przeglądarce czas na otwarcie dialogu
     setTimeout(() => {
-        if (document.getElementById('print-modal-style')) {
-            document.head.removeChild(printStyle);
-        }
-    }, 500);
+        selection.removeAllRanges();
+    }, 1000); // 1 sekunda opóźnienia
 });
 
 /* ⬆️ ======================================================= ⬆️ */
