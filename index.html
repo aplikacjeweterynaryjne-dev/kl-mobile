@@ -2540,16 +2540,19 @@ if (saveCardToArchiveBtn) {
             const rows = rowsEditable(); // Używamy istniejącej funkcji pomocniczej
 
             rows.forEach(tr => {
-                const rowData = {
-                    lp: tr.cells[0].textContent, // Zapisujemy też numer wiersza
-                    opis: tr.cells[1].textContent,
-                    liczba: tr.cells[2].querySelector('input') ? tr.cells[2].querySelector('input').value : '',
-                    rozpoznanie: tr.cells[3].textContent,
-                    lek: tr.cells[4].querySelector('input') ? tr.cells[4].querySelector('input').value : '',
-                    seria: tr.cells[5].textContent,
-                    iloscDawka: tr.cells[6].innerHTML, // Zapisujemy jako HTML, aby zachować input i tekst
-                    karencja: tr.cells[7].textContent
-                };
+           const logicalIndex = rows.indexOf(tr);
+                
+                const rowData = {
+                    logicalIndex: logicalIndex, // ✅ NOWA WŁAŚCIWOŚĆ
+                    lp: tr.cells[0].textContent,
+                    opis: tr.cells[1].textContent,
+                    liczba: tr.cells[2].querySelector('input') ? tr.cells[2].querySelector('input').value : '',
+                    rozpoznanie: tr.cells[3].textContent,
+                    lek: tr.cells[4].querySelector('input') ? tr.cells[4].querySelector('input').value : '',
+                    seria: tr.cells[5].textContent,
+                    iloscDawka: tr.cells[6].innerHTML,
+                    karencja: tr.cells[7].textContent
+                };
                 // Zapisujemy tylko wiersze, które mają jakąkolwiek treść
                 if (rowData.opis || rowData.liczba || rowData.rozpoznanie || rowData.lek) {
                     tableRows.push(rowData);
@@ -6076,65 +6079,87 @@ if (archiveCardListContainer) {
 /**
  * Pkt 6: Funkcja pomocnicza budująca HTML dla podglądu (Wersja Poprawiona)
  */
+/* ⬇️ ======================================================= ⬇️ */
+/* ✅ ZASTĄP CAŁĄ FUNKCJĘ "buildArchivedCardView" TYM KODEM: */
+
+/**
+ * Pkt 6: Funkcja pomocnicza budująca HTML dla podglądu (Wersja Poprawiona v2)
+ * Ta wersja poprawnie odtwarza 13-wierszową strukturę i szuka danych po 'logicalIndex'.
+ */
 function buildArchivedCardView(card) {
-    const header = card.header;
+    const header = card.header;
 
-    // 1. Wypełnij Nagłówek (Top Section)
-    document.getElementById('archive_nazwaLecznicy').textContent = header.nazwaLecznicy || '';
-    document.getElementById('archive_dataWykonania').textContent = header.dataWykonania || '';
-    document.getElementById('archive_nrStada').textContent = header.nrStada || '';
-    document.getElementById('archive_klient').textContent = header.klient || '';
-    document.getElementById('archive_adresKlienta').textContent = header.adresKlienta || '';
-    document.getElementById('archive_dataZgloszenia').textContent = header.dataZgloszenia || '';
-    document.getElementById('archive_nrDokumentu').textContent = header.nrDokumentu || '';
+    // 1. Wypełnij Nagłówek (Top Section)
+    document.getElementById('archive_nazwaLecznicy').textContent = header.nazwaLecznicy || '';
+    document.getElementById('archive_dataWykonania').textContent = header.dataWykonania || '';
+    document.getElementById('archive_nrStada').textContent = header.nrStada || '';
+    document.getElementById('archive_klient').textContent = header.klient || '';
+    document.getElementById('archive_adresKlienta').textContent = header.adresKlienta || '';
+    document.getElementById('archive_dataZgloszenia').textContent = header.dataZgloszenia || '';
+    document.getElementById('archive_nrDokumentu').textContent = header.nrDokumentu || '';
 
-    // 2. Wypełnij Tabelę
-    const tbody = document.querySelector('#archive_karta tbody');
-    tbody.innerHTML = ''; // Wyczyść stare wiersze
+    // 2. Wypełnij Tabelę (NOWA, POPRAWNA LOGIKA)
+    const tbody = document.querySelector('#archive_karta tbody');
+    tbody.innerHTML = ''; // Wyczyść stare wiersze
 
-    // Wypełnij wierszami z zapisanych danych
-    card.table.forEach((row, index) => {
-        const tr = tbody.insertRow();
-        tr.innerHTML = `
-            <td>${row.lp || (index + 1) + '.'}</td>
-            <td>${row.opis || ''}</td>
-            <td style="text-align: center;">${row.liczba || ''}</td>
-            <td>${row.rozpoznanie || ''}</td>
-            <td>${row.lek || ''}</td>
-            <td>${row.seria || ''}</td>
-            <td>${row.iloscDawka || ''}</td> <td>${row.karencja || ''}</td>
-        `;
-    });
+    // 'savedRows' to teraz tablica TYLKO wypełnionych wierszy
+    const savedRows = card.table || [];
+    
+    // Funkcja pomocnicza do wyszukiwania danych dla wiersza
+    const findRowData = (logicalIndex) => {
+        return savedRows.find(r => r.logicalIndex === logicalIndex);
+    };
 
-    // Znajdź numer ostatniego wiersza (np. "1.") i przekształć na liczbę
-    let lastRowIndex = 0;
-    if (card.table.length > 0) {
-        try {
-            // Usuwamy kropkę z "1." i parsujemy na liczbę
-            lastRowIndex = parseInt(card.table[card.table.length - 1].lp) || card.table.length;
-        } catch(e) { lastRowIndex = card.table.length; }
-    }
+    // Odtwarzamy DOKŁADNIE 13-wierszową strukturę
+    for (let i = 1; i <= 13; i++) {
+        const tr = tbody.insertRow(); // Tworzymy <tr>
+        let logicalIndex = -1;
+        let displayLp = '';
 
-    // Dopełnij pustymi wierszami do 9 (tak jak w generatorze)
-    for (let i = lastRowIndex + 1; i <= 9; i++) {
-         tbody.insertRow().innerHTML = `<td>${i}.</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>`;
-    }
+        if (i < 10) {
+            // --- Wiersze 1-9 ---
+            logicalIndex = i - 1; // 0 do 8
+            displayLp = `${i}.`;
+        } else if (i === 10) {
+            // --- Wiersz specjalny (Potwierdzenie) ---
+            // NAPRAWIONY BŁĄD: wstawiamy <td>, a nie <tr><td>
+            tr.innerHTML = `<td colspan="8" style="font-weight: bold; padding: 3px 2px;">Potwierdzenie nabycia produktu leczniczego weterynaryjnego/paszy leczniczej</td>`;
+            continue; // Przejdź do następnej iteracji
+        } else {
+            // --- Wiersze 11-13 ---
+            logicalIndex = i - 2; // 9, 10, 11
+            displayLp = `${i - 10}.`; // 1., 2., 3.
+        }
 
-    // Wiersz specjalny
-    tbody.insertRow().innerHTML = `
-        <tr><td colspan="8" style="font-weight: bold; padding: 3px 2px;">Potwierdzenie nabycia produktu...</td></tr>
-    `;
+        // Szukamy danych dla tego wiersza
+        const rowData = findRowData(logicalIndex);
+        
+        if (rowData) {
+            // Mamy zapisane dane dla tego wiersza
+            // Używamy <td>, a nie <tr>
+            tr.innerHTML = `
+                <td>${rowData.lp}</td>
+                <td>${rowData.opis || ''}</td>
+                <td style="text-align: center;">${rowData.liczba || ''}</td>
+                <td>${rowData.rozpoznanie || ''}</td>
+                <td>${rowData.lek || ''}</td>
+                <td>${rowData.seria || ''}</td>
+                <td>${rowData.iloscDawka || ''}</td>
+                <td>${rowData.karencja || ''}</td>
+            `;
+        } else {
+            // Renderuj pusty wiersz
+            tr.innerHTML = `<td>${displayLp}</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>`;
+        }
+    }
 
-    // Wiersze 10, 11, 12 (tak jak w generatorze)
-     for (let i = 10; i <= 12; i++) {
-         tbody.insertRow().innerHTML = `<td>${i}.</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>`;
-    }
-
-    // 3. Wypełnij Podpisy
-    document.getElementById('archive_doctor-signature').src = header.podpisLekarzaImg || '';
-    document.getElementById('archive_doctor-signature-name').textContent = header.podpisLekarzaLinia || '';
-    document.getElementById('archive_podpisPosiadacza').src = card.podpisPosiadacza || '';
+    // 3. Wypełnij Podpisy
+    document.getElementById('archive_doctor-signature').src = header.podpisLekarzaImg || '';
+    document.getElementById('archive_doctor-signature-name').textContent = header.podpisLekarzaLinia || '';
+    document.getElementById('archive_podpisPosiadacza').src = card.podpisPosiadacza || '';
 }
+
+/* ⬆️ ======================================================= ⬆️ */
 // Listenery dla przycisków modala podglądu
 if(archiveCloseBtn) archiveCloseBtn.addEventListener('click', () => {
     archiveCardViewerModal.style.display = 'none';
@@ -6200,10 +6225,7 @@ if(archivePrintBtn) archivePrintBtn.addEventListener('click', () => {
                 overflow: visible !important;
                 background: #fff !important;
                 padding: 0 !important;
-                /* Użyj transformacji, aby zmieścić na stronie A4 */
-                transform: scale(0.9) !important;
-                transform-origin: top left !important;
-                width: 111% !important; /* Kompensacja dla skali 0.9 */
+                /* Użyj transformacji, aby zmieścić na stronie A4 *
             }
 
             /* Ukryj przyciski w modalu */
