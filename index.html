@@ -6135,7 +6135,95 @@ function buildArchivedCardView(card) {
     document.getElementById('archive_doctor-signature-name').textContent = header.podpisLekarzaLinia || '';
     document.getElementById('archive_podpisPosiadacza').src = card.podpisPosiadacza || '';
 }
+// Listenery dla przycisków modala podglądu
+if(archiveCloseBtn) archiveCloseBtn.addEventListener('click', () => {
+    archiveCardViewerModal.style.display = 'none';
+    archiveCardContent.innerHTML = ''; // Wyczyść zawartość
+    // Przywróć oryginalną strukturę HTML do modala (ważne po ostatniej zmianie)
+    archiveCardContent.innerHTML = `
+        <h2 style="text-align: center; font-size: 15px; text-transform: uppercase; margin-bottom: 10px;">KARTA LECZENIA ZWIERZĄT... (Podgląd z Archiwum)</h2>
+        <div class="top-section" id="archive_topSection">
+            <div><b>Nazwa i adres zakładu...:</b><br><span id="archive_nazwaLecznicy"></span><br><b>Wykonanie czynności...:</b><span id="archive_dataWykonania" style="font-weight: bold;"></span><br><b>Nr stada:</b> <span id="archive_nrStada" style="font-weight: bold;"></span></div>
+            <div><b>Imię, nazwisko i adres...:</b><br><span id="archive_klient" style="font-weight: bold;"></span><br><span id="archive_adresKlienta"></span></div>
+            <div><b>Zgłoszenie:</b> Data: <span id="archive_dataZgloszenia"></span><br><b>Nr dokumentu:</b> <span id="archive_nrDokumentu" style="font-weight: bold;"></span></div>
+        </div>
+        <div class="table-container"><table id="archive_karta"><thead>
+            <tr><th rowspan="2" style="width:30px;">Lp.</th><th rowspan="2" class="center-text">Nazwa siedziby stada...</th><th rowspan="2" class="center-text">Liczba...</th><th rowspan="2" class="center-text">Rozpoznanie...</th><th colspan="3">Zastosowane... produkty...</th><th rowspan="2">Okres karencji...</th></tr>
+            <tr><th>Nazwa produktu...</th><th>Numer serii...</th><th>Ilość, dawkowanie...</th></tr>
+        </thead><tbody></tbody></table></div>
+        <p><b>Oświadczam, że nabyte produkty...</b></p>
+        <div class="signatures">
+            <div class="signature-box"><span class="signature-label">Lekarz weterynarii</span><img id="archive_doctor-signature" class="signature-img" alt="Podpis lekarza"><span id="archive_doctor-signature-name" class="signature-name"></span></div>
+            <div class="signature-box"><span class="signature-label">Podpis posiadacza zwierzęcia</span><img id="archive_podpisPosiadacza" class="signature-img" alt="Podpis posiadacza"></div>
+        </div>
+        <p><b>Wyniki badań uzupełniających:</b><br>*W przypadku zwierząt...</p>
+    `;
+});
 
+// Lepsza funkcja drukowania (bez przeładowania strony)
+if(archivePrintBtn) archivePrintBtn.addEventListener('click', () => {
+    // 1. Dodaj styl do <head>, który ukryje wszystko poza modalem
+    const printStyle = document.createElement('style');
+    printStyle.id = 'print-modal-style';
+    printStyle.innerHTML = `
+        @media print {
+            /* Ukryj całą stronę */
+            body > * { 
+                display: none !important; 
+                visibility: hidden !important;
+            }
+
+            /* Pokaż tylko modal i jego zawartość */
+            #archiveCardViewerModal, #archiveCardViewerModal * {
+                display: block !important;
+                visibility: visible !important;
+            }
+
+            /* Ustaw modal na całą szerokość */
+            #archiveCardViewerModal {
+                position: absolute !important;
+                left: 0 !important;
+                top: 0 !important;
+                width: 100% !important;
+                height: auto !important;
+                z-index: 99999 !important;
+            }
+
+            /* Usuń cienie i tło z modala */
+            #archiveCardViewerModal > div {
+                 width: 100% !important; height: auto !important;
+                 box-shadow: none !important; border: none !important;
+            }
+
+            /* Pokaż całą przewijaną zawartość */
+            #archiveCardContent {
+                overflow: visible !important;
+                background: #fff !important;
+                padding: 0 !important;
+                /* Użyj transformacji, aby zmieścić na stronie A4 */
+                transform: scale(0.9) !important;
+                transform-origin: top left !important;
+                width: 111% !important; /* Kompensacja dla skali 0.9 */
+            }
+
+            /* Ukryj przyciski w modalu */
+            #archiveCardViewerModal h3, #archivePrintBtn, #archiveCloseBtn {
+                display: none !important;
+            }
+        }
+    `;
+    document.head.appendChild(printStyle);
+
+    // 2. Wywołaj druk
+    window.print();
+
+    // 3. Usuń ten styl (z małym opóźnieniem, aby drukarka zdążyła)
+    setTimeout(() => {
+        document.head.removeChild(printStyle);
+    }, 500);
+});
+
+/* ⬆️ ======================================================= ⬆️ */
 /* ⬆️ ======================================================= ⬆️ */
 
 
