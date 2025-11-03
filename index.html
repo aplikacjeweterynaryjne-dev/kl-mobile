@@ -1461,7 +1461,7 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
                 <button id="archiveCloseBtn" class="btn warn small" style="margin-left: 10px;">Zamknij</button>
             </div>
         </div>
-<div id="archiveCardContent" style="flex: 1; overflow: auto; padding: 15px; background: #f4f4f4;">
+<div id="archiveCardContent" style="flex: 1; overflow: auto; padding: 15px; background: #f4f4f4; transform: scale(0.95); transform-origin: top left; width: 105.26%;">
     <h2 style="text-align: center; font-size: 15px; text-transform: uppercase; margin-bottom: 10px;">KARTA LECZENIA ZWIERZĄT... (Podgląd z Archiwum)</h2>
 
     <div class="top-section" id="archive_topSection">
@@ -6161,53 +6161,57 @@ if(archiveCloseBtn) archiveCloseBtn.addEventListener('click', () => {
 });
 
 // Lepsza funkcja drukowania (bez przeładowania strony)
+/* ⬇️ ======================================================= ⬇️ */
+/* ✅ ZASTĄP CAŁY BLOK 'archivePrintBtn' TYM KODEM: */
+
+// Lepsza funkcja drukowania (bez przeładowania strony)
 if(archivePrintBtn) archivePrintBtn.addEventListener('click', () => {
-    // 1. Dodaj styl do <head>, który ukryje wszystko poza modalem
+    // 1. Dodaj styl do <head>, który ukryje wszystko POZA zawartością karty
     const printStyle = document.createElement('style');
     printStyle.id = 'print-modal-style';
     printStyle.innerHTML = `
         @media print {
-            /* Ukryj całą stronę */
+            /* 1. Ukryj całą stronę */
             body > * { 
-                display: none !important; 
                 visibility: hidden !important;
+                display: none !important;
             }
 
-            /* Pokaż tylko modal i jego zawartość */
-            #archiveCardViewerModal, #archiveCardViewerModal * {
-                display: block !important;
+            /* 2. Pokaż tylko kontener z zawartością karty i jego rodziców */
+            #archiveCardViewerModal, 
+            #archiveCardViewerModal > div, 
+            #archiveCardContent, 
+            #archiveCardContent * {
                 visibility: visible !important;
+                display: block !important;
             }
 
-            /* Ustaw modal na całą szerokość */
+            /* 3. Ustaw modal na całą stronę */
             #archiveCardViewerModal {
                 position: absolute !important;
                 left: 0 !important;
                 top: 0 !important;
                 width: 100% !important;
-                height: auto !important;
-                z-index: 99999 !important;
             }
-
-            /* Usuń cienie i tło z modala */
+            
+            /* 4. Usuń style wizualne modala (ramki, tło, padding) */
             #archiveCardViewerModal > div {
-                 width: 100% !important; height: auto !important;
-                 box-shadow: none !important; border: none !important;
+                 box-shadow: none !important;
+                 border: none !important;
             }
-
-            /* Pokaż całą przewijaną zawartość */
             #archiveCardContent {
-                overflow: visible !important;
-                background: #fff !important;
                 padding: 0 !important;
-                /* Użyj transformacji, aby zmieścić na stronie A4 */
-                transform: scale(0.9) !important;
-                transform-origin: top left !important;
-                width: 111% !important; /* Kompensacja dla skali 0.9 */
+                background: #fff !important;
+                /* RESETUJ transformację z modala, aby strona przejęła kontrolę */
+                transform: none !important;
+                width: 100% !important;
+                overflow: visible !important;
             }
-
-            /* Ukryj przyciski w modalu */
-            #archiveCardViewerModal h3, #archivePrintBtn, #archiveCloseBtn {
+            
+            /* 5. Ukryj nagłówek modala (tytuł i przyciski) */
+            #archiveCardViewerModal h3, 
+            #archivePrintBtn, 
+            #archiveCloseBtn {
                 display: none !important;
             }
         }
@@ -6217,11 +6221,13 @@ if(archivePrintBtn) archivePrintBtn.addEventListener('click', () => {
     // 2. Wywołaj druk
     window.print();
 
-    // 3. Usuń ten styl (z małym opóźnieniem, aby drukarka zdążyła)
+    // 3. Usuń ten styl po drukowaniu
     setTimeout(() => {
         document.head.removeChild(printStyle);
     }, 500);
 });
+
+/* ⬆️ ======================================================= ⬆️ */
 
 /* ⬆️ ======================================================= ⬆️ */
 /* ⬆️ ======================================================= ⬆️ */
