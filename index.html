@@ -5927,10 +5927,14 @@ async function loadCardsForUser(lekarz_uid) {
                 const cardEl = document.createElement('div');
                 cardEl.className = 'archive-card-item';
                 cardEl.innerHTML = `
-                    <span>Nr: <strong>${card.nrDokumentu || 'Brak nr'}</strong></span>
-                    <span>Data: ${card.dataWykonania || 'Brak daty'}</span>
-                    <button class="btn primary small btn-view-archived-card" data-card-id="${card.id}">Podgląd KL</button>
-                `;
+                    cardEl.innerHTML = `
+    <span>Nr: <strong>${card.nrDokumentu || 'Brak nr'}</strong></span>
+    <span>Data: ${card.dataWykonania || 'Brak daty'}</span>
+    <div style="display: flex; gap: 5px;">
+        <button class="btn primary small btn-view-archived-card" data-card-id="${card.id}">Podgląd KL</button>
+        <button class="btn warn small btn-delete-archived-card" data-card-id="${card.id}" data-card-nr="${card.nrDokumentu || 'Brak nr'}">Usuń</button>
+    </div>
+`;
                 cardListDiv.appendChild(cardEl);
             });
             
@@ -5954,9 +5958,12 @@ if(archiveUserSelect) archiveUserSelect.addEventListener('change', () => {
 // Używamy delegacji zdarzeń, bo przyciski są dynamiczne
 if (archiveCardListContainer) {
     archiveCardListContainer.addEventListener('click', async (e) => {
-        if (e.target.classList.contains('btn-view-archived-card')) {
-            const cardId = e.target.dataset.cardId;
-            e.target.textContent = 'Ładowanie...';
+        const target = e.target; // Cel kliknięcia
+
+        // --- Logika Podglądu Karty ---
+        if (target.classList.contains('btn-view-archived-card')) {
+            const cardId = target.dataset.cardId;
+            target.textContent = 'Ładowanie...';
             
             try {
                 const doc = await db.collection("archiwumKarty").doc(cardId).get();
@@ -5966,15 +5973,34 @@ if (archiveCardListContainer) {
                 }
                 const cardData = doc.data();
                 
-                // Wywołaj funkcję budującą podgląd
-                buildArchivedCardView(cardData);
+                buildArchivedCardView(cardData); // Tę funkcję zaraz naprawimy
                 archiveCardViewerModal.style.display = 'flex';
                 
             } catch (error) {
                 console.error("Błąd wczytywania karty do podglądu:", error);
                 alert("Błąd wczytywania karty.");
             } finally {
-                e.target.textContent = 'Podgląd KL';
+                target.textContent = 'Podgląd KL';
+            }
+        } 
+
+        // --- ✅ NOWA LOGIKA: Usuwanie Karty ---
+        else if (target.classList.contains('btn-delete-archived-card')) {
+            const cardId = target.dataset.cardId;
+            const cardNr = target.dataset.cardNr;
+            
+            if (confirm(`Czy na pewno chcesz trwale usunąć kartę nr: ${cardNr}?`)) {
+                target.textContent = 'Usuwanie...';
+                try {
+                    await db.collection("archiwumKarty").doc(cardId).delete();
+                    // Usuń element z widoku
+                    target.closest('.archive-card-item').remove();
+                    alert('Karta została usunięta.');
+                } catch (error) {
+                    console.error("Błąd usuwania karty:", error);
+                    alert("Wystąpił błąd podczas usuwania.");
+                    target.textContent = 'Usuń';
+                }
             }
         }
     });
