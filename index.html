@@ -623,53 +623,7 @@ background: #a93226;
 
 /* ✅ KONIEC: Moduł 7 - Style dla Archiwum */
 /* ⬆️ ======================================================= ⬆️ */
-/* ⬇️ DODAJ TEN BLOK NA KOŃCU GŁÓWNEGO STYLU ⬇️ */
 
-/* ⬇️ WKLEJ TEN NOWY BLOK CSS ZAMIAST POPRZEDNIEGO Z POPRAWKI 2 ⬇️ */
-
-/* Poprawki dla okna modala archiwum */
-#archiveCardViewerModal > div[style*="width: 95%"] {
-    width: 98% !important; /* POSZERZAMY GŁÓWNE OKNO MODALA */
-    max-width: 1400px; /* Ustawiamy maks. szerokość */
-    height: 95% !important;
-}
-
-#archiveCardContent .top-section {
-    /* Poprawka dla górnej sekcji - pozwól jej się łamać */
-    font-size: 11px; /* Zmniejszamy trochę czcionkę, aby się zmieściło */
-}
-
-/* Poprawki dla tabeli w podglądzie archiwum */
-#archive_karta {
-    table-layout: fixed; /* Kluczowe dla poprawnego łamania */
-    width: 100%;
-    font-size: 11px; /* Ustawiamy bazową czcionkę jak w generatorze */
-}
-
-#archive_karta th,
-#archive_karta td {
-    word-break: break-word; /* Zezwól na łamanie długich słów */
-    vertical-align: middle;
-    padding: 4px; /* Ustawiamy padding jak w generatorze */
-    font-size: 11px;
-}
-
-#archive_karta th {
-     background: #e8eefc; /* Tło nagłówka jak w generatorze */
-     text-align: center; /* Wyśrodkowanie nagłówków */
-}
-
-/* Ustawienie szerokości kolumn (bardziej zbliżone do generatora) */
-#archive_karta th:nth-child(1), #archive_karta td:nth-child(1) { width: 35px; text-align: center; } /* Lp. */
-#archive_karta th:nth-child(2), #archive_karta td:nth-child(2) { width: 18%; }  /* Opis */
-#archive_karta th:nth-child(3), #archive_karta td:nth-child(3) { width: 50px; text-align: center; } /* Liczba */
-#archive_karta th:nth-child(4), #archive_karta td:nth-child(4) { width: 15%; text-align: center; }  /* Rozpoznanie */
-#archive_karta th:nth-child(5) { width: 15%; }  /* Nazwa produktu */
-#archive_karta th:nth-child(6) { width: 10%; }  /* Seria */
-#archive_karta th:nth-child(7) { width: 12%; }  /* Ilość */
-#archive_karta th:nth-child(8) { width: auto; }  /* Karencja */
-
-/* ⬆️ ======================================================= ⬆️ */
 </style>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
@@ -6122,15 +6076,6 @@ if (archiveCardListContainer) {
 /**
  * Pkt 6: Funkcja pomocnicza budująca HTML dla podglądu (Wersja Poprawiona)
  */
-/* ⬇️ ======================================================= ⬇️ */
-/* ✅ ZASTĄP CAŁĄ FUNKCJĘ "buildArchivedCardView" TYM KODEM: */
-
-/**
- * Pkt 6: Funkcja pomocnicza budująca HTML dla podglądu (Wersja Poprawiona)
- */
-/* ⬇️ ======================================================= ⬇️ */
-/* ✅ ZASTĄP CAŁĄ FUNKCJĘ "buildArchivedCardView" TYM NOWYM KODEM: */
-
 function buildArchivedCardView(card) {
     const header = card.header;
 
@@ -6143,75 +6088,46 @@ function buildArchivedCardView(card) {
     document.getElementById('archive_dataZgloszenia').textContent = header.dataZgloszenia || '';
     document.getElementById('archive_nrDokumentu').textContent = header.nrDokumentu || '';
 
-    // 2. Wypełnij Tabelę (NOWA, POPRAWNA LOGIKA ODCZYTU KLUCZA)
+    // 2. Wypełnij Tabelę
     const tbody = document.querySelector('#archive_karta tbody');
     tbody.innerHTML = ''; // Wyczyść stare wiersze
 
-    // Stwórz mapę z zapisanymi danymi
-    const savedRowsMap = new Map();
-    if (card.table) {
-        card.table.forEach(row => {
-            if (row.lp) {
-                // KLUCZOWA POPRAWKA:
-                // Czasem lp to "1. ", czasem "1. ➡️".
-                // Bierzemy tylko pierwszą część (numer i kropkę).
-                const key = row.lp.split(' ')[0]; // Z "1. ➡️" robi "1."
-                savedRowsMap.set(key, row);
-            }
-        });
-    }
-
-    // Funkcja pomocnicza do tworzenia wiersza (pustego lub z danymi)
-    const createRow = (lp) => {
-        const lpKey = lp + '.'; // Np. "1."
+    // Wypełnij wierszami z zapisanych danych
+    card.table.forEach((row, index) => {
         const tr = tbody.insertRow();
-        
-        if (savedRowsMap.has(lpKey)) {
-            // Jeśli mamy dane dla tego wiersza, wypełnij go
-            const row = savedRowsMap.get(lpKey);
-            tr.innerHTML = `
-                <td>${row.lp || lpKey}</td>
-                <td class="center-text">${row.opis || ''}</td>
-                <td class="center-text">${row.liczba || ''}</td>
-                <td class="center-text">${row.rozpoznanie || ''}</td>
-                <td>${row.lek || ''}</td>
-                <td>${row.seria || ''}</td>
-                <td>${row.iloscDawka || ''}</td>
-                <td>${row.karencja || ''}</td>
-            `;
-        } else {
-            // Jeśli nie ma danych, wstaw pusty wiersz
-            tr.innerHTML = `
-                <td>${lpKey}</td>
-                <td class="center-text"></td>
-                <td class="center-text"></td>
-                <td class="center-text"></td>
-                <td></td>
-                <td></td>
-                <td></td>
-                <td></td>
-            `;
-        }
-    };
+        tr.innerHTML = `
+            <td>${row.lp || (index + 1) + '.'}</td>
+            <td>${row.opis || ''}</td>
+            <td style="text-align: center;">${row.liczba || ''}</td>
+            <td>${row.rozpoznanie || ''}</td>
+            <td>${row.lek || ''}</td>
+            <td>${row.seria || ''}</td>
+            <td>${row.iloscDawka || ''}</td> <td>${row.karencja || ''}</td>
+        `;
+    });
 
-    // Odtwórz strukturę 13 wierszy, tak jak w generatorze
-    
-    // Wiersze 1-9 (Leczenie na miejscu)
-    for (let i = 1; i <= 9; i++) {
-        createRow(i);
+    // Znajdź numer ostatniego wiersza (np. "1.") i przekształć na liczbę
+    let lastRowIndex = 0;
+    if (card.table.length > 0) {
+        try {
+            // Usuwamy kropkę z "1." i parsujemy na liczbę
+            lastRowIndex = parseInt(card.table[card.table.length - 1].lp) || card.table.length;
+        } catch(e) { lastRowIndex = card.table.length; }
     }
 
-    // Wiersz specjalny (Potwierdzenie nabycia)
-    const specialRow = tbody.insertRow();
-    specialRow.innerHTML = `
-        <td colspan="8" style="font-weight: bold; padding: 4px 5px; text-align: left; background: #e8eefc;">
-            Potwierdzenie nabycia produktu leczniczego weterynaryjnego/paszy leczniczej
-        </td>
+    // Dopełnij pustymi wierszami do 9 (tak jak w generatorze)
+    for (let i = lastRowIndex + 1; i <= 9; i++) {
+         tbody.insertRow().innerHTML = `<td>${i}.</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>`;
+    }
+
+    // Wiersz specjalny
+    tbody.insertRow().innerHTML = `
+        <tr><td colspan="8" style="font-weight: bold; padding: 3px 2px;">Potwierdzenie nabycia produktu...</td></tr>
     `;
-    
-    // Wiersze 10-12 (Produkty pozostawione)
-    for (let i = 10; i <= 12; i++) {
-        createRow(i);
+
+    // Wiersze 10, 11, 12 (tak jak w generatorze)
+     for (let i = 10; i <= 12; i++) {
+         tbody.insertRow().innerHTML = `<td>${i}.</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>`;
     }
 
     // 3. Wypełnij Podpisy
@@ -6219,9 +6135,6 @@ function buildArchivedCardView(card) {
     document.getElementById('archive_doctor-signature-name').textContent = header.podpisLekarzaLinia || '';
     document.getElementById('archive_podpisPosiadacza').src = card.podpisPosiadacza || '';
 }
-/* ⬆️ ======================================================= ⬆️ */
-
-/* ⬆️ ======================================================= ⬆️ */
 // Listenery dla przycisków modala podglądu
 if(archiveCloseBtn) archiveCloseBtn.addEventListener('click', () => {
     archiveCardViewerModal.style.display = 'none';
@@ -6246,12 +6159,6 @@ if(archiveCloseBtn) archiveCloseBtn.addEventListener('click', () => {
         <p><b>Wyniki badań uzupełniających:</b><br>*W przypadku zwierząt...</p>
     `;
 });
-
-// Lepsza funkcja drukowania (bez przeładowania strony)
-/* ⬇️ ZASTĄP CAŁY BLOK 'archivePrintBtn' TYM KODEM ⬇️ */
-
-// Lepsza funkcja drukowania (bez przeładowania strony)
-/* ⬇️ ZASTĄP CAŁY BLOK 'archivePrintBtn' (z Poprawki 3) TYM KODEM ⬇️ */
 
 // Lepsza funkcja drukowania (bez przeładowania strony)
 if(archivePrintBtn) archivePrintBtn.addEventListener('click', () => {
@@ -6300,11 +6207,11 @@ if(archivePrintBtn) archivePrintBtn.addEventListener('click', () => {
             }
 
             /* Ukryj przyciski w modalu */
-            #archiveCardViewerModal h3, #archivePrintBtn, #archiveCloseBtn, #archiveCardViewerModal > div:first-child {
+            #archiveCardViewerModal h3, #archivePrintBtn, #archiveCloseBtn {
                 display: none !important;
             }
         }
-    `
+    `;
     document.head.appendChild(printStyle);
 
     // 2. Wywołaj druk
@@ -6315,7 +6222,10 @@ if(archivePrintBtn) archivePrintBtn.addEventListener('click', () => {
         document.head.removeChild(printStyle);
     }, 500);
 });
+
 /* ⬆️ ======================================================= ⬆️ */
+/* ⬆️ ======================================================= ⬆️ */
+
 
 /**
  * Pkt 8: Logika dla Archiwum Paragonów (analogicznie do Kart)
