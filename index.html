@@ -6263,25 +6263,27 @@ if(archiveCloseBtn) archiveCloseBtn.addEventListener('click', () => {
 /* ⬇️ ZASTĄP CAŁY BLOK "archivePrintBtn" (ok. linii 3080) TYM KODEM ⬇️ */
 
 // OSTATECZNA funkcja drukowania v4 - Implementacja Twojego pomysłu
+// OSTATECZNA funkcja drukowania v4 - Implementacja Twojego pomysłu (POPRAWKA v5 - Race condition)
 if(archivePrintBtn) archivePrintBtn.addEventListener('click', () => {
-    // 1. Znajdź główny kontener modala i kontener treści
+    // 1. Znajdź główny kontener modala
     const modal = document.getElementById('archiveCardViewerModal');
-    const content = document.getElementById('archiveCardContent');
     
-    if (!modal || !content) {
+    if (!modal) {
         console.error('Błąd drukowania: Nie znaleziono kluczowych elementów modala.');
         return;
     }
 
     // 2. Dodaj specjalną klasę CSS do modala na czas drukowania
-    // Ta klasa powie stylom, aby ukryły tytuł i rozwinęły treść
     modal.classList.add('print-mode');
     
-    // 3. Wywołaj druk
-    window.print();
-    
-    // 4. Usuń klasę *po* wywołaniu drukowania (nie musi być natychmiast)
-    // Używamy setTimeout, aby dać przeglądarce czas na przygotowanie wydruku
+    // 3. Wywołaj druk Z MINIMALNYM OPÓŹNIENIEM
+    // To daje przeglądarce czas na zastosowanie stylów .print-mode
+    setTimeout(() => {
+        window.print();
+    }, 50); // 50 milisekund w zupełności wystarczy
+
+    // 4. Usuń klasę PO wydruku (oryginalna logika jest OK)
+    // Używamy dłuższego opóźnienia, aby mieć pewność, że okno dialogowe się zamknęło
     setTimeout(() => {
         modal.classList.remove('print-mode');
     }, 500);
