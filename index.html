@@ -2341,6 +2341,103 @@ const calcNrDokInput = document.getElementById('calcNrDokInput');
 
 // Przycisk zapisu karty (Pkt 4)
 const saveCardToArchiveBtn = document.getElementById('saveCardToArchiveBtn');
+/* Plik: index.html (wklej ok. linii 1122) */
+
+/**
+ * Pkt 4: Listener dla przycisku "Zapisz w Archiwum"
+ */
+if (saveCardToArchiveBtn) {
+    saveCardToArchiveBtn.addEventListener('click', async () => {
+        if (!currentUserProfile || !currentUserProfile.uid) {
+            alert("Nie można zapisać. Brak danych zalogowanego użytkownika.");
+            return;
+        }
+
+        // Zabezpieczenie przed zapisaniem pustej karty
+        const klient = document.getElementById('klientSelect').value;
+        const nrDok = document.getElementById('nrDokumentu').value;
+        if (!klient || !nrDok) {
+            alert("Nie można zapisać. Wypełnij przynajmniej pola 'Klient' i 'Nr Dokumentu'.");
+            return;
+        }
+
+        console.log("Rozpoczynanie zapisu karty do archiwum...");
+        saveCardToArchiveBtn.disabled = true;
+        saveCardToArchiveBtn.textContent = 'Zapisywanie...';
+
+        try {
+            // 1. Serializacja nagłówka
+            const headerData = {
+                nazwaLecznicy: document.getElementById('nazwaLecznicy').textContent,
+                dataWykonania: document.getElementById('dataWykonania').value,
+                nrStada: document.getElementById('nrStada').textContent,
+                klient: klient,
+                adresKlienta: document.getElementById('adresKlienta').textContent,
+                dataZgloszenia: document.getElementById('dataZgloszenia').value,
+                nrDokumentu: nrDok,
+                podpisLekarzaImg: document.getElementById('doctor-signature').src,
+                podpisLekarzaLinia: document.getElementById('doctor-signature-name').textContent
+            };
+
+            // 2. Serializacja tabeli (wierszy z danymi)
+            const tableRows = [];
+            const rows = rowsEditable(); // Używamy istniejącej funkcji pomocniczej
+
+            rows.forEach(tr => {
+                const rowData = {
+                    lp: tr.cells[0].textContent, // Zapisujemy też numer wiersza
+                    opis: tr.cells[1].textContent,
+                    liczba: tr.cells[2].querySelector('input') ? tr.cells[2].querySelector('input').value : '',
+                    rozpoznanie: tr.cells[3].textContent,
+                    lek: tr.cells[4].querySelector('input') ? tr.cells[4].querySelector('input').value : '',
+                    seria: tr.cells[5].textContent,
+                    iloscDawka: tr.cells[6].innerHTML, // Zapisujemy jako HTML, aby zachować input i tekst
+                    karencja: tr.cells[7].textContent
+                };
+                // Zapisujemy tylko wiersze, które mają jakąkolwiek treść
+                if (rowData.opis || rowData.liczba || rowData.rozpoznanie || rowData.lek) {
+                    tableRows.push(rowData);
+                }
+            });
+
+            // 3. Serializacja płótna podpisu posiadacza (jako Base64)
+            const podpisPosiadacza = document.getElementById('canvasPosiadacz').toDataURL();
+
+            // 4. Kompletny obiekt do zapisu
+            const cardArchiveData = {
+                // Metadane do wyszukiwania i numeracji (Pkt 7)
+                lekarz_uid: currentUserProfile.uid,
+                lekarz_nazwisko: `${currentUserProfile.Imie} ${currentUserProfile.Nazwisko}`,
+                id_lecznicy: currentUserProfile['ID lecznicy'],
+                klient_nazwa: headerData.klient,
+                nrDokumentu: headerData.nrDokumentu,
+                dataWykonania: headerData.dataWykonania,
+                counter: currentCardData.nextCounter,
+                miesiac: currentCardData.currentMonth,
+                rok: currentCardData.currentYear,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+
+                // Pełne dane karty (do podglądu)
+                header: headerData,
+                table: tableRows, // Zapisujemy tylko wypełnione wiersze
+                podpisPosiadacza: podpisPosiadacza
+            };
+
+            // 5. Zapis do Firestore
+            await db.collection("archiwumKarty").add(cardArchiveData);
+
+            isCurrentCardSaved = true; // Oznacz kartę jako zapisaną
+            alert(`Karta (Nr: ${headerData.nrDokumentu}) została pomyślnie zapisana w archiwum!`);
+            saveCardToArchiveBtn.textContent = 'Zapisano ✔️';
+
+        } catch (error) {
+            console.error("Błąd zapisu karty do archiwum:", error);
+            alert("Wystąpił błąd podczas zapisu karty. Sprawdź konsolę.");
+            saveCardToArchiveBtn.disabled = false; // Umożliw ponowną próbę
+            saveCardToArchiveBtn.textContent = '💾 Zapisz w Archiwum';
+        }
+    });
+}
 
 // Sekcje Archiwum i ich elementy (Pkt 6, 8)
 const archiwumKartySection = document.getElementById('archiwumKartySection');
@@ -5509,7 +5606,40 @@ if (menuKartaBtn) {
 /* ✅ KONIEC: NOWY BLOK KODU */
 
 /* ⬆️ ======================================================= ⬆️ */
-async function generateAndSetDocumentNumber() {
+unction confirmOnTabChange() {
+    // Sprawdzamy, czy karta jest widoczna i czy NIE jest zapisana
+    if (kartaSection.style.display === 'block' && !isCurrentCardSaved) {
+        if (!confirm("Karta nie została zapisana w archiwum.\n\nCzy na pewno chcesz opuścić tę zakładkę? Niezapisane zmiany zostaną utracone.")) {
+            return false; // Anuluj zmianę zakładki
+        }
+    }
+    return true; // Kontynuuj zmianę zakładki
+}
+
+// Musimy "przechwycić" kliknięcia na WSZYSTKIE przyciski nawigacyjne,
+// które prowadzą POZA sekcję Karty Leczenia.
+// Używamy "true" (capture phase), aby ten listener uruchomił się PIERWSZY.
+
+const navButtonsToCheck = [
+    tabKalkulatorBtn, tabBazaKlientowBtn, tabBazaProduktowBtn, // Zakładki
+    backToMenuBtn, logoutBtn, menuLogoutBtn, // Przyciski paska i menu
+    menuKalkulatorBtn, menuBazaKlientowBtn, menuBazaProduktowBtn, // Przyciski podmenu
+    menuRaportyBtn, menuArchiwumKartyBtn, menuArchiwumParagonyBtn, menuKonfiguracjaBtn, // Przyciski menu
+    openCalculatorBtn, // Przycisk na karcie
+    metodaTradycyjnaBtn, metodaFormularzBtn // Przyciski z modala metody
+];
+
+navButtonsToCheck.forEach(btn => {
+    if (btn) { // Sprawdź, czy przycisk istnieje
+        btn.addEventListener('click', (e) => {
+            if (!confirmOnTabChange()) {
+                e.stopImmediatePropagation(); // Zatrzymaj inne listenery (np. showSection)
+                e.preventDefault(); // Zatrzymaj domyślną akcję
+            }
+        }, true); // <-- WAŻNE: 'true' uruchamia ten kod w pierwszej kolejności
+    }
+});
+    async function generateAndSetDocumentNumber() {
     if (!currentUserProfile || !currentUserProfile.uid) {
         console.warn("Auto-numeracja wstrzymana: brak profilu użytkownika.");
         return;
