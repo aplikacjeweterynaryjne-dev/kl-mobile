@@ -6076,94 +6076,65 @@ if (archiveCardListContainer) {
 /**
  * Pkt 6: Funkcja pomocnicza budująca HTML dla podglądu (Wersja Poprawiona)
  */
-/* ⬇️ ======================================================= ⬇️ */
-/* ✅ ZASTĄP CAŁĄ FUNKCJĘ "buildArchivedCardView" TYM KODEM: */
-
-/**
- * Pkt 6: Funkcja pomocnicza budująca HTML dla podglądu (Wersja Poprawiona)
- */
 function buildArchivedCardView(card) {
-    const header = card.header;
+    const header = card.header;
 
-    // 1. Wypełnij Nagłówek (Top Section) - bez zmian
-    document.getElementById('archive_nazwaLecznicy').textContent = header.nazwaLecznicy || '';
-    document.getElementById('archive_dataWykonania').textContent = header.dataWykonania || '';
-    document.getElementById('archive_nrStada').textContent = header.nrStada || '';
-    document.getElementById('archive_klient').textContent = header.klient || '';
-    document.getElementById('archive_adresKlienta').textContent = header.adresKlienta || '';
-    document.getElementById('archive_dataZgloszenia').textContent = header.dataZgloszenia || '';
-    document.getElementById('archive_nrDokumentu').textContent = header.nrDokumentu || '';
+    // 1. Wypełnij Nagłówek (Top Section)
+    document.getElementById('archive_nazwaLecznicy').textContent = header.nazwaLecznicy || '';
+    document.getElementById('archive_dataWykonania').textContent = header.dataWykonania || '';
+    document.getElementById('archive_nrStada').textContent = header.nrStada || '';
+    document.getElementById('archive_klient').textContent = header.klient || '';
+    document.getElementById('archive_adresKlienta').textContent = header.adresKlienta || '';
+    document.getElementById('archive_dataZgloszenia').textContent = header.dataZgloszenia || '';
+    document.getElementById('archive_nrDokumentu').textContent = header.nrDokumentu || '';
 
-    // 2. Wypełnij Tabelę (NOWA LOGIKA)
-    const tbody = document.querySelector('#archive_karta tbody');
-    tbody.innerHTML = ''; // Wyczyść stare wiersze
+    // 2. Wypełnij Tabelę
+    const tbody = document.querySelector('#archive_karta tbody');
+    tbody.innerHTML = ''; // Wyczyść stare wiersze
 
-    // Pobieramy zapisane wiersze. Funkcja rowsEditable() zapisuje 12 wierszy.
-    // Pierwsze 9 to wiersze 1-9.
-    // Ostatnie 3 to wiersze 1-3 z sekcji "Potwierdzenie...".
-    const savedRows = card.table || [];
-    
-    // Odtwarzamy DOKŁADNIE 13-wierszową strukturę, tak jak w generateRows
-    for (let i = 1; i <= 13; i++) {
-        const tr = tbody.insertRow();
+    // Wypełnij wierszami z zapisanych danych
+    card.table.forEach((row, index) => {
+        const tr = tbody.insertRow();
+        tr.innerHTML = `
+            <td>${row.lp || (index + 1) + '.'}</td>
+            <td>${row.opis || ''}</td>
+            <td style="text-align: center;">${row.liczba || ''}</td>
+            <td>${row.rozpoznanie || ''}</td>
+            <td>${row.lek || ''}</td>
+            <td>${row.seria || ''}</td>
+            <td>${row.iloscDawka || ''}</td> <td>${row.karencja || ''}</td>
+        `;
+    });
 
-        if (i < 10) {
-            // --- Wiersze 1-9 ---
-            const rowData = savedRows[i - 1]; // Szukamy w indeksach 0-8
-            if (rowData) {
-                // Mamy zapisane dane dla tego wiersza
-                tr.innerHTML = `
-                    <td>${rowData.lp || i + '.'}</td>
-                    <td>${rowData.opis || ''}</td>
-                    <td style="text-align: center;">${rowData.liczba || ''}</td>
-                    <td>${rowData.rozpoznanie || ''}</td>
-                    <td>${rowData.lek || ''}</td>
-                    <td>${rowData.seria || ''}</td>
-                    <td>${rowData.iloscDawka || ''}</td>
-                    <td>${rowData.karencja || ''}</td>
-                `;
-            } else {
-                // Renderuj pusty wiersz
-                tr.innerHTML = `<td>${i}.</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>`;
-            }
-        } else if (i === 10) {
-            // --- Wiersz specjalny (Potwierdzenie) ---
-            tr.innerHTML = `<td colspan="8" style="font-weight: bold; padding: 3px 2px;">Potwierdzenie nabycia produktu leczniczego weterynaryjnego/paszy leczniczej</td>`;
-        } else {
-            // --- Wiersze 11-13 (logiczne wiersze 10, 11, 12) ---
-            // i=11 -> indeks 9 (11-2)
-            // i=12 -> indeks 10 (12-2)
-            // i=13 -> indeks 11 (13-2)
-            const savedRowIndex = i - 2; // Szukamy w indeksach 9, 10, 11
-            const rowData = savedRows[savedRowIndex];
-            const displayLp = i - 10; // Numeracja 1., 2., 3.
+    // Znajdź numer ostatniego wiersza (np. "1.") i przekształć na liczbę
+    let lastRowIndex = 0;
+    if (card.table.length > 0) {
+        try {
+            // Usuwamy kropkę z "1." i parsujemy na liczbę
+            lastRowIndex = parseInt(card.table[card.table.length - 1].lp) || card.table.length;
+        } catch(e) { lastRowIndex = card.table.length; }
+    }
 
-            if (rowData) {
-                // Mamy zapisane dane dla tego wiersza
-                tr.innerHTML = `
-                    <td>${rowData.lp || displayLp + '.'}</td>
-                    <td>${rowData.opis || ''}</td>
-                    <td style="text-align: center;">${rowData.liczba || ''}</td>
-                    <td>${rowData.rozpoznanie || ''}</td>
-                    <td>${rowData.lek || ''}</td>
-                    <td>${rowData.seria || ''}</td>
-                    <td>${rowData.iloscDawka || ''}</td>
-                    <td>${rowData.karencja || ''}</td>
-                `;
-            } else {
-                // Renderuj pusty wiersz
-                tr.innerHTML = `<td>${displayLp}.</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>`;
-            }
-        }
-    }
+    // Dopełnij pustymi wierszami do 9 (tak jak w generatorze)
+    for (let i = lastRowIndex + 1; i <= 9; i++) {
+         tbody.insertRow().innerHTML = `<td>${i}.</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>`;
+    }
 
-    // 3. Wypełnij Podpisy (bez zmian)
-    document.getElementById('archive_doctor-signature').src = header.podpisLekarzaImg || '';
-    document.getElementById('archive_doctor-signature-name').textContent = header.podpisLekarzaLinia || '';
-    document.getElementById('archive_podpisPosiadacza').src = card.podpisPosiadacza || '';
+    // Wiersz specjalny
+    tbody.insertRow().innerHTML = `
+        <tr><td colspan="8" style="font-weight: bold; padding: 3px 2px;">Potwierdzenie nabycia produktu...</td></tr>
+    `;
+
+    // Wiersze 10, 11, 12 (tak jak w generatorze)
+     for (let i = 10; i <= 12; i++) {
+         tbody.insertRow().innerHTML = `<td>${i}.</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>`;
+    }
+
+    // 3. Wypełnij Podpisy
+    document.getElementById('archive_doctor-signature').src = header.podpisLekarzaImg || '';
+    document.getElementById('archive_doctor-signature-name').textContent = header.podpisLekarzaLinia || '';
+    document.getElementById('archive_podpisPosiadacza').src = card.podpisPosiadacza || '';
 }
-
-/* ⬆️ ======================================================= ⬆️ */
 // Listenery dla przycisków modala podglądu
 if(archiveCloseBtn) archiveCloseBtn.addEventListener('click', () => {
     archiveCardViewerModal.style.display = 'none';
@@ -6229,7 +6200,10 @@ if(archivePrintBtn) archivePrintBtn.addEventListener('click', () => {
                 overflow: visible !important;
                 background: #fff !important;
                 padding: 0 !important;
-    
+                /* Użyj transformacji, aby zmieścić na stronie A4 */
+                transform: scale(0.9) !important;
+                transform-origin: top left !important;
+                width: 111% !important; /* Kompensacja dla skali 0.9 */
             }
 
             /* Ukryj przyciski w modalu */
