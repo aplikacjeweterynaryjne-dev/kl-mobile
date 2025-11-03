@@ -572,6 +572,56 @@ background: #a93226;
   background-color: #fdf2d9 !important; /* Jaśniejsze tło przy najechaniu */
 }
 }
+    /* Plik: index.html (wklej ok. linii 335) */
+
+/* ... (style dla #formNextRowBtn:hover) ... */
+}
+}
+
+/* ⬇️ ======================================================= ⬇️ */
+/* ✅ POCZĄTEK: Moduł 7 - Style dla Archiwum */
+
+.archive-client-group {
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    margin-bottom: 8px;
+    background: #fff;
+}
+.archive-client-summary {
+    padding: 12px 15px;
+    cursor: pointer;
+    font-size: 18px;
+    background: #f9f9f9;
+    border-radius: 8px;
+}
+.archive-client-group[open] > .archive-client-summary {
+    border-bottom: 1px solid #eee;
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+}
+.archive-card-list {
+    padding: 10px;
+    border-top: 1px solid #eee;
+}
+.archive-card-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 5px;
+    border-bottom: 1px solid #f0f0f0;
+    gap: 8px; /* Dodaje odstęp między elementami */
+    flex-wrap: wrap; /* Pozwala zawijać na mniejszych ekranach */
+}
+.archive-card-item:last-child {
+    border-bottom: none;
+}
+.archive-card-item span {
+    font-size: 15px;
+}
+
+/* ✅ KONIEC: Moduł 7 - Style dla Archiwum */
+/* ⬆️ ======================================================= ⬆️ */
+
 </style>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
@@ -2776,7 +2826,7 @@ else if (sectionToShow === 'archiwumKarty' && archiwumKartySection) {
     // Automatyczne wczytanie użytkowników przy wejściu (jeśli jeszcze nie wczytani)
     if (archiveUserSelect.options.length <= 1) {
         // (Funkcję `loadArchiveUsers` dodamy w kolejnym module)
-        // loadArchiveUsers();
+        loadArchiveUsers();
     }
 }
 
@@ -2788,7 +2838,7 @@ else if (sectionToShow === 'archiwumParagony' && archiwumParagonySection) {
     // Automatyczne wczytanie użytkowników przy wejściu (jeśli jeszcze nie wczytani)
     if (archiveReceiptUserSelect.options.length <= 1) {
         // (Funkcję `loadArchiveReceiptUsers` dodamy w kolejnym module)
-        // loadArchiveReceiptUsers();
+        loadArchiveReceiptUsers();
     }
 }
 /* ✅ KONIEC: NOWE BLOKI DLA ARCHIWUM */
@@ -5715,6 +5765,518 @@ if (menuKartaBtn) {
 }
 
 /* ✅ KONIEC: NOWY BLOK KODU */
+/* ⬆️ ======================================================= ⬆️ */
+/* ⬇️ ======================================================= ⬇️ */
+/* ✅ POCZĄTEK: Moduł 7 - Logika wczytywania Archiwum */
+
+/**
+ * Pkt 6: Wczytuje użytkowników (lekarzy) do listy rozwijanej w Archiwum Kart
+ */
+async function loadArchiveUsers() {
+    if (!archiveUserSelect || !loadArchiveUsersBtn) return;
+    
+    // Użyjmy tych samych uprawnień co w Konfiguracji
+    let query;
+    if (!currentUserProfile) return;
+
+    if (currentUserProfile.Rola === 'administrator') {
+        query = db.collection("konfiguracja").orderBy("Nazwisko");
+    } else {
+        const userClinicId = currentUserProfile['ID lecznicy'];
+        if (!userClinicId) return;
+        query = db.collection("konfiguracja").where("ID lecznicy", "==", userClinicId).orderBy("Nazwisko");
+    }
+    
+    loadArchiveUsersBtn.disabled = true;
+    loadArchiveUsersBtn.textContent = 'Ładowanie...';
+    archiveUserSelect.innerHTML = '<option value="">Ładowanie...</option>';
+
+    try {
+        const snapshot = await query.get();
+        archiveUserSelect.innerHTML = ''; // Wyczyść
+        archiveUserSelect.add(new Option("--- Wybierz lekarza ---", ""));
+        
+        snapshot.docs.forEach(doc => {
+            const user = doc.data();
+            const optionText = `${user.Imie} ${user.Nazwisko}`;
+            archiveUserSelect.add(new Option(optionText, user.uid)); // Wartością jest UID
+        });
+        
+        // Jeśli jest tylko 1 lekarz (np. właściciel), wybierz go automatycznie
+        if (snapshot.docs.length === 1) {
+             archiveUserSelect.value = snapshot.docs[0].data().uid;
+             // Automatycznie wczytaj jego karty
+             loadCardsForUser(snapshot.docs[0].data().uid);
+        }
+
+    } catch (error) {
+        console.error("Błąd wczytywania użytkowników do archiwum:", error);
+        archiveUserSelect.innerHTML = '<option value="">Błąd ładowania</option>';
+    } finally {
+        loadArchiveUsersBtn.style.display = 'none'; // Ukryj przycisk po wczytaniu
+    }
+}
+// Podepnij listener
+if(loadArchiveUsersBtn) loadArchiveUsersBtn.addEventListener('click', loadArchiveUsers);
+
+/**
+ * Pkt 6: Wczytuje karty dla wybranego UID lekarza
+ */
+async function loadCardsForUser(lekarz_uid) {
+    if (!lekarz_uid) {
+        archiveCardListContainer.innerHTML = '<p style="text-align: center; color: #555;">Wybierz użytkownika, aby zobaczyć archiwum.</p>';
+        return;
+    }
+    
+    archiveCardListContainer.innerHTML = '<p style="text-align: center; color: #555;">Wczytywanie kart... ⏳</p>';
+
+    try {
+        const q = db.collection("archiwumKarty")
+            .where("lekarz_uid", "==", lekarz_uid)
+            .orderBy("createdAt", "desc"); // Najnowsze na górze
+            
+        const snapshot = await q.get();
+        
+        if (snapshot.empty) {
+            archiveCardListContainer.innerHTML = '<p style="text-align: center; color: #999;">Ten użytkownik nie ma jeszcze żadnych zapisanych kart.</p>';
+            return;
+        }
+        
+        // --- Grupowanie po kliencie (jak prosiłeś) ---
+        const cardsByClient = new Map();
+        snapshot.docs.forEach(doc => {
+            const card = { id: doc.id, ...doc.data() };
+            const clientName = card.klient_nazwa || "Klient nieznany";
+            
+            if (!cardsByClient.has(clientName)) {
+                cardsByClient.set(clientName, []);
+            }
+            cardsByClient.get(clientName).push(card);
+        });
+        
+        // --- Budowanie interfejsu (akordeon) ---
+        archiveCardListContainer.innerHTML = '';
+        
+        // Sortuj klientów alfabetycznie
+        const sortedClients = [...cardsByClient.keys()].sort((a, b) => a.localeCompare(b, 'pl'));
+
+        for (const clientName of sortedClients) {
+            const cards = cardsByClient.get(clientName);
+            
+            // Tworzymy element <details> (rozwijany) dla Klienta
+            const clientDetails = document.createElement('details');
+            clientDetails.className = 'archive-client-group';
+            clientDetails.innerHTML = `
+                <summary class="archive-client-summary">
+                    <strong>${clientName}</strong> (${cards.length} ${cards.length === 1 ? 'karta' : (cards.length < 5 ? 'karty' : 'kart')})
+                </summary>
+                <div class="archive-card-list">
+                                    </div>
+            `;
+            
+            const cardListDiv = clientDetails.querySelector('.archive-card-list');
+            
+            cards.forEach(card => {
+                const cardEl = document.createElement('div');
+                cardEl.className = 'archive-card-item';
+                cardEl.innerHTML = `
+                    <span>Nr: <strong>${card.nrDokumentu || 'Brak nr'}</strong></span>
+                    <span>Data: ${card.dataWykonania || 'Brak daty'}</span>
+                    <button class="btn primary small btn-view-archived-card" data-card-id="${card.id}">Podgląd KL</button>
+                `;
+                cardListDiv.appendChild(cardEl);
+            });
+            
+            archiveCardListContainer.appendChild(clientDetails);
+        }
+
+    } catch (error) {
+        console.error(`Błąd wczytywania kart dla UID ${lekarz_uid}:`, error);
+        archiveCardListContainer.innerHTML = '<p style="text-align: center; color: red;">Wystąpił błąd podczas wczytywania kart.</p>';
+    }
+}
+// Listener dla zmiany lekarza w Archiwum
+if(archiveUserSelect) archiveUserSelect.addEventListener('change', () => {
+    loadCardsForUser(archiveUserSelect.value);
+});
+
+
+/**
+ * Pkt 6: Logika podglądu zapisanej karty
+ */
+// Używamy delegacji zdarzeń, bo przyciski są dynamiczne
+if (archiveCardListContainer) {
+    archiveCardListContainer.addEventListener('click', async (e) => {
+        if (e.target.classList.contains('btn-view-archived-card')) {
+            const cardId = e.target.dataset.cardId;
+            e.target.textContent = 'Ładowanie...';
+            
+            try {
+                const doc = await db.collection("archiwumKarty").doc(cardId).get();
+                if (!doc.exists) {
+                    alert("Błąd: Nie znaleziono tej karty w archiwum.");
+                    return;
+                }
+                const cardData = doc.data();
+                
+                // Wywołaj funkcję budującą podgląd
+                buildArchivedCardView(cardData);
+                archiveCardViewerModal.style.display = 'flex';
+                
+            } catch (error) {
+                console.error("Błąd wczytywania karty do podglądu:", error);
+                alert("Błąd wczytywania karty.");
+            } finally {
+                e.target.textContent = 'Podgląd KL';
+            }
+        }
+    });
+}
+
+/**
+ * Pkt 6: Funkcja pomocnicza budująca HTML dla podglądu
+ */
+function buildArchivedCardView(card) {
+    // 1. Odtwórz Nagłówek
+    const header = card.header;
+    const headerHtml = `
+        <h2 style="text-align: center; font-size: 15px; text-transform: uppercase; margin-bottom: 10px;">KARTA LECZENIA ZWIERZĄT... (PODGLĄD Z ARCHIWUM)</h2>
+        <div class="top-section">
+            <div>
+                <b>Nazwa i adres zakładu leczniczego dla zwierząt:</b><br>
+                <span>${header.nazwaLecznicy || ''}</span><br>
+                <b>Wykonanie czynności lekarsko-weterynaryjnych dnia:</b>
+                <span>${header.dataWykonania || ''}</span><br>
+                <b>Nr stada:</b> <span>${header.nrStada || ''}</span>
+            </div>
+            <div>
+                <b>Imię, nazwisko i adres...:</b><br>
+                <span>${header.klient || ''}</span><br>
+                <span>${header.adresKlienta || ''}</span>
+            </div>
+            <div>
+                <b>Zgłoszenie:</b> Data: <span>${header.dataZgloszenia || ''}</span><br>
+                <b>Nr dokumentu:</b> <span>${header.nrDokumentu || ''}</span>
+            </div>
+        </div>
+    `;
+    
+    // 2. Odtwórz Tabelę
+    let tableHtml = `
+        <div class="table-container">
+            <table id="karta_archiwum" style="font-size: 10px;">                 <thead>
+                    <tr>
+                        <th rowspan="2">Lp.</th>
+                        <th rowspan="2">Nazwa siedziby stada i opis...</th>
+                        <th rowspan="2">Liczba</th>
+                        <th rowspan="2">Rozpoznanie...</th>
+                        <th colspan="3">Zastosowane produkty...</th>
+                        <th rowspan="2">Okres karencji / Zabieg...</th>
+                    </tr>
+                    <tr>
+                        <th>Nazwa produktu...</th>
+                        <th>Numer serii...</th>
+                        <th>Ilość, dawkowanie...</th>
+                    </tr>
+                </thead>
+                <tbody>
+    `;
+    
+    // Wypełnij wiersze danymi (tylko te zapisane)
+    card.table.forEach((row, index) => {
+        tableHtml += `
+            <tr>
+                <td>${row.lp || (index + 1) + '.'}</td>
+                <td>${row.opis || ''}</td>
+                <td style="text-align: center;">${row.liczba || ''}</td>
+                <td>${row.rozpoznanie || ''}</td>
+                <td>${row.lek || ''}</td>
+                <td>${row.seria || ''}</td>
+                <td>${row.iloscDawka || ''}</td>                 <td>${row.karencja || ''}</td>
+            </tr>
+        `;
+    });
+    
+    // Znajdź numer ostatniego wiersza (np. "1.") i przekształć na liczbę
+    let lastRowIndex = 0;
+    if (card.table.length > 0) {
+        try {
+            lastRowIndex = parseInt(card.table[card.table.length - 1].lp) || card.table.length;
+        } catch(e) { lastRowIndex = card.table.length; }
+    }
+
+    // Dopełnij pustymi wierszami do 9
+    for (let i = lastRowIndex + 1; i <= 9; i++) {
+         tableHtml += `<tr><td>${i}.</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>`;
+    }
+    
+    // Wiersz specjalny
+    tableHtml += `
+        <tr><td colspan="8" style="font-weight: bold; padding: 3px 2px;">Potwierdzenie nabycia produktu...</td></tr>
+    `;
+    
+    // Wiersze 10, 11, 12
+     for (let i = 10; i <= 12; i++) {
+         tableHtml += `<tr><td>${i}.</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>`;
+    }
+    
+    tableHtml += `</tbody></table></div>`;
+    
+    // 3. Odtwórz Podpisy
+    const footerHtml = `
+        <p><b>Oświadczam, że nabyte produkty...</b></p>
+        <div class="signatures">
+            <div class="signature-box">
+                <span class="signature-label">Lekarz weterynarii</span>
+                <img class="signature-img" alt="Podpis lekarza" src="${header.podpisLekarzaImg || ''}">
+                <span class="signature-name">${header.podpisLekarzaLinia || ''}</span>
+            </div>
+            <div class="signature-box">
+                <span class="signature-label">Podpis posiadacza zwierzęcia</span>
+                <img class="signature-img" alt="Podpis posiadacza" src="${card.podpisPosiadacza || ''}">
+            </div>
+        </div>
+        <p><b>Wyniki badań uzupełniających:</b><br>*W przypadku zwierząt...</p>
+    `;
+
+    // 4. Wstaw wszystko do modala
+    archiveCardContent.innerHTML = headerHtml + tableHtml + footerHtml;
+}
+
+// Listenery dla przycisków modala podglądu
+if(archiveCloseBtn) archiveCloseBtn.addEventListener('click', () => {
+    archiveCardViewerModal.style.display = 'none';
+    archiveCardContent.innerHTML = ''; // Wyczyść
+});
+
+// Lepsza funkcja drukowania (bez przeładowania strony)
+if(archivePrintBtn) archivePrintBtn.addEventListener('click', () => {
+    // 1. Dodaj styl do <head>, który ukryje wszystko poza modalem
+    const printStyle = document.createElement('style');
+    printStyle.id = 'print-modal-style';
+    printStyle.innerHTML = `
+        @media print {
+            /* Ukryj całą stronę */
+            body > * { 
+                display: none !important; 
+                visibility: hidden !important;
+            }
+
+            /* Pokaż tylko modal i jego zawartość */
+            #archiveCardViewerModal, #archiveCardViewerModal * {
+                display: block !important;
+                visibility: visible !important;
+            }
+
+            /* Ustaw modal na całą szerokość */
+            #archiveCardViewerModal {
+                position: absolute !important;
+                left: 0 !important;
+                top: 0 !important;
+                width: 100% !important;
+                height: auto !important;
+                z-index: 99999 !important;
+            }
+
+            /* Usuń cienie i tło z modala */
+            #archiveCardViewerModal > div {
+                 width: 100% !important; height: auto !important;
+                 box-shadow: none !important; border: none !important;
+            }
+
+            /* Pokaż całą przewijaną zawartość */
+            #archiveCardContent {
+                overflow: visible !important;
+                background: #fff !important;
+                padding: 0 !important;
+                /* Użyj transformacji, aby zmieścić na stronie A4 */
+                transform: scale(0.9) !important;
+                transform-origin: top left !important;
+                width: 111% !important; /* Kompensacja dla skali 0.9 */
+            }
+
+            /* Ukryj przyciski w modalu */
+            #archiveCardViewerModal h3, #archivePrintBtn, #archiveCloseBtn {
+                display: none !important;
+            }
+        }
+    `;
+    document.head.appendChild(printStyle);
+
+    // 2. Wywołaj druk
+    window.print();
+
+    // 3. Usuń ten styl (z małym opóźnieniem, aby drukarka zdążyła)
+    setTimeout(() => {
+        document.head.removeChild(printStyle);
+    }, 500);
+});
+
+
+/**
+ * Pkt 8: Logika dla Archiwum Paragonów (analogicznie do Kart)
+ */
+async function loadArchiveReceiptUsers() {
+    if (!archiveReceiptUserSelect || !loadArchiveReceiptUsersBtn) return;
+    
+    // Użyjmy tych samych uprawnień co w Konfiguracji
+    let query;
+    if (!currentUserProfile) return;
+
+    if (currentUserProfile.Rola === 'administrator') {
+        query = db.collection("konfiguracja").orderBy("Nazwisko");
+    } else {
+        const userClinicId = currentUserProfile['ID lecznicy'];
+        if (!userClinicId) return;
+        query = db.collection("konfiguracja").where("ID lecznicy", "==", userClinicId).orderBy("Nazwisko");
+    }
+    
+    loadArchiveReceiptUsersBtn.disabled = true;
+    loadArchiveReceiptUsersBtn.textContent = 'Ładowanie...';
+    archiveReceiptUserSelect.innerHTML = '<option value="">Ładowanie...</option>';
+
+    try {
+        const snapshot = await query.get();
+        archiveReceiptUserSelect.innerHTML = ''; // Wyczyść
+        archiveReceiptUserSelect.add(new Option("--- Wybierz lekarza ---", ""));
+        
+        snapshot.docs.forEach(doc => {
+            const user = doc.data();
+            const optionText = `${user.Imie} ${user.Nazwisko}`;
+            archiveReceiptUserSelect.add(new Option(optionText, user.uid)); // Wartością jest UID
+        });
+        
+        if (snapshot.docs.length === 1) {
+             archiveReceiptUserSelect.value = snapshot.docs[0].data().uid;
+             loadReceiptsForUser(snapshot.docs[0].data().uid);
+        }
+
+    } catch (error) {
+        console.error("Błąd wczytywania użytkowników do archiwum paragonów:", error);
+        archiveReceiptUserSelect.innerHTML = '<option value="">Błąd ładowania</option>';
+    } finally {
+        loadArchiveReceiptUsersBtn.style.display = 'none';
+    }
+}
+if(loadArchiveReceiptUsersBtn) loadArchiveReceiptUsersBtn.addEventListener('click', loadArchiveReceiptUsers);
+
+// Wczytuje paragony dla wybranego lekarza
+async function loadReceiptsForUser(lekarz_uid) {
+    if (!lekarz_uid) {
+        archiveReceiptListContainer.innerHTML = '<p style="text-align: center; color: #555;">Wybierz użytkownika, aby zobaczyć archiwum.</p>';
+        return;
+    }
+    
+    archiveReceiptListContainer.innerHTML = '<p style="text-align: center; color: #555;">Wczytywanie paragonów... ⏳</p>';
+
+    try {
+        const q = db.collection("archiwumParagony")
+            .where("lekarz_uid", "==", lekarz_uid)
+            .orderBy("createdAt", "desc");
+            
+        const snapshot = await q.get();
+        
+        if (snapshot.empty) {
+            archiveReceiptListContainer.innerHTML = '<p style="text-align: center; color: #999;">Ten użytkownik nie ma jeszcze żadnych zapisanych paragonów.</p>';
+            return;
+        }
+        
+        // Grupowanie po kliencie
+        const receiptsByClient = new Map();
+        snapshot.docs.forEach(doc => {
+            const receipt = { id: doc.id, ...doc.data() };
+            const clientName = receipt.klient || "Klient nieznany";
+            
+            if (!receiptsByClient.has(clientName)) {
+                receiptsByClient.set(clientName, []);
+            }
+            receiptsByClient.get(clientName).push(receipt);
+        });
+        
+        // Budowanie UI
+        archiveReceiptListContainer.innerHTML = '';
+        const sortedClients = [...receiptsByClient.keys()].sort((a, b) => a.localeCompare(b, 'pl'));
+
+        for (const clientName of sortedClients) {
+            const receipts = receiptsByClient.get(clientName);
+            
+            const clientDetails = document.createElement('details');
+            clientDetails.className = 'archive-client-group';
+            clientDetails.innerHTML = `
+                <summary class="archive-client-summary">
+                    <strong>${clientName}</strong> (${receipts.length} ${receipts.length === 1 ? 'paragon' : (receipts.length < 5 ? 'paragony' : 'paragonów')})
+                </summary>
+                <div class="archive-card-list">
+                                    </div>
+            `;
+            
+            const receiptListDiv = clientDetails.querySelector('.archive-card-list');
+            
+            receipts.forEach(receipt => {
+                const receiptEl = document.createElement('div');
+                receiptEl.className = 'archive-card-item';
+                const statusColor = receipt.status === "Zapłacone" ? "green" : (receipt.status === "Dług" ? "red" : "inherit");
+                
+                receiptEl.innerHTML = `
+                    <span>Data: <strong>${receipt.data || 'Brak daty'}</strong></span>
+                    <span>Suma: ${formatPrice(receipt.suma)}</span>
+                    <span style="color: ${statusColor}; font-weight: bold;">${receipt.status}</span>
+                    <button class="btn primary small btn-view-archived-receipt" data-receipt-id="${receipt.id}">Podgląd</button>
+                `;
+                receiptListDiv.appendChild(receiptEl);
+            });
+            
+            archiveReceiptListContainer.appendChild(clientDetails);
+        }
+
+    } catch (error) {
+        console.error(`Błąd wczytywania paragonów dla UID ${lekarz_uid}:`, error);
+        archiveReceiptListContainer.innerHTML = '<p style="text-align: center; color: red;">Wystąpił błąd podczas wczytywania paragonów.</p>';
+    }
+}
+if(archiveReceiptUserSelect) archiveReceiptUserSelect.addEventListener('change', () => {
+    loadReceiptsForUser(archiveReceiptUserSelect.value);
+});
+
+// Podgląd Paragonu (użyjemy zwykłego alert() dla prostoty)
+if (archiveReceiptListContainer) {
+    archiveReceiptListContainer.addEventListener('click', async (e) => {
+        if (e.target.classList.contains('btn-view-archived-receipt')) {
+            const receiptId = e.target.dataset.receiptId;
+            e.target.textContent = '...';
+            
+            try {
+                const doc = await db.collection("archiwumParagony").doc(receiptId).get();
+                if (!doc.exists) { alert("Błąd: Nie znaleziono paragonu."); return; }
+                
+                const r = doc.data();
+                let receiptText = `--- Podgląd Paragonu ---\n`;
+                receiptText += `Data: ${r.data}\n`;
+                receiptText += `Klient: ${r.klient}\n`;
+                receiptText += `Nr Dokumentu KL: ${r.nrDokumentu}\n`;
+                receiptText += `Status: ${r.status}\n`;
+                receiptText += `Lekarz: ${r.lekarz_nazwisko}\n`;
+                receiptText += `--------------------------\n`;
+                
+                r.pozycje.forEach(item => {
+                    receiptText += `> ${item.name} x ${item.quantity} = ${formatPrice(item.price * item.quantity)}\n`;
+                });
+                
+                receiptText += `--------------------------\n`;
+                receiptText += `SUMA: ${formatPrice(r.suma)}`;
+                
+                alert(receiptText); // Pokaż w alercie
+
+            } catch (error) {
+                alert("Błąd wczytywania paragonu.");
+            } finally {
+                e.target.textContent = 'Podgląd';
+            }
+        }
+    });
+}
+
+/* ✅ KONIEC: Moduł 7 - Logika wczytywania Archiwum */
 /* ⬆️ ======================================================= ⬆️ */
 </script> </body>
 </html>
