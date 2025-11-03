@@ -572,6 +572,53 @@ background: #a93226;
 #formNextRowBtn:hover {
   background-color: #fdf2d9 !important; /* Jaśniejsze tło przy najechaniu */
 }
+    /* ⬇️ WKLEJ TEN KOD NA KOŃCU GŁÓWNEGO BLOKU @media print (przed linią ok. 337) ⬇️ */
+
+    /* --- Logika drukowania podglądu z Archiwum --- */
+    /*      * Kiedy modal #archiveCardViewerModal ma klasę .print-mode,
+     * robimy z niego jedyną widoczną rzecz na stronie.
+     */
+    body > *:not(#archiveCardViewerModal.print-mode) {
+        display: none !important; /* Ukryj wszystko OPRÓCZ modala w trybie print-mode */
+        visibility: hidden !important;
+    }
+
+    #archiveCardViewerModal.print-mode {
+        /* Ustaw modal jako zwykły blok, a nie okno 'fixed' */
+        display: block !important;
+        visibility: visible !important;
+        position: static !important;
+        width: 100% !important;
+        height: auto !important;
+        background: none !important;
+    }
+
+    #archiveCardViewerModal.print-mode > div {
+        /* Ustaw "kartę" modala, aby też była zwykłym blokiem */
+        display: block !important;
+        width: 100% !important;
+        height: auto !important;
+        box-shadow: none !important;
+        border: none !important;
+    }
+
+    /* UKRYJ TYTUŁ MODALA (z przyciskami "Drukuj" / "Zamknij") */
+    #archiveCardViewerModal.print-mode > div > div:first-child {
+        display: none !important;
+        visibility: hidden !important;
+    }
+
+    /* ROZWIŃ ZAWARTOŚĆ KARTY I USUŃ SCROLLBAR */
+    #archiveCardViewerModal.print-mode #archiveCardContent {
+        display: block !important;
+        visibility: visible !important;
+        overflow: visible !important; /* TO JEST KLUCZOWE: usuwa scrollbar */
+        height: auto !important;     /* TO JEST KLUCZOWE: pozwala treści się rozwinąć */
+        flex: none !important;       /* Wyłącza flex, który ograniczał wysokość */
+        padding: 0 !important;
+        transform: none !important; /* Usuwa jakiekolwiek skalowanie z poprzednich prób */
+    }
+/* ⬆️ KONIEC KODU DO WKLEJENIA ⬆️ */
 }
     /* Plik: index.html (wklej ok. linii 335) */
 
@@ -6213,41 +6260,33 @@ if(archiveCloseBtn) archiveCloseBtn.addEventListener('click', () => {
 });
 
 // Lepsza funkcja drukowania (bez przeładowania strony)
+/* ⬇️ ZASTĄP CAŁY BLOK "archivePrintBtn" (ok. linii 3080) TYM KODEM ⬇️ */
+
+// OSTATECZNA funkcja drukowania v4 - Implementacja Twojego pomysłu
 if(archivePrintBtn) archivePrintBtn.addEventListener('click', () => {
-    // 1. Znajdź element, który ma być wydrukowany
-    // To jest ten DIV, który zawiera nagłówek, tabelę i podpisy
-    const contentToPrint = document.getElementById('archiveCardContent');
+    // 1. Znajdź główny kontener modala i kontener treści
+    const modal = document.getElementById('archiveCardViewerModal');
+    const content = document.getElementById('archiveCardContent');
     
-    if (!contentToPrint) {
-        console.error('Nie znaleziono elementu #archiveCardContent do wydruku.');
+    if (!modal || !content) {
+        console.error('Błąd drukowania: Nie znaleziono kluczowych elementów modala.');
         return;
     }
 
-    // 2. Programistycznie "zaznacz" ten element
-    const selection = window.getSelection();
-    const range = document.createRange();
+    // 2. Dodaj specjalną klasę CSS do modala na czas drukowania
+    // Ta klasa powie stylom, aby ukryły tytuł i rozwinęły treść
+    modal.classList.add('print-mode');
     
-    range.selectNode(contentToPrint); // Zaznacz cały DIV z jego zawartością
-    selection.removeAllRanges(); // Wyczyść stare zaznaczenia (jeśli jakieś były)
-    selection.addRange(range); // Dodaj nasze nowe zaznaczenie
+    // 3. Wywołaj druk
+    window.print();
     
-    // 3. Wywołaj systemowe okno drukowania
-    // Przeglądarka automatycznie wykryje "zaznaczenie"
-    // i domyślnie ustawi tryb "Drukuj zaznaczone"
-    try {
-        document.execCommand('print'); // Starsza, ale bardziej niezawodna metoda
-    } catch (e) {
-        window.print(); // Standardowa metoda
-    }
-
-    // 4. Wyczyść zaznaczenie po chwili (po zamknięciu okna druku)
-    // Używamy setTimeout, aby dać przeglądarce czas na otwarcie dialogu
+    // 4. Usuń klasę *po* wywołaniu drukowania (nie musi być natychmiast)
+    // Używamy setTimeout, aby dać przeglądarce czas na przygotowanie wydruku
     setTimeout(() => {
-        selection.removeAllRanges();
-    }, 1000); // 1 sekunda opóźnienia
+        modal.classList.remove('print-mode');
+    }, 500);
 });
-
-/* ⬆️ ======================================================= ⬆️ */
+/* ⬆️ KONIEC ZASTĘPOWANIA ⬆️ */
 
 
 /**
