@@ -6191,27 +6191,26 @@ function buildArchivedCardView(card) {
 
 // Listenery dla przycisków modala podglądu
 if(archiveCloseBtn) archiveCloseBtn.addEventListener('click', () => {
+    // 1. Ukryj modal
     archiveCardViewerModal.style.display = 'none';
-    archiveCardContent.innerHTML = ''; // Wyczyść zawartość
-    // Przywróć oryginalną strukturę HTML do modala (ważne po ostatniej zmianie)
-    archiveCardContent.innerHTML = `
-        <h2 style="text-align: center; font-size: 15px; text-transform: uppercase; margin-bottom: 10px;">KARTA LECZENIA ZWIERZĄT... (Podgląd z Archiwum)</h2>
-        <div class="top-section" id="archive_topSection">
-            <div><b>Nazwa i adres zakładu...:</b><br><span id="archive_nazwaLecznicy"></span><br><b>Wykonanie czynności...:</b><span id="archive_dataWykonania" style="font-weight: bold;"></span><br><b>Nr stada:</b> <span id="archive_nrStada" style="font-weight: bold;"></span></div>
-            <div><b>Imię, nazwisko i adres...:</b><br><span id="archive_klient" style="font-weight: bold;"></span><br><span id="archive_adresKlienta"></span></div>
-            <div><b>Zgłoszenie:</b> Data: <span id="archive_dataZgloszenia"></span><br><b>Nr dokumentu:</b> <span id="archive_nrDokumentu" style="font-weight: bold;"></span></div>
-        </div>
-        <div class="table-container"><table id="archive_karta"><thead>
-            <tr><th rowspan="2" style="width:30px;">Lp.</th><th rowspan="2" class="center-text">Nazwa siedziby stada...</th><th rowspan="2" class="center-text">Liczba...</th><th rowspan="2" class="center-text">Rozpoznanie...</th><th colspan="3">Zastosowane... produkty...</th><th rowspan="2">Okres karencji...</th></tr>
-            <tr><th>Nazwa produktu...</th><th>Numer serii...</th><th>Ilość, dawkowanie...</th></tr>
-        </thead><tbody></tbody></table></div>
-        <p><b>Oświadczam, że nabyte produkty...</b></p>
-        <div class="signatures">
-            <div class="signature-box"><span class="signature-label">Lekarz weterynarii</span><img id="archive_doctor-signature" class="signature-img" alt="Podpis lekarza"><span id="archive_doctor-signature-name" class="signature-name"></span></div>
-            <div class="signature-box"><span class="signature-label">Podpis posiadacza zwierzęcia</span><img id="archive_podpisPosiadacza" class="signature-img" alt="Podpis posiadacza"></div>
-        </div>
-        <p><b>Wyniki badań uzupełniających:</b><br>*W przypadku zwierząt...</p>
-    `;
+    
+    // 2. Wyczyść *tylko* dynamiczną zawartość, zostawiając nagłówki
+    const tbody = document.querySelector('#archive_karta tbody');
+    if (tbody) {
+        tbody.innerHTML = ''; // Wyczyść tylko wiersze
+    }
+    
+    // 3. Wyczyść dane nagłówka i podpisy (dla pewności)
+    document.getElementById('archive_nazwaLecznicy').textContent = '';
+    document.getElementById('archive_klient').textContent = '';
+    document.getElementById('archive_nrDokumentu').textContent = '';
+    document.getElementById('archive_dataWykonania').textContent = '';
+    document.getElementById('archive_nrStada').textContent = '';
+    document.getElementById('archive_adresKlienta').textContent = '';
+    document.getElementById('archive_dataZgloszenia').textContent = '';
+    document.getElementById('archive_doctor-signature').src = '';
+    document.getElementById('archive_doctor-signature-name').textContent = '';
+    document.getElementById('archive_podpisPosiadacza').src = '';
 });
 
 // Lepsza funkcja drukowania (bez przeładowania strony)
