@@ -6293,11 +6293,14 @@ async function loadReceiptsForUser(lekarz_uid) {
                 const statusColor = receipt.status === "Zapłacone" ? "green" : (receipt.status === "Dług" ? "red" : "inherit");
                 
                 receiptEl.innerHTML = `
-                    <span>Data: <strong>${receipt.data || 'Brak daty'}</strong></span>
-                    <span>Suma: ${formatPrice(receipt.suma)}</span>
-                    <span style="color: ${statusColor}; font-weight: bold;">${receipt.status}</span>
-                    <button class="btn primary small btn-view-archived-receipt" data-receipt-id="${receipt.id}">Podgląd</button>
-                `;
+    <span>Data: <strong>${receipt.data || 'Brak daty'}</strong></span>
+    <span>Suma: ${formatPrice(receipt.suma)}</span>
+    <span style="color: ${statusColor}; font-weight: bold;">${receipt.status}</span>
+    <div style="display: flex; gap: 5px;">
+        <button class="btn primary small btn-view-archived-receipt" data-receipt-id="${receipt.id}">Podgląd</button>
+        <button class="btn warn small btn-delete-archived-receipt" data-receipt-id="${receipt.id}" data-receipt-info="${receipt.data} / ${receipt.klient}">Usuń</button>
+    </div>
+`;
                 receiptListDiv.appendChild(receiptEl);
             });
             
@@ -6316,14 +6319,17 @@ if(archiveReceiptUserSelect) archiveReceiptUserSelect.addEventListener('change',
 // Podgląd Paragonu (użyjemy zwykłego alert() dla prostoty)
 if (archiveReceiptListContainer) {
     archiveReceiptListContainer.addEventListener('click', async (e) => {
-        if (e.target.classList.contains('btn-view-archived-receipt')) {
-            const receiptId = e.target.dataset.receiptId;
-            e.target.textContent = '...';
-            
+        const target = e.target; // Cel kliknięcia
+
+        // --- Logika Podglądu Paragonu ---
+        if (target.classList.contains('btn-view-archived-receipt')) {
+            const receiptId = target.dataset.receiptId;
+            target.textContent = '...';
+            
             try {
                 const doc = await db.collection("archiwumParagony").doc(receiptId).get();
                 if (!doc.exists) { alert("Błąd: Nie znaleziono paragonu."); return; }
-                
+                
                 const r = doc.data();
                 let receiptText = `--- Podgląd Paragonu ---\n`;
                 receiptText += `Data: ${r.data}\n`;
@@ -6332,25 +6338,44 @@ if (archiveReceiptListContainer) {
                 receiptText += `Status: ${r.status}\n`;
                 receiptText += `Lekarz: ${r.lekarz_nazwisko}\n`;
                 receiptText += `--------------------------\n`;
-                
+                
                 r.pozycje.forEach(item => {
                     receiptText += `> ${item.name} x ${item.quantity} = ${formatPrice(item.price * item.quantity)}\n`;
                 });
-                
+                
                 receiptText += `--------------------------\n`;
                 receiptText += `SUMA: ${formatPrice(r.suma)}`;
-                
+                
                 alert(receiptText); // Pokaż w alercie
 
             } catch (error) {
                 alert("Błąd wczytywania paragonu.");
             } finally {
-                e.target.textContent = 'Podgląd';
+                target.textContent = 'Podgląd';
+            }
+        }
+
+        // --- ✅ NOWA LOGIKA: Usuwanie Paragonu ---
+        else if (target.classList.contains('btn-delete-archived-receipt')) {
+            const receiptId = target.dataset.receiptId;
+            const receiptInfo = target.dataset.receiptInfo;
+            
+            if (confirm(`Czy na pewno chcesz trwale usunąć paragon:\n${receiptInfo}?`)) {
+                target.textContent = 'Usuwanie...';
+                try {
+                    await db.collection("archiwumParagony").doc(receiptId).delete();
+                    // Usuń element z widoku
+                    target.closest('.archive-card-item').remove();
+                    alert('Paragon został usunięty.');
+                } catch (error) {
+                    console.error("Błąd usuwania paragonu:", error);
+                    alert("Wystąpił błąd podczas usuwania.");
+                    target.textContent = 'Usuń';
+                }
             }
         }
     });
 }
-
 /* ✅ KONIEC: Moduł 7 - Logika wczytywania Archiwum */
 /* ⬆️ ======================================================= ⬆️ */
 </script> </body>
