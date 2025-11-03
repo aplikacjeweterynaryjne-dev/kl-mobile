@@ -6215,19 +6215,19 @@ if(archiveCloseBtn) archiveCloseBtn.addEventListener('click', () => {
 
 // Lepsza funkcja drukowania (bez przeładowania strony)
 if(archivePrintBtn) archivePrintBtn.addEventListener('click', () => {
-    // 1. Dodaj styl do <head>, który ukryje wszystko poza modalem
+    // 1. Dodaj styl do <head>
     const printStyle = document.createElement('style');
     printStyle.id = 'print-modal-style';
     printStyle.innerHTML = `
         @media print {
             /* 1. Ukryj całą stronę */
-            body > * { 
-                display: none !important; 
+            body > * {
+                display: none !important;
                 visibility: hidden !important;
             }
 
-            /* 2. Pokaż kontener modala i wyzeruj tło */
-            #archiveCardViewerModal {
+            /* 2. Pokaż *tylko* blok z zawartością karty */
+            #archiveCardContent {
                 display: block !important;
                 visibility: visible !important;
                 position: absolute !important;
@@ -6235,42 +6235,26 @@ if(archivePrintBtn) archivePrintBtn.addEventListener('click', () => {
                 top: 0 !important;
                 width: 100% !important;
                 height: auto !important;
+                overflow: visible !important; /* Usuń scrollbar */
+                background: #fff !important;
+                padding: 0 !important;
+            }
+
+            /* 3. Upewnij się, że modal i jego rodzice też są widoczni */
+            #archiveCardViewerModal, #archiveCardViewerModal > div {
+                display: block !important;
+                visibility: visible !important;
+                position: static !important;
+                box-shadow: none !important;
+                border: none !important;
                 background: none !important;
             }
 
-            /* 3. Ustaw "kartę" modala, aby zajmowała całą szerokość */
-            #archiveCardViewerModal > div {
-                width: 100% !important; 
-                height: auto !important;
-                box-shadow: none !important; 
-                border: none !important;
-                display: block !important; /* Wyłącz flex */
-            }
-
-            /* 4. Ukryj WSZYSTKIE dzieci "karty" (czyli nagłówek I treść) */
-            #archiveCardViewerModal > div > * {
+            /* 4. UKRYJ nagłówek modala (z przyciskami Drukuj/Zamknij) */
+            /* Zakładamy, że jest to pierwszy <div> wewnątrz #archiveCardViewerModal > div */
+            #archiveCardViewerModal > div > div:first-child {
                 display: none !important;
                 visibility: hidden !important;
-            }
-            
-            /* 5. Pokaż WYŁĄCZNIE blok treści i rozwiń go */
-            #archiveCardContent {
-                display: block !important;
-                visibility: visible !important;
-                overflow: visible !important; /* Usuń scrollbar */
-                height: auto !important; /* Pozwól treści się rozwinąć */
-                width: 100% !important;
-                flex: none !important;
-                padding: 0 !important;
-                background: #fff !important;
-            }
-
-            /* 6. Zastosuj style A4 (są już w Twoim głównym CSS, 
-                ale dla pewności możemy dodać skalowanie) */
-            body {
-                transform: scale(0.95) !important; /* Lekkie zmniejszenie dla A4 */
-                transform-origin: top left !important;
-                width: 105% !important; /* Kompensacja skali */
             }
         }
     `;
@@ -6279,7 +6263,7 @@ if(archivePrintBtn) archivePrintBtn.addEventListener('click', () => {
     // 2. Wywołaj druk
     window.print();
 
-  t // 3. Usuń ten styl (z małym opóźnieniem, aby drukarka zdążyła)
+    // 3. Usuń ten styl (z małym opóźnieniem, aby drukarka zdążyła)
     setTimeout(() => {
         if (document.getElementById('print-modal-style')) {
             document.head.removeChild(printStyle);
@@ -6287,7 +6271,6 @@ if(archivePrintBtn) archivePrintBtn.addEventListener('click', () => {
     }, 500);
 });
 
-/* ⬆️ ======================================================= ⬆️ */
 /* ⬆️ ======================================================= ⬆️ */
 
 
