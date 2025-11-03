@@ -2547,15 +2547,26 @@ if (saveCardToArchiveBtn) {
             rows.forEach(tr => {
           const logicalIndex = rows.indexOf(tr);
                 
+               const iloscInput = tr.cells[6].querySelector('input[type="number"]');
+                const iloscValue = iloscInput ? iloscInput.value : ''; // Pobieramy wartość
+                let dawkaText = '';
+                // Sprawdzamy, czy po inpucie jest tekst (np. " ml/kg")
+                if (iloscInput && iloscInput.nextSibling && iloscInput.nextSibling.nodeType === Node.TEXT_NODE) {
+                    dawkaText = iloscInput.nextSibling.textContent;
+                }
+                // Odtwarzamy HTML, ale tym razem Z ATRYBUTEM value
+                const iloscDawkaHtml = `<input class="small-input" type="number" value="${iloscValue}"> ${dawkaText}`;
+                // ✅ KONIEC POPRAWKI
+
                 const rowData = {
-                    logicalIndex: logicalIndex, // ✅ NOWA WŁAŚCIWOŚĆ
+                    logicalIndex: logicalIndex,
                     lp: tr.cells[0].textContent,
                     opis: tr.cells[1].textContent,
                     liczba: tr.cells[2].querySelector('input') ? tr.cells[2].querySelector('input').value : '',
                     rozpoznanie: tr.cells[3].textContent,
                     lek: tr.cells[4].querySelector('input') ? tr.cells[4].querySelector('input').value : '',
                     seria: tr.cells[5].textContent,
-                    iloscDawka: tr.cells[6].innerHTML,
+                    iloscDawka: iloscDawkaHtml, // ✅ Używamy nowej, poprawnej zmiennej
                     karencja: tr.cells[7].textContent
                 };
                 // Zapisujemy tylko wiersze, które mają jakąkolwiek treść
@@ -6111,60 +6122,60 @@ function buildArchivedCardView(card) {
     document.getElementById('archive_dataZgloszenia').textContent = header.dataZgloszenia || '';
     document.getElementById('archive_nrDokumentu').textContent = header.nrDokumentu || '';
 
-    // 2. Wypełnij Tabelę (NOWA, POPRAWNA LOGIKA)
+    // 2. Wypełnij Tabelę (NOWA, BEZPIECZNA LOGIKA DOM)
     const tbody = document.querySelector('#archive_karta tbody');
     tbody.innerHTML = ''; // Wyczyść stare wiersze
 
     const savedRows = card.table || [];
     
     // Funkcja pomocnicza do wyszukiwania danych dla wiersza
-    // Sprawdza teraz, czy stary i nowy format zapisu istnieje
     const findRowData = (logicalIndex, lpFallback) => {
-        // 1. Szukaj po nowemu (preferowane)
         let row = savedRows.find(r => r.logicalIndex === logicalIndex);
         if (row) return row;
-        
-        // 2. Szukaj po staremu (dla kart zapisanych przed tą poprawką)
-        // To szuka wiersza, którego 'lp' (np. "1." lub "2.") pasuje do oczekiwanego
-        return savedRows.find(r => r.lp === lpFallback);
+        row = savedRows.find(r => r.lp && r.lp.startsWith(lpFallback));
+        return row; // Zwróci 'row' lub 'undefined'
+    };
+    
+    // Funkcja pomocnicza do tworzenia komórek
+    const createCell = (htmlContent = '', isCenter = false) => {
+        const td = document.createElement('td');
+        td.innerHTML = htmlContent;
+        if (isCenter) {
+            td.style.textAlign = 'center';
+        }
+        return td;
     };
 
     // Odtwarzamy DOKŁADNIE 13-wierszową strukturę
     for (let i = 1; i <= 13; i++) {
-        const tr = tbody.insertRow(); // Tworzymy <tr>
+        const tr = tbody.insertRow();
         let logicalIndex = -1;
         let displayLp = '';
 
         if (i < 10) {
-            // --- Wiersze 1-9 ---
             logicalIndex = i - 1; // 0 do 8
             displayLp = `${i}.`;
         } else if (i === 10) {
-            // --- Wiersz specjalny (Potwierdzenie) ---
-            // NAPRAWIONY BŁĄD: wstawiamy <td> wewnątrz <tr>
             tr.innerHTML = `<td colspan="8" style="font-weight: bold; padding: 3px 2px;">Potwierdzenie nabycia produktu leczniczego weterynaryjnego/paszy leczniczej</td>`;
-            continue; // Przejdź do następnej iteracji
+            continue;
         } else {
-            // --- Wiersze 11-13 ---
             logicalIndex = i - 2; // 9, 10, 11
             displayLp = `${i - 10}.`; // 1., 2., 3.
         }
 
-        // Szukamy danych dla tego wiersza
         const rowData = findRowData(logicalIndex, displayLp);
         
         if (rowData) {
-            // Mamy zapisane dane dla tego wiersza
-            tr.innerHTML = `
-                <td>${rowData.lp}</td>
-                <td>${rowData.opis || ''}</td>
-                <td style="text-align: center;">${rowData.liczba || ''}</td>
-                <td>${rowData.rozpoznanie || ''}</td>
-                <td>${rowData.lek || ''}</td>
-                <td>${rowData.seria || ''}</td>
-                <td>${rowData.iloscDawka || ''}</td>
-                <td>${rowData.karencja || ''}</td>
-            `;
+            // ✅ BUDOWANIE WIERSZA METODĄ DOM (BEZPIECZNE)
+            // To jest poprawna kolejność kolumn
+            tr.appendChild(createCell(displayLp));   // Kol 1: Lp
+            tr.appendChild(createCell(rowData.opis));   // Kol 2: Opis
+            tr.appendChild(createCell(rowData.liczba, true)); // Kol 3: Liczba (wyśrodk.)
+            tr.appendChild(createCell(rowData.rozpoznanie)); // Kol 4: Rozpoznanie
+            tr.appendChild(createCell(rowData.lek));   // Kol 5: Lek
+            tr.appendChild(createCell(rowData.seria));   // Kol 6: Seria
+            tr.appendChild(createCell(rowData.iloscDawka)); // Kol 7: Ilosc (z HTML)
+            tr.appendChild(createCell(rowData.karencja)); // Kol 8: Karencja
         } else {
             // Renderuj pusty wiersz
             tr.innerHTML = `<td>${displayLp}</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>`;
