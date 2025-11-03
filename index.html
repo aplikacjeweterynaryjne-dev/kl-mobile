@@ -2545,7 +2545,7 @@ if (saveCardToArchiveBtn) {
             const rows = rowsEditable(); // Używamy istniejącej funkcji pomocniczej
 
             rows.forEach(tr => {
-           const logicalIndex = rows.indexOf(tr);
+          const logicalIndex = rows.indexOf(tr);
                 
                 const rowData = {
                     logicalIndex: logicalIndex, // ✅ NOWA WŁAŚCIWOŚĆ
@@ -6091,6 +6091,14 @@ if (archiveCardListContainer) {
  * Pkt 6: Funkcja pomocnicza budująca HTML dla podglądu (Wersja Poprawiona v2)
  * Ta wersja poprawnie odtwarza 13-wierszową strukturę i szuka danych po 'logicalIndex'.
  */
+/* ⬇️ ======================================================= ⬇️ */
+/* ✅ ZASTĄP CAŁĄ FUNKCJĘ "buildArchivedCardView" TYM KODEM: */
+
+/**
+ * Pkt 6: Funkcja pomocnicza budująca HTML dla podglądu (Wersja Poprawiona v2)
+ * Ta wersja poprawnie odtwarza 13-wierszową strukturę i szuka danych po 'logicalIndex'.
+* NAPRAWIA błąd z zagnieżdżonym <tr>.
+ */
 function buildArchivedCardView(card) {
     const header = card.header;
 
@@ -6107,12 +6115,18 @@ function buildArchivedCardView(card) {
     const tbody = document.querySelector('#archive_karta tbody');
     tbody.innerHTML = ''; // Wyczyść stare wiersze
 
-    // 'savedRows' to teraz tablica TYLKO wypełnionych wierszy
     const savedRows = card.table || [];
     
     // Funkcja pomocnicza do wyszukiwania danych dla wiersza
-    const findRowData = (logicalIndex) => {
-        return savedRows.find(r => r.logicalIndex === logicalIndex);
+    // Sprawdza teraz, czy stary i nowy format zapisu istnieje
+    const findRowData = (logicalIndex, lpFallback) => {
+        // 1. Szukaj po nowemu (preferowane)
+        let row = savedRows.find(r => r.logicalIndex === logicalIndex);
+        if (row) return row;
+        
+        // 2. Szukaj po staremu (dla kart zapisanych przed tą poprawką)
+        // To szuka wiersza, którego 'lp' (np. "1." lub "2.") pasuje do oczekiwanego
+        return savedRows.find(r => r.lp === lpFallback);
     };
 
     // Odtwarzamy DOKŁADNIE 13-wierszową strukturę
@@ -6127,7 +6141,7 @@ function buildArchivedCardView(card) {
             displayLp = `${i}.`;
         } else if (i === 10) {
             // --- Wiersz specjalny (Potwierdzenie) ---
-            // NAPRAWIONY BŁĄD: wstawiamy <td>, a nie <tr><td>
+            // NAPRAWIONY BŁĄD: wstawiamy <td> wewnątrz <tr>
             tr.innerHTML = `<td colspan="8" style="font-weight: bold; padding: 3px 2px;">Potwierdzenie nabycia produktu leczniczego weterynaryjnego/paszy leczniczej</td>`;
             continue; // Przejdź do następnej iteracji
         } else {
@@ -6137,11 +6151,10 @@ function buildArchivedCardView(card) {
         }
 
         // Szukamy danych dla tego wiersza
-        const rowData = findRowData(logicalIndex);
+        const rowData = findRowData(logicalIndex, displayLp);
         
         if (rowData) {
             // Mamy zapisane dane dla tego wiersza
-            // Używamy <td>, a nie <tr>
             tr.innerHTML = `
                 <td>${rowData.lp}</td>
                 <td>${rowData.opis || ''}</td>
@@ -6163,6 +6176,7 @@ function buildArchivedCardView(card) {
     document.getElementById('archive_doctor-signature-name').textContent = header.podpisLekarzaLinia || '';
     document.getElementById('archive_podpisPosiadacza').src = card.podpisPosiadacza || '';
 }
+/* ⬆️ ======================================================= ⬆️ */
 
 /* ⬆️ ======================================================= ⬆️ */
 // Listenery dla przycisków modala podglądu
