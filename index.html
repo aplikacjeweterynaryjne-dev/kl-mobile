@@ -2904,11 +2904,12 @@ const archiveReceiptListContainer = document.getElementById('archiveReceiptListC
 
 // Zmienna stanu dla Pkt 4 (zapytanie przy wyjściu)
 let isCurrentCardSaved = false; // Domyślnie karta jest "brudna" (niezapisana)
-let currentCardData = { // Metadane do zapisu (Pkt 7)
-    nextCounter: 1,
-    currentMonth: new Date().getMonth() + 1,
-    currentYear: new Date().getFullYear(),
-    initials: ""
+// ⬇️ DODAJ TEN BLOK ⬇️
+let currentReceiptData = { 
+    nextCounter: 1, 
+    currentMonth: new Date().getMonth() + 1, 
+    currentYear: new Date().getFullYear(), 
+    initials: "" 
 };
 
 /* ✅ KONIEC: Nowe zmienne */
@@ -3139,6 +3140,7 @@ if (archiwumParagonySection) archiwumParagonySection.style.display = 'none'; // 
     kalkulatorSection.style.display = 'block';
     if (tabKalkulatorBtn) tabKalkulatorBtn.classList.add('primary');
     renderReceipt(); 
+    onShowKalkulator();
   } else if (sectionToShow === 'baza' && bazaKlientowSection) {
     // Pokaż sekcję i zaznacz przycisk
     bazaKlientowSection.style.display = 'block';
@@ -3659,6 +3661,9 @@ if (saveReceiptBtn) {
         lekarz_uid: currentUserProfile ? currentUserProfile.uid : null, // ID lekarza
         lekarz_nazwisko: currentUserProfile ? `${currentUserProfile.Imie} ${currentUserProfile.Nazwisko}` : 'Nieznany',
         id_lecznicy: currentUserProfile ? currentUserProfile['ID lecznicy'] : null
+        counter: currentReceiptData.nextCounter,
+        miesiac: currentReceiptData.currentMonth,
+        rok: currentReceiptData.currentYear
     };
 
     // --- 2. Logika podsumowania (zgodnie z Twoją prośbą) ---
@@ -6122,7 +6127,85 @@ async function generateAndSetDocumentNumber() {
         }
     }
 }
+// ⬆️ (tutaj kończy się funkcja generateAndSetDocumentNumber) ⬆️
 
+/* ⬇️ WKLEJ CAŁĄ TĘ NOWĄ FUNKCJĘ ⬇️ */
+
+/**
+ * Generuje i wstawia nowy numer dokumentu dla PARAGONU.
+ */
+async function generateAndSetReceiptDocumentNumber() {
+    if (!currentUserProfile || !currentUserProfile.uid) {
+        console.warn("Auto-numeracja paragonu wstrzymana: brak profilu.");
+        return;
+    }
+
+    const nrDokInput = document.getElementById('calcNrDokInput');
+    // Nie generuj, jeśli pole jest już wypełnione (np. ręcznie)
+    if (nrDokInput.value.trim() !== "") {
+        console.log("Auto-numeracja paragonu pominięta: pole jest już wypełnione.");
+        // Spróbuj sparsować istniejący numer
+        try {
+            const parts = nrDokInput.value.replace('PAR-', '').split('/');
+            if (parts.length === 4) {
+                currentReceiptData.nextCounter = parseInt(parts[0]) || 1;
+                currentReceiptData.currentMonth = parseInt(parts[1]) || (new Date().getMonth() + 1);
+                currentReceiptData.currentYear = parseInt(parts[2]) || (new Date().getFullYear());
+                currentReceiptData.initials = parts[3] || (currentUserProfile.Inicjaly || 'NN');
+            }
+        } catch(e) {
+            console.warn("Nie udało się sparsować istniejącego numeru paragonu.");
+        }
+        return;
+    }
+
+    // Ustaw metadane
+    const d = new Date();
+    currentReceiptData.currentMonth = d.getMonth() + 1;
+    currentReceiptData.currentYear = d.getFullYear();
+    currentReceiptData.initials = currentUserProfile.Inicjaly || 'NN';
+
+    console.log(`Pobieranie ostatniego numeru paragonu dla: Uid=${currentUserProfile.uid}, Rok=${currentReceiptData.currentYear}, Miesiąc=${currentReceiptData.currentMonth}`);
+
+    try {
+        // Zapytanie o ostatni PARAGON danego lekarza w miesiącu i roku
+        const q = db.collection("archiwumParagony") // <-- ZMIANA KOLEKCJI
+            .where("lekarz_uid", "==", currentUserProfile.uid)
+            .where("rok", "==", currentReceiptData.currentYear)
+            .where("miesiac", "==", currentReceiptData.currentMonth)
+            .orderBy("counter", "desc") // Sortuj wg licznika malejąco
+            .limit(1);
+
+        const snapshot = await q.get();
+
+        if (snapshot.empty) {
+            currentReceiptData.nextCounter = 1;
+        } else {
+            const lastCounter = snapshot.docs[0].data().counter;
+            currentReceiptData.nextCounter = lastCounter + 1;
+        }
+
+        // Dodajemy prefiks "PAR-", aby odróżnić od numeru karty
+        const newDocNumber = `PAR-${currentReceiptData.nextCounter}/${currentReceiptData.currentMonth}/${currentReceiptData.currentYear}/${currentReceiptData.initials}`;
+
+        nrDokInput.value = newDocNumber; // Wstaw do pola
+        console.log(`Wygenerowano nowy numer paragonu: ${newDocNumber}`);
+
+    } catch (error) {
+        console.error("Błąd podczas generowania numeru paragonu:", error);
+        if (error.code === 'failed-precondition') {
+            // ‼️ To jest BARDZO WAŻNE ‼️
+            alert("BŁĄD KRYTYCZNY: Aby numeracja paragonów działała, administrator musi utworzyć nowy indeks w bazie Firestore.\n\n(Sprawdź konsolę F12, aby zobaczyć link do utworzenia indeksu)");
+            console.error("BŁĄD INDEKSU: Wejdź w konsolę Firebase i utwórz indeks kompozytowy dla 'archiwumParagony': [lekarz_uid(ASC), rok(ASC), miesiac(ASC), counter(DESC)]");
+        }
+    }
+}
+/* ⬆️ KONIEC NOWEJ FUNKCJI ⬆️ */
+
+
+/**
+ * ✅ NOWA FUNKCJA (Pkt 4): Wywoływana przy każdym wejściu do sekcji 'karta'.
+// ... (tutaj zaczyna się funkcja onShowKarta)
 /**
  * ✅ NOWA FUNKCJA (Pkt 4): Wywoływana przy każdym wejściu do sekcji 'karta'.
  * Resetuje stan zapisu i przycisk 'Zapisz w Archiwum'.
@@ -6148,7 +6231,9 @@ if (tabKartaBtn) {
         onShowKarta(); // Wywołaj nową funkcję
     });
 }
-
+function onShowKalkulator() {
+    generateAndSetReceiptDocumentNumber();
+}
 // Zmodyfikuj też listener dla menuKartaBtn
 if (menuKartaBtn) {
     menuKartaBtn.addEventListener('click', () => {
