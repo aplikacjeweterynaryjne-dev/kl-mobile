@@ -3551,19 +3551,22 @@ receiptDisplay.appendChild(totalDiv);
 
 // Funkcja pomocnicza do dodawania lub aktualizowania pozycji
 function addItemToReceipt(productName, quantity, priceOverride = null) {
-// Upewnij się, że quantity jest liczbą
-const numQuantity = Number(quantity) || 0;
-const price = (priceOverride !== null) ? priceOverride : (mapaCen[productName] || 0);
+    // Upewnij się, że quantity jest liczbą
+    const numQuantity = Number(quantity) || 0;
+    if (numQuantity <= 0) return; // Nie dodawaj jeśli ilość jest zerowa lub niepoprawna
 
-    const existingItem = receiptItems.find(item => item.name === productName)
+    // Użyj ceny przekazanej (priceOverride) lub pobierz ją z mapy
+    const price = (priceOverride !== null) ? priceOverride : (mapaCen[productName] || 0);
 
-const existingItem = receiptItems.find(item => item.name === productName);
-if (existingItem) {
-existingItem.quantity = (Number(existingItem.quantity) || 0) + numQuantity; // Upewnij się, że dodajesz liczby
-} else {
-receiptItems.push({ name: productName, quantity: numQuantity, price: price }); // Dodaj z ceną
-}
-renderReceipt(); // Przelicz i odśwież
+    // ⬇️ TUTAJ BYŁ BŁĄD (została tylko jedna, poprawna linia) ⬇️
+    const existingItem = receiptItems.find(item => item.name === productName); 
+    
+    if (existingItem) {
+        existingItem.quantity = (Number(existingItem.quantity) || 0) + numQuantity; // Upewnij się, że dodajesz liczby
+    } else {
+        receiptItems.push({ name: productName, quantity: numQuantity, price: price }); // Dodaj z ceną
+    }
+    renderReceipt(); // Przelicz i odśwież
 }
 
 // Dodawanie produktu z formularza (używa addItemToReceipt)
