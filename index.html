@@ -6221,30 +6221,26 @@ if(loadArchiveUsersBtn) loadArchiveUsersBtn.addEventListener('click', loadArchiv
 /**
  * Pkt 6: Wczytuje karty dla wybranego UID lekarza (ZMODYFIKOWANA O "WSZYSCY")
  */
+// ✅ ZASTĄP CAŁĄ FUNKCJĘ TYM KODEM
 async function loadCardsForUser(lekarz_uid) {
-    const tableBody = document.getElementById('archiveCardTableBody');
-    const filterControls = document.getElementById('archiveCardFilterControls');
-    
-    if (!lekarz_uid) {
-        tableBody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 20px; color: #555;">Wybierz użytkownika, aby zobaczyć archiwum.</td></tr>';
-        filterControls.style.display = 'none'; // Ukryj filtry
-        return;
-    }
-    
-    tableBody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 20px; color: #555;">Wczytywanie kart... ⏳</td></tr>';
-    filterControls.style.display = 'none'; // Ukryj filtry na czas ładowania
+    const tableBody = document.getElementById('archiveCardTableBody');
+    const filterControls = document.getElementById('archiveCardFilterControls');
+    
+    if (!lekarz_uid) {
+        tableBody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 20px; color: #555;">Wybierz użytkownika, aby zobaczyć archiwum.</td></tr>';
+        filterControls.style.display = 'none';
+        return;
+    }
+    
+    tableBody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 20px; color: #555;">Wczytywanie kart... ⏳</td></tr>';
+    filterControls.style.display = 'none';
 
-    let q; // Zadeklaruj zmienną zapytania
-
+    let q; 
     if (lekarz_uid === "ALL") {
-        // UŻYTKOWNIK WYBRAŁ "WSZYSCY"
         console.log("Wczytywanie kart dla: WSZYSCY");
         if (currentUserProfile.Rola === 'administrator') {
-            // Administrator widzi WSZYSTKO
-            q = db.collection("archiwumKarty")
-                  .orderBy("createdAt", "desc");
+            q = db.collection("archiwumKarty").orderBy("createdAt", "desc");
         } else {
-            // Właściciel/pracownik widzi wszystko, ale tylko w swojej lecznicy
             const userClinicId = currentUserProfile['ID lecznicy'];
             if (!userClinicId) {
                  tableBody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 20px; color: red;">Błąd: Twój profil nie ma przypisanego ID lecznicy.</td></tr>';
@@ -6255,52 +6251,73 @@ async function loadCardsForUser(lekarz_uid) {
                   .orderBy("createdAt", "desc");
         }
     } else {
-        // UŻYTKOWNIK WYBRAŁ KONKRETNĄ OSOBĘ (stara logika)
         console.log(`Wczytywanie kart dla UID: ${lekarz_uid}`);
         q = db.collection("archiwumKarty")
               .where("lekarz_uid", "==", lekarz_uid)
               .orderBy("createdAt", "desc");
     }
 
-    try {
-        const snapshot = await q.get(); // Wykonaj zapytanie (q)
-        
-        if (snapshot.empty) {
-            tableBody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 20px; color: #999;">Brak zapisanych kart dla tego wyboru.</td></tr>';
-            filterControls.style.display = 'none'; 
-            return;
-        }
-        
-        tableBody.innerHTML = ''; // Wyczyść tabelę
-        
-        snapshot.docs.forEach(doc => {
-            const card = { id: doc.id, ...doc.data() };
-            const tr = document.createElement('tr');
-            
-            tr.dataset.data = card.dataWykonania || '';
-            tr.dataset.klient = card.klient_nazwa || 'Klient nieznany';
-            tr.dataset.nrDok = card.nrDokumentu || 'Brak nr';
-            tr.dataset.lekarz = card.lekarz_nazwisko || 'Nieznany';
-            
-            tr.innerHTML = `
-                <td>${card.dataWykonania || 'Brak daty'}</td>
-                <td>${card.klient_nazwa || 'Klient nieznany'}</td>
-                <td>${card.nrDokumentu || 'Brak nr'}</td>
-                <td>${card.lekarz_nazwisko || 'Nieznany'}</td>
-                <td class="col-akcje">
-                    <button class="btn primary small btn-view-archived-card" data-card-id="${card.id}">Podgląd KL</button>
-                    <button class="btn warn small btn-delete-archived-card" data-card-id="${card.id}" data-card-nr="${card.nrDokumentu || 'Brak nr'}">Usuń</button>
-                </td>
-            `;
-            tableBody.appendChild(tr);
-        });
+    try {
+        const snapshot = await q.get();
+        
+        if (snapshot.empty) {
+            tableBody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 20px; color: #999;">Brak zapisanych kart dla tego wyboru.</td></tr>';
+            filterControls.style.display = 'none'; 
+            return;
+        }
+        
+        tableBody.innerHTML = ''; // Wyczyść tabelę
+        
+        snapshot.docs.forEach(doc => {
+            const card = { id: doc.id, ...doc.data() };
+            const tr = document.createElement('tr');
+            
+            // Zapisujemy dane do atrybutów data-* dla filtrowania i sortowania
+            tr.dataset.data = card.dataWykonania || '';
+            tr.dataset.klient = card.klient_nazwa || 'Klient nieznany';
+            tr.dataset.nrDok = card.nrDokumentu || 'Brak nr';
+            tr.dataset.lekarz = card.lekarz_nazwisko || 'Nieznany';
+            
+            // --- ⬇️ NOWA, BEZPIECZNA METODA BUDOWANIA WIERSZA ⬇️ ---
+            
+            // Komórka 1: Data
+            const tdData = document.createElement('td');
+            tdData.textContent = card.dataWykonania || 'Brak daty';
+            tr.appendChild(tdData);
 
-        // Pokaż filtry, gdy dane są gotowe
-        filterControls.style.display = 'grid';
+            // Komórka 2: Klient
+            const tdKlient = document.createElement('td');
+            tdKlient.textContent = card.klient_nazwa || 'Klient nieznany';
+            tr.appendChild(tdKlient);
 
-    } catch (error) {
-        console.error(`Błąd wczytywania kart dla ${lekarz_uid}:`, error);
-        // Sprawdź, czy to błąd indeksu dla "Wszystkich"
+            // Komórka 3: Nr Dokumentu
+            const tdNrDok = document.createElement('td');
+            tdNrDok.textContent = card.nrDokumentu || 'Brak nr';
+            tr.appendChild(tdNrDok);
+
+            // Komórka 4: Wystawił
+            const tdLekarz = document.createElement('td');
+            tdLekarz.textContent = card.lekarz_nazwisko || 'Nieznany';
+            tr.appendChild(tdLekarz);
+
+            // Komórka 5: Akcje
+            const tdAkcje = document.createElement('td');
+            tdAkcje.className = 'col-akcje';
+            tdAkcje.innerHTML = `
+                <button class="btn primary small btn-view-archived-card" data-card-id="${card.id}">Podgląd KL</button>
+                <button class="btn warn small btn-delete-archived-card" data-card-id="${card.id}" data-card-nr="${card.nrDokumentu || 'Brak nr'}">Usuń</button>
+            `;
+            tr.appendChild(tdAkcje);
+            
+            // --- ⬆️ KONIEC NOWEJ METODY ⬆️ ---
+
+            tableBody.appendChild(tr);
+        });
+
+        filterControls.style.display = 'grid';
+
+    } catch (error) {
+        console.error(`Błąd wczytywania kart dla ${lekarz_uid}:`, error);
         if (lekarz_uid === "ALL" && error.code === 'failed-precondition') {
              alert("BŁĄD BAZY DANYCH: Aby filtrować 'Wszystkich' w lecznicy, wymagany jest nowy indeks. Sprawdź konsolę (F12), aby zobaczyć link do jego utworzenia.");
              console.error("BŁĄD: Prawdopodobnie brakuje indeksu kompozytowego w Firestore. Utwórz indeks dla kolekcji 'archiwumKarty' dla pól: 'id_lecznicy' (Rosnąco) i 'createdAt' (Malejąco).");
@@ -6308,8 +6325,8 @@ async function loadCardsForUser(lekarz_uid) {
         } else {
             tableBody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 20px; color: red;">Wystąpił błąd podczas wczytywania kart.</td></tr>';
         }
-        filterControls.style.display = 'none';
-    }
+        filterControls.style.display = 'none';
+    }
 }
 // Listener dla zmiany lekarza w Archiwum
 if(archiveUserSelect) archiveUserSelect.addEventListener('change', () => {
@@ -6581,30 +6598,26 @@ if(loadArchiveReceiptUsersBtn) loadArchiveReceiptUsersBtn.addEventListener('clic
 // Wczytuje paragony dla wybranego lekarza
 // ✅ ZMODYFIKOWANA FUNKCJA
 // Wczytuje paragony dla wybranego lekarza (ZMODYFIKOWANA O "WSZYSCY")
+// ✅ ZASTĄP CAŁĄ FUNKCJĘ TYM KODEM
 async function loadReceiptsForUser(lekarz_uid) {
-    const tableBody = document.getElementById('archiveReceiptTableBody');
-    const filterControls = document.getElementById('archiveReceiptFilterControls');
+    const tableBody = document.getElementById('archiveReceiptTableBody');
+    const filterControls = document.getElementById('archiveReceiptFilterControls');
 
-    if (!lekarz_uid) {
-        tableBody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 20px; color: #555;">Wybierz użytkownika, aby zobaczyć archiwum.</td></tr>';
-        filterControls.style.display = 'none';
-        return;
-    }
-    
-    tableBody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 20px; color: #555;">Wczytywanie paragonów... ⏳</td></tr>';
-    filterControls.style.display = 'none';
+    if (!lekarz_uid) {
+        tableBody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 20px; color: #555;">Wybierz użytkownika, aby zobaczyć archiwum.</td></tr>';
+        filterControls.style.display = 'none';
+        return;
+    }
+    
+    tableBody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 20px; color: #555;">Wczytywanie paragonów... ⏳</td></tr>';
+    filterControls.style.display = 'none';
 
-    let q; // Zadeklaruj zmienną zapytania
-
+    let q; 
     if (lekarz_uid === "ALL") {
-        // UŻYTKOWNIK WYBRAŁ "WSZYSCY"
         console.log("Wczytywanie paragonów dla: WSZYSCY");
         if (currentUserProfile.Rola === 'administrator') {
-            // Administrator widzi WSZYSTKO
-            q = db.collection("archiwumParagony")
-                  .orderBy("createdAt", "desc");
+            q = db.collection("archiwumParagony").orderBy("createdAt", "desc");
         } else {
-            // Właściciel/pracownik widzi wszystko, ale tylko w swojej lecznicy
             const userClinicId = currentUserProfile['ID lecznicy'];
             if (!userClinicId) {
                  tableBody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 20px; color: red;">Błąd: Twój profil nie ma przypisanego ID lecznicy.</td></tr>';
@@ -6615,57 +6628,84 @@ async function loadReceiptsForUser(lekarz_uid) {
                   .orderBy("createdAt", "desc");
         }
     } else {
-        // UŻYTKOWNIK WYBRAŁ KONKRETNĄ OSOBĘ (stara logika)
         console.log(`Wczytywanie paragonów dla UID: ${lekarz_uid}`);
         q = db.collection("archiwumParagony")
               .where("lekarz_uid", "==", lekarz_uid)
               .orderBy("createdAt", "desc");
     }
 
-    try {
-        const snapshot = await q.get(); // Wykonaj zapytanie (q)
-        
-        if (snapshot.empty) {
-            tableBody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 20px; color: #999;">Brak zapisanych paragonów dla tego wyboru.</td></tr>';
-            filterControls.style.display = 'none';
-            return;
-        }
-        
-        tableBody.innerHTML = ''; // Wyczyść tabelę
-        
-        snapshot.docs.forEach(doc => {
-            const receipt = { id: doc.id, ...doc.data() };
-            const tr = document.createElement('tr');
-            
-            const statusColor = receipt.status === "Zapłacone" ? "green" : (receipt.status === "Dług" ? "red" : "#555");
-            const suma = parseFloat(receipt.suma) || 0;
-            
-            tr.dataset.data = receipt.data || '';
-            tr.dataset.klient = receipt.klient || 'Klient nieznany';
-            tr.dataset.status = receipt.status || 'Nie wybrano';
-            tr.dataset.suma = suma;
-            tr.dataset.lekarz = receipt.lekarz_nazwisko || 'Nieznany';
-            
-            tr.innerHTML = `
-                <td>${receipt.data || 'Brak daty'}</td>
-                <td>${receipt.klient || 'Klient nieznany'}</td>
-                <td style="color: ${statusColor}; font-weight: bold;">${receipt.status || 'Nie wybrano'}</td>
-                <td style="text-align: right;">${formatPrice(suma)}</td>
-                <td>${receipt.lekarz_nazwisko || 'Nieznany'}</td>
-                <td class="col-akcje">
-                    <button class="btn primary small btn-view-archived-receipt" data-receipt-id="${receipt.id}">Podgląd</button>
-                    <button class="btn warn small btn-delete-archived-receipt" data-receipt-id="${receipt.id}" data-receipt-info="${receipt.data} / ${receipt.klient}">Usuń</button>
-                </td>
-            `;
-            tableBody.appendChild(tr);
-        });
+    try {
+        const snapshot = await q.get(); 
+        
+        if (snapshot.empty) {
+            tableBody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 20px; color: #999;">Brak zapisanych paragonów dla tego wyboru.</td></tr>';
+            filterControls.style.display = 'none';
+            return;
+        }
+        
+        tableBody.innerHTML = ''; // Wyczyść tabelę
+        
+        snapshot.docs.forEach(doc => {
+            const receipt = { id: doc.id, ...doc.data() };
+            const tr = document.createElement('tr');
+            
+            const statusColor = receipt.status === "Zapłacone" ? "green" : (receipt.status === "Dług" ? "red" : "#555");
+            const suma = parseFloat(receipt.suma) || 0;
+            
+            tr.dataset.data = receipt.data || '';
+            tr.dataset.klient = receipt.klient || 'Klient nieznany';
+            tr.dataset.status = receipt.status || 'Nie wybrano';
+            tr.dataset.suma = suma;
+            tr.dataset.lekarz = receipt.lekarz_nazwisko || 'Nieznany';
+            
+            // --- ⬇️ NOWA, BEZPIECZNA METODA BUDOWANIA WIERSZA ⬇️ ---
 
-        // Pokaż filtry
-        filterControls.style.display = 'grid';
+            // Komórka 1: Data
+            const tdData = document.createElement('td');
+            tdData.textContent = receipt.data || 'Brak daty';
+            tr.appendChild(tdData);
 
-    } catch (error) {
-        console.error(`Błąd wczytywania paragonów dla ${lekarz_uid}:`, error);
-        // Sprawdź, czy to błąd indeksu dla "Wszystkich"
+            // Komórka 2: Klient
+            const tdKlient = document.createElement('td');
+            tdKlient.textContent = receipt.klient || 'Klient nieznany';
+            tr.appendChild(tdKlient);
+
+            // Komórka 3: Status
+            const tdStatus = document.createElement('td');
+            tdStatus.textContent = receipt.status || 'Nie wybrano';
+            tdStatus.style.color = statusColor;
+            tdStatus.style.fontWeight = 'bold';
+            tr.appendChild(tdStatus);
+
+            // Komórka 4: Suma
+            const tdSuma = document.createElement('td');
+            tdSuma.textContent = formatPrice(suma);
+            tdSuma.style.textAlign = 'right';
+            tr.appendChild(tdSuma);
+
+            // Komórka 5: Wystawił
+            const tdLekarz = document.createElement('td');
+            tdLekarz.textContent = receipt.lekarz_nazwisko || 'Nieznany';
+            tr.appendChild(tdLekarz);
+
+            // Komórka 6: Akcje
+            const tdAkcje = document.createElement('td');
+            tdAkcje.className = 'col-akcje';
+            tdAkcje.innerHTML = `
+                <button class="btn primary small btn-view-archived-receipt" data-receipt-id="${receipt.id}">Podgląd</button>
+                <button class="btn warn small btn-delete-archived-receipt" data-receipt-id="${receipt.id}" data-receipt-info="${receipt.data} / ${receipt.klient}">Usuń</button>
+            `;
+            tr.appendChild(tdAkcje);
+
+            // --- ⬆️ KONIEC NOWEJ METODY ⬆️ ---
+
+            tableBody.appendChild(tr);
+        });
+
+        filterControls.style.display = 'grid';
+
+    } catch (error) {
+        console.error(`Błąd wczytywania paragonów dla ${lekarz_uid}:`, error);
         if (lekarz_uid === "ALL" && error.code === 'failed-precondition') {
              alert("BŁĄD BAZY DANYCH: Aby filtrować 'Wszystkich' w lecznicy, wymagany jest nowy indeks. Sprawdź konsolę (F12), aby zobaczyć link do jego utworzenia.");
              console.error("BŁĄD: Prawdopodobnie brakuje indeksu kompozytowego w Firestore. Utwórz indeks dla kolekcji 'archiwumParagony' dla pól: 'id_lecznicy' (Rosnąco) i 'createdAt' (Malejąco).");
@@ -6673,8 +6713,8 @@ async function loadReceiptsForUser(lekarz_uid) {
         } else {
              tableBody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 20px; color: red;">Wystąpił błąd podczas wczytywania paragonów.</td></tr>';
         }
-        filterControls.style.display = 'none';
-    }
+        filterControls.style.display = 'none';
+    }
 }
 if(archiveReceiptUserSelect) archiveReceiptUserSelect.addEventListener('change', () => {
     loadReceiptsForUser(archiveReceiptUserSelect.value);
