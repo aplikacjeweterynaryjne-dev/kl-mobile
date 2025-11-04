@@ -2777,112 +2777,196 @@ const saveCardToArchiveBtn = document.getElementById('saveCardToArchiveBtn');
 /**
  * Pkt 4: Listener dla przycisku "Zapisz w Archiwum"
  */
+/* Plik: index.html (ok. linii 1122) */
+
+/**
+ * NOWA FUNKCJA: Logika zapisu karty do archiwum (wydzielona)
+ * @param {HTMLElement} buttonElement - Przycisk, który wywołał zapis (aby zmienić jego tekst)
+ * @returns {Promise<boolean>} - Zwraca true jeśli zapis się udał, false jeśli nie
+ */
+async function saveCardLogic(buttonElement) {
+    if (!currentUserProfile || !currentUserProfile.uid) {
+        alert("Nie można zapisać. Brak danych zalogowanego użytkownika.");
+        return false;
+    }
+
+    // Zabezpieczenie przed zapisaniem pustej karty
+    const klient = document.getElementById('klientSelect').value;
+    const nrDok = document.getElementById('nrDokumentu').value;
+    if (!klient || !nrDok) {
+        alert("Nie można zapisać. Wypełnij przynajmniej pola 'Klient' i 'Nr Dokumentu'.");
+        return false;
+    }
+
+    console.log("Rozpoczynanie zapisu karty do archiwum...");
+    if (buttonElement) {
+        buttonElement.disabled = true;
+        buttonElement.textContent = 'Zapisywanie...';
+    }
+
+    try {
+        // 1. Serializacja nagłówka
+        const headerData = {
+            nazwaLecznicy: document.getElementById('nazwaLecznicy').textContent,
+            dataWykonania: document.getElementById('dataWykonania').value,
+            nrStada: document.getElementById('nrStada').textContent,
+            klient: klient,
+            adresKlienta: document.getElementById('adresKlienta').textContent,
+            dataZgloszenia: document.getElementById('dataZgloszenia').value,
+            nrDokumentu: nrDok,
+            podpisLekarzaImg: document.getElementById('doctor-signature').src,
+            podpisLekarzaLinia: document.getElementById('doctor-signature-name').textContent
+        };
+
+        // 2. Serializacja tabeli (wierszy z danymi)
+        const tableRows = [];
+        const rows = rowsEditable(); 
+
+        rows.forEach(tr => {
+            const logicalIndex = rows.indexOf(tr);
+            
+            const iloscInput = tr.cells[6].querySelector('input[type="number"]');
+            const iloscValue = iloscInput ? iloscInput.value : ''; 
+            let dawkaText = '';
+            if (iloscInput && iloscInput.nextSibling && iloscInput.nextSibling.nodeType === Node.TEXT_NODE) {
+                dawkaText = iloscInput.nextSibling.textContent;
+            }
+            const iloscDawkaHtml = `<input class="small-input" type="number" value="${iloscValue}"> ${dawkaText}`;
+
+            const rowData = {
+                logicalIndex: logicalIndex,
+                lp: tr.cells[0].textContent,
+                opis: tr.cells[1].textContent,
+                liczba: tr.cells[2].querySelector('input') ? tr.cells[2].querySelector('input').value : '',
+                rozpoznanie: tr.cells[3].textContent,
+                lek: tr.cells[4].querySelector('input') ? tr.cells[4].querySelector('input').value : '',
+                seria: tr.cells[5].textContent,
+                iloscDawka: iloscDawkaHtml, 
+                karencja: tr.cells[7].textContent
+            };
+            if (rowData.opis || rowData.liczba || rowData.rozpoznanie || rowData.lek) {
+                tableRows.push(rowData);
+            }
+        });
+
+        // 3. Serializacja płótna podpisu posiadacza (jako Base64)
+        const podpisPosiadacza = document.getElementById('canvasPosiadacz').toDataURL();
+
+        // 4. Kompletny obiekt do zapisu
+        const cardArchiveData = {
+            lekarz_uid: currentUserProfile.uid,
+            lekarz_nazwisko: `${currentUserProfile.Imie} ${currentUserProfile.Nazwisko}`,
+            id_lecznicy: currentUserProfile['ID lecznicy'],
+            klient_nazwa: headerData.klient,
+            nrDokumentu: headerData.nrDokumentu,
+            dataWykonania: headerData.dataWykonania,
+            counter: currentCardData.nextCounter,
+            miesiac: currentCardData.currentMonth,
+            rok: currentCardData.currentYear,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            header: headerData,
+            table: tableRows,
+            podpisPosiadacza: podpisPosiadacza
+        };
+
+        // 5. Zapis do Firestore
+        await db.collection("archiwumKarty").add(cardArchiveData);
+
+        isCurrentCardSaved = true; // Oznacz kartę jako zapisaną
+        alert(`Karta (Nr: ${headerData.nrDokumentu}) została pomyślnie zapisana w archiwum!`);
+        
+        if (buttonElement) {
+             buttonElement.textContent = 'Zapisano ✔️';
+             // Pozostawiamy disabled, aby uniknąć podwójnego zapisu
+        }
+        return true; // Zapis się udał
+
+    } catch (error) {
+        console.error("Błąd zapisu karty do archiwum:", error);
+        alert("Wystąpił błąd podczas zapisu karty. Sprawdź konsolę.");
+        if (buttonElement) {
+            buttonElement.disabled = false; // Umożliw ponowną próbę
+            buttonElement.textContent = '💾 Zapisz w Archiwum';
+        }
+        return false; // Zapis się nie udał
+    }
+}
+
+/**
+ * Listener dla oryginalnego przycisku "Zapisz w Archiwum"
+ * Teraz po prostu wywołuje nową funkcję
+ */
 if (saveCardToArchiveBtn) {
-    saveCardToArchiveBtn.addEventListener('click', async () => {
-        if (!currentUserProfile || !currentUserProfile.uid) {
-            alert("Nie można zapisać. Brak danych zalogowanego użytkownika.");
-            return;
-        }
-
-        // Zabezpieczenie przed zapisaniem pustej karty
-        const klient = document.getElementById('klientSelect').value;
-        const nrDok = document.getElementById('nrDokumentu').value;
-        if (!klient || !nrDok) {
-            alert("Nie można zapisać. Wypełnij przynajmniej pola 'Klient' i 'Nr Dokumentu'.");
-            return;
-        }
-
-        console.log("Rozpoczynanie zapisu karty do archiwum...");
-        saveCardToArchiveBtn.disabled = true;
-        saveCardToArchiveBtn.textContent = 'Zapisywanie...';
-
-        try {
-            // 1. Serializacja nagłówka
-            const headerData = {
-                nazwaLecznicy: document.getElementById('nazwaLecznicy').textContent,
-                dataWykonania: document.getElementById('dataWykonania').value,
-                nrStada: document.getElementById('nrStada').textContent,
-                klient: klient,
-                adresKlienta: document.getElementById('adresKlienta').textContent,
-                dataZgloszenia: document.getElementById('dataZgloszenia').value,
-                nrDokumentu: nrDok,
-                podpisLekarzaImg: document.getElementById('doctor-signature').src,
-                podpisLekarzaLinia: document.getElementById('doctor-signature-name').textContent
-            };
-
-            // 2. Serializacja tabeli (wierszy z danymi)
-            const tableRows = [];
-            const rows = rowsEditable(); // Używamy istniejącej funkcji pomocniczej
-
-            rows.forEach(tr => {
-          const logicalIndex = rows.indexOf(tr);
-                
-               const iloscInput = tr.cells[6].querySelector('input[type="number"]');
-                const iloscValue = iloscInput ? iloscInput.value : ''; // Pobieramy wartość
-                let dawkaText = '';
-                // Sprawdzamy, czy po inpucie jest tekst (np. " ml/kg")
-                if (iloscInput && iloscInput.nextSibling && iloscInput.nextSibling.nodeType === Node.TEXT_NODE) {
-                    dawkaText = iloscInput.nextSibling.textContent;
-                }
-                // Odtwarzamy HTML, ale tym razem Z ATRYBUTEM value
-                const iloscDawkaHtml = `<input class="small-input" type="number" value="${iloscValue}"> ${dawkaText}`;
-                // ✅ KONIEC POPRAWKI
-
-                const rowData = {
-                    logicalIndex: logicalIndex,
-                    lp: tr.cells[0].textContent,
-                    opis: tr.cells[1].textContent,
-                    liczba: tr.cells[2].querySelector('input') ? tr.cells[2].querySelector('input').value : '',
-                    rozpoznanie: tr.cells[3].textContent,
-                    lek: tr.cells[4].querySelector('input') ? tr.cells[4].querySelector('input').value : '',
-                    seria: tr.cells[5].textContent,
-                    iloscDawka: iloscDawkaHtml, // ✅ Używamy nowej, poprawnej zmiennej
-                    karencja: tr.cells[7].textContent
-                };
-                // Zapisujemy tylko wiersze, które mają jakąkolwiek treść
-                if (rowData.opis || rowData.liczba || rowData.rozpoznanie || rowData.lek) {
-                    tableRows.push(rowData);
-                }
-            });
-
-            // 3. Serializacja płótna podpisu posiadacza (jako Base64)
-            const podpisPosiadacza = document.getElementById('canvasPosiadacz').toDataURL();
-
-            // 4. Kompletny obiekt do zapisu
-            const cardArchiveData = {
-                // Metadane do wyszukiwania i numeracji (Pkt 7)
-                lekarz_uid: currentUserProfile.uid,
-                lekarz_nazwisko: `${currentUserProfile.Imie} ${currentUserProfile.Nazwisko}`,
-                id_lecznicy: currentUserProfile['ID lecznicy'],
-                klient_nazwa: headerData.klient,
-                nrDokumentu: headerData.nrDokumentu,
-                dataWykonania: headerData.dataWykonania,
-                counter: currentCardData.nextCounter,
-                miesiac: currentCardData.currentMonth,
-                rok: currentCardData.currentYear,
-                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-
-                // Pełne dane karty (do podglądu)
-                header: headerData,
-                table: tableRows, // Zapisujemy tylko wypełnione wiersze
-                podpisPosiadacza: podpisPosiadacza
-            };
-
-            // 5. Zapis do Firestore
-            await db.collection("archiwumKarty").add(cardArchiveData);
-
-            isCurrentCardSaved = true; // Oznacz kartę jako zapisaną
-            alert(`Karta (Nr: ${headerData.nrDokumentu}) została pomyślnie zapisana w archiwum!`);
-            saveCardToArchiveBtn.textContent = 'Zapisano ✔️';
-
-        } catch (error) {
-            console.error("Błąd zapisu karty do archiwum:", error);
-            alert("Wystąpił błąd podczas zapisu karty. Sprawdź konsolę.");
-            saveCardToArchiveBtn.disabled = false; // Umożliw ponowną próbę
-            saveCardToArchiveBtn.textContent = '💾 Zapisz w Archiwum';
-        }
+    saveCardToArchiveBtn.addEventListener('click', () => {
+        saveCardLogic(saveCardToArchiveBtn); // Przekaż sam przycisk do funkcji
     });
 }
+    /* ⬇️ WKLEJ TEN NOWY BLOK KODU ⬇️ */
+
+const saveConfirmModal = document.getElementById('saveConfirmModal');
+const customConfirmSaveBtn = document.getElementById('customConfirmSaveBtn');
+const customConfirmLeaveBtn = document.getElementById('customConfirmLeaveBtn');
+const customConfirmCancelBtn = document.getElementById('customConfirmCancelBtn');
+
+// Ta zmienna będzie przechowywać akcję, którą chcemy wykonać po opuszczeniu (np. () => showSection('kalkulator'))
+let pendingNavigationAction = null;
+
+/**
+ * Pokazuje nowy modal potwierdzenia zapisu.
+ * @param {Function} callbackOnLeave - Funkcja, która ma się wykonać, jeśli użytkownik opuści kartę.
+ */
+function showSaveConfirmDialog(callbackOnLeave) {
+    pendingNavigationAction = callbackOnLeave; // Zapisz akcję do wykonania
+    saveConfirmModal.style.display = 'flex'; // Pokaż modal
+
+    // Przywróć domyślny stan przycisków
+    customConfirmSaveBtn.disabled = false;
+    customConfirmSaveBtn.textContent = '💾 Zapisz i Opuść';
+    customConfirmLeaveBtn.disabled = false;
+}
+
+// Listener dla przycisku "Anuluj" w nowym modalu
+customConfirmCancelBtn.addEventListener('click', () => {
+    saveConfirmModal.style.display = 'none'; // Ukryj modal
+    pendingNavigationAction = null; // Wyczyść akcję
+});
+
+// Listener dla przycisku "Opuść bez zapisu" w nowym modalu
+customConfirmLeaveBtn.addEventListener('click', () => {
+    saveConfirmModal.style.display = 'none'; // Ukryj modal
+    if (pendingNavigationAction) {
+        pendingNavigationAction(); // Wykonaj zapisaną akcję (np. zmianę zakładki)
+    }
+    pendingNavigationAction = null; // Wyczyść akcję
+});
+
+// Listener dla przycisku "Zapisz i Opuść" w nowym modalu
+customConfirmSaveBtn.addEventListener('click', async () => {
+    // Zablokuj przyciski na czas zapisu
+    customConfirmSaveBtn.disabled = true;
+    customConfirmLeaveBtn.disabled = true;
+    
+    // Wywołaj naszą logikę zapisu, przekazując ten przycisk do aktualizacji tekstu
+    const saveSuccess = await saveCardLogic(customConfirmSaveBtn);
+
+    if (saveSuccess) {
+        // Jeśli zapis się udał, poczekaj chwilę, by użytkownik zobaczył "Zapisano ✔️"
+        setTimeout(() => {
+            saveConfirmModal.style.display = 'none'; // Ukryj modal
+            if (pendingNavigationAction) {
+                pendingNavigationAction(); // Wykonaj zapisaną akcję (np. zmianę zakładki)
+            }
+            pendingNavigationAction = null; // Wyczyść akcję
+        }, 800); // 0.8 sekundy opóźnienia
+    } else {
+        // Jeśli zapis się nie udał (np. brak klienta), odblokuj przyciski
+        customConfirmSaveBtn.disabled = false;
+        customConfirmLeaveBtn.disabled = false;
+        // Modal pozostaje otwarty, aby użytkownik mógł podjąć inną decyzję
+    }
+});
+
+/* ⬆️ KONIEC NOWEGO BLOKU KODU ⬆️ */
 
 // Sekcje Archiwum i ich elementy (Pkt 6, 8)
 const archiwumKartySection = document.getElementById('archiwumKartySection');
@@ -6013,38 +6097,123 @@ if (document.readyState === 'loading') {
 /**
  * Pkt 4: Sprawdza, czy karta jest zapisana przy próbie zmiany zakładki.
  */
-function confirmOnTabChange() {
-    // Sprawdzamy, czy karta jest widoczna i czy NIE jest zapisana
-    if (kartaSection.style.display === 'block' && !isCurrentCardSaved) {
-        if (!confirm("Karta nie została zapisana w archiwum.\n\nCzy na pewno chcesz opuścić tę zakładkę? Niezapisane zmiany zostaną utracone.")) {
-            return false; // Anuluj zmianę zakładki
-        }
-    }
-    return true; // Kontynuuj zmianę zakładki
+/* ⬇️ WKLEJ TEN BLOK ZAMIAST 'confirmOnTabChange' i 'navButtonsToCheck' ⬇️ */
+
+/**
+ * NOWA FUNKCJA: Sprawdza, czy karta jest zapisana.
+ * Jeśli tak, wykonuje akcję.
+ * Jeśli nie, zatrzymuje akcję i pokazuje nowy modal.
+ * @param {Event} e - Oryginalne zdarzenie (click)
+ * @param {Function} navigationAction - Akcja do wykonania (np. () => showSection('kalkulator'))
+ */
+function checkUnsavedCard(e, navigationAction) {
+    // Sprawdź, czy karta jest widoczna i NIE jest zapisana
+    if (kartaSection.style.display === 'block' && !isCurrentCardSaved) {
+        
+        // Jesteśmy na karcie i jest niezapisana
+        e.preventDefault(); // Zatrzymaj oryginalną akcję
+        e.stopImmediatePropagation(); // Zatrzymaj inne listenery
+        
+        // Pokaż nasz nowy modal, przekazując mu akcję do wykonania
+        showSaveConfirmDialog(navigationAction);
+        
+    } else {
+        // Nie jesteśmy na karcie LUB jest ona zapisana
+        // Po prostu wykonaj akcję
+        navigationAction();
+    }
 }
 
-// Musimy "przechwycić" kliknięcia na WSZYSTKIE przyciski nawigacyjne
-/* Plik: index.html (ok. linii 1920) */
+// --- NOWA LOGIKA PODPINANIA LISTENERÓW ---
+// Musimy podpiąć 'checkUnsavedCard' do każdego przycisku nawigacyjnego z osobna
 
-const navButtonsToCheck = [
-    tabKalkulatorBtn, tabBazaKlientowBtn, tabBazaProduktowBtn, // Zakładki
-    backToMenuBtn, logoutBtn, menuLogoutBtn, // Przyciski paska i menu
-    menuKalkulatorBtn, menuBazaKlientowBtn, menuBazaProduktowBtn, // Przyciski podmenu
-    menuRaportyBtn, menuArchiwumKartyBtn, menuArchiwumParagonyBtn, menuKonfiguracjaBtn, // Przyciski menu
-    openCalculatorBtn // Przycisk na karcie
-]; // <-- Koniec tablicy. Usunęliśmy przyciski z modala.
+// 1. Zakładki na górnym pasku
+if (tabKalkulatorBtn) {
+    tabKalkulatorBtn.addEventListener('click', (e) => {
+        checkUnsavedCard(e, () => showSection('kalkulator'));
+    }, true); // 'true' jest ważne, aby przechwycić kliknięcie
+}
+if (tabBazaKlientowBtn) {
+    tabBazaKlientowBtn.addEventListener('click', (e) => {
+        checkUnsavedCard(e, () => showSection('baza'));
+    }, true);
+}
+if (tabBazaProduktowBtn) {
+    tabBazaProduktowBtn.addEventListener('click', (e) => {
+        checkUnsavedCard(e, () => showSection('produkty'));
+    }, true);
+}
 
-navButtonsToCheck.forEach(btn => {
-    if (btn) { // Sprawdź, czy przycisk istnieje
-        btn.addEventListener('click', (e) => {
-            if (!confirmOnTabChange()) {
-                e.stopImmediatePropagation(); // Zatrzymaj inne listenery (np. showSection)
-                e.preventDefault(); // Zatrzymaj domyślną akcję
-            }
-        }, true); // <-- WAŻNE: 'true' uruchamia ten kod w pierwszej kolejności
-    }
-});
+// 2. Przyciski na pasku i w menu
+if (backToMenuBtn) {
+    backToMenuBtn.addEventListener('click', (e) => {
+        checkUnsavedCard(e, () => {
+            // Akcja powrotu do menu
+            if (kartaSection) kartaSection.style.display = 'none';
+            if (kalkulatorSection) kalkulatorSection.style.display = 'none';
+            if (bazaKlientowSection) bazaKlientowSection.style.display = 'none'; 
+            if (bazaProduktowSection) bazaProduktowSection.style.display = 'none';
+            if (mainTabBar) mainTabBar.style.display = 'none';
+            if (mainMenuSection) mainMenuSection.style.display = 'flex';
+            if (bazaSubMenu) bazaSubMenu.style.display = 'none';
+        });
+    }, true);
+}
+if (logoutBtn) {
+    logoutBtn.addEventListener('click', (e) => {
+        checkUnsavedCard(e, handleLogout); // handleLogout to istniejąca funkcja
+    }, true);
+}
+if (menuLogoutBtn) {
+     menuLogoutBtn.addEventListener('click', (e) => {
+        checkUnsavedCard(e, handleLogout);
+    }, true);
+}
 
+// 3. Przyciski Menu Głównego i podmenu
+if (menuKalkulatorBtn) {
+    menuKalkulatorBtn.addEventListener('click', (e) => {
+        checkUnsavedCard(e, () => showSection('kalkulator'));
+    }, true);
+}
+if (menuBazaKlientowBtn) {
+    menuBazaKlientowBtn.addEventListener('click', (e) => {
+        checkUnsavedCard(e, () => showSection('baza'));
+    }, true);
+}
+if (menuBazaProduktowBtn) {
+    menuBazaProduktowBtn.addEventListener('click', (e) => {
+        checkUnsavedCard(e, () => showSection('produkty'));
+    }, true);
+}
+if (menuRaportyBtn) {
+    menuRaportyBtn.addEventListener('click', (e) => {
+        checkUnsavedCard(e, () => { /* tu wstaw akcję dla raportów */ });
+    }, true);
+}
+if (menuArchiwumKartyBtn) {
+    menuArchiwumKartyBtn.addEventListener('click', (e) => {
+        checkUnsavedCard(e, () => showSection('archiwumKarty'));
+    }, true);
+}
+if (menuArchiwumParagonyBtn) {
+    menuArchiwumParagonyBtn.addEventListener('click', (e) => {
+        checkUnsavedCard(e, () => showSection('archiwumParagony'));
+    }, true);
+}
+if (menuKonfiguracjaBtn) {
+    menuKonfiguracjaBtn.addEventListener('click', (e) => {
+        checkUnsavedCard(e, () => showSection('konfiguracja'));
+    }, true);
+}
+
+// 4. Przycisk "Otwórz Kalkulator" na samej karcie
+if (openCalculatorBtn) {
+     openCalculatorBtn.addEventListener('click', (e) => {
+        checkUnsavedCard(e, () => showSection('kalkulator'));
+    }, true);
+}
+/* ⬆️ KONIEC BLOKU ZASTĘPUJĄCEGO ⬆️ */
 /**
  * Pkt 7: Generuje i wstawia nowy numer dokumentu do pola w Karcie Leczenia.
  */
@@ -6880,5 +7049,28 @@ if (document.readyState === 'loading') {
 } else {
     setupArchiveEventListeners();
 }
-</script> </body>
+</script>
+<div id="saveConfirmModal" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.48); display: none; z-index: 20000; justify-content: center; align-items: center; overflow: hidden;">
+    <div class="form-card" style="width: 90vw; max-width: 450px; height: auto;">
+        
+        <h3 style="font-size: 22px; text-align: center; margin-top: 0;">Karta nie została zapisana</h3>
+        
+        <p style="font-size: 17px; text-align: center; margin: 15px 0;">Czy chcesz zapisać zmiany w archiwum przed opuszczeniem karty?</p>
+
+        <div class="form-actions" style="margin-top: 25px; flex-direction: column; gap: 10px;">
+            <button id="customConfirmSaveBtn" class="btn primary" style="font-size: 18px; padding: 12px; width: 100%;">
+                💾 Zapisz i Opuść
+            </button>
+            
+            <button id="customConfirmLeaveBtn" class="btn warn" style="font-size: 17px; padding: 10px; width: 100%;">
+                ❌ Opuść bez zapisu
+            </button>
+            
+            <button id="customConfirmCancelBtn" class="btn ghost" style="font-size: 17px; padding: 10px; width: 100%; margin-top: 5px;">
+                Anuluj
+            </button>
+        </div>
+    </div>
+</div>
+</body>
 </html>
