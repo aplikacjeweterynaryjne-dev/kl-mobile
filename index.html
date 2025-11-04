@@ -666,7 +666,73 @@ background: #a93226;
 .archive-card-item span {
     font-size: 15px;
 }
+/* Plik: index.html (wklej na końcu głównego bloku <style>) */
 
+/* --- Style dla nowego Archiwum (Tabela i Filtry) --- */
+.archive-filter-controls {
+    display: grid;
+    /* Automatycznie dopasuj kolumny, min 180px */
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 10px;
+    margin-bottom: 15px;
+    padding: 10px;
+    background-color: #f7f7f7;
+    border-radius: 8px;
+}
+.archive-filter-controls input,
+.archive-filter-controls select {
+    padding: 8px;
+    font-size: 14px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    box-sizing: border-box;
+}
+
+/* Style dla nowych tabel archiwum */
+.sortable-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+.sortable-table th, .sortable-table td {
+    border: 1px solid #ddd;
+    padding: 8px;
+    font-size: 14px;
+    text-align: left;
+    /* Umożliwia łamanie długich nazw */
+    word-break: break-word; 
+}
+.sortable-table th {
+    background-color: #f2f2f2;
+    cursor: pointer;
+    user-select: none; /* Zapobiega zaznaczaniu tekstu */
+    position: relative;
+}
+.sortable-table th:hover {
+    background-color: #e9e9e9;
+}
+/* Dodaje strzałkę do sortowania */
+.sortable-table th[data-sort-key]::after {
+    content: ' ↕️';
+    font-size: 10px;
+    color: #999;
+    position: absolute;
+    right: 5px;
+}
+.sortable-table tbody tr:nth-child(even) {
+    background-color: #f9f9f9;
+}
+.sortable-table tbody tr:hover {
+    background-color: #f1f1f1;
+}
+.sortable-table .col-akcje {
+    width: 130px;
+    text-align: center;
+}
+
+/* Klasa do ukrywania wierszy przez filtr */
+.filter-hidden {
+    display: none;
+}
 /* ✅ KONIEC: Moduł 7 - Style dla Archiwum */
 /* ⬆️ ======================================================= ⬆️ */
 
@@ -1466,7 +1532,8 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
 </div>
     <div id="archiwumKartySection" style="display: none; padding: 0 20px;">
     <h2>🗄️ Archiwum Kart Leczenia</h2>
-    <div id="archiveCardFilterControls" style="margin-bottom: 20px; border-bottom: 1px solid #eee; padding-bottom: 15px;">
+    
+    <div style="margin-bottom: 20px; border-bottom: 1px solid #eee; padding-bottom: 15px;">
         <div class="form-row">
             <label for="archiveUserSelect">Wybierz użytkownika (lekarza):</label>
             <select id="archiveUserSelect" style="width:100%; padding:8px; font-size:16px;">
@@ -1476,15 +1543,36 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
         <button id="loadArchiveUsersBtn" class="btn primary small" style="margin-top: 10px;">📥 Wczytaj Użytkowników</button>
     </div>
     
-    <div id="archiveCardListContainer">
-        <p style="text-align: center; color: #555;">Wybierz użytkownika, aby zobaczyć archiwum.</p>
+    <div id="archiveCardFilterControls" class="archive-filter-controls" style="display: none;"> <input type="date" id="arcCardDateStart" title="Data od">
+        <input type="date" id="arcCardDateEnd" title="Data do">
+        <input type="text" id="arcCardClient" placeholder="Filtruj klienta...">
+        <input type="text" id="arcCardDoc" placeholder="Filtruj nr dok...">
     </div>
-</div>
 
+    <div class="table-container">
+        <table id="archiveCardTable" class="sortable-table">
+            <thead>
+                <tr>
+                    <th data-sort-key="data">Data ↕️</th>
+                    <th data-sort-key="klient">Klient ↕️</th>
+                    <th data-sort-key="nrDok">Nr Dokumentu ↕️</th>
+                    <th data-sort-key="lekarz">Wystawił ↕️</th>
+                    <th class="col-akcje">Akcje</th>
+                </tr>
+            </thead>
+            <tbody id="archiveCardTableBody">
+                 <tr><td colspan="5" style="text-align: center; padding: 20px; color: #555;">Wybierz użytkownika, aby wczytać dane.</td></tr>
+            </tbody>
+        </table>
+    </div>
+    
+    <div id="archiveCardListContainer" style="display: none;"></div>
+</div>
 <div id="archiwumParagonySection" style="display: none; padding: 0 20px;">
     <h2>🧾 Archiwum Paragonów</h2>
-    <div id="archiveReceiptFilterControls" style="margin-bottom: 20px; border-bottom: 1px solid #eee; padding-bottom: 15px;">
-         <div class="form-row">
+    
+    <div style="margin-bottom: 20px; border-bottom: 1px solid #eee; padding-bottom: 15px;">
+        <div class="form-row">
             <label for="archiveReceiptUserSelect">Wybierz użytkownika (lekarza):</label>
             <select id="archiveReceiptUserSelect" style="width:100%; padding:8px; font-size:16px;">
                 <option value="">Najpierw wczytaj użytkowników...</option>
@@ -1493,9 +1581,36 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
         <button id="loadArchiveReceiptUsersBtn" class="btn primary small" style="margin-top: 10px;">📥 Wczytaj Użytkowników</button>
     </div>
 
-    <div id="archiveReceiptListContainer">
-         <p style="text-align: center; color: #555;">Wybierz użytkownika, aby zobaczyć archiwum.</p>
+    <div id="archiveReceiptFilterControls" class="archive-filter-controls" style="display: none;"> <input type="date" id="arcReceiptDateStart" title="Data od">
+        <input type="date" id="arcReceiptDateEnd" title="Data do">
+        <input type="text" id="arcReceiptClient" placeholder="Filtruj klienta...">
+        <select id="arcReceiptStatus">
+            <option value="">Filtruj status...</option>
+            <option value="Zapłacone">Zapłacone</option>
+            <option value="Dług">Dług</option>
+            <option value="Nie wybrano">Nie wybrano</option>
+        </select>
     </div>
+
+    <div class="table-container">
+        <table id="archiveReceiptTable" class="sortable-table">
+            <thead>
+                <tr>
+                    <th data-sort-key="data">Data ↕️</th>
+                    <th data-sort-key="klient">Klient ↕️</th>
+                    <th data-sort-key="status">Status ↕️</th>
+                    <th data-sort-key="suma" data-sort-type="number">Suma ↕️</th>
+                    <th data-sort-key="lekarz">Wystawił ↕️</th>
+                    <th class="col-akcje">Akcje</th>
+                </tr>
+            </thead>
+            <tbody id="archiveReceiptTableBody">
+                <tr><td colspan="6" style="text-align: center; padding: 20px; color: #555;">Wybierz użytkownika, aby wczytać dane.</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div id="archiveReceiptListContainer" style="display: none;"></div>
 </div>
 
 <div id="archiveCardViewerModal" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.5); display: none; z-index: 10001; justify-content: center; align-items: center;">
@@ -5993,84 +6108,66 @@ if(loadArchiveUsersBtn) loadArchiveUsersBtn.addEventListener('click', loadArchiv
 /**
  * Pkt 6: Wczytuje karty dla wybranego UID lekarza
  */
+// ✅ ZMODYFIKOWANA FUNKCJA
 async function loadCardsForUser(lekarz_uid) {
-    if (!lekarz_uid) {
-        archiveCardListContainer.innerHTML = '<p style="text-align: center; color: #555;">Wybierz użytkownika, aby zobaczyć archiwum.</p>';
-        return;
-    }
-    
-    archiveCardListContainer.innerHTML = '<p style="text-align: center; color: #555;">Wczytywanie kart... ⏳</p>';
+    const tableBody = document.getElementById('archiveCardTableBody');
+    const filterControls = document.getElementById('archiveCardFilterControls');
+    
+    if (!lekarz_uid) {
+        tableBody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 20px; color: #555;">Wybierz użytkownika, aby zobaczyć archiwum.</td></tr>';
+        filterControls.style.display = 'none'; // Ukryj filtry
+        return;
+    }
+    
+    tableBody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 20px; color: #555;">Wczytywanie kart... ⏳</td></tr>';
+    filterControls.style.display = 'none'; // Ukryj filtry na czas ładowania
 
-    try {
-        const q = db.collection("archiwumKarty")
-            .where("lekarz_uid", "==", lekarz_uid)
-            .orderBy("createdAt", "desc"); // Najnowsze na górze
-            
-        const snapshot = await q.get();
-        
-        if (snapshot.empty) {
-            archiveCardListContainer.innerHTML = '<p style="text-align: center; color: #999;">Ten użytkownik nie ma jeszcze żadnych zapisanych kart.</p>';
-            return;
-        }
-        
-        // --- Grupowanie po kliencie (jak prosiłeś) ---
-        const cardsByClient = new Map();
-        snapshot.docs.forEach(doc => {
-            const card = { id: doc.id, ...doc.data() };
-            const clientName = card.klient_nazwa || "Klient nieznany";
-            
-            if (!cardsByClient.has(clientName)) {
-                cardsByClient.set(clientName, []);
-            }
-            cardsByClient.get(clientName).push(card);
-        });
-        
-        // --- Budowanie interfejsu (akordeon) ---
-        archiveCardListContainer.innerHTML = '';
-        
-        // Sortuj klientów alfabetycznie
-        const sortedClients = [...cardsByClient.keys()].sort((a, b) => a.localeCompare(b, 'pl'));
+    try {
+        const q = db.collection("archiwumKarty")
+            .where("lekarz_uid", "==", lekarz_uid)
+            .orderBy("createdAt", "desc"); // Najnowsze na górze
+            
+        const snapshot = await q.get();
+        
+        if (snapshot.empty) {
+            tableBody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 20px; color: #999;">Ten użytkownik nie ma jeszcze żadnych zapisanych kart.</td></tr>';
+            filterControls.style.display = 'none'; // Nie ma co filtrować
+            return;
+        }
+        
+        tableBody.innerHTML = ''; // Wyczyść tabelę
+        
+        snapshot.docs.forEach(doc => {
+            const card = { id: doc.id, ...doc.data() };
+            const tr = document.createElement('tr');
+            
+            // Zapisujemy dane do atrybutów data-* dla filtrowania i sortowania
+            tr.dataset.data = card.dataWykonania || '';
+            tr.dataset.klient = card.klient_nazwa || 'Klient nieznany';
+            tr.dataset.nrDok = card.nrDokumentu || 'Brak nr';
+            tr.dataset.lekarz = card.lekarz_nazwisko || 'Nieznany';
+            
+            tr.innerHTML = `
+                <td>${card.dataWykonania || 'Brak daty'}</td>
+                <td>${card.klient_nazwa || 'Klient nieznany'}</td>
+                <td>${card.nrDokumentu || 'Brak nr'}</td>
+                <td>${card.lekarz_nazwisko || 'Nieznany'}</td>
+                <td class="col-akcje">
+                    <button class="btn primary small btn-view-archived-card" data-card-id="${card.id}">Podgląd KL</button>
+                    <button class="btn warn small btn-delete-archived-card" data-card-id="${card.id}" data-card-nr="${card.nrDokumentu || 'Brak nr'}">Usuń</button>
+                </td>
+            `;
+            tableBody.appendChild(tr);
+        });
 
-        for (const clientName of sortedClients) {
-            const cards = cardsByClient.get(clientName);
-            
-            // Tworzymy element <details> (rozwijany) dla Klienta
-            const clientDetails = document.createElement('details');
-            clientDetails.className = 'archive-client-group';
-            clientDetails.innerHTML = `
-                <summary class="archive-client-summary">
-                    <strong>${clientName}</strong> (${cards.length} ${cards.length === 1 ? 'karta' : (cards.length < 5 ? 'karty' : 'kart')})
-                </summary>
-                <div class="archive-card-list">
-                                    </div>
-            `;
-            
-            const cardListDiv = clientDetails.querySelector('.archive-card-list');
-            
-           cards.forEach(card => {
-    const cardEl = document.createElement('div');
-    cardEl.className = 'archive-card-item';
+        // Pokaż filtry, gdy dane są gotowe
+        filterControls.style.display = 'grid';
 
-    // Poprawna, pojedyncza zawartość innerHTML
-    cardEl.innerHTML = `
-        <span>Nr: <strong>${card.nrDokumentu || 'Brak nr'}</strong></span>
-        <span>Data: ${card.dataWykonania || 'Brak daty'}</span>
-        <div style="display: flex; gap: 5px;">
-            <button class="btn primary small btn-view-archived-card" data-card-id="${card.id}">Podgląd KL</button>
-            <button class="btn warn small btn-delete-archived-card" data-card-id="${card.id}" data-card-nr="${card.nrDokumentu || 'Brak nr'}">Usuń</button>
-        </div>
-    `;
-
-    cardListDiv.appendChild(cardEl);
-});
-            
-            archiveCardListContainer.appendChild(clientDetails);
-        }
-
-    } catch (error) {
-        console.error(`Błąd wczytywania kart dla UID ${lekarz_uid}:`, error);
-        archiveCardListContainer.innerHTML = '<p style="text-align: center; color: red;">Wystąpił błąd podczas wczytywania kart.</p>';
-    }
+    } catch (error) {
+        console.error(`Błąd wczytywania kart dla UID ${lekarz_uid}:`, error);
+        tableBody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 20px; color: red;">Wystąpił błąd podczas wczytywania kart.</td></tr>';
+        filterControls.style.display = 'none';
+    }
 }
 // Listener dla zmiany lekarza w Archiwum
 if(archiveUserSelect) archiveUserSelect.addEventListener('change', () => {
@@ -6082,8 +6179,9 @@ if(archiveUserSelect) archiveUserSelect.addEventListener('change', () => {
  * Pkt 6: Logika podglądu zapisanej karty
  */
 // Używamy delegacji zdarzeń, bo przyciski są dynamiczne
-if (archiveCardListContainer) {
-    archiveCardListContainer.addEventListener('click', async (e) => {
+const archiveCardTableBody = document.getElementById('archiveCardTableBody');
+if (archiveCardTableBody) {
+    archiveCardTableBody.addEventListener('click', async (e) => {
         const target = e.target; // Cel kliknięcia
 
         // --- Logika Podglądu Karty ---
@@ -6339,89 +6437,80 @@ async function loadArchiveReceiptUsers() {
 if(loadArchiveReceiptUsersBtn) loadArchiveReceiptUsersBtn.addEventListener('click', loadArchiveReceiptUsers);
 
 // Wczytuje paragony dla wybranego lekarza
+// ✅ ZMODYFIKOWANA FUNKCJA
 async function loadReceiptsForUser(lekarz_uid) {
-    if (!lekarz_uid) {
-        archiveReceiptListContainer.innerHTML = '<p style="text-align: center; color: #555;">Wybierz użytkownika, aby zobaczyć archiwum.</p>';
-        return;
-    }
-    
-    archiveReceiptListContainer.innerHTML = '<p style="text-align: center; color: #555;">Wczytywanie paragonów... ⏳</p>';
+    const tableBody = document.getElementById('archiveReceiptTableBody');
+    const filterControls = document.getElementById('archiveReceiptFilterControls');
 
-    try {
-        const q = db.collection("archiwumParagony")
-            .where("lekarz_uid", "==", lekarz_uid)
-            .orderBy("createdAt", "desc");
-            
-        const snapshot = await q.get();
-        
-        if (snapshot.empty) {
-            archiveReceiptListContainer.innerHTML = '<p style="text-align: center; color: #999;">Ten użytkownik nie ma jeszcze żadnych zapisanych paragonów.</p>';
-            return;
-        }
-        
-        // Grupowanie po kliencie
-        const receiptsByClient = new Map();
-        snapshot.docs.forEach(doc => {
-            const receipt = { id: doc.id, ...doc.data() };
-            const clientName = receipt.klient || "Klient nieznany";
-            
-            if (!receiptsByClient.has(clientName)) {
-                receiptsByClient.set(clientName, []);
-            }
-            receiptsByClient.get(clientName).push(receipt);
-        });
-        
-        // Budowanie UI
-        archiveReceiptListContainer.innerHTML = '';
-        const sortedClients = [...receiptsByClient.keys()].sort((a, b) => a.localeCompare(b, 'pl'));
+    if (!lekarz_uid) {
+        tableBody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 20px; color: #555;">Wybierz użytkownika, aby zobaczyć archiwum.</td></tr>';
+        filterControls.style.display = 'none';
+        return;
+    }
+    
+    tableBody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 20px; color: #555;">Wczytywanie paragonów... ⏳</td></tr>';
+    filterControls.style.display = 'none';
 
-        for (const clientName of sortedClients) {
-            const receipts = receiptsByClient.get(clientName);
-            
-            const clientDetails = document.createElement('details');
-            clientDetails.className = 'archive-client-group';
-            clientDetails.innerHTML = `
-                <summary class="archive-client-summary">
-                    <strong>${clientName}</strong> (${receipts.length} ${receipts.length === 1 ? 'paragon' : (receipts.length < 5 ? 'paragony' : 'paragonów')})
-                </summary>
-                <div class="archive-card-list">
-                                    </div>
-            `;
-            
-            const receiptListDiv = clientDetails.querySelector('.archive-card-list');
-            
-            receipts.forEach(receipt => {
-                const receiptEl = document.createElement('div');
-                receiptEl.className = 'archive-card-item';
-                const statusColor = receipt.status === "Zapłacone" ? "green" : (receipt.status === "Dług" ? "red" : "inherit");
-                
-                receiptEl.innerHTML = `
-    <span>Data: <strong>${receipt.data || 'Brak daty'}</strong></span>
-    <span>Suma: ${formatPrice(receipt.suma)}</span>
-    <span style="color: ${statusColor}; font-weight: bold;">${receipt.status}</span>
-    <div style="display: flex; gap: 5px;">
-        <button class="btn primary small btn-view-archived-receipt" data-receipt-id="${receipt.id}">Podgląd</button>
-        <button class="btn warn small btn-delete-archived-receipt" data-receipt-id="${receipt.id}" data-receipt-info="${receipt.data} / ${receipt.klient}">Usuń</button>
-    </div>
-`;
-                receiptListDiv.appendChild(receiptEl);
-            });
-            
-            archiveReceiptListContainer.appendChild(clientDetails);
-        }
+    try {
+        const q = db.collection("archiwumParagony")
+            .where("lekarz_uid", "==", lekarz_uid)
+            .orderBy("createdAt", "desc");
+            
+        const snapshot = await q.get();
+        
+        if (snapshot.empty) {
+            tableBody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 20px; color: #999;">Ten użytkownik nie ma jeszcze żadnych zapisanych paragonów.</td></tr>';
+            filterControls.style.display = 'none';
+            return;
+        }
+        
+        tableBody.innerHTML = ''; // Wyczyść tabelę
+        
+        snapshot.docs.forEach(doc => {
+            const receipt = { id: doc.id, ...doc.data() };
+            const tr = document.createElement('tr');
+            
+            const statusColor = receipt.status === "Zapłacone" ? "green" : (receipt.status === "Dług" ? "red" : "#555");
+            const suma = parseFloat(receipt.suma) || 0;
+            
+            // Zapisujemy dane do atrybutów data-* dla filtrowania i sortowania
+            tr.dataset.data = receipt.data || '';
+            tr.dataset.klient = receipt.klient || 'Klient nieznany';
+            tr.dataset.status = receipt.status || 'Nie wybrano';
+            tr.dataset.suma = suma;
+            tr.dataset.lekarz = receipt.lekarz_nazwisko || 'Nieznany';
+            
+            tr.innerHTML = `
+                <td>${receipt.data || 'Brak daty'}</td>
+                <td>${receipt.klient || 'Klient nieznany'}</td>
+                <td style="color: ${statusColor}; font-weight: bold;">${receipt.status || 'Nie wybrano'}</td>
+                <td style="text-align: right;">${formatPrice(suma)}</td>
+                <td>${receipt.lekarz_nazwisko || 'Nieznany'}</td>
+                <td class="col-akcje">
+                    <button class="btn primary small btn-view-archived-receipt" data-receipt-id="${receipt.id}">Podgląd</button>
+                    <button class="btn warn small btn-delete-archived-receipt" data-receipt-id="${receipt.id}" data-receipt-info="${receipt.data} / ${receipt.klient}">Usuń</button>
+                </td>
+            `;
+            tableBody.appendChild(tr);
+        });
 
-    } catch (error) {
-        console.error(`Błąd wczytywania paragonów dla UID ${lekarz_uid}:`, error);
-        archiveReceiptListContainer.innerHTML = '<p style="text-align: center; color: red;">Wystąpił błąd podczas wczytywania paragonów.</p>';
-    }
+        // Pokaż filtry
+        filterControls.style.display = 'grid';
+
+    } catch (error) {
+        console.error(`Błąd wczytywania paragonów dla UID ${lekarz_uid}:`, error);
+        tableBody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 20px; color: red;">Wystąpił błąd podczas wczytywania paragonów.</td></tr>';
+        filterControls.style.display = 'none';
+    }
 }
 if(archiveReceiptUserSelect) archiveReceiptUserSelect.addEventListener('change', () => {
     loadReceiptsForUser(archiveReceiptUserSelect.value);
 });
 
 // Podgląd Paragonu (użyjemy zwykłego alert() dla prostoty)
-if (archiveReceiptListContainer) {
-    archiveReceiptListContainer.addEventListener('click', async (e) => {
+const archiveReceiptTableBody = document.getElementById('archiveReceiptTableBody');
+if (archiveReceiptTableBody) {
+    archiveReceiptTableBody.addEventListener('click', async (e) => {
         const target = e.target; // Cel kliknięcia
 
         // --- Logika Podglądu Paragonu ---
@@ -6481,5 +6570,206 @@ if (archiveReceiptListContainer) {
 }
 /* ✅ KONIEC: Moduł 7 - Logika wczytywania Archiwum */
 /* ⬆️ ======================================================= ⬆️ */
+/* Plik: index.html (wklej na samym końcu bloku <script>) */
+
+// ========================================================
+// ✅ NOWA LOGIKA: FILTROWANIE I SORTOWANIE ARCHIWÓW
+// ========================================================
+
+/**
+ * Główna funkcja do filtrowania tabeli Archiwum Kart
+ */
+function applyCardFilters() {
+    const tableBody = document.getElementById('archiveCardTableBody');
+    if (!tableBody) return;
+
+    // Pobierz wartości filtrów
+    const dateStart = document.getElementById('arcCardDateStart').value;
+    const dateEnd = document.getElementById('arcCardDateEnd').value;
+    const client = document.getElementById('arcCardClient').value.toLowerCase();
+    const docNum = document.getElementById('arcCardDoc').value.toLowerCase();
+
+    // Przekształć daty na liczby (timestamp) dla łatwego porównania
+    // Ustaw czas na 00:00:00 dla daty początkowej
+    const timeStart = dateStart ? new Date(dateStart).setHours(0, 0, 0, 0) : 0;
+    // Ustaw czas na 23:59:59 dla daty końcowej
+    const timeEnd = dateEnd ? new Date(dateEnd).setHours(23, 59, 59, 999) : Infinity;
+
+    // Iteruj przez każdy wiersz tabeli
+    for (const row of tableBody.rows) {
+        let isVisible = true;
+        
+        // 1. Filtr Daty
+        const rowDateStr = row.dataset.data;
+        if (rowDateStr) {
+            const rowTime = new Date(rowDateStr).getTime();
+            if (rowTime < timeStart || rowTime > timeEnd) {
+                isVisible = false;
+            }
+        } else if (timeStart > 0 || timeEnd < Infinity) {
+             isVisible = false; // Ukryj wiersze bez daty, jeśli filtr dat jest aktywny
+        }
+
+        // 2. Filtr Klienta (jeśli wciąż widoczny)
+        if (isVisible && client) {
+            if (!row.dataset.klient.toLowerCase().includes(client)) {
+                isVisible = false;
+            }
+        }
+        
+        // 3. Filtr Nr Dokumentu (jeśli wciąż widoczny)
+        if (isVisible && docNum) {
+            if (!row.dataset.nrDok.toLowerCase().includes(docNum)) {
+                isVisible = false;
+            }
+        }
+
+        // Pokaż lub ukryj wiersz
+        row.style.display = isVisible ? '' : 'none';
+    }
+}
+
+/**
+ * Główna funkcja do filtrowania tabeli Archiwum Paragonów
+ */
+function applyReceiptFilters() {
+    const tableBody = document.getElementById('archiveReceiptTableBody');
+    if (!tableBody) return;
+
+    // Pobierz wartości filtrów
+    const dateStart = document.getElementById('arcReceiptDateStart').value;
+    const dateEnd = document.getElementById('arcReceiptDateEnd').value;
+    const client = document.getElementById('arcReceiptClient').value.toLowerCase();
+    const status = document.getElementById('arcReceiptStatus').value; // Bez toLowerCase(), musi pasować dokładnie
+
+    const timeStart = dateStart ? new Date(dateStart).setHours(0, 0, 0, 0) : 0;
+    const timeEnd = dateEnd ? new Date(dateEnd).setHours(23, 59, 59, 999) : Infinity;
+
+    for (const row of tableBody.rows) {
+        let isVisible = true;
+        
+        // 1. Filtr Daty
+        const rowDateStr = row.dataset.data;
+        if (rowDateStr) {
+            const rowTime = new Date(rowDateStr).getTime();
+            if (rowTime < timeStart || rowTime > timeEnd) {
+                isVisible = false;
+            }
+        } else if (timeStart > 0 || timeEnd < Infinity) {
+             isVisible = false;
+        }
+
+        // 2. Filtr Klienta
+        if (isVisible && client) {
+            if (!row.dataset.klient.toLowerCase().includes(client)) {
+                isVisible = false;
+            }
+        }
+        
+        // 3. Filtr Statusu
+        if (isVisible && status) {
+            if (row.dataset.status !== status) {
+                isVisible = false;
+            }
+        }
+
+        row.style.display = isVisible ? '' : 'none';
+    }
+}
+
+/**
+ * Generyczna funkcja do sortowania tabeli
+ * @param {HTMLTableElement} table - Tabela do posortowania
+ * @param {HTMLTableCellElement} th - Nagłówek (th), który został kliknięty
+ */
+function sortTable(table, th) {
+    const tableBody = table.tBodies[0];
+    const rows = Array.from(tableBody.rows);
+    const sortKey = th.dataset.sortKey;
+    const sortType = th.dataset.sortType || 'string'; // Domyślnie sortuj jako tekst
+
+    // Sprawdź kierunek sortowania (zapisany w nagłówku)
+    let dir = th.dataset.sortDir === 'asc' ? 'desc' : 'asc';
+    th.dataset.sortDir = dir;
+
+    // Wyczyść kierunek na innych nagłówkach
+    for (const otherTh of th.parentElement.cells) {
+        if (otherTh !== th) {
+            delete otherTh.dataset.sortDir;
+        }
+    }
+
+    const direction = dir === 'asc' ? 1 : -1;
+
+    // Sortuj tablicę wierszy
+    const sortedRows = rows.sort((a, b) => {
+        let valA = a.dataset[sortKey] || '';
+        let valB = b.dataset[sortKey] || '';
+        
+        switch(sortType) {
+            case 'number':
+                valA = parseFloat(valA) || 0;
+                valB = parseFloat(valB) || 0;
+                break;
+            case 'date':
+                valA = new Date(valA).getTime() || 0;
+                valB = new Date(valB).getTime() || 0;
+                break;
+            default: // string
+                valA = valA.toLowerCase();
+                valB = valB.toLowerCase();
+                break;
+        }
+
+        if (valA < valB) return -1 * direction;
+        if (valA > valB) return 1 * direction;
+        return 0;
+    });
+
+    // Wstaw posortowane wiersze z powrotem do tabeli
+    tableBody.innerHTML = '';
+    tableBody.append(...sortedRows);
+}
+
+
+/**
+ * Podłącza wszystkie listenery do filtrów i sortowania
+ */
+function setupArchiveEventListeners() {
+    // === Filtrowanie Kart ===
+    const cardFilters = ['arcCardDateStart', 'arcCardDateEnd', 'arcCardClient', 'arcCardDoc'];
+    cardFilters.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.addEventListener('input', applyCardFilters);
+        }
+    });
+
+    // === Filtrowanie Paragonów ===
+    const receiptFilters = ['arcReceiptDateStart', 'arcReceiptDateEnd', 'arcReceiptClient', 'arcReceiptStatus'];
+    receiptFilters.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            // Użyj 'change' dla <select> i <input type="date">, 'input' dla <input type="text">
+            const eventType = (el.tagName === 'SELECT' || el.type === 'date') ? 'change' : 'input';
+            el.addEventListener(eventType, applyReceiptFilters);
+        }
+    });
+
+    // === Sortowanie (obie tabele) ===
+    document.querySelectorAll('.sortable-table th[data-sort-key]').forEach(th => {
+        th.addEventListener('click', () => {
+            const table = th.closest('.sortable-table');
+            sortTable(table, th);
+        });
+    });
+}
+
+// Uruchom podłączenie listenerów po załadowaniu strony
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', setupArchiveEventListeners);
+} else {
+    setupArchiveEventListeners();
+}
 </script> </body>
 </html>
