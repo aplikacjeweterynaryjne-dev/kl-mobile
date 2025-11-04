@@ -1109,10 +1109,11 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
 <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
 <label style="margin:0; font-weight:600;">Wybierz wiersz</label>
 <select id="formRowSelect" style="flex:1; padding:8px; border-radius:6px; border:1px solid #ccc;"></select>
-<div style="display:flex; gap:6px;">
-<button id="prevRow" class="btn small">◀</button>
-<button id="nextRow" class="btn small">▶</button>
 </div>
+
+<div style="display: flex; justify-content: space-between; margin-bottom: 12px; margin-top: 12px;">
+    <button id="prevRow" class="btn small">◀</button>
+    <button id="nextRow" class="btn small">▶</button>
 </div>
 
 <div class="form-row">
@@ -2254,7 +2255,31 @@ document.getElementById('formDawkowanie').value = tekstDawkowania;
 
 document.getElementById('formKarencja').value = row.cells[7].textContent.trim();
 }
+// ✅ START: KOD DLA WNIOSKU 4 - DYNAMICZNY TYTUŁ
+                const titleEl = document.getElementById('formRowTitle');
+                if (titleEl) {
+                    let titleText = '';
+                    if (logicalIndex >= 0 && logicalIndex <= 8) {
+                        // Wiersze 1-9 (indeks 0-8)
+                        titleText = `Jesteś w wierszu nr ${logicalIndex + 1}`;
+                    } else if (logicalIndex === 9) {
+                        // Wiersz 10 (indeks 9)
+                        titleText = 'Jesteś w produktach pozostawionych wiersz nr 1';
+                    } else if (logicalIndex === 10) {
+                        // Wiersz 11 (indeks 10)
+                        titleText = 'Jesteś w produktach pozostawionych wiersz nr 2';
+                    } else if (logicalIndex === 11) {
+                        // Wiersz 12 (indeks 11) - Ostatni edytowalny wiersz
+                        titleText = 'Jesteś w produktach pozostawionych wiersz nr 3';
+                    } else {
+                        // Fallback, gdyby było więcej wierszy
+                        titleText = `Jesteś w wierszu nr ${logicalIndex + 1}`;
+                    }
+                    titleEl.textContent = titleText;
+                }
+                // ✅ KONIEC: KOD DLA WNIOSKU 4
 
+} // <-- To jest nawias zamykający funkcję, wklej kod POWYŻEJ niego
 /* ---- po wyborze produktu w formularzu automatycznie uzupełnij seria/dawkowanie/karencja ---- */
 document.getElementById('formLek').addEventListener('input', function(){
 const n = this.value;
