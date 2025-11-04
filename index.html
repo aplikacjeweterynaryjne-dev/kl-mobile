@@ -1284,8 +1284,9 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
     </button>
   </div>
 </div>
-<div style="text-align: right; margin-top: 20px;">
-<button id="saveReceiptBtn" class="btn primary">Zapisz Paragon</button>
+<div style="text-align: right; margin-top: 20px; display: flex; justify-content: flex-end; gap: 8px;">
+    <button id="roundTotalBtn" class="btn small" style="background-color: #f0f0f0;">Zaokrąglij sumę (do 10)</button>
+    <button id="saveReceiptBtn" class="btn primary">Zapisz Paragon</button>
 </div>
 </div>
 
@@ -3552,9 +3553,9 @@ receiptDisplay.appendChild(totalDiv);
 function addItemToReceipt(productName, quantity) {
 // Upewnij się, że quantity jest liczbą
 const numQuantity = Number(quantity) || 0;
-if (numQuantity <= 0) return; // Nie dodawaj jeśli ilość jest zerowa lub niepoprawna
+const price = (priceOverride !== null) ? priceOverride : (mapaCen[productName] || 0);
 
-const price = mapaCen[productName] || 0; // Pobierz cenę z mapy
+    const existingItem = receiptItems.find(item => item.name === productName)
 
 const existingItem = receiptItems.find(item => item.name === productName);
 if (existingItem) {
@@ -3739,6 +3740,29 @@ if (saveReceiptBtn) {
     if (paymentStatusPaidBtn) paymentStatusPaidBtn.classList.remove('active');
     if (paymentStatusDebtBtn) paymentStatusDebtBtn.classList.remove('active');
   });
+}
+    /* ⬇️ WKLEJ TEN BLOK (Zadanie 1) ⬇️ */
+// --- Listener dla przycisku Zaokrąglij Sumę ---
+const roundTotalBtn = document.getElementById('roundTotalBtn');
+if (roundTotalBtn) {
+    roundTotalBtn.addEventListener('click', () => {
+        // 1. Usuń poprzednie zaokrąglenie, jeśli istnieje
+        receiptItems = receiptItems.filter(item => item.name !== "Wyrównanie");
+        
+        // 2. Przelicz sumę na nowo (po usunięciu)
+        renderReceipt();
+        
+        // 3. Oblicz różnicę
+        const currentTotal = receiptTotal;
+        const roundedTotal = Math.ceil(currentTotal / 10) * 10;
+        const difference = roundedTotal - currentTotal;
+
+        // 4. Dodaj "Wyrównanie" tylko jeśli jest dodatnie
+        if (difference > 0) {
+            // Używamy zmodyfikowanej funkcji, aby dodać produkt z własną ceną
+            addItemToReceipt("Wyrównanie", 1, difference);
+        }
+    });
 }
 /* Plik: index.html (wklej ok. linii 1527) */
 
