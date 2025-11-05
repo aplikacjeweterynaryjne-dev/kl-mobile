@@ -641,10 +641,58 @@ background: #a93226;
         visibility: visible !important;
         overflow: visible !important; /* TO JEST KLUCZOWE: usuwa scrollbar */
         height: auto !important;     /* TO JEST KLUCZOWE: pozwala treści się rozwinąć */
-        flex: none !important;       /* Wyłącza flex, który ograniczał wysokość */
+     flex: none !important;       /* Wyłącza flex, który ograniczał wysokość */
         padding: 0 !important;
         transform: none !important; /* Usuwa jakiekolwiek skalowanie z poprzednich prób */
     }
+
+    /* --- Logika drukowania Raportów --- */
+    /* Kiedy sekcja raportów ma klasę .print-mode, staje się jedyną widoczną rzeczą */
+    
+    body > *:not(#raportySection.print-mode) {
+        display: none !important;
+        visibility: hidden !important;
+    }
+
+    #raportySection.print-mode {
+        display: block !important;
+        visibility: visible !important;
+        position: static !important;
+        width: 100% !important;
+        height: auto !important;
+        background: none !important;
+        padding: 0 !important; /* Usuń padding sekcji */
+    }
+
+    /* Ukryj kontrolki (filtry) podczas drukowania */
+    #raportySection.print-mode .report-controls {
+        display: none !important;
+    }
+    
+    /* Ukryj przycisk "Drukuj" */
+    #raportySection.print-mode #printReportBtn {
+        display: none !important;
+    }
+    
+    /* Ukryj pole "koszty paliwa" */
+    #raportySection.print-mode #reportFuelSection {
+        display: none !important;
+    }
+    
+    /* Ukryj sumę NETTO (zostaw tylko sumę brutto) */
+    #raportySection.print-mode #reportNetSum {
+        display: none !important;
+    }
+    #raportySection.print-mode #reportNetSum::before {
+        content: "" !important; /* Ukryj znak "=" */
+    }
+    
+    /* Usuń tło z podsumowania */
+    #raportySection.print-mode .report-summary-header div {
+        background: none !important;
+        padding: 0 !important;
+        border: none !important;
+    }
 /* ⬆️ KONIEC KODU DO WKLEJENIA ⬆️ */
 }
     /* Plik: index.html (wklej ok. linii 335) */
@@ -758,9 +806,59 @@ background: #a93226;
 
 /* Klasa do ukrywania wierszy przez filtr */
 .filter-hidden {
-    display: none;
+    display: none;
 }
 /* ✅ KONIEC: Moduł 7 - Style dla Archiwum */
+/* ⬆️ ======================================================= ⬆️ */
+
+
+/* ⬇️ ======================================================= ⬇️ */
+/* ✅ POCZĄTEK: Style dla sekcji Raportów                   */
+
+#raportySection {
+    padding-bottom: 100px; /* Dodatkowy margines na dole */
+}
+
+.report-controls {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 15px;
+    padding: 15px;
+    background-color: #f9f9f9;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+}
+.report-controls .form-row {
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.report-controls label {
+    font-size: 14px;
+    font-weight: 600;
+}
+.report-controls input,
+.report-controls select {
+    padding: 8px;
+    font-size: 16px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    box-sizing: border-box;
+}
+
+/* Styl dla kolumny "Zużycia" w tabeli raportów */
+#reportWizytyTable .col-zuzycia ul {
+    margin: 0;
+    padding-left: 18px; /* Małe wcięcie dla listy */
+    font-size: 12px;
+    color: #333;
+}
+#reportWizytyTable .col-zuzycia li {
+    margin-bottom: 2px;
+}
+
+/* ✅ KONIEC: Style dla sekcji Raportów                     */
 /* ⬆️ ======================================================= ⬆️ */
 
 </style>
@@ -1666,7 +1764,115 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
 
     <div id="archiveReceiptListContainer" style="display: none;"></div>
 </div>
+<div id="raportySection" style="display: none; padding: 0 20px;">
+    <h2>📊 Raporty</h2>
 
+    <div class="report-controls">
+        <div class="form-row">
+            <label for="reportTypeSelect">1. Wybierz typ raportu:</label>
+            <select id="reportTypeSelect" style="width:100%; padding:8px; font-size:16px;">
+                <option value="">--- Wybierz ---</option>
+                <option value="gotowka">1. Raport przyjętej gotówki</option>
+                <option value="ogolny">2. Raport ogólny (wszystkie wizyty)</option>
+                <option value="dluznicy">3. Raport dłużników</option>
+                <option value="zuzycia">4. Raport zużycia produktów</option>
+            </select>
+        </div>
+
+        <div class="form-row">
+            <label for="reportDateStart">2. Data od:</label>
+            <input type="date" id="reportDateStart" title="Data od">
+        </div>
+        <div class="form-row">
+            <label for="reportDateEnd">3. Data do:</label>
+            <input type="date" id="reportDateEnd" title="Data do">
+        </div>
+
+        <div class="form-row">
+            <label for="reportUserSelect">4. Pracownik (Lekarz):</label>
+            <select id="reportUserSelect" style="width:100%; padding:8px; font-size:16px;">
+                <option value="">Wczytywanie użytkowników...</option>
+                </select>
+        </div>
+
+        <div class="form-row">
+            <label for="reportClientSelect">5. Klient:</label>
+            <select id="reportClientSelect" style="width:100%; padding:8px; font-size:16px;">
+                <option value="">Wczytywanie klientów...</option>
+                </select>
+        </div>
+        
+        <div class="form-row" style="grid-column: 1 / -1; display: flex; gap: 10px; align-items: flex-end; margin-top: 10px;">
+            <button id="generateReportBtn" class="btn primary" style="font-size: 16px; padding: 10px 15px;">Generuj Raport</button>
+            <button id="printReportBtn" class="btn" style="font-size: 16px; padding: 10px 15px; display: none;">🖨️ Drukuj Raport</button>
+        </div>
+    </div>
+
+    <hr style="margin: 20px 0;">
+
+    <div id="reportResultArea" style="display: none;">
+        
+        <div class="report-summary-header">
+            <h3 id="reportMainTitle" style="font-size: 20px; margin-bottom: 5px;">Raport Wizyt</h3>
+            <p id="reportDateDisplay" style="font-size: 15px; margin: 0;">Raport zawiera wizyty od: -- do: --</p>
+            <p id="reportUserDisplay" style="font-size: 15px; margin: 0;">Pracownik: --</p>
+            
+            <div style="margin-top: 15px; padding: 10px; background: #f7f7f7; border-radius: 8px;">
+                <h4 id="reportSumTitle" style="margin: 0 0 5px 0;">Suma przyjętej gotówki:</h4>
+                <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center; font-size: 18px; font-weight: bold;">
+                    <span id="reportCalculatedSum" style="color: #27ae60; font-size: 22px;">0,00 zł</span>
+                    
+                    <span id="reportFuelSection" style="display: flex; align-items: center; gap: 5px;">
+                        <label for="reportFuelCost" style="font-size: 14px; font-weight: normal; margin-left: 10px;">- koszty (np. paliwo):</label>
+                        <input type="number" id="reportFuelCost" value="0" style="width: 80px; padding: 5px; font-size: 16px;">
+                        <span>zł</span>
+                    </span>
+                    
+                    <span style="margin-left: 10px; border-top: 2px solid #333; padding-top: 5px;">
+                        = <span id="reportNetSum" style="color: #2b74e4; font-size: 22px;">0,00 zł</span>
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <div id="reportWizytyTableContainer" class="table-container" style="margin-top: 15px; display: none;">
+            <table id="reportWizytyTable" class="sortable-table">
+                <thead>
+                    <tr>
+                        <th data-sort-key="klient">Imię i Nazwisko klienta</th>
+                        <th data-sort-key="data">Data</th>
+                        <th data-sort-key="czynnosci">Czynność</th>
+                        <th>Zużycia (Produkty)</th>
+                        <th data-sort-key="suma" data-sort-type="number">Suma</th>
+                        <th data-sort-key="status">Płatność</th>
+                        <th data-sort-key="notatka">Notatka</th>
+                    </tr>
+                </thead>
+                <tbody id="reportWizytyTableBody">
+                    </tbody>
+            </table>
+        </div>
+
+        <div id="reportZuzyciaTableContainer" class="table-container" style="margin-top: 15px; display: none;">
+            <table id="reportZuzyciaTable" class="sortable-table">
+                <thead>
+                    <tr>
+                        <th data-sort-key="produkt">Produkt</th>
+                        <th data-sort-key="ilosc" data-sort-type="number">Łączna ilość (suma zużyć)</th>
+                    </tr>
+                </thead>
+                <tbody id="reportZuzyciaTableBody">
+                    </tbody>
+            </table>
+        </div>
+
+    </div>
+
+    <div id="report-placeholder" style="text-align: center; padding: 40px; color: #777;">
+        <p>Wybierz filtry i kliknij "Generuj Raport", aby zobaczyć wyniki.</p>
+    </div>
+
+</div>
 <div id="archiveCardViewerModal" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.5); display: none; z-index: 10001; justify-content: center; align-items: center;">
    <div style="width: 100%; height: 100%; background: white; border-radius: 0; box-shadow: none; display: flex; flex-direction: column;">
 <div style="padding: 10px 15px; border-bottom: 1px solid #ccc; display: flex; justify-content: space-between; align-items: center;">
@@ -3866,6 +4072,7 @@ if (pluCodeInput) pluCodeInput.value = '';
 }
 });
 }
+
     // ✅ Moduł 2: Logika przełączania statusu płatności
 if (paymentStatusPaidBtn && paymentStatusDebtBtn) {
     paymentStatusPaidBtn.addEventListener('click', () => {
