@@ -95,12 +95,18 @@ td[contenteditable="true"] { background: #fefefe; }
     font-weight: bold;
 }
 
-/* Powiększenie dla nazwy lecznicy i adresu klienta */
+/* Powiększenie dla nazwy lecznicy i adresu klienta (w generatorze i archiwum) */
 #nazwaLecznicy,
-#adresKlienta {
-    font-size: 14px; /* +2px (domyślnie było 12px) */
+#adresKlienta,
+#archive_nazwaLecznicy,
+#archive_adresKlienta,
+#archive_nrStada,
+#archive_klient,
+#archive_nrDokumentu,
+#archive_dataWykonania,
+#archive_dataZgloszenia {
+    font-size: 14px; /* +2px (domyślnie było 12px) */
 }
-
 .small-input { width: 40px; display: inline-block; margin-right: 3px; }
 .center-text { text-align: center; }
 
@@ -1289,7 +1295,7 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
 <div class="form-row" style="margin-top: 15px;">
     <label for="calcNotatkaInput">Notatka:</label>
     <textarea id="calcNotatkaInput" placeholder="Dodatkowe uwagi do paragonu..." style="min-height: 60px; font-size: 16px;"></textarea>
-</div> <p id="receiptError" style="color: #c0392b; font-size: 16px; text-align: right; display: none; margin: 10px 0; font-weight: bold;"></p>
+</div>
 <div style="text-align: right; margin-top: 20px; display: flex; justify-content: flex-end; gap: 8px;">
     <button id="roundTotalBtn" class="btn small" style="background-color: #f0f0f0;">Zaokrąglij sumę (do 10)</button>
     <button id="saveReceiptBtn" class="btn primary">Zapisz Paragon</button>
@@ -1679,24 +1685,30 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
 <div id="archiveCardContent" style="flex: 1; overflow: auto; padding: 15px; background: #f4f4f4;">
     <h2 style="text-align: center; font-size: 15px; text-transform: uppercase; margin-bottom: 10px;">KARTA LECZENIA ZWIERZĄT GOSPODARSKICH ORAZ ZWIERZĄT, Z KTÓRYCH POZYSKANE TKANKI LUB PRODUKTY SĄ PRZEZNACZONE DO SPOŻYCIA PRZEZ LUDZI / EWIDENCJA LECZENIA ZWIERZĄT</h2>
 
-    <div class="top-section" id="archive_topSection">
-        <div>
-            <b>Nazwa i adres zakładu leczniczego dla zwierząt:</b><br>
-            <span id="archive_nazwaLecznicy"></span><br>
-            <b>Wykonanie czynności lekarsko-weterynaryjnych dnia:</b>
-            <span id="archive_dataWykonania" style="font-weight: bold;"></span><br>
-            <b>Nr stada:</b> <span id="archive_nrStada" style="font-weight: bold;"></span>
-        </div>
-        <div>
-            <b>Imię, nazwisko i adres albo nazwa siedziby i adres posiadacza zwierzęcia:</b><br>
-            <span id="archive_klient" style="font-weight: bold;"></span><br>
-            <span id="archive_adresKlienta"></span>
-        </div>
-        <div>
-            <b>Zgłoszenie:</b> Data: <span id="archive_dataZgloszenia"></span><br>
-            <b>Nr dokumentu:</b> <span id="archive_nrDokumentu" style="font-weight: bold;"></span>
-        </div>
-    </div>
+<div class="top-section" id="archive_topSection">
+        <div>
+            Nazwa i adres zakładu leczniczego dla zwierząt:<br>
+                        <b><span id="archive_nazwaLecznicy"></span></b><br>
+            <br>
+            
+            Wykonanie czynności lekarsko-weterynaryjnych dnia:
+            <b id="archive_dataWykonania"></b><br>             <br>
+            Nr stada: <b><span id="archive_nrStada"></span></b>
+        </div>
+        <div>
+            Imię, nazwisko i adres albo nazwa siedziby i adres posiadacza zwierzęcia:<br>
+            <b><span id="archive_klient"></span></b><br>
+
+            <br>
+            <b><span id="archive_adresKlienta"></span></b>
+        </div>
+        <div>
+            Zgłoszenie: Data: <b><span id="archive_dataZgloszenia"></span></b><br>             
+            <br>
+            
+            Nr dokumentu: <b><span id="archive_nrDokumentu"></span></b>
+        </div>
+    </div>
 
     <div class="table-container">
         <table id="archive_karta"> <thead>
@@ -3451,7 +3463,6 @@ const savedReceiptSummary = document.getElementById('savedReceiptSummary');
 const pluCodeInput = document.getElementById('pluCodeInput');
 const pluBtn = document.getElementById('pluBtn');
 const productUnitDisplay = document.getElementById('productUnitDisplay');
-const receiptError = document.getElementById('receiptError');
 // Tablica przechowuje teraz { name: '...', quantity: 1, price: 10.50 }
     // ✅ Moduł 2: Zmienne statusu płatności
 const paymentStatusSection = document.getElementById('paymentStatusSection');
@@ -3658,30 +3669,11 @@ if (copyCheckbox) {
 
 // Zapisywanie paragonu
 if (saveReceiptBtn) {
-  saveReceiptBtn.addEventListener('click', async () => { // Zmieniono na async
-    
-    // Ukryj stary błąd przy każdej próbie zapisu
-    if (receiptError) receiptError.style.display = 'none';
-
-    // ⬇️ NOWA WALIDACJA STATUSU PŁATNOŚCI ⬇️
-    const isStatusSelected = paymentStatusPaidBtn.classList.contains('active') || paymentStatusDebtBtn.classList.contains('active');
-
-    if (!isStatusSelected) {
-        if (receiptError) {
-            receiptError.textContent = 'Paragon nie zapisany! Wybierz status płatności!';
-            receiptError.style.display = 'block';
-        } else {
-            // Awaryjny alert, gdyby coś poszło nie tak
-            alert('Paragon nie zapisany! Wybierz status płatności!');
-        }
-        return; // Zatrzymaj dalsze wykonywanie funkcji
+  saveReceiptBtn.addEventListener('click', async () => { // Zmieniono na async
+    if (receiptItems.length === 0) {
+      alert('Paragon jest pusty, nie ma czego zapisywać.');
+      return;
     }
-    // ⬆️ KONIEC NOWEJ WALIDACJI ⬆️
-
-    if (receiptItems.length === 0) {
-      alert('Paragon jest pusty, nie ma czego zapisywać.');
-      return;
-    }
 
     // --- 1. Pobranie danych do zapisu ---
     let statusText = "Nie wybrano statusu";
