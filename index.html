@@ -6933,8 +6933,56 @@ if (archiveReceiptTableBody) {
                 }
             }
         }
+        else if (target.classList.contains('btn-pay-debt')) {
+            const receiptId = target.dataset.receiptId;
+            const klient = target.dataset.receiptKlient;
+            const suma = parseFloat(target.dataset.receiptSuma) || 0;
+            
+            if (confirm(`Czy na pewno chcesz spłacić dług dla: ${klient} (Suma: ${formatPrice(suma)})?\n\nStatus zostanie zmieniony na "Zapłacone", a data zaktualizowana.`)) {
+                
+                target.disabled = true;
+                target.textContent = '...';
+                
+                const today = new Date().toISOString().split('T')[0];
+                
+                const updateData = {
+                    status: "Zapłacone",
+                    data: today, // Aktualizuj datę paragonu na datę spłaty
+                    paymentNote: "**Spłata Długu**" // Dodaj notatkę
+                };
+                
+                try {
+                    // Zaktualizuj bazę danych
+                    await db.collection("archiwumParagony").doc(receiptId).update(updateData);
+                    
+                    // Zaktualizuj tabelę w widoku (bez przeładowania)
+                    const tr = target.closest('tr');
+                    if (tr) {
+                        // Aktualizuj komórkę Daty (indeks 0)
+                        tr.cells[0].textContent = today;
+                        tr.dataset.data = today;
+                        
+                        // Aktualizuj komórkę Statusu (indeks 4)
+                        tr.cells[4].textContent = "Zapłacone";
+                        tr.cells[4].style.color = "green";
+                        tr.dataset.status = "Zapłacone";
+                    }
+                    
+                    // Ukryj przycisk "Zapłać"
+                    target.style.display = 'none';
+                    alert('Dług został pomyślnie spłacony.');
+
+                } catch (error) {
+                    console.error("Błąd podczas spłaty długu:", error);
+                    alert("Wystąpił błąd. Spróbuj ponownie.");
+                    target.disabled = false;
+                    target.textContent = 'Zapłać';
+                }
+            }
+        }
     });
 }
+    
 /* ✅ KONIEC: Moduł 7 - Logika wczytywania Archiwum */
 /* ⬆️ ======================================================= ⬆️ */
 /* Plik: index.html (wklej na samym końcu bloku <script>) */
