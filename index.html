@@ -846,7 +846,11 @@ background: #a93226;
     border-radius: 6px;
     box-sizing: border-box;
 }
-
+/* ⬇️ NOWA REGUŁA DLA PRZEWIJALNYCH TABEL ⬇️ */
+#reportWizytyTable th, #reportWizytyTable td,
+#reportZuzyciaTable th, #reportZuzyciaTable td {
+    white-space: nowrap; /* Zapobiega zawijaniu tekstu */
+}
 /* Styl dla kolumny "Zużycia" w tabeli raportów */
 #reportWizytyTable .col-zuzycia ul {
     margin: 0;
@@ -1795,11 +1799,11 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
                 </select>
         </div>
 
-        <div class="form-row">
-            <label for="reportClientSelect">5. Klient:</label>
-            <select id="reportClientSelect" style="width:100%; padding:8px; font-size:16px;">
-                <option value="">Wczytywanie klientów...</option>
-                </select>
+       <div class="form-row">
+            <label for="reportClientInput">5. Klient:</label>
+            <input id="reportClientInput" list="reportClientDatalist" placeholder="Wpisz lub wybierz klienta..." style="width:100%; padding:8px; font-size:16px; border:1px solid #ccc; border-radius:6px; box-sizing:border-box;">
+            <datalist id="reportClientDatalist">
+                </datalist>
         </div>
         
         <div class="form-row" style="grid-column: 1 / -1; display: flex; gap: 10px; align-items: flex-end; margin-top: 10px;">
@@ -7492,7 +7496,7 @@ const reportTypeSelect = document.getElementById('reportTypeSelect');
 const reportDateStart = document.getElementById('reportDateStart');
 const reportDateEnd = document.getElementById('reportDateEnd');
 const reportUserSelect = document.getElementById('reportUserSelect');
-const reportClientSelect = document.getElementById('reportClientSelect');
+const reportClientInput = document.getElementById('reportClientInput'); // ZMIENIONO z reportClientSelect
 const generateReportBtn = document.getElementById('generateReportBtn');
 const printReportBtn = document.getElementById('printReportBtn');
 
@@ -7601,43 +7605,55 @@ async function loadReportUsers() {
 /**
  * Wczytuje klientów do listy <select> w raportach.
  */
+/**
+ * Wczytuje klientów do listy <datalist> w raportach.
+ */
 async function loadReportClients() {
-    if (!reportClientSelect) return;
+    // Znajdź datalist bezpośrednio
+    const datalist = document.getElementById('reportClientDatalist');
+    if (!datalist) return;
 
     try {
+        // Funkcja pomocnicza do wypełniania datalist
+        const populateDatalist = (clients) => {
+             datalist.innerHTML = ''; // Wyczyść
+             // Dodaj opcję "Wszyscy"
+             datalist.appendChild(new Option("Wszyscy Klienci", "ALL"));
+             
+             clients.forEach(klient => {
+                 // W datalist opcje mają "value", które jest też tekstem
+                 datalist.appendChild(new Option(klient.nazwa, klient.nazwa));
+             });
+        };
+
         // Używamy cachedClients jeśli są już wczytani
         if (cachedClients && cachedClients.length > 0) {
-             console.log("Używanie klientów z cache dla raportów.");
-             reportClientSelect.innerHTML = ''; // Wyczyść
-             reportClientSelect.add(new Option("Wszyscy Klienci", "ALL"));
-             
+             console.log("Używanie klientów z cache dla raportów datalist.");
              // Sortuj cache (jeśli nie jest)
              cachedClients.sort((a, b) => (a.nazwa || '').localeCompare(b.nazwa || '', 'pl'));
-             
-             cachedClients.forEach(klient => {
-                 reportClientSelect.add(new Option(klient.nazwa, klient.nazwa));
-             });
+             populateDatalist(cachedClients);
              reportClientsLoaded = true;
         } else {
             // Jeśli nie ma w cache, pobierz z bazy
-            console.log("Pobieranie klientów z bazy dla raportów...");
+            console.log("Pobieranie klientów z bazy dla raportów datalist...");
             const snapshot = await db.collection("klienci").orderBy("nazwa").get();
-            reportClientSelect.innerHTML = ''; // Wyczyść
-            reportClientSelect.add(new Option("Wszyscy Klienci", "ALL")); // Opcja "Wszyscy"
-
-            snapshot.docs.forEach(doc => {
-                const klient = doc.data();
-                reportClientSelect.add(new Option(klient.nazwa, klient.nazwa)); // Wartością jest nazwa
-            });
+            const clientsFromDB = snapshot.docs.map(doc => doc.data());
+            
+            populateDatalist(clientsFromDB);
             reportClientsLoaded = true;
             console.log("Wczytano klientów do raportów.");
         }
+        
+        // Ustaw domyślną wartość pola input na "Wszyscy Klienci"
+        if (reportClientInput) {
+            reportClientInput.value = "Wszyscy Klienci";
+        }
+        
     } catch (error) {
         console.error("Błąd wczytywania klientów do raportów:", error);
-        reportClientSelect.innerHTML = '<option value="">Błąd ładowania</option>';
+        // Nie psujemy datalist, zostawiamy puste
     }
 }
-
 
 // --- 3. Logika generowania raportu ---
 
@@ -7649,7 +7665,7 @@ if (generateReportBtn) {
             dateEnd: reportDateEnd.value,
             userId: reportUserSelect.value, // Może być "ALL"
             userName: reportUserSelect.options[reportUserSelect.selectedIndex].text,
-            klient: reportClientSelect.value // Może być "ALL"
+            klient: reportClientInput.value // Może być "ALL"
         };
 
         if (!filters.type) {
