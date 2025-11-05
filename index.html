@@ -7475,5 +7475,489 @@ if (document.readyState === 'loading') {
 } else {
     setupArchiveEventListeners();
 }
+/* ⬇️ ======================================================= ⬇️ */
+/* ✅ POCZĄTEK: Logika dla sekcji Raportów                   */
+
+// --- Zmienne globalne dla Raportów ---
+const raportySection = document.getElementById('raportySection');
+// const menuRaportyBtn = document.getElementById('menuRaportyBtn'); // Już zdefiniowane
+
+// Kontrolki
+const reportTypeSelect = document.getElementById('reportTypeSelect');
+const reportDateStart = document.getElementById('reportDateStart');
+const reportDateEnd = document.getElementById('reportDateEnd');
+const reportUserSelect = document.getElementById('reportUserSelect');
+const reportClientSelect = document.getElementById('reportClientSelect');
+const generateReportBtn = document.getElementById('generateReportBtn');
+const printReportBtn = document.getElementById('printReportBtn');
+
+// Obszar wyników
+const reportResultArea = document.getElementById('reportResultArea');
+const reportPlaceholder = document.getElementById('report-placeholder');
+const reportMainTitle = document.getElementById('reportMainTitle');
+const reportDateDisplay = document.getElementById('reportDateDisplay');
+const reportUserDisplay = document.getElementById('reportUserDisplay');
+const reportSumTitle = document.getElementById('reportSumTitle');
+const reportCalculatedSum = document.getElementById('reportCalculatedSum');
+const reportFuelCost = document.getElementById('reportFuelCost');
+const reportNetSum = document.getElementById('reportNetSum');
+const reportFuelSection = document.getElementById('reportFuelSection');
+
+// Tabele
+const reportWizytyTableContainer = document.getElementById('reportWizytyTableContainer');
+const reportWizytyTableBody = document.getElementById('reportWizytyTableBody');
+const reportZuzyciaTableContainer = document.getElementById('reportZuzyciaTableContainer');
+const reportZuzyciaTableBody = document.getElementById('reportZuzyciaTableBody');
+
+// Zmienna cache na wczytane paragony (dla wydajności)
+let cachedReportData = [];
+
+
+// --- 1. Podpięcie do Menu i showSection ---
+
+// Zmodyfikuj istniejący listener przycisku w menu
+if (menuRaportyBtn) {
+    // Usuń stary listener jeśli istniał (na wszelki wypadek)
+    // menuRaportyBtn.removeEventListener('click', ...); // Jeśli był pusty, to nie trzeba
+    menuRaportyBtn.addEventListener('click', () => {
+        showSection('raporty');
+    });
+}
+
+// Funkcja showSection zostanie zmodyfikowana w KROKU 4
+
+
+// --- 2. Inicjalizacja sekcji (ładowanie filtrów) ---
+
+let reportUsersLoaded = false;
+let reportClientsLoaded = false;
+
+/**
+ * Wywoływana przy każdym wejściu do sekcji Raporty.
+ * Ładuje listy lekarzy i klientów do filtrów.
+ */
+function onShowRaporty() {
+    console.log("Wejście do sekcji Raporty. Ładowanie filtrów...");
+    if (!reportUsersLoaded) {
+        loadReportUsers();
+    }
+    if (!reportClientsLoaded) {
+        loadReportClients();
+    }
+    
+    // Ustaw domyślne daty (np. bieżący miesiąc)
+    const today = new Date();
+    const firstDay = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
+    const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0).toISOString().split('T')[0];
+    
+    if (!reportDateStart.value) reportDateStart.value = firstDay;
+    if (!reportDateEnd.value) reportDateEnd.value = lastDay;
+}
+
+/**
+ * Wczytuje użytkowników (lekarzy) do listy <select> w raportach.
+ */
+async function loadReportUsers() {
+    if (!reportUserSelect || !currentUserProfile) return;
+
+    let query;
+    if (currentUserProfile.Rola === 'administrator') {
+        query = db.collection("konfiguracja").orderBy("Nazwisko");
+    } else {
+        const userClinicId = currentUserProfile['ID lecznicy'];
+        if (!userClinicId) return;
+        query = db.collection("konfiguracja").where("ID lecznicy", "==", userClinicId).orderBy("Nazwisko");
+    }
+
+    try {
+        const snapshot = await query.get();
+        reportUserSelect.innerHTML = ''; // Wyczyść
+        reportUserSelect.add(new Option("Wszyscy Pracownicy", "ALL")); // Opcja "Wszyscy"
+        
+        snapshot.docs.forEach(doc => {
+            const user = doc.data();
+            const optionText = `${user.Imie} ${user.Nazwisko}`;
+            reportUserSelect.add(new Option(optionText, user.uid)); // Wartością jest UID
+        });
+        
+        // Ustaw domyślnie na zalogowanego użytkownika
+        if (currentUserProfile.uid) {
+            reportUserSelect.value = currentUserProfile.uid;
+        }
+        
+        reportUsersLoaded = true;
+        console.log("Wczytano użytkowników do raportów.");
+    } catch (error) {
+        console.error("Błąd wczytywania użytkowników do raportów:", error);
+        reportUserSelect.innerHTML = '<option value="">Błąd ładowania</option>';
+    }
+}
+
+/**
+ * Wczytuje klientów do listy <select> w raportach.
+ */
+async function loadReportClients() {
+    if (!reportClientSelect) return;
+
+    try {
+        // Używamy cachedClients jeśli są już wczytani
+        if (cachedClients && cachedClients.length > 0) {
+             console.log("Używanie klientów z cache dla raportów.");
+             reportClientSelect.innerHTML = ''; // Wyczyść
+             reportClientSelect.add(new Option("Wszyscy Klienci", "ALL"));
+             
+             // Sortuj cache (jeśli nie jest)
+             cachedClients.sort((a, b) => (a.nazwa || '').localeCompare(b.nazwa || '', 'pl'));
+             
+             cachedClients.forEach(klient => {
+                 reportClientSelect.add(new Option(klient.nazwa, klient.nazwa));
+             });
+             reportClientsLoaded = true;
+        } else {
+            // Jeśli nie ma w cache, pobierz z bazy
+            console.log("Pobieranie klientów z bazy dla raportów...");
+            const snapshot = await db.collection("klienci").orderBy("nazwa").get();
+            reportClientSelect.innerHTML = ''; // Wyczyść
+            reportClientSelect.add(new Option("Wszyscy Klienci", "ALL")); // Opcja "Wszyscy"
+
+            snapshot.docs.forEach(doc => {
+                const klient = doc.data();
+                reportClientSelect.add(new Option(klient.nazwa, klient.nazwa)); // Wartością jest nazwa
+            });
+            reportClientsLoaded = true;
+            console.log("Wczytano klientów do raportów.");
+        }
+    } catch (error) {
+        console.error("Błąd wczytywania klientów do raportów:", error);
+        reportClientSelect.innerHTML = '<option value="">Błąd ładowania</option>';
+    }
+}
+
+
+// --- 3. Logika generowania raportu ---
+
+if (generateReportBtn) {
+    generateReportBtn.addEventListener('click', async () => {
+        const filters = {
+            type: reportTypeSelect.value,
+            dateStart: reportDateStart.value,
+            dateEnd: reportDateEnd.value,
+            userId: reportUserSelect.value, // Może być "ALL"
+            userName: reportUserSelect.options[reportUserSelect.selectedIndex].text,
+            klient: reportClientSelect.value // Może być "ALL"
+        };
+
+        if (!filters.type) {
+            alert("Wybierz typ raportu.");
+            return;
+        }
+        if (!filters.dateStart || !filters.dateEnd) {
+            alert("Wybierz zakres dat.");
+            return;
+        }
+
+        generateReportBtn.disabled = true;
+        generateReportBtn.textContent = 'Generowanie... ⏳';
+        reportPlaceholder.style.display = 'none';
+        reportResultArea.style.display = 'none';
+        printReportBtn.style.display = 'none';
+
+        try {
+            // Pobierz dane z Firestore
+            // Używamy "bezpiecznego" zapytania (tylko data i lekarz), resztę filtrujemy w JS
+            cachedReportData = await fetchReceiptsForReport(filters.dateStart, filters.dateEnd, filters.userId);
+            
+            // Uruchom odpowiednią funkcję generującą
+            if (filters.type === 'zuzycia') {
+                generateZuzyciaReport(cachedReportData, filters);
+            } else {
+                generateWizytyReport(cachedReportData, filters);
+            }
+
+            reportResultArea.style.display = 'block';
+            printReportBtn.style.display = 'inline-block';
+
+        } catch (error) {
+            console.error("Błąd podczas generowania raportu:", error);
+            alert("Wystąpił błąd. Sprawdź konsolę.");
+            reportPlaceholder.style.display = 'block';
+        } finally {
+            generateReportBtn.disabled = false;
+            generateReportBtn.textContent = 'Generuj Raport';
+        }
+    });
+}
+
+/**
+ * Funkcja pomocnicza: Pobiera paragony z Firestore na podstawie daty i lekarza.
+ */
+async function fetchReceiptsForReport(dateStart, dateEnd, userId) {
+    console.log(`Pobieranie danych dla raportu: UserID: ${userId}, Date: ${dateStart} do ${dateEnd}`);
+    
+    let q = db.collection("archiwumParagony");
+
+    // 1. Filtr Pracownika (Lekarza)
+    if (userId !== "ALL") {
+        q = q.where("lekarz_uid", "==", userId);
+    } else {
+        // Jeśli "Wszyscy", musimy też ograniczyć do lecznicy (dla właściciela)
+        if (currentUserProfile.Rola !== 'administrator') {
+             const userClinicId = currentUserProfile['ID lecznicy'];
+             if (!userClinicId) throw new Error("Brak ID lecznicy dla właściciela");
+             q = q.where("id_lecznicy", "==", userClinicId);
+        }
+        // Admin widzi wszystko (bez filtra lecznicy)
+    }
+
+    // 2. Filtr Daty (wymaga indeksu: [lekarz_uid, data] lub [id_lecznicy, data])
+    q = q.where("data", ">=", dateStart).where("data", "<=", dateEnd);
+    
+    try {
+        const snapshot = await q.get();
+        console.log(`Pobrano ${snapshot.size} pasujących paragonów z bazy.`);
+        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    } catch (error) {
+        console.error("Błąd zapytania Firestore: ", error);
+        if (error.code === 'failed-precondition') {
+            alert("BŁĄD BAZY DANYCH: Aby generować raporty, wymagany jest indeks w Firestore. Sprawdź konsolę (F12), aby zobaczyć link do jego utworzenia.");
+            console.error("BŁĄD INDEKSU: Wejdź w konsolę Firebase i utwórz wymagane indeksy kompozytowe dla 'archiwumParagony', np: \n[lekarz_uid(ASC), data(ASC)] \n[id_lecznicy(ASC), data(ASC)]");
+        }
+        throw error; // Przerwij generowanie
+    }
+}
+
+/**
+ * Generuje Raporty Wizyt (Typ 1, 2, 3)
+ */
+function generateWizytyReport(allReceipts, filters) {
+    console.log("Generowanie raportu wizyt...");
+    
+    // --- 1. Filtrowanie w JavaScript ---
+    let filteredReceipts = [...allReceipts];
+
+    // Filtr Klienta
+    if (filters.klient !== "ALL") {
+        filteredReceipts = filteredReceipts.filter(r => r.klient === filters.klient);
+    }
+
+    // Filtr Statusu (w zależności od typu raportu)
+    let reportTitle = "Raport Ogólny";
+    let sumTitle = "Suma wszystkich wizyt";
+    
+    if (filters.type === "gotowka") {
+        filteredReceipts = filteredReceipts.filter(r => r.status === "Zapłacone");
+        reportTitle = "Raport Przyjętej Gotówki";
+        sumTitle = "Suma przyjętej gotówki";
+    } else if (filters.type === "dluznicy") {
+        filteredReceipts = filteredReceipts.filter(r => r.status === "Dług");
+        reportTitle = "Raport Dłużników";
+        sumTitle = "Suma zadłużenia";
+    }
+    // Dla "ogolny" nie filtrujemy statusu
+
+    // --- 2. Obliczanie sumy i budowanie tabeli ---
+    let totalSum = 0;
+    let tableHtml = '';
+
+    filteredReceipts.sort((a, b) => a.data.localeCompare(b.data)); // Sortuj po dacie
+
+    for (const receipt of filteredReceipts) {
+        const suma = parseFloat(receipt.suma) || 0;
+        totalSum += suma;
+
+        // Formatowanie kolumny "Zużycia"
+        let zuzyciaHtml = '';
+        if (receipt.pozycje && receipt.pozycje.length > 0) {
+            // Filtrujemy, aby pokazać tylko produkty (bez "Wyrównanie")
+            const produkty = receipt.pozycje.filter(p => p.name.toLowerCase() !== 'wyrównanie');
+            
+            if (produkty.length > 0) {
+                 zuzyciaHtml = '<ul style="margin: 0; padding-left: 18px; font-size: 12px; color: #333;">';
+                for (const item of produkty) {
+                    zuzyciaHtml += `<li>${item.name} - ${item.quantity}</li>`;
+                }
+                zuzyciaHtml += '</ul>';
+            }
+        }
+        
+        // Status płatności (kolorowanie)
+        const statusColor = receipt.status === "Zapłacone" ? "green" : (receipt.status === "Dług" ? "red" : "#555");
+        const notatka = receipt.notatka || '';
+
+        // Budowanie wiersza
+        tableHtml += `
+            <tr data-klient="${receipt.klient}" data-data="${receipt.data}" data-czynnosci="${receipt.czynnosci || ''}" data-suma="${suma}" data-status="${receipt.status || ''}" data-notatka="${notatka}">
+                <td>${receipt.klient}</td>
+                <td>${receipt.data}</td>
+                <td>${receipt.czynnosci || ''}</td>
+                <td class="col-zuzycia">${zuzyciaHtml}</td>
+                <td style="text-align: right;">${formatPrice(suma)}</td>
+                <td style="color: ${statusColor}; font-weight: bold;">${receipt.status || 'Brak'}</td>
+                <td title="${notatka}">${notatka.substring(0, 30)}${notatka.length > 30 ? '...' : ''}</td>
+            </tr>
+        `;
+    }
+
+    // --- 3. Aktualizacja widoku (DOM) ---
+    reportWizytyTableBody.innerHTML = tableHtml || '<tr><td colspan="7" style="text-align: center; padding: 20px;">Brak danych dla wybranych filtrów.</td></tr>';
+    
+    // Pokaż/Ukryj tabele
+    reportWizytyTableContainer.style.display = 'block';
+    reportZuzyciaTableContainer.style.display = 'none';
+    reportFuelSection.style.display = (filters.type === "gotowka"); // Pokaż pole paliwa tylko dla raportu gotówki
+
+    // Aktualizuj podsumowanie
+    reportMainTitle.textContent = reportTitle;
+    reportDateDisplay.textContent = `Raport zawiera wizyty od: ${filters.dateStart} do: ${filters.dateEnd}`;
+    reportUserDisplay.textContent = `Pracownik: ${filters.userName}`;
+    reportSumTitle.textContent = `${sumTitle}:`; // Usunięto tekst o tankowaniu
+    reportCalculatedSum.textContent = formatPrice(totalSum);
+    
+    // Zaktualizuj sumę netto
+    reportFuelCost.value = 0; // Zresetuj koszty
+    updateNetSum(totalSum);
+}
+
+/**
+ * Generuje Raport Zużycia Produktów (Typ 4)
+ */
+function generateZuzyciaReport(allReceipts, filters) {
+    console.log("Generowanie raportu zużycia...");
+
+    // --- 1. Filtrowanie w JavaScript (tylko klient) ---
+    let filteredReceipts = [...allReceipts];
+    if (filters.klient !== "ALL") {
+        filteredReceipts = filteredReceipts.filter(r => r.klient === filters.klient);
+    }
+    
+    // --- 2. Agregacja produktów ---
+    const productMap = new Map();
+
+    for (const receipt of filteredReceipts) {
+        if (receipt.pozycje && receipt.pozycje.length > 0) {
+            for (const item of receipt.pozycje) {
+                const productName = item.name.trim();
+                // Ignorujemy "Wyrównanie"
+                if (productName.toLowerCase() === 'wyrównanie') {
+                    continue;
+                }
+                
+                const currentQty = productMap.get(productName) || 0;
+                const itemQty = Number(item.quantity) || 0;
+                productMap.set(productName, currentQty + itemQty);
+            }
+        }
+    }
+
+    // --- 3. Budowanie tabeli ---
+    let tableHtml = '';
+    
+    // Sortowanie alfabetyczne produktów
+    const sortedProducts = Array.from(productMap.keys()).sort((a, b) => a.localeCompare(b, 'pl'));
+
+    for (const productName of sortedProducts) {
+        const totalQty = productMap.get(productName);
+        tableHtml += `
+            <tr data-produkt="${productName}" data-ilosc="${totalQty}">
+                <td>${productName}</td>
+                <td style="text-align: center; font-weight: bold;">${totalQty}</td>
+            </tr>
+        `;
+    }
+
+    // --- 4. Aktualizacja widoku (DOM) ---
+    reportZuzyciaTableBody.innerHTML = tableHtml || '<tr><td colspan="2" style="text-align: center; padding: 20px;">Brak zużytych produktów dla wybranych filtrów.</td></tr>';
+    
+    // Pokaż/Ukryj tabele
+    reportWizytyTableContainer.style.display = 'none';
+    reportZuzyciaTableContainer.style.display = 'block';
+    reportFuelSection.style.display = 'none'; // Ukryj pole paliwa
+
+    // Aktualizuj podsumowanie
+    reportMainTitle.textContent = "Raport Zużycia Produktów";
+    reportDateDisplay.textContent = `Raport zawiera zużycia od: ${filters.dateStart} do: ${filters.dateEnd}`;
+    reportUserDisplay.textContent = `Pracownik: ${filters.userName}`;
+    reportSumTitle.textContent = `Łączna liczba unikalnych produktów:`;
+    reportCalculatedSum.textContent = `${sortedProducts.length}`; // Pokaż liczbę produktów
+    reportNetSum.textContent = ''; // Ukryj sumę netto
+    reportFuelCost.value = 0;
+}
+
+
+// --- 4. Logika obliczania sumy Netto i Drukowania ---
+
+/**
+ * Aktualizuje sumę netto po odjęciu kosztów paliwa.
+ */
+function updateNetSum(totalSum) {
+    const fuelCost = parseFloat(reportFuelCost.value) || 0;
+    const netSum = totalSum - fuelCost;
+    reportNetSum.textContent = formatPrice(netSum);
+}
+
+// Listener dla pola kosztów
+if (reportFuelCost) {
+    reportFuelCost.addEventListener('input', () => {
+        // Oblicz sumę brutto na podstawie tego co jest wyświetlane
+        let currentTotalSumText = reportCalculatedSum.textContent;
+        // Sprawdź czy to cena (dla wizyt) czy liczba (dla zużyć)
+        if (currentTotalSumText.includes('zł')) {
+            const currentTotalSum = parseFloat(currentTotalSumText.replace(' zł', '').replace(',', '.')) || 0;
+            updateNetSum(currentTotalSum);
+        }
+        // Jeśli to raport zużycia, ta funkcja nie robi nic
+    });
+}
+
+// Listener dla przycisku Drukuj
+if (printReportBtn) {
+    printReportBtn.addEventListener('click', () => {
+        console.log("Przygotowanie do druku raportu...");
+        
+        // Dodaj klasę print-mode do sekcji raportów
+        if (raportySection) {
+            raportySection.classList.add('print-mode');
+        }
+
+        // Daj przeglądarce chwilę na zastosowanie styli
+        setTimeout(() => {
+            window.print();
+        }, 100); // 100ms opóźnienia
+
+        // Usuń klasę po wydruku
+        setTimeout(() => {
+            if (raportySection) {
+                raportySection.classList.remove('print-mode');
+            }
+        }, 1000); // Dłuższe opóźnienie, aby mieć pewność
+    });
+}
+
+// Listener dla zmiany typu raportu (aby pokazać/ukryć koszty paliwa)
+if (reportTypeSelect) {
+    reportTypeSelect.addEventListener('change', () => {
+        if (reportResultArea.style.display === 'block') {
+            // Jeśli raport jest już wygenerowany, ukryj/pokaż pole paliwa
+            if (reportTypeSelect.value === 'gotowka') {
+                reportFuelSection.style.display = 'flex';
+                // Zaktualizuj tytuł sumy
+                reportSumTitle.textContent = 'Suma przyjętej gotówki:';
+            } else if (reportTypeSelect.value === 'ogolny') {
+                reportFuelSection.style.display = 'none';
+                reportSumTitle.textContent = 'Suma wszystkich wizyt:';
+            } else if (reportTypeSelect.value === 'dluznicy') {
+                reportFuelSection.style.display = 'none';
+                reportSumTitle.textContent = 'Suma zadłużenia:';
+            } else if (reportTypeSelect.value === 'zuzycia') {
+                reportFuelSection.style.display = 'none';
+                reportSumTitle.textContent = 'Łączna liczba unikalnych produktów:';
+            }
+        }
+    });
+}
+
+
+/* ✅ KONIEC: Logika dla sekcji Raportów                   */
+/* ⬆️ ======================================================= ⬆️ */
 </script> </body>
 </html>
