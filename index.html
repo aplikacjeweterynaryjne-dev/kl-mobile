@@ -1286,6 +1286,9 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
       <span style="font-size: 20px; color: #c0392b; font-weight: bold;">-</span> Dług
     </button>
   </div>
+<div class="form-row" style="margin-top: 15px;">
+    <label for="calcNotatkaInput">Notatka:</label>
+    <textarea id="calcNotatkaInput" placeholder="Dodatkowe uwagi do paragonu..." style="min-height: 60px; font-size: 16px;"></textarea>
 </div>
 <div style="text-align: right; margin-top: 20px; display: flex; justify-content: flex-end; gap: 8px;">
     <button id="roundTotalBtn" class="btn small" style="background-color: #f0f0f0;">Zaokrąglij sumę (do 10)</button>
@@ -1649,8 +1652,9 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
                     <th data-sort-key="czynnosci">Czynności</th>
                     <th data-sort-key="nrDokumentu">Nr Dokumentu</th>
                                         <th data-sort-key="status">Status</th>
-                    <th data-sort-key="suma" data-sort-type="number">Suma</th>
+                 <th data-sort-key="suma" data-sort-type="number">Suma</th>
                     <th data-sort-key="lekarz">Wystawił</th>
+                    <th data-sort-key="paymentNote">Notatka</th>
                     <th class="col-akcje">Akcje</th>
                 </tr>
             </thead>
@@ -3681,8 +3685,8 @@ if (saveReceiptBtn) {
         lekarz_uid: currentUserProfile ? currentUserProfile.uid : null, // ID lekarza
         lekarz_nazwisko: currentUserProfile ? `${currentUserProfile.Imie} ${currentUserProfile.Nazwisko}` : 'Nieznany',
         id_lecznicy: currentUserProfile ? currentUserProfile['ID lecznicy'] : null,
-        czynnosci: document.getElementById('calcCzynnosciInput').value || '',
-        paymentNote: '', // Pole dla Zadania 3
+       czynnosci: document.getElementById('calcCzynnosciInput').value || '',
+        paymentNote: document.getElementById('calcNotatkaInput').value || '', // <-- ZMODYFIKOWANA LINIA
         
         // Dane do numeracji
         counter: currentReceiptData.nextCounter,
@@ -3698,11 +3702,12 @@ if (saveReceiptBtn) {
         const infoP = document.createElement('p');
         infoP.style.fontSize = '0.9em';
         infoP.style.color = '#333';
-        infoP.innerHTML = `
+       infoP.innerHTML = `
             <strong>Klient:</strong> ${receiptData.klient}<br>
             <strong>Data:</strong> ${receiptData.data}<br>
             <strong>Czynności:</strong> ${receiptData.czynnosci || 'Brak'}<br>
-            <strong>Nr dokumentu:</strong> ${receiptData.nrDokumentu}
+            <strong>Nr dokumentu:</strong> ${receiptData.nrDokumentu}<br>
+            <strong>Notatka:</strong> ${receiptData.paymentNote || 'Brak'}
         `;
         savedReceiptSummary.appendChild(infoP);
 
@@ -6738,12 +6743,12 @@ async function loadReceiptsForUser(lekarz_uid) {
     const filterControls = document.getElementById('archiveReceiptFilterControls');
 
     if (!lekarz_uid) {
-        tableBody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 20px; color: #555;">Wybierz użytkownika, aby zobaczyć archiwum.</td></tr>';
+        tableBody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 20px; color: #555;">Wybierz użytkownika, aby zobaczyć archiwum.</td></tr>';
         filterControls.style.display = 'none';
         return;
     }
     
-    tableBody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 20px; color: #555;">Wczytywanie paragonów... ⏳</td></tr>';
+    tableBody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 20px; color: #555;">Wczytywanie paragonów... ⏳</td></tr>';
     filterControls.style.display = 'none';
 
     let q; 
@@ -6772,7 +6777,7 @@ async function loadReceiptsForUser(lekarz_uid) {
         const snapshot = await q.get(); 
         
         if (snapshot.empty) {
-            tableBody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 20px; color: #999;">Brak zapisanych paragonów dla tego wyboru.</td></tr>';
+            tableBody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 20px; color: #999;">Brak zapisanych paragonów dla tego wyboru.</td></tr>';
             filterControls.style.display = 'none';
             return;
         }
@@ -6794,7 +6799,7 @@ async function loadReceiptsForUser(lekarz_uid) {
             tr.dataset.status = receipt.status || 'Nie wybrano';
             tr.dataset.suma = suma;
             tr.dataset.lekarz = receipt.lekarz_nazwisko || 'Nieznany';
-            
+            tr.dataset.paymentNote = receipt.paymentNote || '';
             // --- Budowanie wiersza metodą DOM ---
 
             // Komórka 1: Data
@@ -6830,19 +6835,24 @@ async function loadReceiptsForUser(lekarz_uid) {
             tdSuma.style.textAlign = 'right';
             tr.appendChild(tdSuma);
 
-            // Komórka 7: Wystawił
-            const tdLekarz = document.createElement('td');
-            tdLekarz.textContent = receipt.lekarz_nazwisko || 'Nieznany';
-            tr.appendChild(tdLekarz);
+// Komórka 7: Wystawił
+            const tdLekarz = document.createElement('td');
+            tdLekarz.textContent = receipt.lekarz_nazwisko || 'Nieznany';
+            tr.appendChild(tdLekarz);
 
-            // Komórka 8: Akcje (z logiką dla Zadania 3)
-            const tdAkcje = document.createElement('td');
-            tdAkcje.className = 'col-akcje';
+            // Komórka 8: Notatka
+            const tdNotatka = document.createElement('td');
+            tdNotatka.textContent = receipt.paymentNote || '';
+            tr.appendChild(tdNotatka);
             
-            let akcjeHTML = `
-                <button class="btn primary small btn-view-archived-receipt" data-receipt-id="${receipt.id}">Podgląd</button>
-                <button class="btn warn small btn-delete-archived-receipt" data-receipt-id="${receipt.id}" data-receipt-info="${receipt.data} / ${receipt.klient}">Usuń</button>
-            `;
+            // Komórka 9: Akcje (z logiką dla Zadania 3)
+            const tdAkcje = document.createElement('td');
+            tdAkcje.className = 'col-akcje';
+            
+            let akcjeHTML = `
+                <button class="btn primary small btn-view-archived-receipt" data-receipt-id="${receipt.id}">Podgląd</button>
+                <button class="btn warn small btn-delete-archived-receipt" data-receipt-id="${receipt.id}" data-receipt-info="${receipt.data} / ${receipt.klient}">Usuń</button>
+            `;
             
             // ⬇️ LOGIKA DLA ZADANIA 3 ⬇️
             if (receipt.status === "Dług") {
