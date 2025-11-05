@@ -1788,8 +1788,8 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
             <input type="date" id="reportDateEnd" title="Data do">
         </div>
 
-        <div class="form-row">
-            <label for="reportUserSelect">4. Pracownik (Lekarz):</label>
+<div class="form-row">
+            <label for="reportUserSelect">4. Pracownik:</label>
             <select id="reportUserSelect" style="width:100%; padding:8px; font-size:16px;">
                 <option value="">Wczytywanie użytkowników...</option>
                 </select>
@@ -1828,7 +1828,7 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
                         <span>zł</span>
                     </span>
                     
-                    <span style="margin-left: 10px; border-top: 2px solid #333; padding-top: 5px;">
+                    <span id="reportNetSumContainer" style="margin-left: 10px; border-top: 2px solid #333; padding-top: 5px;">
                         = <span id="reportNetSum" style="color: #2b74e4; font-size: 22px;">0,00 zł</span>
                     </span>
                 </div>
@@ -7507,7 +7507,7 @@ const reportCalculatedSum = document.getElementById('reportCalculatedSum');
 const reportFuelCost = document.getElementById('reportFuelCost');
 const reportNetSum = document.getElementById('reportNetSum');
 const reportFuelSection = document.getElementById('reportFuelSection');
-
+const reportNetSumContainer = document.getElementById('reportNetSumContainer');
 // Tabele
 const reportWizytyTableContainer = document.getElementById('reportWizytyTableContainer');
 const reportWizytyTableBody = document.getElementById('reportWizytyTableBody');
@@ -7809,7 +7809,13 @@ function generateWizytyReport(allReceipts, filters) {
     // Pokaż/Ukryj tabele
     reportWizytyTableContainer.style.display = 'block';
     reportZuzyciaTableContainer.style.display = 'none';
-    reportFuelSection.style.display = (filters.type === "gotowka"); // Pokaż pole paliwa tylko dla raportu gotówki
+    
+    // Pokaż/Ukryj pole paliwa i sumę netto
+    const isCashReport = (filters.type === "gotowka");
+    reportFuelSection.style.display = isCashReport ? 'flex' : 'none';
+    reportNetSumContainer.style.display = isCashReport ? 'inline' : 'none'; // 'inline' lub 'block'
+
+    // Aktualizuj podsumowanie
 
     // Aktualizuj podsumowanie
     reportMainTitle.textContent = reportTitle;
@@ -7877,6 +7883,7 @@ function generateZuzyciaReport(allReceipts, filters) {
     reportWizytyTableContainer.style.display = 'none';
     reportZuzyciaTableContainer.style.display = 'block';
     reportFuelSection.style.display = 'none'; // Ukryj pole paliwa
+    reportNetSumContainer.style.display = 'none'; // Ukryj sumę netto
 
     // Aktualizuj podsumowanie
     reportMainTitle.textContent = "Raport Zużycia Produktów";
@@ -7945,16 +7952,20 @@ if (reportTypeSelect) {
             // Jeśli raport jest już wygenerowany, ukryj/pokaż pole paliwa
             if (reportTypeSelect.value === 'gotowka') {
                 reportFuelSection.style.display = 'flex';
+                reportNetSumContainer.style.display = 'inline';
                 // Zaktualizuj tytuł sumy
                 reportSumTitle.textContent = 'Suma przyjętej gotówki:';
             } else if (reportTypeSelect.value === 'ogolny') {
                 reportFuelSection.style.display = 'none';
+                reportNetSumContainer.style.display = 'none';
                 reportSumTitle.textContent = 'Suma wszystkich wizyt:';
             } else if (reportTypeSelect.value === 'dluznicy') {
                 reportFuelSection.style.display = 'none';
+                reportNetSumContainer.style.display = 'none';
                 reportSumTitle.textContent = 'Suma zadłużenia:';
             } else if (reportTypeSelect.value === 'zuzycia') {
                 reportFuelSection.style.display = 'none';
+                reportNetSumContainer.style.display = 'none';
                 reportSumTitle.textContent = 'Łączna liczba unikalnych produktów:';
             }
         }
