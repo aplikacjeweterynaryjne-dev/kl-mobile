@@ -714,56 +714,48 @@ background: #a93226;
         border: none !important;
     }
 /* ⬆️ KONIEC KODU DO WKLEJENIA ⬆️ */
-/* ⬇️ OSTATECZNA POPRAWKA DRUKOWANIA v4 (Transform, Tła, Cienie) ⬇️ */
+/* ⬇️ OSTATECZNA POPRAWKA DRUKOWANIA v5 (Logika klas) ⬇️ */
 
-    /* 1. Zresetuj 'body' - to jest najważniejsze */
-    body {
-        transform: none !important; /* ‼️ USUŃ SKALOWANIE PODCZAS DRUKU ‼️ */
-        background-color: #FFFFFF !important; /* Wymuś białe tło */
-        background: none !important;
+    /* Kiedy body MA klasę .print-mode-karta... */
+    body.print-mode-karta {
+        transform: none !important; /* Usuń skalowanie */
+        background: none !important; /* Usuń tło */
         box-shadow: none !important;
-        -webkit-box-shadow: none !important;
-        height: auto !important;
-        overflow: visible !important;
-    }
-    
-    /* 2. Zresetuj wszystkie inne cienie */
-    * {
-        box-shadow: none !important;
-        -webkit-box-shadow: none !important;
-    }
-    
-    /* 3. Upewnij się, że kontenery nie obcinają zawartości */
-    .table-container, .form-card {
         overflow: visible !important;
         height: auto !important;
-        border: none !important; 
     }
-    
-    /* 4. Ukryj wszystko, co nie jest kartą */
-    #loginSection, #registerSection, #mainMenuSection, #kalkulatorWizytySection, 
-    #bazaKlientowSection, #bazaProduktowSection, #konfiguracjaSection, 
-    #archiwumKartySection, #archiwumParagonySection, #raportySection, #mainTabBar,
-    .actions, #fullscreenOverlay, #formModal, #metodaModal,
-    #archiveCardViewerModal {
+
+    /* Ukryj wszystko... */
+    body.print-mode-karta > *:not(#kartaLeczeniaSection) {
         display: none !important;
         visibility: hidden !important;
     }
     
-    /* 5. Pokaż TYLKO sekcję karty */
-    #kartaLeczeniaSection {
+    /* ...z wyjątkiem sekcji karty */
+    body.print-mode-karta #kartaLeczeniaSection {
         display: block !important;
         visibility: visible !important;
         position: static !important;
         width: 100% !important;
         height: auto !important;
+        box-shadow: none !important;
+        border: none !important;
     }
-
-    /* 6. Przywróć ramkę tabeli */
+    
+    /* Usuń też cienie i obramowania z kontenerów WEWNĄTRZ karty */
+    body.print-mode-karta .table-container,
+    body.print-mode-karta .form-card {
+        box-shadow: none !important;
+        border: none !important;
+        overflow: visible !important; /* Pozwól tabeli się "wylać" */
+    }
+    
+    /* Przywró ZAWSZE ramkę tabeli podczas druku */
     table {
          border: 1px solid #000 !important;
     }
-    /* ⬆️ KONIEC POPRAWKI v4 ⬆️ */
+
+    /* ⬆️ KONIEC POPRAWKI v5 ⬆️ */
 }
     /* Plik: index.html (wklej ok. linii 335) */
 
@@ -1343,7 +1335,7 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
 <button id="copyBtn" class="btn">Przepisz dane z leczenia na miejscu</button>
 <button id="formBtn" class="btn">📋 Wprowadź poprzez formularz</button>
 <button id="saveCardToArchiveBtn" class="btn primary" style="background-color: #27ae60; border-color: #229954; margin-left: 5px;">💾 Zapisz w Archiwum</button>
-<button id="printBtn" class="btn" onclick="window.print()">Drukuj / Zapisz PDF</button>
+<button id="printBtn" class="btn">Drukuj / Zapisz PDF</button>
 </div>
 
 <!-- fullscreen overlay for signature -->
@@ -3097,12 +3089,28 @@ console.warn('Rozpoznawanie mowy nie jest obsługiwane w tej przeglądarce.');
 }
 // === Obsługa przycisku Drukuj i zapisu e-maila ===
 
-// Drukuj (jeśli chcesz żeby kliknięcie tego przycisku wywołało window.print)
-const drukujBtn = document.getElementById('drukujBtn');
+// === Obsługa przycisku Drukuj i zapisu e-maila ===
+
+// Drukuj (NOWA LOGIKA - dodaje klasę, aby naprawić błąd białej strony)
+const drukujBtn = document.getElementById('printBtn'); // ‼️ ZMIANA na printBtn
 if (drukujBtn) {
-drukujBtn.addEventListener('click', () => {
-window.print();
-});
+    // Usuń stary atrybut onclick, jeśli istnieje (na wszelki wypadek)
+    drukujBtn.removeAttribute('onclick');
+    
+    drukujBtn.addEventListener('click', () => {
+        // Dodaj klasę do body, aby aktywować style drukowania
+        document.body.classList.add('print-mode-karta');
+        
+        // Daj przeglądarce chwilę na zastosowanie styli
+        setTimeout(() => {
+            window.print();
+        }, 100); // 100ms opóźnienia
+
+        // Usuń klasę po wydruku (z dłuższym opóźnieniem)
+        setTimeout(() => {
+            document.body.classList.remove('print-mode-karta');
+        }, 1000);
+    });
 }
 
 // Elementy e-mail
