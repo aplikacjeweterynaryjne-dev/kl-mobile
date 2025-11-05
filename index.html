@@ -95,18 +95,12 @@ td[contenteditable="true"] { background: #fefefe; }
     font-weight: bold;
 }
 
-/* Powiększenie dla nazwy lecznicy i adresu klienta (w generatorze i archiwum) */
+/* Powiększenie dla nazwy lecznicy i adresu klienta */
 #nazwaLecznicy,
-#adresKlienta,
-#archive_nazwaLecznicy,
-#archive_adresKlienta,
-#archive_nrStada,
-#archive_klient,
-#archive_nrDokumentu,
-#archive_dataWykonania,
-#archive_dataZgloszenia {
-    font-size: 14px; /* +2px (domyślnie było 12px) */
+#adresKlienta {
+    font-size: 14px; /* +2px (domyślnie było 12px) */
 }
+
 .small-input { width: 40px; display: inline-block; margin-right: 3px; }
 .center-text { text-align: center; }
 
@@ -758,8 +752,8 @@ background: #a93226;
     background-color: #f1f1f1;
 }
 .sortable-table .col-akcje {
-    width: 220px; /* Zwiększamy szerokość, aby zmieściły się 3 przyciski */
-    text-align: right; /* Wyrównujemy do prawej */
+    width: 130px;
+    text-align: center;
 }
 
 /* Klasa do ukrywania wierszy przez filtr */
@@ -1685,30 +1679,24 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
 <div id="archiveCardContent" style="flex: 1; overflow: auto; padding: 15px; background: #f4f4f4;">
     <h2 style="text-align: center; font-size: 15px; text-transform: uppercase; margin-bottom: 10px;">KARTA LECZENIA ZWIERZĄT GOSPODARSKICH ORAZ ZWIERZĄT, Z KTÓRYCH POZYSKANE TKANKI LUB PRODUKTY SĄ PRZEZNACZONE DO SPOŻYCIA PRZEZ LUDZI / EWIDENCJA LECZENIA ZWIERZĄT</h2>
 
-<div class="top-section" id="archive_topSection">
-        <div>
-            Nazwa i adres zakładu leczniczego dla zwierząt:<br>
-                        <b><span id="archive_nazwaLecznicy"></span></b><br>
-            <br>
-            
-            Wykonanie czynności lekarsko-weterynaryjnych dnia:
-            <b id="archive_dataWykonania"></b><br>             <br>
-            Nr stada: <b><span id="archive_nrStada"></span></b>
-        </div>
-        <div>
-            Imię, nazwisko i adres albo nazwa siedziby i adres posiadacza zwierzęcia:<br>
-            <b><span id="archive_klient"></span></b><br>
-
-            <br>
-            <b><span id="archive_adresKlienta"></span></b>
-        </div>
-        <div>
-            Zgłoszenie: Data: <b><span id="archive_dataZgloszenia"></span></b><br>             
-            <br>
-            
-            Nr dokumentu: <b><span id="archive_nrDokumentu"></span></b>
-        </div>
-    </div>
+    <div class="top-section" id="archive_topSection">
+        <div>
+            <b>Nazwa i adres zakładu leczniczego dla zwierząt:</b><br>
+            <span id="archive_nazwaLecznicy"></span><br>
+            <b>Wykonanie czynności lekarsko-weterynaryjnych dnia:</b>
+            <span id="archive_dataWykonania" style="font-weight: bold;"></span><br>
+            <b>Nr stada:</b> <span id="archive_nrStada" style="font-weight: bold;"></span>
+        </div>
+        <div>
+            <b>Imię, nazwisko i adres albo nazwa siedziby i adres posiadacza zwierzęcia:</b><br>
+            <span id="archive_klient" style="font-weight: bold;"></span><br>
+            <span id="archive_adresKlienta"></span>
+        </div>
+        <div>
+            <b>Zgłoszenie:</b> Data: <span id="archive_dataZgloszenia"></span><br>
+            <b>Nr dokumentu:</b> <span id="archive_nrDokumentu" style="font-weight: bold;"></span>
+        </div>
+    </div>
 
     <div class="table-container">
         <table id="archive_karta"> <thead>
@@ -6965,75 +6953,53 @@ if (archiveReceiptTableBody) {
                 }
             }
         }
-else if (target.classList.contains('btn-pay-debt')) {
-            const receiptId = target.dataset.receiptId;
-            const klient = target.dataset.receiptKlient;
-            const suma = parseFloat(target.dataset.receiptSuma) || 0;
-            
-            if (confirm(`Czy na pewno chcesz spłacić dług dla: ${klient} (Suma: ${formatPrice(suma)})?\n\nStatus zostanie zmieniony na "Zapłacone", a data zaktualizowana.`)) {
-                
-                target.disabled = true;
-                target.textContent = '...';
-                
-                const today = new Date().toISOString().split('T')[0];
-                
-                // ⬇️ TUTAJ ZACZYNA SIĘ POPRAWIONA LOGIKA ⬇️
-                try {
-                    // 1. Pobierz aktualny dokument, aby sprawdzić starą notatkę
-                    const docRef = db.collection("archiwumParagony").doc(receiptId);
-                    const docSnap = await docRef.get();
-                    let oldNote = '';
-                    if (docSnap.exists) {
-                        oldNote = docSnap.data().paymentNote || '';
+        else if (target.classList.contains('btn-pay-debt')) {
+            const receiptId = target.dataset.receiptId;
+            const klient = target.dataset.receiptKlient;
+            const suma = parseFloat(target.dataset.receiptSuma) || 0;
+            
+            if (confirm(`Czy na pewno chcesz spłacić dług dla: ${klient} (Suma: ${formatPrice(suma)})?\n\nStatus zostanie zmieniony na "Zapłacone", a data zaktualizowana.`)) {
+                
+                target.disabled = true;
+                target.textContent = '...';
+                
+                const today = new Date().toISOString().split('T')[0];
+                
+                const updateData = {
+                    status: "Zapłacone",
+                    data: today, // Aktualizuj datę paragonu na datę spłaty
+                    paymentNote: "**Spłata Długu**" // Dodaj notatkę
+                };
+                
+try {
+                    // Zaktualizuj bazę danych
+                    await db.collection("archiwumParagony").doc(receiptId).update(updateData);
+                    
+                    // Zaktualizuj tabelę w widoku (bez przeładowania)
+                    const tr = target.closest('tr');
+                    if (tr) {
+                        // Aktualizuj komórkę Daty (indeks 0)
+                        tr.cells[0].textContent = today;
+                        tr.dataset.data = today;
+                        
+                        // Aktualizuj komórkę Statusu (indeks 4)
+                        tr.cells[4].textContent = "Zapłacone";
+                        tr.cells[4].style.color = "green";
+                        tr.dataset.status = "Zapłacone";
                     }
+                    
+                    // Ukryj przycisk "Zapłać"
+                    target.style.display = 'none';
+                    alert('Dług został pomyślnie spłacony.');
 
-                    // 2. Przygotuj nową notatkę (doklej na górze)
-                    let newNote = "**Spłata Długu**";
-                    if (oldNote) {
-                        newNote += `\n----------------\n${oldNote}`; // Dodaj starą notatkę poniżej
-                    }
-
-                    // 3. Zdefiniuj obiekt aktualizacji
-                    const updateData = {
-                        status: "Zapłacone",
-                        data: today, // Aktualizuj datę paragonu na datę spłaty
-                        paymentNote: newNote // Użyj nowej, połączonej notatki
-                    };
-                    
-                    // 4. Zaktualizuj bazę danych
-                    await docRef.update(updateData);
-                    
-                    // 5. Zaktualizuj tabelę w widoku (bez przeładowania)
-                    const tr = target.closest('tr');
-                    if (tr) {
-                        // Aktualizuj komórkę Daty (indeks 0)
-                        tr.cells[0].textContent = today;
-                        tr.dataset.data = today;
-                        
-                        // Aktualizuj komórkę Statusu (indeks 4)
-                        tr.cells[4].textContent = "Zapłacone";
-                        tr.cells[4].style.color = "green";
-                        tr.dataset.status = "Zapłacone";
-
-                        // Aktualizuj komórkę Notatki (indeks 7)
-                        if(tr.cells[7]) { 
-                            tr.cells[7].textContent = newNote;
-                            tr.dataset.paymentNote = newNote;
-                        }
-                    }
-                    
-                    // Ukryj przycisk "Spłata długu"
-                    target.style.display = 'none';
-                    alert('Dług został pomyślnie spłacony.');
-
-                } catch (error) {
-                    console.error("Błąd podczas spłaty długu:", error);
-                    alert("Wystąpił błąd. Spróbuj ponownie.");
-                    target.disabled = false;
-                    target.textContent = 'Spłata długu';
-                }
-            }
-        }
+                } catch (error) {
+                    console.error("Błąd podczas spłaty długu:", error);
+                    alert("Wystąpił błąd. Spróbuj ponownie.");
+                    target.disabled = false;
+                    target.textContent = 'Spłata długu';
+                }
+            }
+        }
     });
 }
     
