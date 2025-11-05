@@ -3451,6 +3451,7 @@ const savedReceiptSummary = document.getElementById('savedReceiptSummary');
 const pluCodeInput = document.getElementById('pluCodeInput');
 const pluBtn = document.getElementById('pluBtn');
 const productUnitDisplay = document.getElementById('productUnitDisplay');
+const receiptError = document.getElementById('receiptError');
 // Tablica przechowuje teraz { name: '...', quantity: 1, price: 10.50 }
     // ✅ Moduł 2: Zmienne statusu płatności
 const paymentStatusSection = document.getElementById('paymentStatusSection');
@@ -3657,11 +3658,30 @@ if (copyCheckbox) {
 
 // Zapisywanie paragonu
 if (saveReceiptBtn) {
-  saveReceiptBtn.addEventListener('click', async () => { // Zmieniono na async
-    if (receiptItems.length === 0) {
-      alert('Paragon jest pusty, nie ma czego zapisywać.');
-      return;
+  saveReceiptBtn.addEventListener('click', async () => { // Zmieniono na async
+    
+    // Ukryj stary błąd przy każdej próbie zapisu
+    if (receiptError) receiptError.style.display = 'none';
+
+    // ⬇️ NOWA WALIDACJA STATUSU PŁATNOŚCI ⬇️
+    const isStatusSelected = paymentStatusPaidBtn.classList.contains('active') || paymentStatusDebtBtn.classList.contains('active');
+
+    if (!isStatusSelected) {
+        if (receiptError) {
+            receiptError.textContent = 'Paragon nie zapisany! Wybierz status płatności!';
+            receiptError.style.display = 'block';
+        } else {
+            // Awaryjny alert, gdyby coś poszło nie tak
+            alert('Paragon nie zapisany! Wybierz status płatności!');
+        }
+        return; // Zatrzymaj dalsze wykonywanie funkcji
     }
+    // ⬆️ KONIEC NOWEJ WALIDACJI ⬆️
+
+    if (receiptItems.length === 0) {
+      alert('Paragon jest pusty, nie ma czego zapisywać.');
+      return;
+    }
 
     // --- 1. Pobranie danych do zapisu ---
     let statusText = "Nie wybrano statusu";
