@@ -1659,7 +1659,7 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
                 </tr>
             </thead>
             <tbody id="archiveReceiptTableBody">
-                <tr><td colspan="6" style="text-align: center; padding: 20px; color: #555;">Wybierz użytkownika, aby wczytać dane.</td></tr>
+                <tr><td colspan="9" style="text-align: center; padding: 20px; color: #555;">Wybierz użytkownika, aby wczytać dane.</td></tr>
             </tbody>
         </table>
     </div>
@@ -3449,6 +3449,7 @@ const savedReceiptSummary = document.getElementById('savedReceiptSummary');
 const pluCodeInput = document.getElementById('pluCodeInput');
 const pluBtn = document.getElementById('pluBtn');
 const productUnitDisplay = document.getElementById('productUnitDisplay');
+    const calcNotatkaInput = document.getElementById('calcNotatkaInput'); // ✅ ZADANIE 2
 // Tablica przechowuje teraz { name: '...', quantity: 1, price: 10.50 }
     // ✅ Moduł 2: Zmienne statusu płatności
 const paymentStatusSection = document.getElementById('paymentStatusSection');
@@ -3717,7 +3718,9 @@ if (saveReceiptBtn) {
         lekarz_nazwisko: currentUserProfile ? `${currentUserProfile.Imie} ${currentUserProfile.Nazwisko}` : 'Nieznany',
         id_lecznicy: currentUserProfile ? currentUserProfile['ID lecznicy'] : null,
         czynnosci: document.getElementById('calcCzynnosciInput').value || '',
-        paymentNote: '', // Pole dla Zadania 3
+        notatka: calcNotatkaInput.value || '', // ✅ ZADANIE 2
+      
+      // Dane do numeracji
         
         // Dane do numeracji
         counter: currentReceiptData.nextCounter,
@@ -3748,7 +3751,15 @@ if (saveReceiptBtn) {
         statusP.style.marginTop = '10px';
         statusP.innerHTML = `Status: <span style="color: ${statusColor};">${statusText}</span>`;
         savedReceiptSummary.appendChild(statusP);
-
+        // ✅ ZADANIE 2: Dodanie notatki do podsumowania
+      if (receiptData.notatka) {
+          const notatkaP = document.createElement('p');
+          notatkaP.style.fontSize = '0.9em';
+          notatkaP.style.color = '#333';
+          notatkaP.style.whiteSpace = 'pre-wrap'; // Zachowaj łamanie linii
+          notatkaP.innerHTML = `<strong>Notatka:</strong> ${receiptData.notatka}`;
+          savedReceiptSummary.appendChild(notatkaP);
+      }
         // Lista produktów (bez zmian)
         const list = document.createElement('ul');
         list.style.listStyle = 'none'; list.style.paddingLeft = '10px';
@@ -3792,7 +3803,7 @@ if (saveReceiptBtn) {
     } else {
          alert('Paragon zapisany (tymczasowo), ale NIE został dodany do archiwum.');
     }
-
+    if (calcNotatkaInput) calcNotatkaInput.value = ''; // ✅ ZADANIE 2: Wyczyść notatkę
     // Resetowanie statusu (bez zmian)
     if (paymentStatusPaidBtn) paymentStatusPaidBtn.classList.remove('active');
     if (paymentStatusDebtBtn) paymentStatusDebtBtn.classList.remove('active');
@@ -6765,22 +6776,18 @@ async function loadArchiveReceiptUsers() {
 }
 if(loadArchiveReceiptUsersBtn) loadArchiveReceiptUsersBtn.addEventListener('click', loadArchiveReceiptUsers);
 
-// Wczytuje paragony dla wybranego lekarza
-// ✅ ZMODYFIKOWANA FUNKCJA
-// Wczytuje paragony dla wybranego lekarza (ZMODYFIKOWANA O "WSZYSCY")
-// ✅ ZASTĄP CAŁĄ FUNKCJĘ TYM KODEM
 // ✅ ZASTĄP CAŁĄ FUNKCJĘ TYM KODEM (Zadanie 2 i 3)
 async function loadReceiptsForUser(lekarz_uid) {
     const tableBody = document.getElementById('archiveReceiptTableBody');
     const filterControls = document.getElementById('archiveReceiptFilterControls');
 
     if (!lekarz_uid) {
-        tableBody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 20px; color: #555;">Wybierz użytkownika, aby zobaczyć archiwum.</td></tr>';
+        tableBody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 20px; color: #555;">Wybierz użytkownika, aby zobaczyć archiwum.</td></tr>'; // Zmieniono colspan
         filterControls.style.display = 'none';
         return;
     }
     
-    tableBody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 20px; color: #555;">Wczytywanie paragonów... ⏳</td></tr>';
+    tableBody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 20px; color: #555;">Wczytywanie paragonów... ⏳</td></tr>'; // Zmieniono colspan
     filterControls.style.display = 'none';
 
     let q; 
@@ -6791,25 +6798,25 @@ async function loadReceiptsForUser(lekarz_uid) {
         } else {
             const userClinicId = currentUserProfile['ID lecznicy'];
             if (!userClinicId) {
-                 tableBody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 20px; color: red;">Błąd: Twój profil nie ma przypisanego ID lecznicy.</td></tr>';
-                 return;
+                  tableBody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 20px; color: red;">Błąd: Twój profil nie ma przypisanego ID lecznicy.</td></tr>'; // Zmieniono colspan
+                  return;
             }
             q = db.collection("archiwumParagony")
-                  .where("id_lecznicy", "==", userClinicId)
-                  .orderBy("createdAt", "desc");
+                    .where("id_lecznicy", "==", userClinicId)
+                    .orderBy("createdAt", "desc");
         }
     } else {
         console.log(`Wczytywanie paragonów dla UID: ${lekarz_uid}`);
         q = db.collection("archiwumParagony")
-              .where("lekarz_uid", "==", lekarz_uid)
-              .orderBy("createdAt", "desc");
+                  .where("lekarz_uid", "==", lekarz_uid)
+                  .orderBy("createdAt", "desc");
     }
 
     try {
         const snapshot = await q.get(); 
         
         if (snapshot.empty) {
-            tableBody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 20px; color: #999;">Brak zapisanych paragonów dla tego wyboru.</td></tr>';
+            tableBody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 20px; color: #999;">Brak zapisanych paragonów dla tego wyboru.</td></tr>'; // Zmieniono colspan
             filterControls.style.display = 'none';
             return;
         }
@@ -6822,15 +6829,17 @@ async function loadReceiptsForUser(lekarz_uid) {
             
             const statusColor = receipt.status === "Zapłacone" ? "green" : (receipt.status === "Dług" ? "red" : "#555");
             const suma = parseFloat(receipt.suma) || 0;
+            const notatka = receipt.notatka || ''; // ✅ ZADANIE 2
             
             // Zapisujemy dane do atrybutów data-*
             tr.dataset.data = receipt.data || '';
             tr.dataset.klient = receipt.klient || 'Klient nieznany';
-            tr.dataset.czynnosci = receipt.czynnosci || ''; // NOWE
-            tr.dataset.nrDokumentu = receipt.nrDokumentu || ''; // NOWE
+            tr.dataset.czynnosci = receipt.czynnosci || '';
+            tr.dataset.nrDokumentu = receipt.nrDokumentu || '';
             tr.dataset.status = receipt.status || 'Nie wybrano';
             tr.dataset.suma = suma;
             tr.dataset.lekarz = receipt.lekarz_nazwisko || 'Nieznany';
+            tr.dataset.notatka = notatka; // ✅ ZADANIE 2
             
             // --- Budowanie wiersza metodą DOM ---
 
@@ -6844,12 +6853,12 @@ async function loadReceiptsForUser(lekarz_uid) {
             tdKlient.textContent = receipt.klient || 'Klient nieznany';
             tr.appendChild(tdKlient);
 
-            // Komórka 3: Czynności (NOWA)
+            // Komórka 3: Czynności
             const tdCzynnosci = document.createElement('td');
             tdCzynnosci.textContent = receipt.czynnosci || '';
             tr.appendChild(tdCzynnosci);
 
-            // Komórka 4: Nr Dokumentu (NOWA)
+            // Komórka 4: Nr Dokumentu
             const tdNrDok = document.createElement('td');
             tdNrDok.textContent = receipt.nrDokumentu || '';
             tr.appendChild(tdNrDok);
@@ -6872,7 +6881,13 @@ async function loadReceiptsForUser(lekarz_uid) {
             tdLekarz.textContent = receipt.lekarz_nazwisko || 'Nieznany';
             tr.appendChild(tdLekarz);
 
-            // Komórka 8: Akcje (z logiką dla Zadania 3)
+            // ✅ ZADANIE 2: Komórka 8: Notatka
+            const tdNotatka = document.createElement('td');
+            tdNotatka.textContent = notatka.substring(0, 30) + (notatka.length > 30 ? '...' : ''); // Skrócony podgląd
+            tdNotatka.title = notatka; // Pełna notatka w podpowiedzi
+            tr.appendChild(tdNotatka);
+
+            // Komórka 9: Akcje (z logiką dla Zadania 3)
             const tdAkcje = document.createElement('td');
             tdAkcje.className = 'col-akcje';
             
@@ -6900,9 +6915,9 @@ async function loadReceiptsForUser(lekarz_uid) {
         if (lekarz_uid === "ALL" && error.code === 'failed-precondition') {
              alert("BŁĄD BAZY DANYCH: Aby filtrować 'Wszystkich' w lecznicy, wymagany jest nowy indeks. Sprawdź konsolę (F12), aby zobaczyć link do jego utworzenia.");
              console.error("BŁĄD: Prawdopodobnie brakuje indeksu kompozytowego w Firestore. Utwórz indeks dla kolekcji 'archiwumParagony' dla pól: 'id_lecznicy' (Rosnąco) i 'createdAt' (Malejąco).");
-             tableBody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 20px; color: red;">Błąd konfiguracji bazy danych (brak indeksu).</td></tr>';
+             tableBody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 20px; color: red;">Błąd konfiguracji bazy danych (brak indeksu).</td></tr>'; // Zmieniono colspan
         } else {
-             tableBody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 20px; color: red;">Wystąpił błąd podczas wczytywania paragonów.</td></tr>';
+             tableBody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 20px; color: red;">Wystąpił błąd podczas wczytywania paragonów.</td></tr>'; // Zmieniono colspan
         }
         filterControls.style.display = 'none';
     }
@@ -6935,12 +6950,12 @@ if (archiveReceiptTableBody) {
                 receiptText += `Czynności: ${r.czynnosci || 'Brak'}\n`;
                 
                 receiptText += `Nr Dokumentu: ${r.nrDokumentu}\n`;
-                receiptText += `Status: ${r.status}\n`;
+               receiptText += `Status: ${r.status}\n`;
 
-                // ⬇️ DODANA LOGIKA (Zadanie 3) ⬇️
-                if (r.paymentNote) {
-                    receiptText += `Notatka: ${r.paymentNote}\n`;
-                }
+          // ⬇️ ZMODYFIKOWANA LOGIKA (Zadanie 2) ⬇️
+          if (r.notatka) {
+              receiptText += `Notatka: ${r.notatka}\n`;
+          }
 
                 receiptText += `Użytkownik: ${r.lekarz_nazwisko}\n`;
                 receiptText += `--------------------------\n`;
@@ -6980,53 +6995,73 @@ if (archiveReceiptTableBody) {
                 }
             }
         }
-        else if (target.classList.contains('btn-pay-debt')) {
-            const receiptId = target.dataset.receiptId;
-            const klient = target.dataset.receiptKlient;
-            const suma = parseFloat(target.dataset.receiptSuma) || 0;
-            
-            if (confirm(`Czy na pewno chcesz spłacić dług dla: ${klient} (Suma: ${formatPrice(suma)})?\n\nStatus zostanie zmieniony na "Zapłacone", a data zaktualizowana.`)) {
-                
-                target.disabled = true;
-                target.textContent = '...';
-                
-                const today = new Date().toISOString().split('T')[0];
-                
-                const updateData = {
-                    status: "Zapłacone",
-                    data: today, // Aktualizuj datę paragonu na datę spłaty
-                    paymentNote: "**Spłata Długu**" // Dodaj notatkę
-                };
-                
-                try {
-                    // Zaktualizuj bazę danych
-                    await db.collection("archiwumParagony").doc(receiptId).update(updateData);
-                    
-                    // Zaktualizuj tabelę w widoku (bez przeładowania)
-                    const tr = target.closest('tr');
-                    if (tr) {
-                        // Aktualizuj komórkę Daty (indeks 0)
-                        tr.cells[0].textContent = today;
-                        tr.dataset.data = today;
-                        
-                        // Aktualizuj komórkę Statusu (indeks 4)
-                        tr.cells[4].textContent = "Zapłacone";
-                        tr.cells[4].style.color = "green";
-                        tr.dataset.status = "Zapłacone";
-                    }
-                    
-                    // Ukryj przycisk "Zapłać"
-                    target.style.display = 'none';
-                    alert('Dług został pomyślnie spłacony.');
+ // --- ✅ ZADANIE 3: ZMODYFIKOWANA LOGIKA SPŁATY DŁUGU ---
+      else if (target.classList.contains('btn-pay-debt')) {
+          const receiptId = target.dataset.receiptId;
+          const klient = target.dataset.receiptKlient;
+          const suma = parseFloat(target.dataset.receiptSuma) || 0;
+          
+          if (confirm(`Czy na pewno chcesz spłacić dług dla: ${klient} (Suma: ${formatPrice(suma)})?\n\nStatus zostanie zmieniony na "Zapłacone", a data zaktualizowana.`)) {
+              
+              target.disabled = true;
+              target.textContent = '...';
+              
+              const today = new Date().toISOString().split('T')[0];
+              
+              try {
+                  // Logika odczytu-przed-zapisem
+                  const docRef = db.collection("archiwumParagony").doc(receiptId);
+                  const doc = await docRef.get();
+                  
+                  let existingNote = '';
+                  if (doc.exists) {
+                      existingNote = doc.data().notatka || '';
+                  }
+                  
+                  // Stwórz nową notatkę, dodając tekst na początku
+                  const newNote = "SPŁATA DŁUGU" + (existingNote ? ` | ${existingNote}` : '');
+                  
+                  const updateData = {
+                      status: "Zapłacone",
+                      data: today, // Aktualizuj datę paragonu na datę spłaty
+                      notatka: newNote // Zaktualizowana notatka
+                  };
+                  
+                  // Zaktualizuj bazę danych
+                  await docRef.update(updateData);
+                  
+                  // Zaktualizuj tabelę w widoku (bez przeładowania)
+                  const tr = target.closest('tr');
+                  if (tr) {
+                      // Aktualizuj komórkę Daty (indeks 0)
+                      tr.cells[0].textContent = today;
+                      tr.dataset.data = today;
+                      
+                      // Aktualizuj komórkę Statusu (indeks 4)
+                      tr.cells[4].textContent = "Zapłacone";
+                      tr.cells[4].style.color = "green";
+                      tr.dataset.status = "Zapłacone";
+                      
+                      // Aktualizuj komórkę Notatki (indeks 7)
+                      if (tr.cells[7]) { // Sprawdź czy komórka istnieje
+                          tr.cells[7].textContent = newNote.substring(0, 30) + (newNote.length > 30 ? '...' : ''); // Skrócony podgląd
+                          tr.cells[7].title = newNote;
+                          tr.dataset.notatka = newNote;
+                      }
+                  }
+                  
+                  // Ukryj przycisk "Zapłać"
+                  target.style.display = 'none';
+                  alert('Dług został pomyślnie spłacony.');
 
-                } catch (error) {
-                    console.error("Błąd podczas spłaty długu:", error);
-                    alert("Wystąpił błąd. Spróbuj ponownie.");
-                    target.disabled = false;
-                    target.textContent = 'Zapłać';
-                }
-            }
-        }
+              } catch (error) {
+                  console.error("Błąd podczas spłaty długu:", error);
+                  alert("Wystąpił błąd. Spróbuj ponownie.");
+                  target.disabled = false;
+                  target.textContent = 'Zapłać';
+              }
+          }
+      }
     });
 }
     
