@@ -3652,7 +3652,40 @@ if (copyCheckbox) {
 // Zapisywanie paragonu
 if (saveReceiptBtn) {
   saveReceiptBtn.addEventListener('click', async () => { // Zmieniono na async
-    if (receiptItems.length === 0) {
+  // ⬇️ POCZĄTEK ZMIAN (ZADANIE 1) ⬇️
+    // Walidacja statusu płatności
+    if (paymentStatusPaidBtn && paymentStatusDebtBtn &&
+        !paymentStatusPaidBtn.classList.contains('active') &&
+        !paymentStatusDebtBtn.classList.contains('active')) {
+        
+        // Znajdź lub stwórz element błędu
+        let errorMsgEl = document.getElementById('paymentStatusError');
+        if (!errorMsgEl) {
+            errorMsgEl = document.createElement('p');
+            errorMsgEl.id = 'paymentStatusError';
+            errorMsgEl.style.color = '#c0392b';
+            errorMsgEl.style.fontWeight = 'bold';
+            errorMsgEl.style.marginTop = '10px';
+            errorMsgEl.style.textAlign = 'center'; // Wyśrodkuj błąd
+            // Wstaw błąd przed przyciskami zapisu
+            const saveButtonsContainer = saveReceiptBtn.closest('div');
+            if (saveButtonsContainer) {
+                saveButtonsContainer.parentNode.insertBefore(errorMsgEl, saveButtonsContainer);
+            }
+        }
+        errorMsgEl.textContent = 'PARAGON NIEZAPISANY. USTAW STATUS PŁATNOŚCI.';
+        errorMsgEl.style.display = 'block';
+        
+        // Ukryj błąd po 3 sekundach
+        setTimeout(() => { if (errorMsgEl) errorMsgEl.style.display = 'none'; }, 3000);
+        return; // Zatrzymaj zapis
+    }
+    
+    // Ukryj błąd, jeśli walidacja przeszła
+    let errorMsgEl = document.getElementById('paymentStatusError');
+    if (errorMsgEl) errorMsgEl.style.display = 'none';
+    // ⬆️ KONIEC ZMIAN (ZADANIE 1) ⬆️
+      if (receiptItems.length === 0) {
       alert('Paragon jest pusty, nie ma czego zapisywać.');
       return;
     }
