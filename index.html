@@ -8954,28 +8954,34 @@ try {
         }
     }
     
-    // 4. Funkcja do wypełniania i filtrowania listy w modalu klienta
+ // 4. Funkcja do wypełniania i filtrowania listy w modalu klienta (WERSJA POPRAWIONA - czyta z <datalist>)
     function populateAndFilterClientList() {
         if (!clientSearchListModal) return;
 
-        // `cachedClients` to Twoja globalna tablica z klientami (zdefiniowana wcześnie w kodzie)
-        if (typeof cachedClients === 'undefined' || cachedClients.length === 0) {
-            clientSearchListModal.innerHTML = '<div class="client-search-item" style="cursor: default;">Błąd: Brak załadowanej bazy klientów.</div>';
+        // --- ⬇️ TUTAJ JEST GŁÓWNA POPRAWKA ⬇️ ---
+        // Zamiast 'cachedClients', czytamy z 'klientList', która jest ładowana na starcie
+        const dataList = document.getElementById('klientList');
+        if (!dataList || dataList.options.length === 0) {
+            clientSearchListModal.innerHTML = '<div class="client-search-item" style="cursor: default;">Błąd: Lista klientów (klientList) jest pusta lub niezaładowana.</div>';
             return;
         }
+        // --- ⬆️ KONIEC POPRAWKI ⬆️ ---
 
         const filterText = clientSearchInputModal.value.toLowerCase().trim();
         clientSearchListModal.innerHTML = ''; // Wyczyść listę
-
         let foundItems = 0;
         
-        // Sortuj alfabetycznie przed wyświetleniem
-        cachedClients.sort((a, b) => (a.nazwa || '').localeCompare(b.nazwa || '', 'pl'));
+        // Konwertujemy kolekcję opcji na tablicę, aby ją posortować
+        const options = Array.from(dataList.options);
         
-        cachedClients.forEach(klient => {
-            const nazwa = klient.nazwa || '';
-            const adres = klient.adres || '';
-            const nrStada = klient.nrStada || '';
+        // Sortuj alfabetycznie
+        options.sort((a, b) => (a.value || '').localeCompare(b.value || '', 'pl'));
+        
+        // Iterujemy po opcjach z <datalist>
+        options.forEach(opt => {
+            const nazwa = opt.value || '';
+            const adres = opt.dataset.adres || '';
+            const nrStada = opt.dataset.nrstada || ''; // W HTML atrybut jest 'nrstada' (małymi)
             
             // Stwórz tekst do wyszukiwania (nazwa + adres + nr stada)
             const searchableText = `${nazwa} ${adres} ${nrStada}`.toLowerCase();
@@ -8990,13 +8996,21 @@ try {
                     <strong>${nazwa}</strong>
                     <span class="details">
                         ${adres ? `Adres: ${adres}` : ''}
-                        ${(adres && nrStada) ? '<br>' : ''} ${nrStada ? `Nr stada: ${nrStada}` : ''}
+                        ${(adres && nrStada) ? '<br>' : ''}
+                        ${nrStada ? `Nr stada: ${nrStada}` : ''}
                     </span>
                 `;
                 
+                // Stwórz obiekt 'klient' (taki sam, jakiego oczekuje funkcja select)
+                const klientData = {
+                    nazwa: nazwa,
+                    adres: adres,
+                    nrStada: nrStada
+                };
+
                 // Dodaj listener kliknięcia do tego elementu
                 itemDiv.addEventListener('click', () => {
-                    selectClientFromModal(klient);
+                    selectClientFromModal(klientData);
                 });
                 
                 clientSearchListModal.appendChild(itemDiv);
