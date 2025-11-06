@@ -8714,6 +8714,7 @@ try {
     // === 3. PODPIĘCIE LISTENERÓW ===
 
     // Listener Tabeli (Główny - obsługuje D-pad i Modal)
+   // 2. Aktywacja przez kliknięcie w tabelę (WERSJA 2.1 - Poprawka fokusu inputów)
     if (kartaTableBody) {
         kartaTableBody.addEventListener('click', (e) => {
             const targetCell = e.target.closest('td');
@@ -8724,14 +8725,17 @@ try {
 
             if (cellIndex === 4) { // Kolumna "Produkt Leczniczy"
                 e.preventDefault(); 
-                e.stopPropagation();
-                openProductSearchModal(targetCell); // Otwórz modal
+                e.stopPropagation(); // Zatrzymaj propagację TYLKO dla modala
+                openProductSearchModal(targetCell); 
                 return; 
             }
             
-            // Inne komórki: aktywuj D-pad
+            // Oryginalna logika D-pada dla innych komórek
             setActiveCell(targetCell);
-            e.stopPropagation();
+            
+            // NIE wywołujemy e.stopPropagation() dla innych komórek.
+            // Pozwala to przeglądarce na domyślne zachowanie
+            // (np. fokusowanie inputa i otwarcie klawiatury numerycznej).
         });
     }
 
