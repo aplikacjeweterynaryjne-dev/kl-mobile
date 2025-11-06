@@ -8623,7 +8623,7 @@ try {
         setTimeout(() => productSearchInputModal.focus(), 50);
     }
 
-    // Funkcja D-pada: Ustawianie aktywnej komórki (WERSJA 2.0)
+   // Funkcja D-pada: Ustawianie aktywnej komórki (WERSJA 2.2 - z auto-przewijaniem)
     function setActiveCell(cell) {
         if (!cell || cell.tagName !== 'TD' || cell.closest('thead')) { return; }
         const cellIndex = Array.from(cell.parentNode.cells).indexOf(cell);
@@ -8638,6 +8638,11 @@ try {
         activeCell = cell;
         activeCell.classList.add('active-cell-highlight');
         if (cellNavigator) { cellNavigator.style.display = 'flex'; }
+
+        // --- ⬇️ TUTAJ JEST DODANA POPRAWKA PRZEWIJANIA ⬇️ ---
+        // Delikatnie przewiń, aby komórka była widoczna (szczególnie w poziomie)
+        activeCell.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+        // --- ⬆️ KONIEC POPRAWKI ⬆️ ---
 
         if (activeCell.contentEditable === 'true') {
             activeCell.focus();
@@ -8794,15 +8799,16 @@ try {
         }
     });
 
-    document.getElementById('navDown')?.addEventListener('click', () => {
+   document.getElementById('navDown')?.addEventListener('click', () => {
         const loc = getCellLocation(activeCell);
         if (!loc) return;
+        // Upewnij się, że nie jesteś w ostatnim wierszu
         if (loc.rowIndex < loc.rows.length - 1) {
             const nextRow = loc.rows[loc.rowIndex + 1];
-            const targetCell = nextRow.cells[loc.cellIndex];
+            const targetCell = nextRow.cells[loc.cellIndex]; // Komórka w tej samej kolumnie
             if (targetCell) {
                 setActiveCell(targetCell);
-                targetCell.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+                // Przewijanie jest teraz obsługiwane przez setActiveCell
             }
         }
     });
@@ -8810,12 +8816,13 @@ try {
     document.getElementById('navUp')?.addEventListener('click', () => {
         const loc = getCellLocation(activeCell);
         if (!loc) return;
+        // Upewnij się, że nie jesteś w pierwszym wierszu
         if (loc.rowIndex > 0) {
             const prevRow = loc.rows[loc.rowIndex - 1];
-            const targetCell = prevRow.cells[loc.cellIndex];
+            const targetCell = prevRow.cells[loc.cellIndex]; // Komórka w tej samej kolumnie
             if (targetCell) {
                 setActiveCell(targetCell);
-                targetCell.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+                // Przewijanie jest teraz obsługiwane przez setActiveCell
             }
         }
     });
