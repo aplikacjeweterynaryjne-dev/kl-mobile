@@ -8583,50 +8583,68 @@ try {
     const kartaTableBody = document.getElementById('karta')?.tBodies[0];
     let activeCell = null; // Przechowuje aktualnie klikniętą komórkę <td>
 
-    // 1. Funkcja do podświetlania i ustawiania aktywnej komórki
+ // 1. Funkcja do podświetlania i ustawiania aktywnej komórki (WERSJA 2.0 z obsługą modala)
     function setActiveCell(cell) {
         if (!cell || cell.tagName !== 'TD' || cell.closest('thead')) {
             return;
         }
-        
-        // Usuń stare podświetlenie
+
+        // Sprawdź indeks komórki
+        const cellIndex = Array.from(cell.parentNode.cells).indexOf(cell);
+
+        // ⬇️ NOWA LOGIKA PRZECHWYTUJĄCA ⬇️
+        if (cellIndex === 4) { // Kolumna "Produkt Leczniczy"
+            // Nie ustawiaj aktywnej komórki, tylko od razu otwórz modal
+            openProductSearchModal(cell); 
+            return; // Zakończ funkcję
+        }
+        // ⬆️ KONIEC NOWEJ LOGIKI ⬆️
+
+        // --- Oryginalna logika D-pada dla pozostałych komórek ---
         if (activeCell) {
             activeCell.classList.remove('active-cell-highlight');
         }
-
-        // Ustaw nową aktywną komórkę
         activeCell = cell;
         activeCell.classList.add('active-cell-highlight');
 
-        // Pokaż nawigator
         if (cellNavigator) {
             cellNavigator.style.display = 'flex';
         }
 
-        // Ustaw focus (dla edycji lub inputa)
         if (activeCell.contentEditable === 'true') {
             activeCell.focus();
         } else {
             const input = activeCell.querySelector('input, textarea');
             if (input) {
                 input.focus();
-                // input.select(); // Opcjonalnie: zaznacz tekst w inpucie
             }
         }
     }
 
-    // 2. Aktywacja przez kliknięcie w tabelę
+   // 2. Aktywacja przez kliknięcie w tabelę (WERSJA 2.0 z obsługą modala)
     if (kartaTableBody) {
         kartaTableBody.addEventListener('click', (e) => {
             const targetCell = e.target.closest('td');
             if (targetCell) {
-                // Sprawdź, czy komórka należy do "specjalnego" wiersza (tego z colSpan)
                 if (targetCell.colSpan === 8) {
                     return; // Ignoruj kliknięcie w specjalny wiersz
                 }
+
+                // Sprawdź indeks komórki
+                const cellIndex = Array.from(targetCell.parentNode.cells).indexOf(targetCell);
+
+                // ⬇️ NOWA LOGIKA PRZECHWYTUJĄCA ⬇️
+                if (cellIndex === 4) { // Kolumna "Produkt Leczniczy"
+                    e.preventDefault(); // Zatrzymaj domyślną akcję (np. focus)
+                    e.stopPropagation();
+                    openProductSearchModal(targetCell); // Otwórz nasz modal
+                    return; // Zakończ
+                }
+                // ⬆️ KONIEC NOWEJ LOGIKI ⬆️
                 
+                // Oryginalna logika D-pada dla innych komórek
                 setActiveCell(targetCell);
-                e.stopPropagation(); // Zatrzymaj propagację, aby listener dokumentu nie zadziałał
+                e.stopPropagation();
             }
         });
     }
@@ -8723,9 +8741,6 @@ try {
     });
 
 } catch (err) {
-    console.error("Błąd inicjalizacji Nawigatora Komórek:", err);
-}
-/* ⬆️ KONIEC BLOKU JAVASCRIPT ⬆️ */
 /* ⬇️ KROK 3: WKLEJ TEN BLOK KODU JAVASCRIPT ⬇️ */
 
 // --- Logika Modala Wyszukiwania Produktów ---
@@ -8832,120 +8847,6 @@ try {
     if (productSearchInputModal) {
         productSearchInputModal.addEventListener('input', populateAndFilterProductList);
     }
-
-    // --- Modyfikacja istniejących listenerów (KROK 3B) ---
-
-    // 7. Przechwyć kliknięcie w komórkę z lekiem (index 4)
-    // Modyfikujemy istniejący listener D-pada
-    if (kartaTableBody) {
-        // Usuwamy stary listener, aby się nie powielał (na wszelki wypadek)
-        // (Zakładamy, że ten kod jest na końcu, więc stary listener już istnieje)
-        
-        // Zastąpimy logikę w `setActiveCell` ORAZ w `kartaTableBody.addEventListener`
-        
-        // ZNAJDŹ I ZASTĄP CAŁĄ FUNKCJĘ 'setActiveCell' (ok. linii 3749)
-        // (Stara funkcja jest zakomentowana poniżej dla porównania)
-        /* // STARA FUNKCJA (do zastąpienia):
-        function setActiveCell(cell) {
-            if (!cell || cell.tagName !== 'TD' || cell.closest('thead')) { return; }
-            if (activeCell) { activeCell.classList.remove('active-cell-highlight'); }
-            activeCell = cell;
-            activeCell.classList.add('active-cell-highlight');
-            if (cellNavigator) { cellNavigator.style.display = 'flex'; }
-            if (activeCell.contentEditable === 'true') {
-                activeCell.focus();
-            } else {
-                const input = activeCell.querySelector('input, textarea');
-                if (input) { input.focus(); }
-            }
-        }
-        */
-
-        // NOWA, POPRAWIONA FUNKCJA 'setActiveCell':
-        function setActiveCell(cell) {
-            if (!cell || cell.tagName !== 'TD' || cell.closest('thead')) {
-                return;
-            }
-
-            // Sprawdź indeks komórki
-            const cellIndex = Array.from(cell.parentNode.cells).indexOf(cell);
-
-            // ⬇️ NOWA LOGIKA PRZECHWYTUJĄCA ⬇️
-            if (cellIndex === 4) { // Kolumna "Produkt Leczniczy"
-                // Nie ustawiaj aktywnej komórki, tylko od razu otwórz modal
-                openProductSearchModal(cell); 
-                return; // Zakończ funkcję
-            }
-            // ⬆️ KONIEC NOWEJ LOGIKI ⬆️
-
-            // --- Oryginalna logika D-pada dla pozostałych komórek ---
-            if (activeCell) {
-                activeCell.classList.remove('active-cell-highlight');
-            }
-            activeCell = cell;
-            activeCell.classList.add('active-cell-highlight');
-
-            if (cellNavigator) {
-                cellNavigator.style.display = 'flex';
-            }
-
-            if (activeCell.contentEditable === 'true') {
-                activeCell.focus();
-            } else {
-                const input = activeCell.querySelector('input, textarea');
-                if (input) {
-                    input.focus();
-                }
-            }
-        }
-        
-        // 8. ZNAJDŹ I ZASTĄP CAŁY LISTENER 'kartaTableBody' (ok. linii 3777)
-        // (Stary listener jest zakomentowany poniżej dla porównania)
-        /*
-        // STARY LISTENER (do zastąpienia):
-        if (kartaTableBody) {
-            kartaTableBody.addEventListener('click', (e) => {
-                const targetCell = e.target.closest('td');
-                if (targetCell) {
-                    if (targetCell.colSpan === 8) {
-                        return; // Ignoruj kliknięcie w specjalny wiersz
-                    }
-                    setActiveCell(targetCell);
-                    e.stopPropagation(); // Zatrzymaj propagację, aby listener dokumentu nie zadziałał
-                }
-            });
-        }
-        */
-        
-        // NOWY, POPRAWIONY LISTENER 'kartaTableBody':
-        if (kartaTableBody) {
-            kartaTableBody.addEventListener('click', (e) => {
-                const targetCell = e.target.closest('td');
-                if (targetCell) {
-                    if (targetCell.colSpan === 8) {
-                        return; // Ignoruj kliknięcie w specjalny wiersz
-                    }
-
-                    // Sprawdź indeks komórki
-                    const cellIndex = Array.from(targetCell.parentNode.cells).indexOf(targetCell);
-
-                    // ⬇️ NOWA LOGIKA PRZECHWYTUJĄCA ⬇️
-                    if (cellIndex === 4) { // Kolumna "Produkt Leczniczy"
-                        e.preventDefault(); // Zatrzymaj domyślną akcję (np. focus)
-                        e.stopPropagation();
-                        openProductSearchModal(targetCell); // Otwórz nasz modal
-                        return; // Zakończ
-                    }
-                    // ⬆️ KONIEC NOWEJ LOGIKI ⬆️
-                    
-                    // Oryginalna logika D-pada dla innych komórek
-                    setActiveCell(targetCell);
-                    e.stopPropagation();
-                }
-            });
-        }
-    }
-    
 } catch(err) {
     console.error("Błąd inicjalizacji Modala Wyszukiwania Produktów:", err);
 }
