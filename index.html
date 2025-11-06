@@ -1229,6 +1229,79 @@ table {
     }
 }
 /* ⬆️ KONIEC BLOKU CSS ⬆️ */
+/* ⬇️ KROK 2: WKLEJ TEN BLOK KODU CSS ⬇️ */
+
+/* --- Style dla Modala Wyszukiwania Produktów --- */
+.product-search-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0,0,0,0.4); /* Półprzezroczyste tło */
+    display: flex; /* (display: none; jest w HTML-u) */
+    justify-content: center;
+    align-items: center;
+    z-index: 10002; /* Wyżej niż D-pad, ale niżej niż Toasty */
+}
+.product-search-card {
+    display: flex;
+    flex-direction: column;
+    width: 95vw; /* 95% szerokości ekranu */
+    max-width: 500px; /* Ale nie więcej niż 500px */
+    height: 80vh; /* 80% wysokości ekranu */
+    max-height: 600px; /* Ale nie więcej niż 600px */
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.2);
+    padding: 16px;
+    box-sizing: border-box; /* Ważne dla paddingu */
+}
+.product-search-card h3 {
+    margin-top: 0;
+    font-size: 22px;
+    text-align: center;
+}
+/* Pole wyszukiwania w modalu */
+#productSearchInputModal {
+    width: 100%;
+    padding: 10px 12px;
+    font-size: 18px;
+    border: 2px solid #ccc;
+    border-radius: 8px;
+    margin-bottom: 10px;
+    box-sizing: border-box;
+}
+#productSearchInputModal:focus {
+    border-color: #6A994E; /* Twój zielony kolor */
+    outline: none;
+}
+/* Lista produktów w modalu */
+.product-search-list {
+    flex-grow: 1; /* Zajmuje całe wolne miejsce */
+    overflow-y: auto; /* Dodaje pasek przewijania */
+    border: 1px solid #eee;
+    border-radius: 8px;
+    background: #fdfdfd;
+}
+.product-search-item {
+    padding: 12px 10px;
+    font-size: 16px;
+    border-bottom: 1px solid #f0f0f0;
+    cursor: pointer;
+    user-select: none; /* Zapobiega zaznaczaniu tekstu przy klikaniu */
+}
+.product-search-item:hover {
+    background: #EBF5E6; /* Twoja jasnozielona zieleń */
+}
+.product-search-item:last-child {
+    border-bottom: none;
+}
+/* Ukryj elementy listy, które nie pasują do filtra */
+.product-search-item.filtered-out {
+    display: none;
+}
+/* ⬆️ KONIEC BLOKU CSS ⬆️ */
 </style>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
@@ -1687,7 +1760,18 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
 </div>
 </div>
 </div>
-<!-- datalist dla leków (tworzone dynamicznie) -->
+
+<div id="productSearchModal" class="product-search-modal" style="display: none;">
+    <div class="product-search-card">
+        <h3>Wyszukaj produkt</h3>
+        <input type="search" id="productSearchInputModal" placeholder="Wpisz nazwę produktu...">
+        <div id="productSearchListModal" class="product-search-list">
+            </div>
+        <div class="form-actions" style="justify-content: flex-end;">
+            <button id="productSearchCloseBtn" class="btn ghost">Anuluj</button>
+        </div>
+    </div>
+</div>
 <datalist id="listaLekow"></datalist>
 </div> <div id="kalkulatorWizytySection" style="display: none;">
 <h2>Kalkulator Wizyty</h2>
@@ -8640,6 +8724,230 @@ try {
 
 } catch (err) {
     console.error("Błąd inicjalizacji Nawigatora Komórek:", err);
+}
+/* ⬆️ KONIEC BLOKU JAVASCRIPT ⬆️ */
+/* ⬇️ KROK 3: WKLEJ TEN BLOK KODU JAVASCRIPT ⬇️ */
+
+// --- Logika Modala Wyszukiwania Produktów ---
+try {
+    // 1. Zmienne globalne dla modala
+    const productSearchModal = document.getElementById('productSearchModal');
+    const productSearchInputModal = document.getElementById('productSearchInputModal');
+    const productSearchListModal = document.getElementById('productSearchListModal');
+    const productSearchCloseBtn = document.getElementById('productSearchCloseBtn');
+    
+    // Zmienna przechowująca, którą komórkę <td> aktualnie edytujemy
+    let currentProductInputCell = null; 
+
+    // 2. Funkcja otwierająca modal
+    function openProductSearchModal(cell) {
+        if (!cell || !productSearchModal) return;
+
+        console.log("Otwieranie modala wyszukiwania produktu...");
+        currentProductInputCell = cell; // Zapisz, którą komórkę edytujemy
+
+        // Pobierz aktualną wartość z inputa w tabeli
+        const currentInput = cell.querySelector('input[list="listaLekow"]');
+        const currentValue = currentInput ? currentInput.value : '';
+        
+        // Wpisz aktualną wartość do pola wyszukiwania w modalu
+        productSearchInputModal.value = currentValue;
+
+        // Wypełnij listę i od razu przefiltruj
+        populateAndFilterProductList();
+        
+        // Pokaż modal
+        productSearchModal.style.display = 'flex';
+        
+        // Ustaw focus na polu wyszukiwania
+        setTimeout(() => productSearchInputModal.focus(), 50);
+    }
+
+    // 3. Funkcja zamykająca modal
+    function closeProductSearchModal() {
+        if (productSearchModal) {
+            productSearchModal.style.display = 'none';
+        }
+        currentProductInputCell = null; // Wyczyść stan
+    }
+    
+    // 4. Funkcja do wypełniania i filtrowania listy w modalu
+    function populateAndFilterProductList() {
+        if (!productSearchListModal) return;
+
+        // `nazwyLekow` to Twoja globalna tablica z nazwami (zdefiniowana wcześnie w kodzie)
+        if (typeof nazwyLekow === 'undefined' || nazwyLekow.length === 0) {
+            productSearchListModal.innerHTML = '<div class="product-search-item">Błąd: Brak załadowanej bazy leków.</div>';
+            return;
+        }
+
+        const filterText = productSearchInputModal.value.toLowerCase().trim();
+        productSearchListModal.innerHTML = ''; // Wyczyść listę
+
+        let foundItems = 0;
+        nazwyLekow.forEach(lekName => {
+            // Sprawdź, czy lek pasuje do filtra
+            if (filterText === '' || lekName.toLowerCase().includes(filterText)) {
+                const itemDiv = document.createElement('div');
+                itemDiv.className = 'product-search-item';
+                itemDiv.textContent = lekName;
+                itemDiv.dataset.lekName = lekName; // Zapisz nazwę w atrybucie
+                
+                // Dodaj listener kliknięcia do tego elementu
+                itemDiv.addEventListener('click', () => {
+                    selectProductFromModal(lekName);
+                });
+                
+                productSearchListModal.appendChild(itemDiv);
+                foundItems++;
+            }
+        });
+
+        if (foundItems === 0) {
+            productSearchListModal.innerHTML = '<div class="product-search-item" style="color: #999; cursor: default;">Brak pasujących produktów.</div>';
+        }
+    }
+
+    // 5. Funkcja wyboru produktu z listy
+    function selectProductFromModal(lekName) {
+        if (!currentProductInputCell) return;
+
+        const input = currentProductInputCell.querySelector('input[list="listaLekow"]');
+        if (input) {
+            input.value = lekName; // Ustaw wartość w inpucie tabeli
+            
+            // ‼️ NAJWAŻNIEJSZE: Uruchom "ręcznie" zdarzenie 'input' 
+            // To sprawi, że Twoja stara logika (wypełnianie serii, dawkowania, karencji) zadziała!
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+        
+        closeProductSearchModal(); // Zamknij modal
+    }
+
+    // 6. Podpięcie listenerów do modala
+    if (productSearchCloseBtn) {
+        productSearchCloseBtn.addEventListener('click', closeProductSearchModal);
+    }
+    // Filtruj listę przy każdym wpisaniu litery w modalu
+    if (productSearchInputModal) {
+        productSearchInputModal.addEventListener('input', populateAndFilterProductList);
+    }
+
+    // --- Modyfikacja istniejących listenerów (KROK 3B) ---
+
+    // 7. Przechwyć kliknięcie w komórkę z lekiem (index 4)
+    // Modyfikujemy istniejący listener D-pada
+    if (kartaTableBody) {
+        // Usuwamy stary listener, aby się nie powielał (na wszelki wypadek)
+        // (Zakładamy, że ten kod jest na końcu, więc stary listener już istnieje)
+        
+        // Zastąpimy logikę w `setActiveCell` ORAZ w `kartaTableBody.addEventListener`
+        
+        // ZNAJDŹ I ZASTĄP CAŁĄ FUNKCJĘ 'setActiveCell' (ok. linii 3749)
+        // (Stara funkcja jest zakomentowana poniżej dla porównania)
+        /* // STARA FUNKCJA (do zastąpienia):
+        function setActiveCell(cell) {
+            if (!cell || cell.tagName !== 'TD' || cell.closest('thead')) { return; }
+            if (activeCell) { activeCell.classList.remove('active-cell-highlight'); }
+            activeCell = cell;
+            activeCell.classList.add('active-cell-highlight');
+            if (cellNavigator) { cellNavigator.style.display = 'flex'; }
+            if (activeCell.contentEditable === 'true') {
+                activeCell.focus();
+            } else {
+                const input = activeCell.querySelector('input, textarea');
+                if (input) { input.focus(); }
+            }
+        }
+        */
+
+        // NOWA, POPRAWIONA FUNKCJA 'setActiveCell':
+        function setActiveCell(cell) {
+            if (!cell || cell.tagName !== 'TD' || cell.closest('thead')) {
+                return;
+            }
+
+            // Sprawdź indeks komórki
+            const cellIndex = Array.from(cell.parentNode.cells).indexOf(cell);
+
+            // ⬇️ NOWA LOGIKA PRZECHWYTUJĄCA ⬇️
+            if (cellIndex === 4) { // Kolumna "Produkt Leczniczy"
+                // Nie ustawiaj aktywnej komórki, tylko od razu otwórz modal
+                openProductSearchModal(cell); 
+                return; // Zakończ funkcję
+            }
+            // ⬆️ KONIEC NOWEJ LOGIKI ⬆️
+
+            // --- Oryginalna logika D-pada dla pozostałych komórek ---
+            if (activeCell) {
+                activeCell.classList.remove('active-cell-highlight');
+            }
+            activeCell = cell;
+            activeCell.classList.add('active-cell-highlight');
+
+            if (cellNavigator) {
+                cellNavigator.style.display = 'flex';
+            }
+
+            if (activeCell.contentEditable === 'true') {
+                activeCell.focus();
+            } else {
+                const input = activeCell.querySelector('input, textarea');
+                if (input) {
+                    input.focus();
+                }
+            }
+        }
+        
+        // 8. ZNAJDŹ I ZASTĄP CAŁY LISTENER 'kartaTableBody' (ok. linii 3777)
+        // (Stary listener jest zakomentowany poniżej dla porównania)
+        /*
+        // STARY LISTENER (do zastąpienia):
+        if (kartaTableBody) {
+            kartaTableBody.addEventListener('click', (e) => {
+                const targetCell = e.target.closest('td');
+                if (targetCell) {
+                    if (targetCell.colSpan === 8) {
+                        return; // Ignoruj kliknięcie w specjalny wiersz
+                    }
+                    setActiveCell(targetCell);
+                    e.stopPropagation(); // Zatrzymaj propagację, aby listener dokumentu nie zadziałał
+                }
+            });
+        }
+        */
+        
+        // NOWY, POPRAWIONY LISTENER 'kartaTableBody':
+        if (kartaTableBody) {
+            kartaTableBody.addEventListener('click', (e) => {
+                const targetCell = e.target.closest('td');
+                if (targetCell) {
+                    if (targetCell.colSpan === 8) {
+                        return; // Ignoruj kliknięcie w specjalny wiersz
+                    }
+
+                    // Sprawdź indeks komórki
+                    const cellIndex = Array.from(targetCell.parentNode.cells).indexOf(targetCell);
+
+                    // ⬇️ NOWA LOGIKA PRZECHWYTUJĄCA ⬇️
+                    if (cellIndex === 4) { // Kolumna "Produkt Leczniczy"
+                        e.preventDefault(); // Zatrzymaj domyślną akcję (np. focus)
+                        e.stopPropagation();
+                        openProductSearchModal(targetCell); // Otwórz nasz modal
+                        return; // Zakończ
+                    }
+                    // ⬆️ KONIEC NOWEJ LOGIKI ⬆️
+                    
+                    // Oryginalna logika D-pada dla innych komórek
+                    setActiveCell(targetCell);
+                    e.stopPropagation();
+                }
+            });
+        }
+    }
+    
+} catch(err) {
+    console.error("Błąd inicjalizacji Modala Wyszukiwania Produktów:", err);
 }
 /* ⬆️ KONIEC BLOKU JAVASCRIPT ⬆️ */
 </script> 
