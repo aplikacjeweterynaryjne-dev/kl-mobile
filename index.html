@@ -8575,189 +8575,30 @@ function showToast(message, type = 'info', duration = 3000) {
 
 /* ✅ KONIEC: Krok 5 - Logika Powiadomień "Toast" */
 /* ⬆️ ======================================================= ⬆️ */
-/* ⬇️ KROK 3: WKLEJ TEN BLOK KODU JAVASCRIPT ⬇️ */
+/* ⬇️ KOMPLETNA LOGIKA DLA NAWIGATORA I MODALA PRODUKTÓW ⬇️ */
 
-// --- Logika Nawigatora Komórek (D-pad) ---
+// --- Logika Nawigatora Komórek ORAZ Modala Produktów ---
 try {
+    // === 1. ZMIENNE ===
+    
+    // Zmienne D-pada
     const cellNavigator = document.getElementById('cellNavigator');
     const kartaTableBody = document.getElementById('karta')?.tBodies[0];
-    let activeCell = null; // Przechowuje aktualnie klikniętą komórkę <td>
-
- // 1. Funkcja do podświetlania i ustawiania aktywnej komórki (WERSJA 2.0 z obsługą modala)
-    function setActiveCell(cell) {
-        if (!cell || cell.tagName !== 'TD' || cell.closest('thead')) {
-            return;
-        }
-
-        // Sprawdź indeks komórki
-        const cellIndex = Array.from(cell.parentNode.cells).indexOf(cell);
-
-        // ⬇️ NOWA LOGIKA PRZECHWYTUJĄCA ⬇️
-        if (cellIndex === 4) { // Kolumna "Produkt Leczniczy"
-            // Nie ustawiaj aktywnej komórki, tylko od razu otwórz modal
-            openProductSearchModal(cell); 
-            return; // Zakończ funkcję
-        }
-        // ⬆️ KONIEC NOWEJ LOGIKI ⬆️
-
-        // --- Oryginalna logika D-pada dla pozostałych komórek ---
-        if (activeCell) {
-            activeCell.classList.remove('active-cell-highlight');
-        }
-        activeCell = cell;
-        activeCell.classList.add('active-cell-highlight');
-
-        if (cellNavigator) {
-            cellNavigator.style.display = 'flex';
-        }
-
-        if (activeCell.contentEditable === 'true') {
-            activeCell.focus();
-        } else {
-            const input = activeCell.querySelector('input, textarea');
-            if (input) {
-                input.focus();
-            }
-        }
-    }
-
-   // 2. Aktywacja przez kliknięcie w tabelę (WERSJA 2.0 z obsługą modala)
-    if (kartaTableBody) {
-        kartaTableBody.addEventListener('click', (e) => {
-            const targetCell = e.target.closest('td');
-            if (targetCell) {
-                if (targetCell.colSpan === 8) {
-                    return; // Ignoruj kliknięcie w specjalny wiersz
-                }
-
-                // Sprawdź indeks komórki
-                const cellIndex = Array.from(targetCell.parentNode.cells).indexOf(targetCell);
-
-                // ⬇️ NOWA LOGIKA PRZECHWYTUJĄCA ⬇️
-                if (cellIndex === 4) { // Kolumna "Produkt Leczniczy"
-                    e.preventDefault(); // Zatrzymaj domyślną akcję (np. focus)
-                    e.stopPropagation();
-                    openProductSearchModal(targetCell); // Otwórz nasz modal
-                    return; // Zakończ
-                }
-                // ⬆️ KONIEC NOWEJ LOGIKI ⬆️
-                
-                // Oryginalna logika D-pada dla innych komórek
-                setActiveCell(targetCell);
-                e.stopPropagation();
-            }
-        });
-    }
-
-    // 3. Ukrywanie nawigatora (jeśli kliknięto poza sekcją karty)
-    document.addEventListener('click', (e) => {
-        const kartaSection = document.getElementById('kartaLeczeniaSection');
-        
-        // Ukryj, jeśli kliknięto POZA sekcją karty I POZA nawigatorem
-        if (kartaSection && !kartaSection.contains(e.target) && cellNavigator && !cellNavigator.contains(e.target)) {
-            cellNavigator.style.display = 'none';
-            if (activeCell) {
-                activeCell.classList.remove('active-cell-highlight');
-                activeCell = null;
-            }
-        }
-    });
-
-    // --- Funkcje pomocnicze do nawigacji ---
+    let activeCell = null; 
     
-    // Używamy Twojej istniejącej funkcji `rowsEditable()` (zwraca tablicę `<tr>`)
-    const getEditableRows = () => {
-        if (typeof rowsEditable === 'function') {
-            return rowsEditable();
-        }
-        // Fallback, gdyby funkcja nie istniała (chociaż powinna)
-        console.warn("Funkcja rowsEditable() nie znaleziona, używam fallbacku.");
-        return Array.from(kartaTableBody.querySelectorAll('tr')).filter(tr => tr.cells.length === 8);
-    };
-
-    // Zwraca lokalizację komórki { wiersze, indeksWiersza, indeksKomórki, bieżącyWiersz }
-    const getCellLocation = (cell) => {
-        if (!cell) return null;
-        const rows = getEditableRows(); // Pobierz tylko edytowalne wiersze
-        const currentRow = cell.parentElement;
-        const rowIndex = rows.indexOf(currentRow); // Znajdź indeks wiersza WŚRÓD edytowalnych
-        const cellIndex = cell.cellIndex;
-        
-        if (rowIndex === -1) {
-            return null; // Komórka nie jest w edytowalnym wierszu (np. wiersz colspan)
-        }
-        return { rows, rowIndex, cellIndex, currentRow };
-    };
-
-    // --- 4. Logika przycisków nawigatora ---
-
-    document.getElementById('navRight')?.addEventListener('click', () => {
-        const loc = getCellLocation(activeCell);
-        if (!loc) return;
-        // Upewnij się, że nie jesteś w ostatniej komórce (indeks 7)
-        if (loc.cellIndex < loc.currentRow.cells.length - 1) {
-            const nextCell = loc.currentRow.cells[loc.cellIndex + 1];
-            setActiveCell(nextCell);
-        }
-    });
-
-    document.getElementById('navLeft')?.addEventListener('click', () => {
-        const loc = getCellLocation(activeCell);
-        if (!loc) return;
-        // Upewnij się, że nie jesteś w pierwszej komórce (indeks 0 - Lp.)
-        if (loc.cellIndex > 0) {
-            const prevCell = loc.currentRow.cells[loc.cellIndex - 1];
-            setActiveCell(prevCell);
-        }
-    });
-
-    document.getElementById('navDown')?.addEventListener('click', () => {
-        const loc = getCellLocation(activeCell);
-        if (!loc) return;
-        // Upewnij się, że nie jesteś w ostatnim wierszu
-        if (loc.rowIndex < loc.rows.length - 1) {
-            const nextRow = loc.rows[loc.rowIndex + 1];
-            const targetCell = nextRow.cells[loc.cellIndex]; // Komórka w tej samej kolumnie
-            if (targetCell) {
-                setActiveCell(targetCell);
-                // Delikatnie przewiń, aby komórka była widoczna
-                targetCell.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
-            }
-        }
-    });
-
-    document.getElementById('navUp')?.addEventListener('click', () => {
-        const loc = getCellLocation(activeCell);
-        if (!loc) return;
-        // Upewnij się, że nie jesteś w pierwszym wierszu
-        if (loc.rowIndex > 0) {
-            const prevRow = loc.rows[loc.rowIndex - 1];
-            const targetCell = prevRow.cells[loc.cellIndex]; // Komórka w tej samej kolumnie
-            if (targetCell) {
-                setActiveCell(targetCell);
-                targetCell.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
-            }
-        }
-    });
-
-} catch (err) {
-/* ⬇️ KROK 3: WKLEJ TEN BLOK KODU JAVASCRIPT ⬇️ */
-
-// --- Logika Modala Wyszukiwania Produktów ---
-try {
-    // 1. Zmienne globalne dla modala
+    // Zmienne Modala Produktów
     const productSearchModal = document.getElementById('productSearchModal');
     const productSearchInputModal = document.getElementById('productSearchInputModal');
     const productSearchListModal = document.getElementById('productSearchListModal');
     const productSearchCloseBtn = document.getElementById('productSearchCloseBtn');
-    
-    // Zmienna przechowująca, którą komórkę <td> aktualnie edytujemy
     let currentProductInputCell = null; 
 
-    // 2. Funkcja otwierająca modal
+    // === 2. DEFINICJE FUNKCJI ===
+
+    // Funkcja Modala: Otwieranie
     function openProductSearchModal(cell) {
         if (!cell || !productSearchModal) return;
-
+        
         console.log("Otwieranie modala wyszukiwania produktu...");
         currentProductInputCell = cell; // Zapisz, którą komórkę edytujemy
 
@@ -8778,15 +8619,37 @@ try {
         setTimeout(() => productSearchInputModal.focus(), 50);
     }
 
-    // 3. Funkcja zamykająca modal
-    function closeProductSearchModal() {
-        if (productSearchModal) {
-            productSearchModal.style.display = 'none';
+    // Funkcja D-pada: Ustawianie aktywnej komórki (WERSJA 2.0)
+    function setActiveCell(cell) {
+        if (!cell || cell.tagName !== 'TD' || cell.closest('thead')) { return; }
+        const cellIndex = Array.from(cell.parentNode.cells).indexOf(cell);
+
+        if (cellIndex === 4) { // Kolumna "Produkt Leczniczy"
+            openProductSearchModal(cell); 
+            return; // Zakończ funkcję
         }
-        currentProductInputCell = null; // Wyczyść stan
+        
+        // --- Oryginalna logika D-pada dla pozostałych komórek ---
+        if (activeCell) { activeCell.classList.remove('active-cell-highlight'); }
+        activeCell = cell;
+        activeCell.classList.add('active-cell-highlight');
+        if (cellNavigator) { cellNavigator.style.display = 'flex'; }
+
+        if (activeCell.contentEditable === 'true') {
+            activeCell.focus();
+        } else {
+            const input = activeCell.querySelector('input, textarea');
+            if (input) { input.focus(); }
+        }
+    }
+
+    // Funkcja Modala: Zamykanie
+    function closeProductSearchModal() {
+        if (productSearchModal) { productSearchModal.style.display = 'none'; }
+        currentProductInputCell = null; 
     }
     
-    // 4. Funkcja do wypełniania i filtrowania listy w modalu
+    // Funkcja Modala: Wypełnianie i filtrowanie listy
     function populateAndFilterProductList() {
         if (!productSearchListModal) return;
 
@@ -8797,22 +8660,16 @@ try {
         }
 
         const filterText = productSearchInputModal.value.toLowerCase().trim();
-        productSearchListModal.innerHTML = ''; // Wyczyść listę
-
+        productSearchListModal.innerHTML = ''; 
         let foundItems = 0;
+        
         nazwyLekow.forEach(lekName => {
-            // Sprawdź, czy lek pasuje do filtra
             if (filterText === '' || lekName.toLowerCase().includes(filterText)) {
                 const itemDiv = document.createElement('div');
                 itemDiv.className = 'product-search-item';
                 itemDiv.textContent = lekName;
-                itemDiv.dataset.lekName = lekName; // Zapisz nazwę w atrybucie
-                
-                // Dodaj listener kliknięcia do tego elementu
-                itemDiv.addEventListener('click', () => {
-                    selectProductFromModal(lekName);
-                });
-                
+                itemDiv.dataset.lekName = lekName;
+                itemDiv.addEventListener('click', () => { selectProductFromModal(lekName); });
                 productSearchListModal.appendChild(itemDiv);
                 foundItems++;
             }
@@ -8823,34 +8680,133 @@ try {
         }
     }
 
-    // 5. Funkcja wyboru produktu z listy
+    // Funkcja Modala: Wybór produktu
     function selectProductFromModal(lekName) {
         if (!currentProductInputCell) return;
-
         const input = currentProductInputCell.querySelector('input[list="listaLekow"]');
         if (input) {
-            input.value = lekName; // Ustaw wartość w inpucie tabeli
-            
-            // ‼️ NAJWAŻNIEJSZE: Uruchom "ręcznie" zdarzenie 'input' 
-            // To sprawi, że Twoja stara logika (wypełnianie serii, dawkowania, karencji) zadziała!
+            input.value = lekName; 
+            // Uruchom 'input' event, aby Twoja stara logika (wypełnianie serii/karencji) zadziałała
             input.dispatchEvent(new Event('input', { bubbles: true }));
         }
-        
-        closeProductSearchModal(); // Zamknij modal
+        closeProductSearchModal(); 
     }
 
-    // 6. Podpięcie listenerów do modala
+    // Funkcje Pomocnicze D-pada (pobieranie wierszy i lokalizacji)
+    const getEditableRows = () => {
+        if (typeof rowsEditable === 'function') {
+            return rowsEditable();
+        }
+        // Fallback
+        console.warn("Funkcja rowsEditable() nie znaleziona, używam fallbacku.");
+        return Array.from(kartaTableBody.querySelectorAll('tr')).filter(tr => tr.cells.length === 8);
+    };
+    const getCellLocation = (cell) => {
+        if (!cell) return null;
+        const rows = getEditableRows();
+        const currentRow = cell.parentElement;
+        const rowIndex = rows.indexOf(currentRow);
+        const cellIndex = cell.cellIndex;
+        if (rowIndex === -1) { return null; }
+        return { rows, rowIndex, cellIndex, currentRow };
+    };
+
+    // === 3. PODPIĘCIE LISTENERÓW ===
+
+    // Listener Tabeli (Główny - obsługuje D-pad i Modal)
+    if (kartaTableBody) {
+        kartaTableBody.addEventListener('click', (e) => {
+            const targetCell = e.target.closest('td');
+            if (!targetCell) return;
+            if (targetCell.colSpan === 8) { return; } // Ignoruj specjalny wiersz
+            
+            const cellIndex = Array.from(targetCell.parentNode.cells).indexOf(targetCell);
+
+            if (cellIndex === 4) { // Kolumna "Produkt Leczniczy"
+                e.preventDefault(); 
+                e.stopPropagation();
+                openProductSearchModal(targetCell); // Otwórz modal
+                return; 
+            }
+            
+            // Inne komórki: aktywuj D-pad
+            setActiveCell(targetCell);
+            e.stopPropagation();
+        });
+    }
+
+    // Listener "tła" (do zamykania D-pada)
+    document.addEventListener('click', (e) => {
+        const kartaSection = document.getElementById('kartaLeczeniaSection');
+        
+        // Ukryj, jeśli kliknięto POZA sekcją karty I POZA nawigatorem
+        if (kartaSection && !kartaSection.contains(e.target) && cellNavigator && !cellNavigator.contains(e.target)) {
+            cellNavigator.style.display = 'none';
+            if (activeCell) {
+                activeCell.classList.remove('active-cell-highlight');
+                activeCell = null;
+            }
+        }
+    });
+
+    // Listenery przycisków D-pada
+    document.getElementById('navRight')?.addEventListener('click', () => {
+        const loc = getCellLocation(activeCell);
+        if (!loc) return;
+        if (loc.cellIndex < loc.currentRow.cells.length - 1) {
+            const nextCell = loc.currentRow.cells[loc.cellIndex + 1];
+            setActiveCell(nextCell);
+        }
+    });
+
+    document.getElementById('navLeft')?.addEventListener('click', () => {
+        const loc = getCellLocation(activeCell);
+        if (!loc) return;
+        if (loc.cellIndex > 0) {
+            const prevCell = loc.currentRow.cells[loc.cellIndex - 1];
+            setActiveCell(prevCell);
+        }
+    });
+
+    document.getElementById('navDown')?.addEventListener('click', () => {
+        const loc = getCellLocation(activeCell);
+        if (!loc) return;
+        if (loc.rowIndex < loc.rows.length - 1) {
+            const nextRow = loc.rows[loc.rowIndex + 1];
+            const targetCell = nextRow.cells[loc.cellIndex];
+            if (targetCell) {
+                setActiveCell(targetCell);
+                targetCell.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+            }
+        }
+    });
+
+    document.getElementById('navUp')?.addEventListener('click', () => {
+        const loc = getCellLocation(activeCell);
+        if (!loc) return;
+        if (loc.rowIndex > 0) {
+            const prevRow = loc.rows[loc.rowIndex - 1];
+            const targetCell = prevRow.cells[loc.cellIndex];
+            if (targetCell) {
+                setActiveCell(targetCell);
+                targetCell.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+            }
+        }
+    });
+    
+    // Listenery Modala Produktów
     if (productSearchCloseBtn) {
         productSearchCloseBtn.addEventListener('click', closeProductSearchModal);
     }
-    // Filtruj listę przy każdym wpisaniu litery w modalu
     if (productSearchInputModal) {
         productSearchInputModal.addEventListener('input', populateAndFilterProductList);
     }
-} catch(err) {
-    console.error("Błąd inicjalizacji Modala Wyszukiwania Produktów:", err);
+
+} catch (err) {
+    console.error("Błąd inicjalizacji Nawigatora Komórek lub Modala Produktów:", err);
 }
-/* ⬆️ KONIEC BLOKU JAVASCRIPT ⬆️ */
+
+/* ⬆️ KONIEC KOMPLETNEGO BLOKU ⬆️ */
 </script> 
 
 <div id="toastContainer" style="position: fixed; top: 20px; right: 20px; z-index: 20000; display: flex; flex-direction: column; gap: 10px;">
