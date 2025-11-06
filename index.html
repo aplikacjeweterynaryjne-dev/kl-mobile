@@ -8684,16 +8684,34 @@ try {
         }
     }
 
-    // Funkcja Modala: Wybór produktu
+  // Funkcja Modala: Wybór produktu (WERSJA 2.0 - z przesunięciem fokusu)
     function selectProductFromModal(lekName) {
         if (!currentProductInputCell) return;
+
         const input = currentProductInputCell.querySelector('input[list="listaLekow"]');
         if (input) {
-            input.value = lekName; 
+            input.value = lekName; // Ustaw wartość w inpucie tabeli
+            
             // Uruchom 'input' event, aby Twoja stara logika (wypełnianie serii/karencji) zadziałała
             input.dispatchEvent(new Event('input', { bubbles: true }));
         }
-        closeProductSearchModal(); 
+        
+        // --- ⬇️ TUTAJ JEST DODANA POPRAWKA ⬇️ ---
+        try {
+            // Znajdź następną komórkę w tym samym wierszu (Numer serii, index 5)
+            const currentRow = currentProductInputCell.parentElement;
+            const nextCell = currentRow.cells[currentProductInputCell.cellIndex + 1]; 
+
+            if (nextCell) {
+                // Użyj funkcji od D-pada, aby ustawić nowy aktywny podświetlony kwadrat
+                setActiveCell(nextCell);
+            }
+        } catch (e) {
+            console.error("Błąd podczas przesuwania fokusu po wyborze produktu:", e);
+        }
+        // --- ⬆️ KONIEC POPRAWKI ⬆️ ---
+
+        closeProductSearchModal(); // Zamknij modal
     }
 
     // Funkcje Pomocnicze D-pada (pobieranie wierszy i lokalizacji)
