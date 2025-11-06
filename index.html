@@ -4899,7 +4899,7 @@ showToast('Nowy klient dodany.', 'success');
 }
 
 clientFormModal.style.display = 'none'; // Zamknij modal
-loadClientsToTable(); // Odśwież tabelę klientów
+loadAndCacheClients(); // <-- ✅ POPRAWKA: Użyj nowej funkcji
 refreshClientDataLists(); // BARDZO WAŻNE: odśwież listy wyboru w całej aplikacji
 
 } catch (error) {
@@ -4912,6 +4912,79 @@ saveClientBtn.textContent = 'Zapisz';
 }
 });
 }
+/* ⬇️ ======================================================= ⬇️ */
+/* ✅ POCZĄTEK: Brakująca obsługa Edycji/Usuwania Klientów */
+
+if (klientTableBody) {
+    klientTableBody.addEventListener('click', async (e) => {
+        const target = e.target;
+
+        // --- EDYCJA KLIENTA ---
+        if (target.classList.contains('btn-edit-client')) {
+            const docId = target.dataset.id;
+            console.log(`Próba edycji klienta o ID: ${docId}`);
+            try {
+                // Pobierz aktualne dane klienta z Firestore
+                const doc = await db.collection("klienci").doc(docId).get();
+                if (!doc.exists) {
+                    showToast('Błąd: Nie znaleziono klienta w bazie danych.', 'error');
+                    console.error(`Nie znaleziono klienta o ID: ${docId}`);
+                    return;
+                }
+                const data = doc.data();
+                console.log("Pobrano dane klienta do edycji:", data);
+
+                // Wypełnij i pokaż modal
+                clientFormTitle.textContent = 'Edytuj dane klienta';
+                clientFormDocId.value = docId; // Ustaw ID do edycji
+                clientFormNazwa.value = data.nazwa || '';
+                clientFormAdres.value = data.adres || '';
+                clientFormNrStada.value = data.nrStada || '';
+                clientFormTelefon.value = data.telefon || '';
+                clientFormEmail.value = data.email || '';
+                clientFormIdLecznicy.value = data.idLecznicy || '';
+
+                clientFormModal.style.display = 'flex';
+
+            } catch (error) {
+                console.error('Błąd pobierania klienta do edycji: ', error);
+                showToast('Wystąpił błąd podczas pobierania danych klienta.', 'error');
+            }
+        }
+
+        // --- USUWANIE KLIENTA ---
+        if (target.classList.contains('btn-delete-client')) {
+            const docId = target.dataset.id;
+            const row = target.closest('tr');
+            const clientName = row.cells[0].textContent;
+
+            if (confirm(`Czy na pewno chcesz usunąć klienta: "${clientName}"? \n\nTej operacji nie można cofnąć.`)) {
+                console.log(`Próba usunięcia klienta o ID: ${docId}`);
+                try {
+                    await db.collection("klienci").doc(docId).delete();
+                    showToast('Klient usunięty pomyślnie.', 'success');
+                    console.log(`Klient ${docId} usunięty.`);
+                    
+                    // Usuń klienta z cache i przeładuj tabelę oraz listy
+                    if (cachedClients) {
+                        cachedClients = cachedClients.filter(c => c.id !== docId);
+                        renderClientTable(cachedClients); // Odśwież tabelę z cache
+                        refreshClientDataLists(); // Odśwież globalne listy
+                        loadReportClients(); // Odśwież listę w raportach
+                    } else {
+                        loadAndCacheClients(); // Jeśli cache był pusty, załaduj na nowo
+                    }
+                } catch (error) {
+                    console.error('Błąd usuwania klienta: ', error);
+                    showToast('Wystąpił błąd podczas usuwania klienta.', 'error');
+                }
+            }
+        }
+    });
+}
+
+/* ✅ KONIEC: Brakująca obsługa Edycji/Usuwania Klientów */
+/* ⬆️ ======================================================= ⬆️ */
 // ✅ KONIEC: LOGIKA ZAKŁADKI BAZA KLIENTÓW
 // ========================================================
 
