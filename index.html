@@ -1347,47 +1347,6 @@ table {
     line-height: 1.4;
 }
 /* ⬆️ KONIEC BLOKU CSS ⬆️ */
-/* ⬇️ KROK 2: WKLEJ TEN BLOK KODU CSS ⬇️ */
-
-/* --- Style dla przełącznika Jw. / Nowe Dane w formularzu --- */
-.form-toggle-group {
-    display: flex;
-    gap: 10px;
-    margin-bottom: 12px;
-}
-.form-toggle-btn {
-    flex: 1; /* Przyciski dzielą się miejscem po równo */
-    font-size: 16px;
-    padding: 10px;
-    background-color: #f0f0f0;
-    border: 2px solid #ccc;
-    opacity: 0.7;
-}
-/* Styl dla aktywnego przycisku */
-.form-toggle-btn.active {
-    background-color: #EBF5E6; /* Twoja jasnozielona */
-    border-color: #6A994E; /* Twoja główna zieleń */
-    opacity: 1.0;
-    font-weight: bold;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-/* ⬆️ KONIEC BLOKU CSS ⬆️ 
-/* ⬇️ OSTATECZNA POPRAWKA ODSTĘPÓW (Wersja 4) ⬇️ */
-
-/* Namierza etykiety "Nazwa", "Liczba", "Rozpoznanie"
-  i zeruje ich dolny margines, aby pole było "przyklejone" do etykiety.
-*/
-#formRowDetailsGroup > .form-row > label {
-    margin-bottom: 2px !important; /* Zmniejszamy odstęp z 4px na 2px */
-}
-
-/* Jednocześnie przywracamy domyślny odstęp MIĘDZY polami,
-  aby był identyczny jak w "idealnej" reszcie formularza.
-*/
-#formRowDetailsGroup > .form-row {
-    margin-bottom: 8px; /* Zapewnia domyślny odstęp 8px */
-}
-/* ⬆️ KONIEC OSTATECZNEJ POPRAWKI ⬆️ */
 </style>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
@@ -1756,37 +1715,32 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
 </div>
 
 <div id="step2" class="form-step">
-  <h3 id="formRowTitle" style="color: red; font-size: 25px;">Edycja wierszy tabeli</h3>
+    <h3 id="formRowTitle" style="color: red; font-size: 25px;">Edycja wierszy tabeli</h3>
 
-    <div id="formLivePreview" style="font-size: 14px; color: #333; background-color: #f4f4f4; border: 1px solid #ddd; border-radius: 6px; padding: 8px; margin-bottom: 12px; max-height: 70px; overflow-y: auto;">
-        <strong style="color: #000;">Dodane do karty:</strong>
-        <span id="previewProductList">ładowanie...</span>
-    </div>
-
-    <div id="formToggleGroup" class="form-toggle-group" style="display: none;">
-        <button type="button" id="formBtnJw" class="btn form-toggle-btn">Jw. (kopiuj z góry)</button>
-        <button type="button" id="formBtnNowe" class="btn form-toggle-btn">Nowe Dane</button>
+    <div id="formLivePreview" style="font-size: 14px; color: #333; background-color: #f4f4f4; border: 1px solid #ddd; border-radius: 6px; padding: 8px; margin-bottom: 12px; max-height: 70px; overflow-y: auto;">
+        <strong style="color: #000;">Dodane do karty:</strong>
+        <span id="previewProductList">ładowanie...</span>
+    </div>
+    <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
+        <label style="margin:0; font-weight:600;">Wybierz wiersz</label>
+        <select id="formRowSelect" style="flex:1; padding:8px; border-radius:6px; border:1px solid #ccc;"></select>
     </div>
 
-    <div id="formRowDetailsGroup" style="display: none;">
-        <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
-            <label style="margin:0; font-weight:600;">Wybierz wiersz</label>
-            <select id="formRowSelect" style="flex:1; padding:8px; border-radius:6px; border:1px solid #ccc;"></select>
-        </div>
+    <div class="form-row">
+        <label for="formOpis">Nazwa siedziby stada i opis zwierzęcia</label>
+        <textarea id="formOpis" placeholder="Opis zwierzęcia"></textarea>
+    </div>
+    <div class="form-row">
+        <label for="formLiczba">Liczba leczonych zwierząt</label>
+        <input type="number" id="formLiczba" min="0" placeholder="0">
+    </div>
+    <div class="form-row">
+        <label for="formRozpoznanie">Rozpoznanie / wstępne rozpoznanie</label>
+        <input type="text" id="formRozpoznanie" placeholder="Rozpoznanie">
+    </div>
 
-        <div class="form-row">
-            <label for="formOpis">Nazwa siedziby stada i opis zwierzęcia</label>
-            <input type="text" id="formOpis" placeholder="Opis zwierzęcia"> 
-        </div>
-        <div class="form-row">
-            <label for="formLiczba">Liczba leczonych zwierząt</label>
-            <input type="number" id="formLiczba" min="0" placeholder="0">
-        </div>
-        <div class="form-row">
-            <label for="formRozpoznanie">Rozpoznanie / wstępne rozpoznanie</label>
-            <input type="text" id="formRozpoznanie" placeholder="Rozpoznanie">
-        </div>
-            <div style="display: flex; align-items: flex-end; gap: 8px; margin-bottom: 8px;">
+    <div style="display: flex; align-items: flex-end; gap: 8px; margin-bottom: 8px;">
+        
         <button id="prevRow" class="btn small">◀</button>
 
         <div class="form-row" style="flex: 1; margin-bottom: 0;">
@@ -2879,10 +2833,7 @@ const closeForm = document.getElementById('closeForm');
 const nextToProducts = document.getElementById('nextToProducts');
 const backToHeader = document.getElementById('backToHeader');
 const formRowSelect = document.getElementById('formRowSelect');
-const formToggleGroup = document.getElementById('formToggleGroup');
-const formBtnJw = document.getElementById('formBtnJw');
-const formBtnNowe = document.getElementById('formBtnNowe');
-const formRowDetailsGroup = document.getElementById('formRowDetailsGroup');
+
 formBtn.addEventListener('click', ()=>{
 formModal.style.display = 'flex';
 showStep(1);
@@ -3104,70 +3055,61 @@ function updateFormLivePreview() {
 }
 /* ⬆️ KONIEC NOWEJ FUNKCJI ⬆️ */
 
-/* ⬇️ KROK 3B: ZASTĄP CAŁĄ FUNKCJĘ ⬇️ */
 function selectRowInForm(logicalIndex){
-    updateFormLivePreview(); // Aktualizuj podgląd (tak jak było)
+   updateFormLivePreview();
     const logical = rowsEditable();
-    const row = logical[logicalIndex];
-    if (!row) return;
+    const row = logical[logicalIndex];
+    if (!row) return;
+    // load values into form
+    document.getElementById('formOpis').value = row.cells[1].textContent.trim();
+    const inp = row.cells[2].querySelector('input');
+    document.getElementById('formLiczba').value = inp ? inp.value : '';
+    document.getElementById('formRozpoznanie').value = row.cells[3].textContent.trim();
+    const lekInput = row.cells[4].querySelector('input');
+    document.getElementById('formLek').value = lekInput ? lekInput.value : '';
+    document.getElementById('formSeria').value = row.cells[5].textContent.trim();
+    // ilość w komórce 6 może być input + tekst dawkowania
+    // --- Wczytanie ilości i dawkowania z komórki 6 ---
+    const cell6 = row.cells[6];
 
-    // --- NOWA LOGIKA POKAZYWANIA/UKRYWANIA ---
-    // logicalIndex 0 = Wiersz 1
-    // logicalIndex 9 = Wiersz 10 (potwierdzenie)
-    if (logicalIndex === 0 || logicalIndex === 9) {
-        // Dla wiersza 1 i 10: Pokaż pola, ukryj przyciski
-        formToggleGroup.style.display = 'none';
-        formRowDetailsGroup.style.display = 'block';
-    } else {
-        // Dla wierszy 2-9 i 11-12: Ukryj pola, pokaż przyciski
-        formToggleGroup.style.display = 'flex';
-        formRowDetailsGroup.style.display = 'none';
-        
-        // Zresetuj aktywne przyciski
-        formBtnJw.classList.remove('active');
-        formBtnNowe.classList.remove('active');
+    // liczba (mały input)
+    const iloscInput = cell6.querySelector('input[type="number"]');
+    document.getElementById('formIlosc').value = iloscInput ? iloscInput.value : '';
+
+    // tekst po input (dawkowanie)
+    let tekstDawkowania = '';
+    if (cell6.childNodes.length > 1 && cell6.childNodes[1].nodeType === Node.TEXT_NODE) {
+        tekstDawkowania = cell6.childNodes[1].textContent.trim();
     }
-    // --- KONIEC NOWEJ LOGIKI ---
+    document.getElementById('formDawkowanie').value = tekstDawkowania;
 
-    // Wczytaj dane do pól (pola są na razie ukryte, ale JS je wypełni)
-    document.getElementById('formOpis').value = row.cells[1].textContent.trim();
-    const inp = row.cells[2].querySelector('input');
-    document.getElementById('formLiczba').value = inp ? inp.value : '';
-    document.getElementById('formRozpoznanie').value = row.cells[3].textContent.trim();
-    const lekInput = row.cells[4].querySelector('input');
-    // Ustaw pole 'formLek' (nawet jeśli ukryte, aby modal wiedział co otworzyć)
-    document.getElementById('formLek').value = lekInput ? lekInput.value : ''; 
-    document.getElementById('formSeria').value = row.cells[5].textContent.trim();
-    
-    const cell6 = row.cells[6];
-    const iloscInput = cell6.querySelector('input[type="number"]');
-    document.getElementById('formIlosc').value = iloscInput ? iloscInput.value : '';
-    let tekstDawkowania = '';
-    if (cell6.childNodes.length > 1 && cell6.childNodes[1].nodeType === Node.TEXT_NODE) {
-        tekstDawkowania = cell6.childNodes[1].textContent.trim();
-    }
-    document.getElementById('formDawkowanie').value = tekstDawkowania;
-    document.getElementById('formKarencja').value = row.cells[7].textContent.trim();
-    
-    // Aktualizuj tytuł (tak jak było)
-    const titleEl = document.getElementById('formRowTitle');
-    if (titleEl) {
-        let titleText = '';
-        if (logicalIndex >= 0 && logicalIndex <= 8) {
-            titleText = `Jesteś w wierszu nr ${logicalIndex + 1}`;
-        } else if (logicalIndex === 9) {
-            titleText = 'Jesteś w produktach pozostawionych wiersz nr 1';
-        } else if (logicalIndex === 10) {
-            titleText = 'Jesteś w produktach pozostawionych wiersz nr 2';
-        } else if (logicalIndex === 11) {
-            titleText = 'Jesteś w produktach pozostawionych wiersz nr 3';
-        } else {
-            titleText = `Jesteś w wierszu nr ${logicalIndex + 1}`;
-        }
-        titleEl.textContent = titleText;
-    }
-}
-/* ⬆️ KONIEC ZASTĘPOWANIA ⬆️ */
+    document.getElementById('formKarencja').value = row.cells[7].textContent.trim();
+    
+    // ✅ START: KOD DLA WNIOSKU 4 - DYNAMICZNY TYTUŁ
+    const titleEl = document.getElementById('formRowTitle');
+    if (titleEl) {
+        let titleText = '';
+        if (logicalIndex >= 0 && logicalIndex <= 8) {
+            // Wiersze 1-9 (indeks 0-8)
+            titleText = `Jesteś w wierszu nr ${logicalIndex + 1}`;
+        } else if (logicalIndex === 9) {
+            // Wiersz 10 (indeks 9)
+            titleText = 'Jesteś w produktach pozostawionych wiersz nr 1';
+        } else if (logicalIndex === 10) {
+            // Wiersz 11 (indeks 10)
+            titleText = 'Jesteś w produktach pozostawionych wiersz nr 2';
+        } else if (logicalIndex === 11) {
+            // Wiersz 12 (indeks 11) - Ostatni edytowalny wiersz
+            titleText = 'Jesteś w produktach pozostawionych wiersz nr 3';
+        } else {
+            // Fallback, gdyby było więcej wierszy
+            titleText = `Jesteś w wierszu nr ${logicalIndex + 1}`;
+        }
+        titleEl.textContent = titleText;
+    }
+    // ✅ KONIEC: KOD DLA WNIOSKU 4
+
+} // <-- Ten nawias zamyka funkcję 'selectRowInForm'
 /* ---- po wyborze produktu w formularzu automatycznie uzupełnij seria/dawkowanie/karencja ---- */
 document.getElementById('formLek').addEventListener('input', function(){
     const n = this.value;
@@ -9276,64 +9218,6 @@ try {
     console.error("Błąd inicjalizacji Modala Produktów (Formularz):", err);
 }
 /* ⬆️ KONIEC BLOKU PRODUKTU ⬆️ */
-/* ⬇️ KROK 3C: WKLEJ TEN BLOK KODU NA KOŃCU SKRYPTU ⬇️ */
-
-// --- Listenery dla przycisków Jw. / Nowe Dane ---
-try {
-    if (formBtnJw) {
-        formBtnJw.addEventListener('click', () => {
-            console.log("Kliknięto 'Jw.'");
-            const logicalIndex = parseInt(formRowSelect.value, 10);
-            if (logicalIndex === 0 || logicalIndex === 9) return; // Zabezpieczenie
-
-            const prevIndex = logicalIndex - 1;
-            const logicalRows = rowsEditable();
-            const prevRow = logicalRows[prevIndex];
-
-            if (prevRow) {
-                // 1. Skopiuj dane z POPRZEDNIEGO wiersza (z tabeli)
-                const opis = prevRow.cells[1].textContent.trim();
-                const liczba = prevRow.cells[2].querySelector('input') ? prevRow.cells[2].querySelector('input').value : '';
-                const rozpoznanie = prevRow.cells[3].textContent.trim();
-
-                // 2. Wklej do pól formularza
-                document.getElementById('formOpis').value = opis;
-                document.getElementById('formLiczba').value = liczba;
-                document.getElementById('formRozpoznanie').value = rozpoznanie;
-                
-                console.log(`Skopiowano: ${opis}, ${liczba}, ${rozpoznanie}`);
-            }
-
-            // 3. Pokaż pola i ustaw stan aktywny
-            formRowDetailsGroup.style.display = 'block';
-            formBtnJw.classList.add('active');
-            formBtnNowe.classList.remove('active');
-        });
-    }
-
-    if (formBtnNowe) {
-        formBtnNowe.addEventListener('click', () => {
-            console.log("Kliknięto 'Nowe Dane'");
-            
-            // 1. Wyczyść pola
-            document.getElementById('formOpis').value = '';
-            document.getElementById('formLiczba').value = '';
-            document.getElementById('formRozpoznanie').value = '';
-
-            // 2. Pokaż pola i ustaw stan aktywny
-            formRowDetailsGroup.style.display = 'block';
-            formBtnNowe.classList.add('active');
-            formBtnJw.classList.remove('active');
-            
-            // 3. Ustaw focus na pierwszym polu
-            document.getElementById('formOpis').focus();
-        });
-    }
-
-} catch(err) {
-    console.error("Błąd podpinania listenerów Jw/Nowe Dane:", err);
-}
-/* ⬆️ KONIEC BLOKU ⬆️ */
 </script> 
 
 <div id="toastContainer" style="position: fixed; top: 20px; right: 20px; z-index: 20000; display: flex; flex-direction: column; gap: 10px;">
