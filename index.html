@@ -3062,35 +3062,38 @@ function updateFormLivePreview() {
     }
 }
 /* ⬆️ KONIEC NOWEJ FUNKCJI ⬆️ */
-
-/* ⬇️ KROK 3B: ZASTĄP CAŁĄ FUNKCJĘ ⬇️ */
+/* ⬇️ KROK 2A: ZASTĄP CAŁĄ FUNKCJĘ ⬇️ */
 function selectRowInForm(logicalIndex){
-    updateFormLivePreview(); // Aktualizuj podgląd (tak jak było)
+    updateFormLivePreview(); 
     const logical = rowsEditable();
     const row = logical[logicalIndex];
     if (!row) return;
 
-    // --- NOWA LOGIKA POKAZYWANIA/UKRYWANIA ---
-    // logicalIndex 0 = Wiersz 1
-    // logicalIndex 9 = Wiersz 10 (potwierdzenie)
+    // --- LOGIKA "NOWE DANE" (TAK JAK BYŁO) ---
     if (logicalIndex === 0 || logicalIndex === 9) {
-        // Dla wiersza 1 i 10: Pokaż pola, ukryj przycisk
         formNoweDaneContainer.style.display = 'none';
         formRowDetailsContainer.style.display = 'block';
     } else {
-        // Dla wierszy 2-9 i 11-12: Ukryj pola, pokaż przycisk
         formNoweDaneContainer.style.display = 'block';
         formRowDetailsContainer.style.display = 'none';
     }
-    // --- KONIEC NOWEJ LOGIKI ---
+    
+    // --- ⬇️ NOWA LOGIKA DLA PRZYCISKU "PRZEPISZ DANE" (Pkt 1) ⬇️ ---
+    const copyBtnContainer = document.getElementById('formCopyBtnContainer');
+    if (logicalIndex === 9) {
+        // Pokaż kontener przycisku tylko w wierszu 10 (indeks 9)
+        copyBtnContainer.style.display = 'block';
+    } else {
+        copyBtnContainer.style.display = 'none';
+    }
+    // --- ⬆️ KONIEC NOWEJ LOGIKI ⬆️ ---
 
-    // Wczytaj dane do pól (pola są na razie ukryte, ale JS je wypełni)
+    // Wczytaj dane do pól (tak jak było)
     document.getElementById('formOpis').value = row.cells[1].textContent.trim();
     const inp = row.cells[2].querySelector('input');
     document.getElementById('formLiczba').value = inp ? inp.value : '';
     document.getElementById('formRozpoznanie').value = row.cells[3].textContent.trim();
     const lekInput = row.cells[4].querySelector('input');
-    // Ustaw pole 'formLek' (nawet jeśli ukryte, aby modal wiedział co otworzyć)
     document.getElementById('formLek').value = lekInput ? lekInput.value : ''; 
     document.getElementById('formSeria').value = row.cells[5].textContent.trim();
     
@@ -3421,19 +3424,6 @@ row.classList.add('highlight-row');
 setTimeout(() => row.classList.remove('highlight-row'), 1600);
 updateFormLivePreview();
 }
-
-/* ---- przycisk Zakończ w kroku 2 ---- */
-const finishBtn = document.createElement('button');
-finishBtn.textContent = 'Zakończ';
-finishBtn.className = 'btn warn small';
-finishBtn.style.marginLeft = '6px';
-finishBtn.addEventListener('click', ()=>{
-const idx = parseInt(formRowSelect.value,10);
-saveRow(idx);          // zapis obecnego wiersza
-syncHeaderFormToTop(); // aktualizacja nagłówka
-formModal.style.display = 'none'; // zamknij formularz
-});
-step2.querySelector('.form-actions .right').appendChild(finishBtn);
 // Dopasowanie formularza do ekranu przy rotacji lub resize
 window.addEventListener("resize", () => {
 const modal = document.getElementById("formModal");
@@ -9256,6 +9246,40 @@ try {
 } catch(err) {
     console.error("Błąd podpinania listenera 'Nowe Dane':", err);
 }
+/* ⬆️ KONIEC BLOKU ⬆️ */
+/* ⬇️ KROK 2C: WKLEJ TEN BLOK KODU NA KOŃCU SKRYPTU ⬇️ */
+
+try {
+    // 1. Przenieś przycisk #formCopyBtn do nowego kontenera
+    const formCopyBtn = document.getElementById('formCopyBtn');
+    const formCopyBtnContainer = document.getElementById('formCopyBtnContainer');
+    if (formCopyBtn && formCopyBtnContainer) {
+        formCopyBtn.style.display = 'inline-block'; // Upewnij się, że jest widoczny
+        formCopyBtnContainer.appendChild(formCopyBtn); // Przenieś go
+    }
+
+    // 2. Logika dla nowego przycisku "Zamknij i zapisz" (Pkt 2)
+    const saveAndCloseBtn = document.getElementById('formSaveAndCloseBtn');
+    if (saveAndCloseBtn) {
+        saveAndCloseBtn.addEventListener('click', () => {
+            const idx = parseInt(formRowSelect.value, 10);
+            
+            if (confirm("Czy na pewno chcesz zapisać zmiany i zamknąć formularz?")) {
+                // TAK: Zapisz i zamknij
+                saveRow(idx); // Użyj istniejącej funkcji zapisu
+                syncHeaderFormToTop();
+                formModal.style.display = 'none';
+            } else {
+                // NIE: Tylko zamknij
+                formModal.style.display = 'none';
+            }
+        });
+    }
+
+} catch (err) {
+    console.error("Błąd konfiguracji nowych przycisków formularza:", err);
+}
+
 /* ⬆️ KONIEC BLOKU ⬆️ */
 </script> 
 
