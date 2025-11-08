@@ -9324,7 +9324,7 @@ try {
     console.error("Błąd konfiguracji nowych przycisków formularza:", err);
 }
 /* ⬆️ KONIEC BLOKU ⬆️ */
-/* ⬇️ KROK 2C (POPRAWIONY): ZASTĄP STARY KROK 2C TYM KODEM ⬇️ */
+/* ⬇️ KROK 2C (POPRAWKA 2): ZASTĄP OSTATNI BLOK KODU TYM NOWYM ⬇️ */
 
 try {
     // 1. Przenieś przycisk #formCopyBtn i PODEPNIJ MU NOWY LISTENER
@@ -9335,19 +9335,25 @@ try {
         formCopyBtn.style.display = 'inline-block'; // Upewnij się, że jest widoczny
         formCopyBtnContainer.appendChild(formCopyBtn); // Przenieś go (to usuwa stary listener)
 
-        // ⬇️ DODANA POPRAWKA: Podpinamy logikę na nowo ⬇️
+        // ⬇️ POPRAWIONA LOGIKA KLIKNIĘCIA ⬇️
         formCopyBtn.addEventListener('click', () => {
-            // Wywołaj główną funkcję kopiującą
-            // (Ta funkcja jest zdefiniowana wyżej w Twoim kodzie)
+            // 1. Wywołaj główną funkcję kopiującą (aktualizuje tabelę)
             if (typeof copyToRow10FromRow0 === 'function') {
-                copyToRow10FromRow0();
+                copyToRow10FromRow0(); 
             } else {
                 console.error("Błąd: Funkcja copyToRow10FromRow0() nie została znaleziona.");
+                return; // Przerwij, jeśli funkcja nie istnieje
             }
             
-            // Opcjonalnie: przewiń tabelę do wiersza 10
+            // 2. ‼️ KLUCZOWA POPRAWKA: Zaktualizuj formularz ‼️
+            // Ustaw listę rozwijaną na wiersz 10 (indeks 9)
+            formRowSelect.value = 9; 
+            // Wywołaj zdarzenie 'change', aby funkcja selectRowInForm(9)
+            // wczytała skopiowane dane z tabeli z powrotem do formularza.
+            formRowSelect.dispatchEvent(new Event('change'));
+
+            // 3. Przewiń (tak jak było)
             const tbodyTrs = [...document.querySelectorAll('#karta tbody tr')];
-            // Znajdź wiersz specjalny (ten z colspan=8)
             const specialRow = tbodyTrs.find(tr => tr.cells.length === 1 && tr.cells[0].colSpan === 8);
             if (specialRow) { 
                 specialRow.scrollIntoView({behavior:'smooth', block:'center'}); 
