@@ -9324,35 +9324,45 @@ try {
     console.error("Błąd konfiguracji nowych przycisków formularza:", err);
 }
 /* ⬆️ KONIEC BLOKU ⬆️ */
-/* ⬇️ KROK 2C (POPRAWKA 2): ZASTĄP OSTATNI BLOK KODU TYM NOWYM ⬇️ */
+/* ⬇️ KROK 2C (POPRAWKA 3 - OSTATECZNA LOGIKA KOPIOWANIA): ZASTĄP CAŁY BLOK ⬇️ */
 
 try {
-    // 1. Przenieś przycisk #formCopyBtn i PODEPNIJ MU NOWY LISTENER
+    // 1. Przenieś przycisk #formCopyBtn i PODEPNIJ MU POPRAWNĄ LOGIKĘ
     const formCopyBtn = document.getElementById('formCopyBtn');
     const formCopyBtnContainer = document.getElementById('formCopyBtnContainer');
     
     if (formCopyBtn && formCopyBtnContainer) {
-        formCopyBtn.style.display = 'inline-block'; // Upewnij się, że jest widoczny
-        formCopyBtnContainer.appendChild(formCopyBtn); // Przenieś go (to usuwa stary listener)
+        formCopyBtn.style.display = 'inline-block'; 
+        formCopyBtnContainer.appendChild(formCopyBtn); // Przenieś go
 
-        // ⬇️ POPRAWIONA LOGIKA KLIKNIĘCIA ⬇️
+        // ⬇️ NOWA, POPRAWIONA LOGIKA KLIKNIĘCIA ⬇️
         formCopyBtn.addEventListener('click', () => {
-            // 1. Wywołaj główną funkcję kopiującą (aktualizuje tabelę)
+            
+            // 1. ‼️ KLUCZOWA POPRAWKA: ZAPISZ dane z formularza do Wiersza 1 ‼️
+            // Sprawdź, czy na pewno jesteśmy w wierszu 1 (indeks 0)
+            const currentIndex = parseInt(formRowSelect.value, 10);
+            if (currentIndex === 0) {
+                // Użyj funkcji saveRow(0), aby zapisać dane z formularza do tabeli
+                if (typeof saveRow === 'function') {
+                    console.log("Zapisywanie wiersza 1 przed kopiowaniem...");
+                    saveRow(0);
+                }
+            }
+            
+            // 2. Wywołaj główną funkcję kopiującą (teraz skopiuje poprawne dane z tabeli)
             if (typeof copyToRow10FromRow0 === 'function') {
+                console.log("Kopiowanie z Wiersza 1 do Wiersza 10...");
                 copyToRow10FromRow0(); 
             } else {
                 console.error("Błąd: Funkcja copyToRow10FromRow0() nie została znaleziona.");
-                return; // Przerwij, jeśli funkcja nie istnieje
+                return;
             }
             
-            // 2. ‼️ KLUCZOWA POPRAWKA: Zaktualizuj formularz ‼️
-            // Ustaw listę rozwijaną na wiersz 10 (indeks 9)
+            // 3. Zaktualizuj formularz, aby pokazywał Wiersz 10
             formRowSelect.value = 9; 
-            // Wywołaj zdarzenie 'change', aby funkcja selectRowInForm(9)
-            // wczytała skopiowane dane z tabeli z powrotem do formularza.
             formRowSelect.dispatchEvent(new Event('change'));
 
-            // 3. Przewiń (tak jak było)
+            // 4. Przewiń (tak jak było)
             const tbodyTrs = [...document.querySelectorAll('#karta tbody tr')];
             const specialRow = tbodyTrs.find(tr => tr.cells.length === 1 && tr.cells[0].colSpan === 8);
             if (specialRow) { 
@@ -9364,19 +9374,17 @@ try {
         // ⬆️ KONIEC POPRAWKI ⬆️
     }
 
-    // 2. Logika dla nowego przycisku "Zamknij i zapisz" (Pkt 2)
+    // 2. Logika dla nowego przycisku "Zamknij i zapisz" (bez zmian)
     const saveAndCloseBtn = document.getElementById('formSaveAndCloseBtn');
     if (saveAndCloseBtn) {
         saveAndCloseBtn.addEventListener('click', () => {
             const idx = parseInt(formRowSelect.value, 10);
             
             if (confirm("Czy na pewno chcesz zapisać zmiany i zamknąć formularz?")) {
-                // TAK: Zapisz i zamknij
-                saveRow(idx); // Użyj istniejącej funkcji zapisu
+                saveRow(idx); 
                 syncHeaderFormToTop();
                 formModal.style.display = 'none';
             } else {
-                // NIE: Tylko zamknij
                 formModal.style.display = 'none';
             }
         });
