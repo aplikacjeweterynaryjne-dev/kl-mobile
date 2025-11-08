@@ -9247,15 +9247,38 @@ try {
     console.error("Błąd podpinania listenera 'Nowe Dane':", err);
 }
 /* ⬆️ KONIEC BLOKU ⬆️ */
-/* ⬇️ KROK 2C: WKLEJ TEN BLOK KODU NA KOŃCU SKRYPTU ⬇️ */
+/* ⬇️ KROK 2C (POPRAWIONY): ZASTĄP STARY KROK 2C TYM KODEM ⬇️ */
 
 try {
-    // 1. Przenieś przycisk #formCopyBtn do nowego kontenera
+    // 1. Przenieś przycisk #formCopyBtn i PODEPNIJ MU NOWY LISTENER
     const formCopyBtn = document.getElementById('formCopyBtn');
     const formCopyBtnContainer = document.getElementById('formCopyBtnContainer');
+    
     if (formCopyBtn && formCopyBtnContainer) {
         formCopyBtn.style.display = 'inline-block'; // Upewnij się, że jest widoczny
-        formCopyBtnContainer.appendChild(formCopyBtn); // Przenieś go
+        formCopyBtnContainer.appendChild(formCopyBtn); // Przenieś go (to usuwa stary listener)
+
+        // ⬇️ DODANA POPRAWKA: Podpinamy logikę na nowo ⬇️
+        formCopyBtn.addEventListener('click', () => {
+            // Wywołaj główną funkcję kopiującą
+            // (Ta funkcja jest zdefiniowana wyżej w Twoim kodzie)
+            if (typeof copyToRow10FromRow0 === 'function') {
+                copyToRow10FromRow0();
+            } else {
+                console.error("Błąd: Funkcja copyToRow10FromRow0() nie została znaleziona.");
+            }
+            
+            // Opcjonalnie: przewiń tabelę do wiersza 10
+            const tbodyTrs = [...document.querySelectorAll('#karta tbody tr')];
+            // Znajdź wiersz specjalny (ten z colspan=8)
+            const specialRow = tbodyTrs.find(tr => tr.cells.length === 1 && tr.cells[0].colSpan === 8);
+            if (specialRow) { 
+                specialRow.scrollIntoView({behavior:'smooth', block:'center'}); 
+                specialRow.classList.add('highlight-row'); 
+                setTimeout(()=>specialRow.classList.remove('highlight-row'),2000); 
+            }
+        });
+        // ⬆️ KONIEC POPRAWKI ⬆️
     }
 
     // 2. Logika dla nowego przycisku "Zamknij i zapisz" (Pkt 2)
@@ -9279,7 +9302,6 @@ try {
 } catch (err) {
     console.error("Błąd konfiguracji nowych przycisków formularza:", err);
 }
-
 /* ⬆️ KONIEC BLOKU ⬆️ */
 </script> 
 
