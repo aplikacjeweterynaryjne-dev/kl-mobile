@@ -1721,25 +1721,29 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
         <strong style="color: #000;">Dodane do karty:</strong>
         <span id="previewProductList">ładowanie...</span>
     </div>
-    <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
-        <label style="margin:0; font-weight:600;">Wybierz wiersz</label>
-        <select id="formRowSelect" style="flex:1; padding:8px; border-radius:6px; border:1px solid #ccc;"></select>
+<div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
+        <label style="margin:0; font-weight:600;">Wybierz wiersz</label>
+        <select id="formRowSelect" style="flex:1; padding:8px; border-radius:6px; border:1px solid #ccc;"></select>
+    </div>
+
+    <div id="formNoweDaneContainer" style="display: none; margin-bottom: 12px;">
+        <button type="button" id="formBtnNoweDane" class="btn primary" style="width: 100%; font-size: 16px; padding: 10px;">+ Nowe Dane</button>
     </div>
 
-    <div class="form-row">
-        <label for="formOpis">Nazwa siedziby stada i opis zwierzęcia</label>
-        <textarea id="formOpis" placeholder="Opis zwierzęcia"></textarea>
-    </div>
-    <div class="form-row">
-        <label for="formLiczba">Liczba leczonych zwierząt</label>
-        <input type="number" id="formLiczba" min="0" placeholder="0">
-    </div>
-    <div class="form-row">
-        <label for="formRozpoznanie">Rozpoznanie / wstępne rozpoznanie</label>
-        <input type="text" id="formRozpoznanie" placeholder="Rozpoznanie">
-    </div>
-
-    <div style="display: flex; align-items: flex-end; gap: 8px; margin-bottom: 8px;">
+    <div id="formRowDetailsContainer" style="display: block;">
+        <div class="form-row">
+            <label for="formOpis">Nazwa siedziby stada i opis zwierzęcia</label>
+            <textarea id="formOpis" placeholder="Opis zwierzęcia"></textarea>
+        </div>
+        <div class="form-row">
+            <label for="formLiczba">Liczba leczonych zwierząt</label>
+            <input type="number" id="formLiczba" min="0" placeholder="0">
+        </div>
+        <div class="form-row">
+            <label for="formRozpoznanie">Rozpoznanie / wstępne rozpoznanie</label>
+            <input type="text" id="formRozpoznanie" placeholder="Rozpoznanie">
+        </div>
+    </div>     <div style="display: flex; align-items: flex-end; gap: 8px; margin-bottom: 8px;">
         
         <button id="prevRow" class="btn small">◀</button>
 
@@ -2833,7 +2837,9 @@ const closeForm = document.getElementById('closeForm');
 const nextToProducts = document.getElementById('nextToProducts');
 const backToHeader = document.getElementById('backToHeader');
 const formRowSelect = document.getElementById('formRowSelect');
-
+const formNoweDaneContainer = document.getElementById('formNoweDaneContainer');
+const formBtnNoweDane = document.getElementById('formBtnNoweDane');
+const formRowDetailsContainer = document.getElementById('formRowDetailsContainer');
 formBtn.addEventListener('click', ()=>{
 formModal.style.display = 'flex';
 showStep(1);
@@ -3055,61 +3061,66 @@ function updateFormLivePreview() {
 }
 /* ⬆️ KONIEC NOWEJ FUNKCJI ⬆️ */
 
+/* ⬇️ KROK 3B: ZASTĄP CAŁĄ FUNKCJĘ ⬇️ */
 function selectRowInForm(logicalIndex){
-   updateFormLivePreview();
+    updateFormLivePreview(); // Aktualizuj podgląd (tak jak było)
     const logical = rowsEditable();
-    const row = logical[logicalIndex];
-    if (!row) return;
-    // load values into form
-    document.getElementById('formOpis').value = row.cells[1].textContent.trim();
-    const inp = row.cells[2].querySelector('input');
-    document.getElementById('formLiczba').value = inp ? inp.value : '';
-    document.getElementById('formRozpoznanie').value = row.cells[3].textContent.trim();
-    const lekInput = row.cells[4].querySelector('input');
-    document.getElementById('formLek').value = lekInput ? lekInput.value : '';
-    document.getElementById('formSeria').value = row.cells[5].textContent.trim();
-    // ilość w komórce 6 może być input + tekst dawkowania
-    // --- Wczytanie ilości i dawkowania z komórki 6 ---
-    const cell6 = row.cells[6];
+    const row = logical[logicalIndex];
+    if (!row) return;
 
-    // liczba (mały input)
-    const iloscInput = cell6.querySelector('input[type="number"]');
-    document.getElementById('formIlosc').value = iloscInput ? iloscInput.value : '';
-
-    // tekst po input (dawkowanie)
-    let tekstDawkowania = '';
-    if (cell6.childNodes.length > 1 && cell6.childNodes[1].nodeType === Node.TEXT_NODE) {
-        tekstDawkowania = cell6.childNodes[1].textContent.trim();
+    // --- NOWA LOGIKA POKAZYWANIA/UKRYWANIA ---
+    // logicalIndex 0 = Wiersz 1
+    // logicalIndex 9 = Wiersz 10 (potwierdzenie)
+    if (logicalIndex === 0 || logicalIndex === 9) {
+        // Dla wiersza 1 i 10: Pokaż pola, ukryj przycisk
+        formNoweDaneContainer.style.display = 'none';
+        formRowDetailsContainer.style.display = 'block';
+    } else {
+        // Dla wierszy 2-9 i 11-12: Ukryj pola, pokaż przycisk
+        formNoweDaneContainer.style.display = 'block';
+        formRowDetailsContainer.style.display = 'none';
     }
-    document.getElementById('formDawkowanie').value = tekstDawkowania;
+    // --- KONIEC NOWEJ LOGIKI ---
 
-    document.getElementById('formKarencja').value = row.cells[7].textContent.trim();
-    
-    // ✅ START: KOD DLA WNIOSKU 4 - DYNAMICZNY TYTUŁ
-    const titleEl = document.getElementById('formRowTitle');
-    if (titleEl) {
-        let titleText = '';
-        if (logicalIndex >= 0 && logicalIndex <= 8) {
-            // Wiersze 1-9 (indeks 0-8)
-            titleText = `Jesteś w wierszu nr ${logicalIndex + 1}`;
-        } else if (logicalIndex === 9) {
-            // Wiersz 10 (indeks 9)
-            titleText = 'Jesteś w produktach pozostawionych wiersz nr 1';
-        } else if (logicalIndex === 10) {
-            // Wiersz 11 (indeks 10)
-            titleText = 'Jesteś w produktach pozostawionych wiersz nr 2';
-        } else if (logicalIndex === 11) {
-            // Wiersz 12 (indeks 11) - Ostatni edytowalny wiersz
-            titleText = 'Jesteś w produktach pozostawionych wiersz nr 3';
-        } else {
-            // Fallback, gdyby było więcej wierszy
-            titleText = `Jesteś w wierszu nr ${logicalIndex + 1}`;
-        }
-        titleEl.textContent = titleText;
-    }
-    // ✅ KONIEC: KOD DLA WNIOSKU 4
-
-} // <-- Ten nawias zamyka funkcję 'selectRowInForm'
+    // Wczytaj dane do pól (pola są na razie ukryte, ale JS je wypełni)
+    document.getElementById('formOpis').value = row.cells[1].textContent.trim();
+    const inp = row.cells[2].querySelector('input');
+    document.getElementById('formLiczba').value = inp ? inp.value : '';
+    document.getElementById('formRozpoznanie').value = row.cells[3].textContent.trim();
+    const lekInput = row.cells[4].querySelector('input');
+    // Ustaw pole 'formLek' (nawet jeśli ukryte, aby modal wiedział co otworzyć)
+    document.getElementById('formLek').value = lekInput ? lekInput.value : ''; 
+    document.getElementById('formSeria').value = row.cells[5].textContent.trim();
+    
+    const cell6 = row.cells[6];
+    const iloscInput = cell6.querySelector('input[type="number"]');
+    document.getElementById('formIlosc').value = iloscInput ? iloscInput.value : '';
+    let tekstDawkowania = '';
+    if (cell6.childNodes.length > 1 && cell6.childNodes[1].nodeType === Node.TEXT_NODE) {
+        tekstDawkowania = cell6.childNodes[1].textContent.trim();
+    }
+    document.getElementById('formDawkowanie').value = tekstDawkowania;
+    document.getElementById('formKarencja').value = row.cells[7].textContent.trim();
+    
+    // Aktualizuj tytuł (tak jak było)
+    const titleEl = document.getElementById('formRowTitle');
+    if (titleEl) {
+        let titleText = '';
+        if (logicalIndex >= 0 && logicalIndex <= 8) {
+            titleText = `Jesteś w wierszu nr ${logicalIndex + 1}`;
+        } else if (logicalIndex === 9) {
+            titleText = 'Jesteś w produktach pozostawionych wiersz nr 1';
+        } else if (logicalIndex === 10) {
+            titleText = 'Jesteś w produktach pozostawionych wiersz nr 2';
+        } else if (logicalIndex === 11) {
+            titleText = 'Jesteś w produktach pozostawionych wiersz nr 3';
+        } else {
+            titleText = `Jesteś w wierszu nr ${logicalIndex + 1}`;
+        }
+        titleEl.textContent = titleText;
+    }
+}
+/* ⬆️ KONIEC ZASTĘPOWANIA ⬆️ */
 /* ---- po wyborze produktu w formularzu automatycznie uzupełnij seria/dawkowanie/karencja ---- */
 document.getElementById('formLek').addEventListener('input', function(){
     const n = this.value;
@@ -9218,6 +9229,32 @@ try {
     console.error("Błąd inicjalizacji Modala Produktów (Formularz):", err);
 }
 /* ⬆️ KONIEC BLOKU PRODUKTU ⬆️ */
+/* ⬇️ KROK 3C: WKLEJ TEN BLOK KODU NA KOŃCU SKRYPTU ⬇️ */
+
+// --- Listener dla przycisku "Nowe Dane" ---
+try {
+    if (formBtnNoweDane) {
+        formBtnNoweDane.addEventListener('click', () => {
+            console.log("Kliknięto 'Nowe Dane'");
+            
+            // 1. Wyczyść pola
+            document.getElementById('formOpis').value = '';
+            document.getElementById('formLiczba').value = '';
+            document.getElementById('formRozpoznanie').value = '';
+
+            // 2. Pokaż pola i ukryj przycisk
+            formRowDetailsContainer.style.display = 'block';
+            formNoweDaneContainer.style.display = 'none';
+            
+            // 3. Ustaw focus na pierwszym polu
+            document.getElementById('formOpis').focus();
+        });
+    }
+
+} catch(err) {
+    console.error("Błąd podpinania listenera 'Nowe Dane':", err);
+}
+/* ⬆️ KONIEC BLOKU ⬆️ */
 </script> 
 
 <div id="toastContainer" style="position: fixed; top: 20px; right: 20px; z-index: 20000; display: flex; flex-direction: column; gap: 10px;">
