@@ -2803,48 +2803,51 @@ document.getElementById('formNrStada').value = opt.dataset.nrstada || '';
 });
 }
 
-/* ---- kopiowanie do wiersza 10 i przewinięcie + podświetlenie ---- */
+/* ⬇️ ZASTĄP CAŁĄ FUNKCJĘ TYM NOWYM KODEM (POPRAWKA: KOPIUJ TYLKO 3 POLA) ⬇️ */
+
 function copyToRow10FromRow0(){
-const rows = document.querySelectorAll('#karta tbody tr');
-if (!rows[0]) return;
-// only copy if rows[0] is a normal row (we built so first is row 1)
-// find source cells: first non-10 row (rows array includes the special row as one element)
-// Safer way: build arr of editable rows (like rowsEditable())
-const ed = rowsEditable();
-if (ed.length === 0) return;
-const src = ed[0]; // first editable row
-// find the DOM row index of physical row10 in tbody (it is the 10th created tr)
-const tbodyTrs = [...document.querySelectorAll('#karta tbody tr')];
-// find index of the row which has colSpan === 8 (our special row)
-const specialIndex = tbodyTrs.findIndex(tr => tr.children.length === 1 && tr.children[0].colSpan==8);
-if (specialIndex === -1) return;
-const row10 = tbodyTrs[specialIndex];
-// copy cells 1..3 from src into the "special" row cells (special row has single TD colspan 8)
-// Original behaviour: rows[10].cells[1] etc. In our DOM the "special" row is single cell colspan 8,
-// but original code earlier assumed rows[10].cells[1] exists. To match original behaviour we will insert
-// a new row AFTER the special row and fill it (but user wanted structure unchanged). So keep original approach:
-// In earlier code, rows[10] referenced the 11th element of NodeList of rows (including special as its own row),
-// and they set rows[10].cells[1] etc. That worked because special row still had 8 cells in earlier code.
-// To be compatible, we will locate the editable rows array and find the 10th logical row (index 9) and copy into it.
-const logicalRows = rowsEditable(); // array of trs for logical rows (skips special)
-if (logicalRows.length >= 10) {
-const target = logicalRows[9]; // 0-based -> 9 = 10th editable row (this corresponds to original design)
-// copy columns: cells[1], cells[2], cells[3]
-target.cells[1].textContent = src.cells[1].textContent;
-// cell[2] may contain input
-const srcInput = src.cells[2].querySelector('input');
-const tgtInput = target.cells[2].querySelector('input');
-if (srcInput && tgtInput) tgtInput.value = srcInput.value;
-target.cells[3].textContent = src.cells[3].textContent;
-// highlight and scroll
-target.classList.add('highlight-row');
-setTimeout(()=>target.classList.remove('highlight-row'),2000);
-// scroll into view
-target.scrollIntoView({behavior:'smooth', block:'center'});
-} else {
-alert('Brak wystarczającej liczby wierszy aby przenieść dane do wiersza 10.');
+    const logicalRows = rowsEditable(); // Używamy Twojej funkcji pomocniczej
+
+    if (logicalRows.length < 10) {
+        alert('Brak wystarczającej liczby wierszy, aby skopiować dane.');
+        return;
+    }
+
+    const src = logicalRows[0]; // Wiersz ŹRÓDŁOWY (Wiersz 1 / indeks 0)
+    const target = logicalRows[9]; // Wiersz DOCELOWY (Wiersz 10 / indeks 9)
+
+    console.log("Kopiowanie 3 pól z wiersza 1 do wiersza 10...");
+
+    // Kopiuj komórkę 1 (Opis)
+    target.cells[1].textContent = src.cells[1].textContent; 
+
+    // Kopiuj komórkę 2 (Input Liczba)
+    const srcInputLiczba = src.cells[2].querySelector('input');
+    const tgtInputLiczba = target.cells[2].querySelector('input');
+    if (srcInputLiczba && tgtInputLiczba) {
+        tgtInputLiczba.value = srcInputLiczba.value;
+    }
+
+    // Kopiuj komórkę 3 (Rozpoznanie)
+    target.cells[3].textContent = src.cells[3].textContent; 
+
+    // ‼️ CELOWO CZYŚCIMY POZOSTAŁE POLA (na wypadek, gdyby coś w nich było) ‼️
+    const tgtInputLek = target.cells[4].querySelector('input');
+    if (tgtInputLek) {
+        tgtInputLek.value = ''; // Wyczyść Lek
+    }
+    target.cells[4].dataset.printValue = ''; // Wyczyść atrybut do druku
+    target.cells[5].textContent = ''; // Wyczyść Seria
+    target.cells[6].innerHTML = `<input class="small-input" type="number" inputmode="numeric" pattern="[0-9]*" placeholder="ilość">`; // Wyczyść Ilość/Dawka
+    target.cells[7].textContent = ''; // Wyczyść Karencja
+
+    // Podświetl (tak jak było)
+    target.classList.add('highlight-row');
+    setTimeout(()=>target.classList.remove('highlight-row'),2000);
+    
+    console.log("Kopiowanie 3 pól zakończone.");
 }
-}
+/* ⬆️ KONIEC ZASTĘPOWANIA ⬆️ */
 
 /* helper: zwraca tabelę logicznych (edytowalnych) wierszy jako tablica */
 function rowsEditable(){
