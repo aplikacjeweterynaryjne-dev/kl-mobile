@@ -9260,33 +9260,42 @@ try {
         formCopyBtn.style.display = 'inline-block'; // Upewnij się, że jest widoczny
         formCopyBtnContainer.appendChild(formCopyBtn); // Przenieś go (to usuwa stary listener)
 
-        // ⬇️ POPRAWIONA LOGIKA KLIKNIĘCIA ⬇️
-        formCopyBtn.addEventListener('click', () => {
-            // 1. Wywołaj główną funkcję kopiującą (aktualizuje tabelę)
-            if (typeof copyToRow10FromRow0 === 'function') {
-                copyToRow10FromRow0(); 
-            } else {
-                console.error("Błąd: Funkcja copyToRow10FromRow0() nie została znaleziona.");
-                return; // Przerwij, jeśli funkcja nie istnieje
-            }
-            
-            // 2. ‼️ KLUCZOWA POPRAWKA: Zaktualizuj formularz ‼️
-            // Ustaw listę rozwijaną na wiersz 10 (indeks 9)
-            formRowSelect.value = 9; 
-            // Wywołaj zdarzenie 'change', aby funkcja selectRowInForm(9)
-            // wczytała skopiowane dane z tabeli z powrotem do formularza.
-            formRowSelect.dispatchEvent(new Event('change'));
+        // ⬇️ POPRAWIONA LOGIKA KLIKNIĘCIA (WERSJA 2) ⬇️
+            formCopyBtn.addEventListener('click', () => {
+                
+                // 1. Wywołaj główną funkcję kopiującą (aktualizuje tabelę)
+                if (typeof copyToRow10FromRow0 === 'function') {
+                    // Ta funkcja kopiuje dane z WIERSZA TABELI 1 do WIERSZA TABELI 10
+                    copyToRow10FromRow0(); 
+                } else {
+                    console.error("Błąd: Funkcja copyToRow10FromRow0() nie została znaleziona.");
+                    return; // Przerwij, jeśli funkcja nie istnieje
+                }
+                
+                // 2. ‼️ KLUCZOWA POPRAWKA: Bezpośrednio odśwież formularz ‼️
+                // Zamiast wywoływać 'change' (co jest zawodne, gdy wartość się nie zmienia),
+                // bezpośrednio wywołaj funkcję, która wczytuje dane z tabeli do formularza.
+                if (typeof selectRowInForm === 'function') {
+                    console.log("Odświeżanie formularza po skopiowaniu danych...");
+                    
+                    // Funkcja selectRowInForm(9) czyta dane z WIERSZA TABELI 10
+                    // i wstawia je do pól formularza (Opis, Liczba, Rozpoznanie).
+                    selectRowInForm(9); // Wczytaj dane dla wiersza 10 (indeks 9)
+                
+                } else {
+                    console.error("Błąd: Funkcja selectRowInForm() nie została znaleziona.");
+                }
 
-            // 3. Przewiń (tak jak było)
-            const tbodyTrs = [...document.querySelectorAll('#karta tbody tr')];
-            const specialRow = tbodyTrs.find(tr => tr.cells.length === 1 && tr.cells[0].colSpan === 8);
-            if (specialRow) { 
-                specialRow.scrollIntoView({behavior:'smooth', block:'center'}); 
-                specialRow.classList.add('highlight-row'); 
-                setTimeout(()=>specialRow.classList.remove('highlight-row'),2000); 
-            }
-        });
-        // ⬆️ KONIEC POPRAWKI ⬆️
+                // 3. Przewiń (tak jak było)
+                const tbodyTrs = [...document.querySelectorAll('#karta tbody tr')];
+                const specialRow = tbodyTrs.find(tr => tr.cells.length === 1 && tr.cells[0].colSpan === 8);
+                if (specialRow) { 
+                    specialRow.scrollIntoView({behavior:'smooth', block:'center'}); 
+                    specialRow.classList.add('highlight-row'); 
+                    setTimeout(()=>specialRow.classList.remove('highlight-row'),2000); 
+                }
+            });
+            // ⬆️ KONIEC POPRAWKI (WERSJA 2) ⬆️
     }
 
     // 2. Logika dla nowego przycisku "Zamknij i zapisz" (Pkt 2)
