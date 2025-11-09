@@ -9313,55 +9313,68 @@ try {
                 saveRow(idx); // Użyj istniejącej funkcji zapisu
                 syncHeaderFormToTop();
                 formModal.style.display = 'none';
+} catch(err) {
+    console.error("Błąd inicjalizacji Modala Klientów (Formularz):", err);
+}
+/* ⬆️ KONIEC BLOKU JAVASCRIPT ⬆️ */
+
+
+/* ⬇️ KROK 2C (POPRAWKA 4): TEN BLOK POWINIEN BYĆ TUTAJ ⬇️ */
+try {
+    // 1. Przenieś przycisk #formCopyBtn i PODEPNIJ MU POPRAWNĄ LOGIKĘ
+    const formCopyBtn = document.getElementById('formCopyBtn');
+    const formCopyBtnContainer = document.getElementById('formCopyBtnContainer');
+    
+    if (formCopyBtn && formCopyBtnContainer) {
+        formCopyBtn.style.display = 'inline-block'; 
+        formCopyBtnContainer.appendChild(formCopyBtn); // Przenieś go
+
+        // ⬇️ NOWA, POPRAWIONA LOGIKA KLIKNIĘCIA ⬇️
+        formCopyBtn.addEventListener('click', () => {
+            
+            // 1. Wywołaj funkcję kopiującą (tę, którą właśnie zastąpiliśmy)
+            // Skopiuje ona 3 pola z logicalRows[0] do logicalRows[9] i wyczyści resztę.
+            if (typeof copyToRow10FromRow0 === 'function') {
+                copyToRow10FromRow0(); 
             } else {
-                // NIE: Tylko zamknij
+                console.error("Błąd: Funkcja copyToRow10FromRow0() nie została znaleziona.");
+                return;
+            }
+            
+            // 2. ‼️ KLUCZOWA POPRAWKA: Ręcznie odśwież formularz ‼️
+            // Musimy wywołać selectRowInForm(9), aby formularz wczytał nowe dane z tabeli.
+            // NIE UŻYWAMY dispatchEvent('change'), bo to powoduje błąd zapisu.
+            const currentIndex = 9; // Jesteśmy w wierszu 10
+            if (typeof selectRowInForm === 'function') {
+                 selectRowInForm(currentIndex); // Ręcznie odśwież formularz
+            }
+
+            // 3. Przewiń (tak jak było)
+            const tbodyTrs = [...document.querySelectorAll('#karta tbody tr')];
+            const specialRow = tbodyTrs.find(tr => tr.cells.length === 1 && tr.cells[0].colSpan === 8);
+            if (specialRow) { 
+                specialRow.scrollIntoView({behavior:'smooth', block:'center'}); 
+                specialRow.classList.add('highlight-row'); 
+                setTimeout(()=>specialRow.classList.remove('highlight-row'),2000); 
+            }
+        });
+        // ⬆️ KONIEC POPRAWKI ⬆️
+    }
+
+    // 2. Logika dla nowego przycisku "Zamknij i zapisz" (bez zmian)
+    const saveAndCloseBtn = document.getElementById('formSaveAndCloseBtn');
+    if (saveAndCloseBtn) {
+        saveAndCloseBtn.addEventListener('click', () => {
+            const idx = parseInt(formRowSelect.value, 10);
+            
+            if (confirm("Czy na pewno chcesz zapisać zmiany i zamknąć formularz?")) {
+                saveRow(idx); 
+                syncHeaderFormToTop();
+                formModal.style.display = 'none';
+            } else {
                 formModal.style.display = 'none';
             }
-/* ⬇️ ZASTĄP CAŁĄ FUNKCJĘ TYM NOWYM KODEM (POPRAWKA: KOPIUJ TYLKO 3 POLA) ⬇️ */
-
-function copyToRow10FromRow0(){
-    const logicalRows = rowsEditable(); // Używamy Twojej funkcji pomocniczej
-
-    if (logicalRows.length < 10) {
-        alert('Brak wystarczającej liczby wierszy, aby skopiować dane.');
-        return;
-    }
-
-    const src = logicalRows[0]; // Wiersz ŹRÓDŁOWY (Wiersz 1 / indeks 0)
-    const target = logicalRows[9]; // Wiersz DOCELOWY (Wiersz 10 / indeks 9)
-
-    console.log("Kopiowanie 3 pól z wiersza 1 do wiersza 10...");
-
-    // Kopiuj komórkę 1 (Opis)
-    target.cells[1].textContent = src.cells[1].textContent; 
-
-    // Kopiuj komórkę 2 (Input Liczba)
-    const srcInputLiczba = src.cells[2].querySelector('input');
-    const tgtInputLiczba = target.cells[2].querySelector('input');
-    if (srcInputLiczba && tgtInputLiczba) {
-        tgtInputLiczba.value = srcInputLiczba.value;
-    }
-
-    // Kopiuj komórkę 3 (Rozpoznanie)
-    target.cells[3].textContent = src.cells[3].textContent; 
-
-    // ‼️ CELOWO CZYŚCIMY POZOSTAŁE POLA (na wypadek, gdyby coś w nich było) ‼️
-    const tgtInputLek = target.cells[4].querySelector('input');
-    if (tgtInputLek) {
-        tgtInputLek.value = ''; // Wyczyść Lek
-    }
-    target.cells[4].dataset.printValue = ''; // Wyczyść atrybut do druku
-    target.cells[5].textContent = ''; // Wyczyść Seria
-    target.cells[6].innerHTML = `<input class="small-input" type="number" inputmode="numeric" pattern="[0-9]*" placeholder="ilość">`; // Wyczyść Ilość/Dawka
-    target.cells[7].textContent = ''; // Wyczyść Karencja
-
-    // Podświetl (tak jak było)
-    target.classList.add('highlight-row');
-    setTimeout(()=>target.classList.remove('highlight-row'),2000);
-    
-    console.log("Kopiowanie 3 pól zakończone.");
-}
-/* ⬆️ KONIEC ZASTĘPOWANIA ⬆️ */        });
+        });
     }
 
 } catch (err) {
@@ -9369,10 +9382,11 @@ function copyToRow10FromRow0(){
 }
 /* ⬆️ KONIEC BLOKU ⬆️ */
 
-</script> 
+
+</script> 
 
 <div id="toastContainer" style="position: fixed; top: 20px; right: 20px; z-index: 20000; display: flex; flex-direction: column; gap: 10px;">
-    </div>
+    </div>
 
 </body>
 </html>
