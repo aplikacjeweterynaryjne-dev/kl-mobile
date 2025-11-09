@@ -3070,7 +3070,19 @@ function updateFormLivePreview() {
 
 /* ⬇️ KROK 2A: ZASTĄP CAŁĄ FUNKCJĘ ⬇️ */
 function selectRowInForm(logicalIndex){
-    updateFormLivePreview(); 
+    updateFormLivePreview();
+    // ⬇️ ⬇️ ⬇️ WKLEJ TEN BLOK KODU ⬇️ ⬇️ ⬇️
+    const formCopyPrevRowBtnContainer = document.getElementById('formCopyPrevRowBtnContainer');
+    if (formCopyPrevRowBtnContainer) {
+        // Pokaż przycisk tylko dla wierszy 2-9 oraz 11-13
+        // Ukryj dla wiersza 1 (indeks 0) i wiersza 10 (indeks 9)
+        if (logicalIndex === 0 || logicalIndex === 9) {
+            formCopyPrevRowBtnContainer.style.display = 'none';
+        } else {
+            formCopyPrevRowBtnContainer.style.display = 'block';
+        }
+    }
+    // ⬆️ ⬆️ ⬆️ KONIEC WKLEJANIA ⬆️ ⬆️ ⬆️
     const logical = rowsEditable();
     const row = logical[logicalIndex];
     if (!row) return;
@@ -9326,49 +9338,46 @@ try {
     console.error("Błąd konfiguracji nowych przycisków formularza:", err);
 }
 /* ⬆️ KONIEC BLOKU ⬆️ */
-/* ----- Sugestia 1: Logika przycisku "Kopiuj dane zwierzęcia z poprzedniego" ----- */
-try {
-    const formCopyPrevRowBtn = document.getElementById('formCopyPrevRowBtn');
-    if (formCopyPrevRowBtn) {
-        formCopyPrevRowBtn.addEventListener('click', () => {
-            const sel = document.getElementById('formRowSelect');
-            const currentIdx = parseInt(sel.value, 10); // Aktualnie wybrany wiersz (indeks 0-11)
-            
-            if (currentIdx === 0 || currentIdx === 9) { // Nie można kopiować w wierszu 1 i 10
-                showToast('Jesteś w pierwszym wierszu (lub pierwszym wierszu "pozostawionych"), brak danych do skopiowania.', 'info');
-                return;
-            }
-            
-            // Znajdź tablicę wszystkich edytowalnych wierszy w tabeli
-            const logicalRows = rowsEditable(); 
-            const prevRow = logicalRows[currentIdx - 1]; // Pobierz poprzedni wiersz z tabeli
-            
-            if (!prevRow) {
-                 console.error("Nie znaleziono poprzedniego wiersza.");
-                 return;
-            }
+// ⬇️ ⬇️ ⬇️ WKLEJ TEN BLOK KODU ⬇️ ⬇️ ⬇️
+        /* ----- Sugestia 1: Logika przycisku "Kopiuj dane zwierzęcia z poprzedniego" ----- */
+        try {
+            const formCopyPrevRowBtn = document.getElementById('formCopyPrevRowBtn');
+            if (formCopyPrevRowBtn) {
+                formCopyPrevRowBtn.addEventListener('click', () => {
+                    const sel = document.getElementById('formRowSelect');
+                    const currentIdx = parseInt(sel.value, 10); // Aktualnie wybrany wiersz (indeks 0-11)
+                    
+                    // Logika kopiowania (z poprzedniej sugestii)
+                    const logicalRows = rowsEditable(); 
+                    const prevRow = logicalRows[currentIdx - 1]; // Pobierz poprzedni wiersz z tabeli
+                    
+                    if (!prevRow) {
+                         console.error("Nie znaleziono poprzedniego wiersza.");
+                         return;
+                    }
 
-            // Odczytaj dane z komórek POPRZEDNIEGO wiersza
-            const opis = prevRow.cells[1].textContent.trim();
-            const liczbaInput = prevRow.cells[2].querySelector('input');
-            const liczba = liczbaInput ? liczbaInput.value : '';
-            const rozpoznanie = prevRow.cells[3].textContent.trim();
-            
-            // Wpisz odczytane dane do AKTUALNYCH pól formularza
-            document.getElementById('formOpis').value = opis;
-            document.getElementById('formLiczba').value = liczba;
-            document.getElementById('formRozpoznanie').value = rozpoznanie;
-            
-            showToast('Skopiowano dane zwierzęcia.', 'success');
-            
-            // Opcjonalnie: ukryj kontener z danymi (jeśli był ukryty)
-            document.getElementById('formRowDetailsContainer').style.display = 'block';
-            document.getElementById('formNoweDaneContainer').style.display = 'none';
-        });
-    }
-} catch (e) {
-    console.error("Błąd podpinania przycisku 'Kopiuj poprzedni wiersz':", e);
-}
+                    // Odczytaj dane z komórek POPRZEDNIEGO wiersza
+                    const opis = prevRow.cells[1].textContent.trim();
+                    const liczbaInput = prevRow.cells[2].querySelector('input');
+                    const liczba = liczbaInput ? liczbaInput.value : '';
+                    const rozpoznanie = prevRow.cells[3].textContent.trim();
+                    
+                    // Wpisz odczytane dane do AKTUALNYCH pól formularza
+                    document.getElementById('formOpis').value = opis;
+                    document.getElementById('formLiczba').value = liczba;
+                    document.getElementById('formRozpoznanie').value = rozpoznanie;
+                    
+                    showToast('Skopiowano dane zwierzęcia.', 'success');
+                    
+                    // Pokaż pola, jeśli były ukryte (np. w wierszu 2-9)
+                    document.getElementById('formRowDetailsContainer').style.display = 'block';
+                    document.getElementById('formNoweDaneContainer').style.display = 'none';
+                });
+            }
+        } catch (e) {
+            console.error("Błąd podpinania przycisku 'Kopiuj poprzedni wiersz':", e);
+        }
+        // ⬆️ ⬆️ ⬆️ KONIEC WKLEJANIA ⬆️ ⬆️ ⬆️
 </script> 
 
 <div id="toastContainer" style="position: fixed; top: 20px; right: 20px; z-index: 20000; display: flex; flex-direction: column; gap: 10px;">
