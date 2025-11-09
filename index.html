@@ -9317,19 +9317,11 @@ try {
                 // NIE: Tylko zamknij
                 formModal.style.display = 'none';
             }
-        });
-    }
-
-} catch (err) {
-    console.error("Błąd konfiguracji nowych przycisków formularza:", err);
-}
-/* ⬆️ KONIEC BLOKU ⬆️ */
-/* ⬇️ ZASTĄP CAŁĄ FUNKCJĘ TYM NOWYM KODEM (POPRAWKA KOPIOWANIA) ⬇️ */
+/* ⬇️ ZASTĄP CAŁĄ FUNKCJĘ TYM NOWYM KODEM (POPRAWKA: KOPIUJ TYLKO 3 POLA) ⬇️ */
 
 function copyToRow10FromRow0(){
     const logicalRows = rowsEditable(); // Używamy Twojej funkcji pomocniczej
 
-    // Upewnij się, że masz co najmniej 10 wierszy (indeks 0 i indeks 9)
     if (logicalRows.length < 10) {
         alert('Brak wystarczającej liczby wierszy, aby skopiować dane.');
         return;
@@ -9338,13 +9330,10 @@ function copyToRow10FromRow0(){
     const src = logicalRows[0]; // Wiersz ŹRÓDŁOWY (Wiersz 1 / indeks 0)
     const target = logicalRows[9]; // Wiersz DOCELOWY (Wiersz 10 / indeks 9)
 
-    console.log("Rozpoczynanie pełnego kopiowania z wiersza 1 do wiersza 10...");
+    console.log("Kopiowanie 3 pól z wiersza 1 do wiersza 10...");
 
-    // Kopiuj komórki tekstowe (Opis, Rozpoznanie, Seria, Karencja)
-    target.cells[1].textContent = src.cells[1].textContent; // Opis
-    target.cells[3].textContent = src.cells[3].textContent; // Rozpoznanie
-    target.cells[5].textContent = src.cells[5].textContent; // Seria
-    target.cells[7].textContent = src.cells[7].textContent; // Karencja
+    // Kopiuj komórkę 1 (Opis)
+    target.cells[1].textContent = src.cells[1].textContent; 
 
     // Kopiuj komórkę 2 (Input Liczba)
     const srcInputLiczba = src.cells[2].querySelector('input');
@@ -9353,29 +9342,33 @@ function copyToRow10FromRow0(){
         tgtInputLiczba.value = srcInputLiczba.value;
     }
 
-    // Kopiuj komórkę 4 (Input Lek)
-    const srcInputLek = src.cells[4].querySelector('input');
-    const tgtInputLek = target.cells[4].querySelector('input');
-    if (srcInputLek && tgtInputLek) {
-        tgtInputLek.value = srcInputLek.value;
-        // Skopiuj też atrybut data-print-value (dla drukowania)
-        target.cells[4].dataset.printValue = src.cells[4].dataset.printValue || srcInputLek.value;
-    }
+    // Kopiuj komórkę 3 (Rozpoznanie)
+    target.cells[3].textContent = src.cells[3].textContent; 
 
-    // Kopiuj komórkę 6 (Input Ilość + tekst Dawka)
-    // Najbezpieczniej jest skopiować cały wewnętrzny HTML tej komórki
-    target.cells[6].innerHTML = src.cells[6].innerHTML;
+    // ‼️ CELOWO CZYŚCIMY POZOSTAŁE POLA (na wypadek, gdyby coś w nich było) ‼️
+    const tgtInputLek = target.cells[4].querySelector('input');
+    if (tgtInputLek) {
+        tgtInputLek.value = ''; // Wyczyść Lek
+    }
+    target.cells[4].dataset.printValue = ''; // Wyczyść atrybut do druku
+    target.cells[5].textContent = ''; // Wyczyść Seria
+    target.cells[6].innerHTML = `<input class="small-input" type="number" inputmode="numeric" pattern="[0-9]*" placeholder="ilość">`; // Wyczyść Ilość/Dawka
+    target.cells[7].textContent = ''; // Wyczyść Karencja
 
     // Podświetl (tak jak było)
     target.classList.add('highlight-row');
     setTimeout(()=>target.classList.remove('highlight-row'),2000);
     
-    // Przewijanie jest teraz obsługiwane przez listener przycisku, więc tu go nie potrzeba
-    // target.scrollIntoView({behavior:'smooth', block:'center'}); 
-    
-    console.log("Kopiowanie zakończone.");
+    console.log("Kopiowanie 3 pól zakończone.");
 }
-/* ⬆️ KONIEC ZASTĘPOWANIA ⬆️ */
+/* ⬆️ KONIEC ZASTĘPOWANIA ⬆️ */        });
+    }
+
+} catch (err) {
+    console.error("Błąd konfiguracji nowych przycisków formularza:", err);
+}
+/* ⬆️ KONIEC BLOKU ⬆️ */
+
 </script> 
 
 <div id="toastContainer" style="position: fixed; top: 20px; right: 20px; z-index: 20000; display: flex; flex-direction: column; gap: 10px;">
