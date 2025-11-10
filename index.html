@@ -9941,11 +9941,18 @@ try {
         }
     }
 
-    // --- 3. Funkcja Startowa (Inicjalizacja) ---
+  // --- 3. Funkcja Startowa (Inicjalizacja) ---
     function onShowKalendarz() {
         console.log("Wejście do sekcji Kalendarz.");
+        
         if (!calendarUsersLoaded) {
+            // Jeśli użytkownicy nie są wczytani, uruchom funkcję,
+            // która ich wczyta I WTEDY uruchomi pobieranie wizyt.
             loadCalendarUsers();
+        } else {
+            // Jeśli użytkownicy SĄ już wczytani (np. wracasz do zakładki),
+            // po prostu odśwież wizyty.
+            fetchAndRenderVisits();
         }
         
         // Ustaw domyślną datę w formularzu
@@ -9958,10 +9965,8 @@ try {
         // Uruchom auto-usuwanie
         runAutoCleanupVisits();
 
-        // Uruchom pobieranie i renderowanie
-        fetchAndRenderVisits();
+        // (Usunęliśmy stąd 'fetchAndRenderVisits()', bo jest teraz w logice if/else)
     }
-
     // --- 4. Ładowanie Filtrów ---
     
     // Wczytuje użytkowników (lekarzy) do listy <select>
@@ -9988,6 +9993,8 @@ try {
                 calendarUserSelect.add(new Option(optionText, user.uid)); // Wartością jest UID
             });
             
+// ... (kod dodający opcje do selecta) ...
+            
             // Ustaw domyślnie na zalogowanego użytkownika
             if (currentUserProfile.uid) {
                 calendarUserSelect.value = currentUserProfile.uid;
@@ -9995,6 +10002,10 @@ try {
             
             calendarUsersLoaded = true;
             console.log("Wczytano użytkowników do kalendarza.");
+
+            // ✅ DODANA LINIA: Uruchom pobieranie wizyt DOPIERO TERAZ
+            fetchAndRenderVisits();
+
         } catch (error) {
             console.error("Błąd wczytywania użytkowników do kalendarza:", error);
             calendarUserSelect.innerHTML = '<option value="">Błąd ładowania</option>';
