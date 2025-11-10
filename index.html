@@ -3564,38 +3564,6 @@ alert('❌ Nie udało się zapisać adresu e-mail lokalnie.');
 // ✅ POCZĄTEK: ZMIENNE DLA BAZY KLIENTÓW I MODALI
 // ========================================================
 // ========================================================
-// ✅ POCZĄTEK: (NOWA WERSJA) BLOK PRZECHWYTYWANIA PRZYCISKU WSTECZ
-// ========================================================
-
-let isMainMenuTrapActive = false;
-
-window.addEventListener('popstate', function(event) {
-    if (isMainMenuTrapActive) {
-        // SCENARIUSZ 1: Jesteś w menu i klikasz "wstecz" (PUŁAPKA WYJŚCIA)
-        // To jest moment, gdy pokazujemy dialog.
-        event.preventDefault(); // Zapobiegaj cofnięciu
-
-        if (confirm('Czy na pewno chcesz zamknąć aplikację?')) {
-            // Użytkownik kliknął "OK"
-            isMainMenuTrapActive = false; // Dezaktywuj pułapkę
-            history.back(); // Pozwól na cofnięcie (zamknięcie)
-        } else {
-            // Użytkownik kliknął "Anuluj"
-            // Natychmiast "wepchnij" stan ponownie, aby pułapka działała dalej
-            history.pushState({ page: 'mainMenu' }, 'Menu Główne', '#menu');
-        }
-    } else if (event.state && event.state.page === 'mainMenu') {
-        // SCENARIUSZ 2: Byłeś w sekcji (np. Karta) i kliknąłeś "wstecz" (PUŁAPKA POWROTU)
-        // Przeglądarka właśnie cofnęła się do naszego stanu '#menu'.
-        
-        // 1. Pokaż wizualnie menu główne.
-        // 2. RE-AKTYWUJ pułapkę (ale nie pchaj nowego stanu do historii, bo już na nim jesteśmy).
-        console.log("POPSTATE: Powrót do menu z sekcji. Aktywuję pułapkę.");
-        showMainMenu(false); // Wywołaj menu BEZ pchania historii
-    }
-});
-
-// ========================================================
 // ✅ KONIEC: NOWY BLOK
 // ========================================================
 // ========================================================
