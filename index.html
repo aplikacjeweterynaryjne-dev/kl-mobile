@@ -10065,13 +10065,31 @@ try {
 
     // --- 6. Renderowanie Widoków ---
 
-    // Renderuje widok Dziś
+  // Renderuje widok Dziś (ZMODYFIKOWANA)
     function renderTodayView(visits) {
         const todayISO = new Date().toISOString().split('T')[0];
         
         // Filtruj tylko na dzisiaj
         const todayVisits = visits.filter(v => v.dataWizyty === todayISO);
         
+        // ✅ KOREKTA 2: Ustaw podsumowanie
+        const totalCount = todayVisits.length;
+        let summaryText = '';
+        const statusFilter = calendarStatusFilter.value;
+        
+        if (statusFilter === 'Nowa') {
+            summaryText = `Liczba wizyt do realizacji: ${totalCount}`;
+        } else if (statusFilter === 'Zrealizowana') {
+            summaryText = `Liczba wizyt zrealizowanych: ${totalCount}`;
+        } else {
+            summaryText = `Łączna liczba wizyt: ${totalCount}`;
+        }
+        // Wpisz do nowego elementu P
+        if (todayViewSummary) {
+            // Ukryj tekst "Liczba wizyt: 0"
+            todayViewSummary.textContent = totalCount > 0 ? summaryText : ''; 
+        }
+
         // Sortuj po porze dnia
         const poraOrder = {"Pilne": 1, "6-10": 2, "10-15": 3, "15-20": 4, "Obojętne": 5};
         todayVisits.sort((a, b) => (poraOrder[a.poraDnia] || 99) - (poraOrder[b.poraDnia] || 99));
@@ -10093,6 +10111,7 @@ try {
 
             const statusText = visit.status === 'Nowa' ? 'Oznacz jako Zrobione' : 'Oznacz jako Nowe';
             
+            // ✅ KOREKTA 1: Dodano "Pora dnia" (pogrubione)
             visitDiv.innerHTML = `
                 <div class="visit-item-info">
                     <strong>${visit.klientNazwa}</strong>
@@ -10101,6 +10120,7 @@ try {
                         ${visit.klientTelefon || 'Brak telefonu'}
                     </span>
                     <span class="purpose">Cel: ${visit.celWizyty || 'Nieokreślony'}</span>
+                    <span class="purpose" style="font-weight: 700;">Pora: ${visit.poraDnia || 'Brak'}</span>
                     ${visit.notatka ? `<span class="details" style="color: #c0392b; font-style: italic;">Notatka: ${visit.notatka}</span>` : ''}
                 </div>
                 <div class="visit-item-actions">
@@ -10111,7 +10131,6 @@ try {
             todayVisitList.appendChild(visitDiv);
         });
     }
-
     // Renderuje widok Miesiąca
     function renderMonthView(visits, date) {
         monthGridBody.innerHTML = ''; // Wyczyść
