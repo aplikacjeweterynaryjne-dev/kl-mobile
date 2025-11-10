@@ -9604,17 +9604,45 @@ try {
         if (foundItems === 0) list.innerHTML = '<div class="client-search-item" style="color: #999;">Brak pasujących klientów.</div>';
     }
 
-    // Wybór klienta
-    function selectFormClient(klient) {
-        if (!klient) return;
+ // Wybór klienta (WERSJA ZMODYFIKOWANA DLA KALENDARZA)
+    function selectFormClient(klient) {
+        if (!klient) return;
 
-        // Aktualizuj pola w formularzu (Step 1)
-        document.getElementById('formKlient').value = klient.nazwa;
-        document.getElementById('formAdres').value = klient.adres || '';
-        document.getElementById('formNrStada').value = klient.nrStada || '';
+        // Sprawdź, skąd przyszliśmy (zmienna globalna)
+        if (clientFormReturnToModal === '#visitFormModal') {
+            // SCENARIUSZ A: Wracamy do formularza WIZYTY
+            
+     // 1. Zapisz dane klienta tymczasowo
+            // Musimy znaleźć oryginalną opcję <option>, żeby dostać telefon (jeśli tam jest)
+            const dataList = document.getElementById('klientList');
+            const opt = Array.from(dataList.options).find(o => o.value === klient.nazwa);
+            const telefonKlienta = opt ? (opt.dataset.telefon || '') : (klient.telefon || ''); // Poprawka na pobranie telefonu
 
-        modal.style.display = 'none';
-    }
+            currentVisitClientData = {
+                nazwa: klient.nazwa,
+                adres: klient.adres || '',
+                telefon: telefonKlienta
+            };
+            
+            // 2. Wypełnij pola w modalu wizyty
+            visitFormKlient.value = klient.nazwa;
+            visitFormKlientAdres.textContent = klient.adres || 'Brak';
+            visitFormKlientTelefon.textContent = telefonKlienta || 'Brak';
+            
+            // 3. Zamknij modal klienta i pokaż modal wizyty
+            modal.style.display = 'none'; // (modal klienta)
+            visitFormModal.style.display = 'flex';
+            clientFormReturnToModal = null; // Wyczyść stan
+
+        } else {
+            // SCENARIUSZ B: Domyślne zachowanie (powrót do formularza KARTY)
+            // Aktualizuj pola w formularzu (Step 1)
+            document.getElementById('formKlient').value = klient.nazwa;
+            document.getElementById('formAdres').value = klient.adres || '';
+            document.getElementById('formNrStada').value = klient.nrStada || '';
+            modal.style.display = 'none';
+        }
+    }
     
 } catch(err) {
     console.error("Błąd inicjalizacji Modala Klientów (Formularz):", err);
@@ -9834,6 +9862,537 @@ try {
             console.error("Błąd podpinania przycisku 'Kopiuj poprzedni wiersz':", e);
         }
         // ⬆️ ⬆️ ⬆️ KONIEC WKLEJANIA ⬆️ ⬆️ ⬆️
+/* ======================================================== */
+/* ✅ POCZĄTEK: LOGIKA KALENDARZA WIZYT (Funkcje Główne)      */
+/* ======================================================== */
+try {
+    // --- Podpięcie do Menu i Nawigacji ---
+
+    if (menuKalendarzBtn) {
+        menuKalendarzBtn.addEventListener('click', () => {
+            showSection('kalendarz');
+        });
+    }
+    if (tabKalendarzBtn) {
+        tabKalendarzBtn.addEventListener('click', () => {
+            // Sprawdź, czy karta jest "brudna"
+            if (typeof confirmOnTabChange === 'function' && !confirmOnTabChange()) {
+                return; // Przerwij, jeśli użytkownik anuluje
+            }
+            showSection('kalendarz');
+        });
+    }
+
+    // --- FUNKCJA AUTO-USUWANIA WIZYT (uruchamiana przy wejściu) ---
+    async function runAutoCleanupVisits() {
+        console.log("Uruchamianie auto-usuwania starych wizyt...");
+        const now = new Date();
+        
+        // 1. Oblicz daty graniczne
+        // Data dla ZREALIZOWANYCH (7 dni temu)
+        const realizedCutoff = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        // Data dla NOWYCH (14 dni temu)
+        const newCutoff = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+
+        // Konwertuj na Timestamp Firebase
+        const realizedTimestamp = firebase.firestore.Timestamp.fromDate(realizedCutoff);
+        const newTimestamp = firebase.firestore.Timestamp.fromDate(newCutoff);
+
+        try {
+            const batch = db.batch();
+            
+            // 2. Zapytanie o stare ZREALIZOWANE wizyty
+            const queryRealized = db.collection('wizyty')
+                .where('status', '==', 'Zrealizowana')
+                .where('createdAt', '<', realizedTimestamp);
+            
+            const snapshotRealized = await queryRealized.get();
+            snapshotRealized.docs.forEach(doc => {
+                console.log(`Zaznaczono do usunięcia (Zrealizowana > 7 dni): ${doc.id}`);
+                batch.delete(doc.ref);
+            });
+
+            // 3. Zapytanie o stare NOWE (niezrealizowane) wizyty
+            const queryNew = db.collection('wizyty')
+                .where('status', '==', 'Nowa')
+                .where('createdAt', '<', newTimestamp); // Użyj createdAt, a nie dataWizyty!
+            
+            const snapshotNew = await queryNew.get();
+            snapshotNew.docs.forEach(doc => {
+                console.log(`Zaznaczono do usunięcia (Nowa > 14 dni): ${doc.id}`);
+                batch.delete(doc.ref);
+            });
+
+            // 4. Wykonaj usunięcie
+            if (snapshotRealized.empty && snapshotNew.empty) {
+                console.log("Brak starych wizyt do usunięcia.");
+                return;
+            }
+            
+            await batch.commit();
+            console.log(`Usunięto ${snapshotRealized.size} zrealizowanych i ${snapshotNew.size} nowych wizyt.`);
+
+        } catch (error) {
+            console.error("Błąd podczas auto-usuwania wizyt:", error);
+            // Prawdopodobnie błąd indeksu
+            if (error.code === 'failed-precondition') {
+                alert("BŁĄD: Wymagane są indeksy Firestore do auto-usuwania wizyt. Sprawdź konsolę (F12).");
+                console.error("BŁĄD INDEKSU: Utwórz indeksy dla 'wizyty': [status(ASC), createdAt(ASC)]");
+            }
+        }
+    }
+
+    // --- 3. Funkcja Startowa (Inicjalizacja) ---
+    function onShowKalendarz() {
+        console.log("Wejście do sekcji Kalendarz.");
+        if (!calendarUsersLoaded) {
+            loadCalendarUsers();
+        }
+        
+        // Ustaw domyślną datę w formularzu
+        const todayISO = new Date().toISOString().split('T')[0];
+        visitFormDate.value = todayISO;
+        
+        // Ustaw tytuł widoku dnia
+        todayViewTitle.textContent = `Wizyty na dzisiaj (${new Date().toLocaleDateString('pl-PL', { day: 'numeric', month: 'long', year: 'numeric' })})`;
+
+        // Uruchom auto-usuwanie
+        runAutoCleanupVisits();
+
+        // Uruchom pobieranie i renderowanie
+        fetchAndRenderVisits();
+    }
+
+    // --- 4. Ładowanie Filtrów ---
+    
+    // Wczytuje użytkowników (lekarzy) do listy <select>
+    async function loadCalendarUsers() {
+        if (!calendarUserSelect || !currentUserProfile) return;
+
+        let query;
+        if (currentUserProfile.Rola === 'administrator') {
+            query = db.collection("konfiguracja").orderBy("Nazwisko");
+        } else {
+            const userClinicId = currentUserProfile['ID lecznicy'];
+            if (!userClinicId) return;
+            query = db.collection("konfiguracja").where("ID lecznicy", "==", userClinicId).orderBy("Nazwisko");
+        }
+
+        try {
+            const snapshot = await query.get();
+            calendarUserSelect.innerHTML = ''; // Wyczyść
+            calendarUserSelect.add(new Option("Wszyscy", "ALL")); // Opcja "Wszyscy"
+            
+            snapshot.docs.forEach(doc => {
+                const user = doc.data();
+                const optionText = `${user.Imie} ${user.Nazwisko}`;
+                calendarUserSelect.add(new Option(optionText, user.uid)); // Wartością jest UID
+            });
+            
+            // Ustaw domyślnie na zalogowanego użytkownika
+            if (currentUserProfile.uid) {
+                calendarUserSelect.value = currentUserProfile.uid;
+            }
+            
+            calendarUsersLoaded = true;
+            console.log("Wczytano użytkowników do kalendarza.");
+        } catch (error) {
+            console.error("Błąd wczytywania użytkowników do kalendarza:", error);
+            calendarUserSelect.innerHTML = '<option value="">Błąd ładowania</option>';
+        }
+    }
+
+    // Listenery filtrów
+    if (calendarUserSelect) calendarUserSelect.addEventListener('change', fetchAndRenderVisits);
+    if (calendarStatusFilter) calendarStatusFilter.addEventListener('change', fetchAndRenderVisits);
+
+    // --- 5. Pobieranie Danych (Firestore) ---
+    
+    // Główna funkcja pobierająca dane
+    async function fetchAndRenderVisits() {
+        if (!currentUserProfile) return; // Musimy być zalogowani
+
+        const selectedUserId = calendarUserSelect.value;
+        const selectedStatus = calendarStatusFilter.value;
+        
+        // Pokaż loader (można dodać)
+        todayVisitList.innerHTML = '<p style="text-align:center; color:#888; margin-top: 30px;">Ładowanie wizyt... ⏳</p>';
+        monthGridBody.innerHTML = '<p style="text-align:center; color:#888;">Ładowanie... ⏳</p>';
+
+        try {
+            let q = db.collection("wizyty");
+
+            // 1. Filtr Użytkownika
+            if (selectedUserId === "ALL") {
+                // Właściciel/Admin widzi wszystkich w lecznicy
+                const userClinicId = currentUserProfile['ID lecznicy'];
+                if (!userClinicId && currentUserProfile.Rola !== 'administrator') {
+                    throw new Error("Brak ID lecznicy dla właściciela");
+                }
+                // Administrator widzi WSZYSTKO (bez filtra lecznicy)
+                if (currentUserProfile.Rola !== 'administrator') {
+                    q = q.where("id_lecznicy", "==", userClinicId);
+                }
+            } else {
+                // Konkretny lekarz
+                q = q.where("lekarz_uid", "==", selectedUserId);
+            }
+
+            // 2. Filtr Statusu (jeśli nie "Wszystkie")
+            if (selectedStatus !== "Wszystkie") {
+                q = q.where("status", "==", selectedStatus);
+            }
+            
+            // !!! WAŻNE: To zapytanie (np. status + id_lecznicy) BĘDZIE WYMAGAĆ INDEKSU w Firestore !!!
+            
+            const snapshot = await q.orderBy("dataWizyty", "asc").get();
+            allFetchedVisits = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            
+            console.log(`Pobrano ${allFetchedVisits.length} wizyt.`);
+
+            // Wyrenderuj oba widoki (jeden będzie ukryty)
+            renderTodayView(allFetchedVisits);
+            renderMonthView(allFetchedVisits, currentMonthView);
+
+        } catch (error) {
+            console.error("Błąd pobierania wizyt z Firestore:", error);
+            if (error.code === 'failed-precondition') {
+                alert("BŁĄD KRYTYCZNY: Aby kalendarz działał, administrator musi utworzyć indeks w bazie danych Firestore.\n\n(Sprawdź konsolę F12, aby zobaczyć link do utworzenia indeksu)");
+                console.error("BŁĄD INDEKSU: Wejdź w konsolę Firebase i utwórz wymagane indeksy kompozytowe dla kolekcji 'wizyty'.");
+            }
+            todayVisitList.innerHTML = '<p style="text-align:center; color:red; margin-top: 30px;">Błąd ładowania wizyt.</p>';
+        }
+    }
+
+    // --- 6. Renderowanie Widoków ---
+
+    // Renderuje widok Dziś
+    function renderTodayView(visits) {
+        const todayISO = new Date().toISOString().split('T')[0];
+        
+        // Filtruj tylko na dzisiaj
+        const todayVisits = visits.filter(v => v.dataWizyty === todayISO);
+        
+        // Sortuj po porze dnia
+        const poraOrder = {"Pilne": 1, "6-10": 2, "10-15": 3, "15-20": 4, "Obojętne": 5};
+        todayVisits.sort((a, b) => (poraOrder[a.poraDnia] || 99) - (poraOrder[b.poraDnia] || 99));
+
+        todayVisitList.innerHTML = ''; // Wyczyść
+        
+        if (todayVisits.length === 0) {
+            const statusMsg = calendarStatusFilter.value === "Nowa" ? "do realizacji" : "zrealizowanych";
+            todayVisitList.innerHTML = `<p style="text-align:center; color:#888; margin-top: 30px;">Brak wizyt ${statusMsg} na dzisiaj.</p>`;
+            return;
+        }
+
+        todayVisits.forEach(visit => {
+            const visitDiv = document.createElement('div');
+            visitDiv.className = 'visit-item';
+            visitDiv.dataset.id = visit.id;
+            visitDiv.dataset.status = visit.status;
+            visitDiv.dataset.pora = visit.poraDnia;
+
+            const statusText = visit.status === 'Nowa' ? 'Oznacz jako Zrobione' : 'Oznacz jako Nowe';
+            
+            visitDiv.innerHTML = `
+                <div class="visit-item-info">
+                    <strong>${visit.klientNazwa}</strong>
+                    <span class="details">
+                        ${visit.klientAdres || 'Brak adresu'}<br>
+                        ${visit.klientTelefon || 'Brak telefonu'}
+                    </span>
+                    <span class="purpose">Cel: ${visit.celWizyty || 'Nieokreślony'}</span>
+                    ${visit.notatka ? `<span class="details" style="color: #c0392b; font-style: italic;">Notatka: ${visit.notatka}</span>` : ''}
+                </div>
+                <div class="visit-item-actions">
+                    <button class="btn btn-quick-status" data-id="${visit.id}" data-new-status="${visit.status === 'Nowa' ? 'Zrealizowana' : 'Nowa'}">${statusText}</button>
+                    <button class="btn ghost small btn-edit-visit" data-id="${visit.id}">Edytuj</button>
+                </div>
+            `;
+            todayVisitList.appendChild(visitDiv);
+        });
+    }
+
+    // Renderuje widok Miesiąca
+    function renderMonthView(visits, date) {
+        monthGridBody.innerHTML = ''; // Wyczyść
+        const year = date.getFullYear();
+        const month = date.getMonth(); // 0-11
+        monthViewTitle.textContent = date.toLocaleDateString('pl-PL', { month: 'long', year: 'numeric' });
+
+        // Grupuj wizyty po dacie
+        const visitsByDate = new Map();
+        visits.forEach(v => {
+            const dateKey = v.dataWizyty; // np. "2025-11-10"
+            if (!visitsByDate.has(dateKey)) {
+                visitsByDate.set(dateKey, []);
+            }
+            visitsByDate.get(dateKey).push(v);
+        });
+
+        // Logika budowania siatki kalendarza
+        const firstDayOfMonth = new Date(year, month, 1).getDay(); // 0=Niedz, 1=Pon
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        
+        // Korekta na polski tydzień (Poniedziałek = 0, Niedziela = 6)
+        const startOffset = (firstDayOfMonth === 0) ? 6 : firstDayOfMonth - 1; 
+        
+        // Dodaj puste komórki na początku
+        for (let i = 0; i < startOffset; i++) {
+            const cell = document.createElement('div');
+            cell.className = 'day-cell other-month';
+            monthGridBody.appendChild(cell);
+        }
+
+        // Dodaj komórki dni
+        for (let day = 1; day <= daysInMonth; day++) {
+            const cell = document.createElement('div');
+            cell.className = 'day-cell';
+            const dayString = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+            cell.dataset.date = dayString;
+
+            // Sprawdź czy dzisiaj
+            const todayISO = new Date().toISOString().split('T')[0];
+            if (dayString === todayISO) {
+                cell.classList.add('is-today');
+            }
+
+            // Numer dnia
+            cell.innerHTML = `<span class="day-number">${day}</span>`;
+            
+            const visitsForThisDay = visitsByDate.get(dayString) || [];
+            
+            // Suma wizyt do realizacji (Req. 4)
+            const visitsToDo = visitsForThisDay.filter(v => v.status === 'Nowa').length;
+            if (visitsToDo > 0) {
+                cell.innerHTML += `<div class="day-summary">${visitsToDo}</div>`;
+            }
+
+            // Kropki kolorów (Req. 11)
+            const pory = new Set(visitsForThisDay.map(v => v.poraDnia));
+            let dotsHtml = '<div class="day-dots">';
+            if (pory.has('Pilne')) dotsHtml += '<div class="day-dot dot-pilne"></div>';
+            if (pory.has('Obojętne')) dotsHtml += '<div class="day-dot dot-obojetne"></div>';
+            if (pory.has('6-10') || pory.has('10-15') || pory.has('15-20')) {
+                dotsHtml += '<div class="day-dot dot-standard"></div>';
+            }
+            dotsHtml += '</div>';
+            cell.innerHTML += dotsHtml;
+
+            // Kliknięcie na dzień przełącza na widok "Dziś"
+            cell.addEventListener('click', () => {
+                // (Logika przejścia do widoku dnia - na razie pominięte, przełącza na główne "Dziś")
+                btnViewToday.click();
+            });
+
+            monthGridBody.appendChild(cell);
+        }
+    }
+
+    // --- 7. Logika Przełączania Widoków (Dziś/Miesiąc) ---
+    btnViewToday.addEventListener('click', () => {
+        todayViewContainer.style.display = 'block';
+        monthViewContainer.style.display = 'none';
+        // yearViewContainer.style.display = 'none';
+        btnViewToday.classList.add('primary');
+        btnViewMonth.classList.remove('primary');
+        btnViewYear.classList.remove('primary');
+    });
+
+    btnViewMonth.addEventListener('click', () => {
+        todayViewContainer.style.display = 'none';
+        monthViewContainer.style.display = 'block';
+        // yearViewContainer.style.display = 'none';
+        btnViewToday.classList.remove('primary');
+        btnViewMonth.classList.add('primary');
+        btnViewYear.classList.remove('primary');
+        // Wyrenderuj widok miesiąca dla aktualnie pobranych danych
+        renderMonthView(allFetchedVisits, currentMonthView);
+    });
+    
+    // Nawigacja miesiąca
+    btnPrevMonth.addEventListener('click', () => {
+        currentMonthView.setMonth(currentMonthView.getMonth() - 1);
+        // Tu powinniśmy na nowo pobrać dane dla nowego miesiąca, na razie renderujemy z cache
+        fetchAndRenderVisits();
+    });
+    btnNextMonth.addEventListener('click', () => {
+        currentMonthView.setMonth(currentMonthView.getMonth() + 1);
+        fetchAndRenderVisits();
+    });
+
+    // --- 8. Logika Formularza Wizyty (Modal) ---
+    
+    // Otwieranie formularza
+    addVisitBtn.addEventListener('click', () => {
+        visitFormTitle.textContent = "Nowa wizyta";
+        visitFormDocId.value = ''; // Tryb dodawania
+        visitFormStatus.value = 'Nowa';
+        visitFormKlient.value = '';
+        visitFormKlientAdres.textContent = '...';
+        visitFormKlientTelefon.textContent = '...';
+        visitFormDate.value = new Date().toISOString().split('T')[0]; // Dziś
+        visitFormPoraDnia.value = '6-10';
+        visitFormCel.value = '';
+        visitFormNotatka.value = '';
+        currentVisitClientData = null; // Wyczyść dane klienta
+        visitFormModal.style.display = 'flex';
+    });
+
+    // Anulowanie
+    cancelVisitForm.addEventListener('click', () => {
+        visitFormModal.style.display = 'none';
+    });
+
+    // Podpięcie wyszukiwania klienta
+    visitFormKlient.addEventListener('click', () => {
+        // Powiedz globalnemu skryptowi, że po dodaniu klienta ma wrócić do modala wizyty
+        if (typeof(clientFormReturnToModal) !== 'undefined') {
+            clientFormReturnToModal = '#visitFormModal';
+        }
+        
+        // Ukryj modal wizyty
+        visitFormModal.style.display = 'none';
+        
+        // Otwórz modal wyszukiwania klienta (ten sam co w formularzu karty)
+        const formKlientTrigger = document.getElementById('formKlient');
+        if(formKlientTrigger) {
+            formKlientTrigger.click(); // Użyj modala z formularza
+        }
+    });
+    
+    // Zapisywanie wizyty (Dodawanie/Edycja)
+    saveVisitBtn.addEventListener('click', async () => {
+        if (!currentUserProfile) {
+            alert("Błąd: Brak danych użytkownika.");
+            return;
+        }
+
+        const dataWizyty = visitFormDate.value;
+        if (!dataWizyty) {
+            alert("Data wizyty jest wymagana.");
+            return;
+        }
+
+        // Pobierz dane klienta
+        let klientNazwa = visitFormKlient.value;
+        let klientAdres = visitFormKlientAdres.textContent;
+        let klientTelefon = visitFormKlientTelefon.textContent;
+
+        if (currentVisitClientData) {
+             klientNazwa = currentVisitClientData.nazwa;
+             klientAdres = currentVisitClientData.adres;
+             klientTelefon = currentVisitClientData.telefon;
+        }
+        
+        if (!klientNazwa || klientNazwa === '...') {
+            alert("Klient jest wymagany.");
+            return;
+        }
+
+        const visitData = {
+            lekarz_uid: currentUserProfile.uid,
+            lekarz_nazwisko: `${currentUserProfile.Imie} ${currentUserProfile.Nazwisko}`,
+            id_lecznicy: currentUserProfile['ID lecznicy'],
+            dataWizyty: dataWizyty,
+            status: visitFormStatus.value,
+            klientNazwa: klientNazwa,
+            klientAdres: (klientAdres === '...') ? '' : klientAdres,
+            klientTelefon: (klientTelefon === '...') ? '' : klientTelefon,
+            poraDnia: visitFormPoraDnia.value,
+            celWizyty: visitFormCel.value.trim(),
+            notatka: visitFormNotatka.value.trim(),
+            createdAt: firebase.firestore.FieldValue.serverTimestamp() // Zawsze ustawiaj przy zapisie
+        };
+
+        const docId = visitFormDocId.value;
+
+        saveVisitBtn.disabled = true;
+        saveVisitBtn.textContent = 'Zapisywanie...';
+
+        try {
+            if (docId) {
+                // Tryb Edycji
+                // Usuwamy createdAt, aby nie nadpisać oryginalnej daty utworzenia
+                delete visitData.createdAt; 
+                await db.collection('wizyty').doc(docId).update(visitData);
+                showToast("Wizyta zaktualizowana.", "success");
+            } else {
+                // Tryb Dodawania
+                await db.collection('wizyty').add(visitData);
+                showToast("Wizyta dodana.", "success");
+            }
+            visitFormModal.style.display = 'none';
+            fetchAndRenderVisits(); // Odśwież listę
+        } catch (error) {
+            console.error("Błąd zapisu wizyty:", error);
+            alert("Wystąpił błąd podczas zapisu.");
+        } finally {
+            saveVisitBtn.disabled = false;
+            saveVisitBtn.textContent = 'Zapisz';
+        }
+    });
+
+    // --- 9. Logika Szybkiej Zmiany Statusu i Edycji (Widok Dnia) ---
+    todayVisitList.addEventListener('click', async (e) => {
+        const target = e.target;
+
+        // Szybka zmiana statusu
+        if (target.classList.contains('btn-quick-status')) {
+            const docId = target.dataset.id;
+            const newStatus = target.dataset.newStatus;
+            
+            target.disabled = true;
+            target.textContent = '...';
+
+            try {
+                await db.collection('wizyty').doc(docId).update({
+                    status: newStatus
+                });
+                showToast(`Status zmieniony na: ${newStatus}`, 'info');
+                fetchAndRenderVisits(); // Odśwież widok
+            } catch (error) {
+                console.error("Błąd zmiany statusu:", error);
+                alert("Błąd zmiany statusu.");
+                target.disabled = false;
+            }
+        }
+
+        // Edycja wizyty
+        if (target.classList.contains('btn-edit-visit')) {
+            const docId = target.dataset.id;
+            const visitData = allFetchedVisits.find(v => v.id === docId);
+            if (visitData) {
+                visitFormTitle.textContent = "Edytuj wizytę";
+                visitFormDocId.value = visitData.id;
+                visitFormStatus.value = visitData.status;
+                visitFormKlient.value = visitData.klientNazwa;
+                visitFormKlientAdres.textContent = visitData.klientAdres || '...';
+                visitFormKlientTelefon.textContent = visitData.klientTelefon || '...';
+                visitFormDate.value = visitData.dataWizyty;
+                visitFormPoraDnia.value = visitData.poraDnia;
+                visitFormCel.value = visitData.celWizyty;
+                visitFormNotatka.value = visitData.notatka;
+                
+                // Zapisz dane klienta na potrzeby zapisu
+                currentVisitClientData = {
+                    nazwa: visitData.klientNazwa,
+                    adres: visitData.klientAdres,
+                    telefon: visitData.klientTelefon
+                };
+
+                visitFormModal.style.display = 'flex';
+            }
+        }
+    });
+
+} catch (err) {
+    console.error("BŁĄD KRYTYCZNY w module Kalendarza Wizyt:", err);
+    // alert("Nie udało się załadować modułu kalendarza.");
+}
+/* ======================================================== */
+/* ✅ KONIEC: LOGIKA KALENDARZA WIZYT                         */
+/* ======================================================== */
 </script> 
 
 <div id="toastContainer" style="position: fixed; top: 20px; right: 20px; z-index: 20000; display: flex; flex-direction: column; gap: 10px;">
