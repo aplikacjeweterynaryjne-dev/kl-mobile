@@ -3563,9 +3563,36 @@ alert('❌ Nie udało się zapisać adresu e-mail lokalnie.');
 <script>
 // ✅ POCZĄTEK: ZMIENNE DLA BAZY KLIENTÓW I MODALI
 // ========================================================
+// ✅ POCZĄTEK: BLOK PRZECHWYTYWANIA PRZYCISKU WSTECZ
 // ========================================================
-// ✅ KONIEC: NOWY BLOK
+
+// Ta zmienna mówi nam, czy "pułapka" w menu głównym jest aktywna
+let isMainMenuTrapActive = false;
+
+window.addEventListener('popstate', function(event) {
+    // Sprawdź, czy pułapka jest aktywna (tzn. czy jesteśmy w menu głównym)
+    if (isMainMenuTrapActive) {
+        
+        // Zatrzymujemy domyślną akcję (choć 'popstate' i tak jej nie ma)
+        event.preventDefault();
+
+        // Pokaż okno dialogowe
+        if (confirm('Czy na pewno chcesz zamknąć aplikację?')) {
+            // Użytkownik kliknął "OK"
+            isMainMenuTrapActive = false; // Dezaktywuj pułapkę
+            // Cofnij się "naprawdę", co teraz zamknie aplikację
+            history.back(); 
+        } else {
+            // Użytkownik kliknął "Anuluj"
+            // Natychmiast "wepchnij" stan ponownie, aby pułapka działała dalej
+            history.pushState({ page: 'mainMenu' }, 'Menu Główne', '#menu');
+            // isMainMenuTrapActive pozostaje 'true'
+        }
+    }
+});
+
 // ========================================================
+// ✅ KONIEC: BLOK PRZECHWYTYWANIA PRZYCISKU WSTECZ
 // ========================================================
 // ✅ NOWE ZMIENNE DLA MENU GŁÓWNEGO I MODALI
 // Zmienne dla ekranu logowania
@@ -3922,10 +3949,10 @@ if (mainTabBar) mainTabBar.style.display = 'none';
   }
 });
 // ⬇️ ⬇️ ⬇️ TUTAJ WKLEJ KOD Z PUNKTU 2 ⬇️ ⬇️ ⬇️
-* Pokazuje menu główne i AKTYWUJE pułapkę przycisku "wstecz".
- * @param {boolean} [pushHistory=true] - Czy dodać nowy wpis do historii przeglądarki.
+/**
+ * Pokazuje menu główne i AKTYWUJE pułapkę przycisku "wstecz".
  */
-function showMainMenu(pushHistory = true) {
+function showMainMenu() {
     // 1. Ukryj wszystkie inne sekcje
     if (kartaSection) kartaSection.style.display = 'none';
     if (kalkulatorSection) kalkulatorSection.style.display = 'none';
@@ -3945,18 +3972,13 @@ function showMainMenu(pushHistory = true) {
     if (archiwumSubMenu) archiwumSubMenu.style.display = 'none';
 
     // 4. ✅ KLUCZOWY KROK: Ustaw pułapkę
-    if (pushHistory) {
-        // Wywoływane tylko przy logowaniu lub celowym przejściu do menu
-        console.log("Ustawianie pułapki 'back' na menu głównym (z pushState).");
-        history.pushState({ page: 'mainMenu' }, 'Menu Główne', '#menu'); 
-    } else {
-        // Wywoływane, gdy 'popstate' cofa nas do menu
-        console.log("RE-AKTYWACJA pułapki 'back' po powrocie do menu (BEZ pushState).");
-    }
-    
-    // W obu przypadkach aktywujemy listener
-    isMainMenuTrapActive = true; 
+    console.log("Ustawianie pułapki 'back' na menu głównym.");
+    // Wypychamy nowy, fałszywy stan do historii
+    history.pushState({ page: 'mainMenu' }, 'Menu Główne', '#menu'); 
+    isMainMenuTrapActive = true; // Aktywujemy nasz listener z Kroku 1
 }
+// ⬆️ ⬆️ ⬆️ KONIEC KODU Z PUNKTU 2 ⬆️ ⬆️ ⬆️
+/* Plik: index.html (zastąp całą funkcję showSection, ok. linii 1170) */
 
 /* ⬇️ WKLEJ TEN KOD ⬇️ */
 
@@ -4117,12 +4139,8 @@ tabKalkulatorBtn.addEventListener('click', () => showSection('kalkulator'));
 // --- Przycisk Wróć do Menu ---
 if (backToMenuBtn) {
     backToMenuBtn.addEventListener('click', () => {
-        // ✅ POPRAWKA:
-        // NIE wywołuj showMainMenu() - to pcha nowy stan do historii i psuje logikę.
-        // Po prostu cofnij się w historii.
-        // Nasz listener 'popstate' (z Kroku 1) przechwyci to cofnięcie,
-        // zobaczy, że wróciliśmy do '#menu' i sam wywoła showMainMenu(false).
-        history.back();
+        // Po prostu wywołaj naszą nową funkcję, która robi to wszystko I ustawia pułapkę
+        showMainMenu();
     });
 }
 
