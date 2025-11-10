@@ -2105,7 +2105,7 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
 <tr><td colspan="7" style="text-align: center; padding: 20px; color: #777; font-size: 1.1em;"><i>Proszę czekać...</i><br><br>Kliknij <i class="bi bi-box-arrow-in-down"></i> <b>Wczytaj bazę produktów</b>, aby rozpocząć.</td></tr>
 </tbody>
     </table>
-  </div> </div> <div id="productFormModal" aria-hidden="true" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.48); display: none; z-index: 10000; justify-content: center; align-items: center; overflow: hidden;">
+  </div> </div> <div id="productFormModal" aria-hidden="true" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.48); display: none; z-index: 10003; justify-content: center; align-items: center; overflow: hidden;">
   <div class="form-card" role="dialog" aria-modal="true">
 
     <h3 id="productFormTitle" style="font-size: 25px;">Dane Produktu</h3>
@@ -2152,7 +2152,7 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
     </div>
 
   </div>
-</div> <div id="konfiguracjaFormModal" aria-hidden="true" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.48); display: none; z-index: 10000; justify-content: center; align-items: center; overflow: hidden;">
+</div> <div id="konfiguracjaFormModal" aria-hidden="true" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.48); display: none; z-index: 10003; justify-content: center; align-items: center; overflow: hidden;">
 <div class="form-card" role="dialog" aria-modal="true">
 
 <h3 id="konfiguracjaFormTitle" style="font-size: 25px;">Dane Konfiguracyjne</h3>
@@ -3780,7 +3780,6 @@ const clientFormNrStada = document.getElementById('clientFormNrStada'); // Popra
 // Zmienna do przechowywania wczytanych klientów w pamięci
 let cachedClients = null;
 let currentUserProfile = null; // ✅ DODAJ TĘ LINIĘ
-let clientFormReturnToModal = null; // ⬅️ ⬅️ ⬅️ DODAJ TĘ LINIĘ
 const adminRoles = ['administrator', 'właściciel'];
 // Przyciski ładowania/odświeżania
 const loadClientsBtn = document.getElementById('loadClientsBtn');
@@ -5166,25 +5165,12 @@ clientFormModal.style.display = 'flex';
 clientFormNazwa.focus();
 });
 }
-
-/**
-/**
-* Przycisk "Anuluj" w modalu klienta
+* Przycisk "Anuluj" w modalu klienta (Wersja 2 - uproszczona)
 */
 if (cancelClientForm) {
 cancelClientForm.addEventListener('click', () => {
-    clientFormModal.style.display = 'none'; // Zawsze ukrywaj formularz
-    
-    // ⬇️ POCZĄTEK POPRAWKI ⬇️
-    // Sprawdź, czy mamy gdzieś wrócić
-    if (clientFormReturnToModal) {
-        const returnModal = document.querySelector(clientFormReturnToModal);
-        if (returnModal) {
-            returnModal.style.display = 'flex'; // Pokaż poprzedni modal
-        }
-        clientFormReturnToModal = null; // Wyczyść stan
-    }
-    // ⬆️ KONIEC POPRAWKI ⬆️
+    clientFormModal.style.display = 'none';
+    // Nie musimy nic więcej robić, modal wyszukiwania jest pod spodem.
 });
 }
 
@@ -5230,33 +5216,26 @@ await db.collection("klienci").add(klientData);
 showToast('Nowy klient dodany.', 'success');
 }
 
-// ⬇️ ⬇️ ⬇️ POCZĄTEK POPRAWKI ⬇️ ⬇️ ⬇️
+// ⬇️ ⬇️ ⬇️ POCZĄTEK POPRAWKI (Wersja 2) ⬇️ ⬇️ ⬇️
 
-            // Przeładuj cache i odśwież globalne listy <datalist>
+            // 1. Przeładuj cache i odśwież globalne listy <datalist>
+            // (To jest asynchroniczne, ale uruchomi się w tle)
             loadAndCacheClients(); 
             refreshClientDataLists(); 
             
-            clientFormModal.style.display = 'none'; // Ukryj formularz dodawania
+            // 2. Ukryj formularz dodawania
+            clientFormModal.style.display = 'none'; 
             
-            // Sprawdź, czy mamy gdzieś wrócić
-            if (clientFormReturnToModal) {
-                const returnModal = document.querySelector(clientFormReturnToModal);
-                if (returnModal) {
-                    returnModal.style.display = 'flex'; // Pokaż poprzedni modal
-                    
-                    // DODATKOWO: Odśwież listę w modalu, do którego wracamy
-                    if (clientFormReturnToModal === '#clientSearchModal' && typeof populateAndFilterClientList === 'function') {
-                        console.log("Odświeżanie listy w clientSearchModal...");
-                        populateAndFilterClientList();
-                    }
-                    if (clientFormReturnToModal === '#formClientSearchModal' && typeof populateAndFilterFormClientList === 'function') {
-                        console.log("Odświeżanie listy w formClientSearchModal...");
-                        populateAndFilterFormClientList();
-                    }
-                }
-                clientFormReturnToModal = null; // Wyczyść stan
+            // 3. Odśwież listy w modalach wyszukiwania (które są pod spodem)
+            if (typeof populateAndFilterClientList === 'function') {
+                console.log("Odświeżanie listy w clientSearchModal...");
+                populateAndFilterClientList();
             }
-            // ⬆️ ⬆️ ⬆️ KONIEC POPRAWKI ⬆️ ⬆️ ⬆️
+            if (typeof populateAndFilterFormClientList === 'function') {
+                console.log("Odświeżanie listy w formClientSearchModal...");
+                populateAndFilterFormClientList();
+            }
+            // ⬆️ ⬆️ ⬆️ KONIEC POPRAWKI (Wersja 2) ⬆️ ⬆️ ⬆️
 
 } catch (error) {
 console.error('Błąd zapisu klienta: ', error);
@@ -9121,16 +9100,12 @@ try {
     }
     // ⬇️ ⬇️ ⬇️ WKLEJ TEN BLOK ⬇️ ⬇️ ⬇️
 
-        // 7. Listener dla przycisku "Dodaj nowego" w modalu karty
+       // 7. Listener for "Add New" in card modal (Wersja 2)
         const clientSearchAddNewBtn = document.getElementById('clientSearchAddNewBtn');
         if (clientSearchAddNewBtn) {
             clientSearchAddNewBtn.addEventListener('click', () => {
-                console.log("Otwieranie formularza klienta z modala wyszukiwania (karta)...");
-                // 1. Zapisz, dokąd wrócić
-                clientFormReturnToModal = '#clientSearchModal'; 
-                // 2. Ukryj modal wyszukiwania
-                if (clientSearchModal) clientSearchModal.style.display = 'none';
-                // 3. Otwórz formularz dodawania (symuluj kliknięcie globalnego przycisku)
+                console.log("Otwieranie formularza klienta (nad wyszukiwarką)...");
+                // Po prostu otwórz formularz. Pojawi się na wierzchu dzięki z-index.
                 if (addNewClientBtn) {
                     addNewClientBtn.click(); 
                 } else {
@@ -9171,16 +9146,12 @@ try {
     input.addEventListener('input', populateAndFilterFormClientList);
 // ⬇️ ⬇️ ⬇️ WKLEJ TEN BLOK ⬇️ ⬇️ ⬇️
 
-        // Listener dla przycisku "Dodaj nowego" w modalu formularza
+// Listener for "Add New" in form modal (Wersja 2)
         const formClientSearchAddNewBtn = document.getElementById('formClientSearchAddNewBtn');
         if (formClientSearchAddNewBtn) {
             formClientSearchAddNewBtn.addEventListener('click', () => {
-                console.log("Otwieranie formularza klienta z modala wyszukiwania (formularz)...");
-                // 1. Zapisz, dokąd wrócić
-                clientFormReturnToModal = '#formClientSearchModal'; 
-                // 2. Ukryj modal wyszukiwania
-                if (modal) modal.style.display = 'none';
-                // 3. Otwórz formularz dodawania
+                console.log("Otwieranie formularza klienta (nad wyszukiwarką)...");
+                // Po prostu otwórz formularz.
                 if (addNewClientBtn) {
                     addNewClientBtn.click();
                 } else {
