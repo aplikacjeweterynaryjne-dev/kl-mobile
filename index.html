@@ -3562,6 +3562,38 @@ alert('❌ Nie udało się zapisać adresu e-mail lokalnie.');
 </script>
 <script>
 // ✅ POCZĄTEK: ZMIENNE DLA BAZY KLIENTÓW I MODALI
+// ========================================================
+// ✅ POCZĄTEK: BLOK PRZECHWYTYWANIA PRZYCISKU WSTECZ
+// ========================================================
+
+// Ta zmienna mówi nam, czy "pułapka" w menu głównym jest aktywna
+let isMainMenuTrapActive = false;
+
+window.addEventListener('popstate', function(event) {
+    // Sprawdź, czy pułapka jest aktywna (tzn. czy jesteśmy w menu głównym)
+    if (isMainMenuTrapActive) {
+        
+        // Zatrzymujemy domyślną akcję (choć 'popstate' i tak jej nie ma)
+        event.preventDefault();
+
+        // Pokaż okno dialogowe
+        if (confirm('Czy na pewno chcesz zamknąć aplikację?')) {
+            // Użytkownik kliknął "OK"
+            isMainMenuTrapActive = false; // Dezaktywuj pułapkę
+            // Cofnij się "naprawdę", co teraz zamknie aplikację
+            history.back(); 
+        } else {
+            // Użytkownik kliknął "Anuluj"
+            // Natychmiast "wepchnij" stan ponownie, aby pułapka działała dalej
+            history.pushState({ page: 'mainMenu' }, 'Menu Główne', '#menu');
+            // isMainMenuTrapActive pozostaje 'true'
+        }
+    }
+});
+
+// ========================================================
+// ✅ KONIEC: BLOK PRZECHWYTYWANIA PRZYCISKU WSTECZ
+// ========================================================
 // ✅ NOWE ZMIENNE DLA MENU GŁÓWNEGO I MODALI
 // Zmienne dla ekranu logowania
 const loginSection = document.getElementById('loginSection');
@@ -3891,10 +3923,12 @@ auth.onAuthStateChanged(user => {
     // Ta funkcja zajmie się pobraniem danych lub wylogowaniem w razie błędu
     fetchUserProfile(user.uid); 
 
-    // KROK 2: Pokaż UI (tak jak było)
-    if (loginSection) loginSection.style.display = 'none';
-    if (mainMenuSection) mainMenuSection.style.display = 'flex';
-    if (mainTabBar) mainTabBar.style.display = 'none'; 
+   
+// KROK 2: Pokaż UI
+if (loginSection) loginSection.style.display = 'none';
+showMainMenu(); // ✅ Używamy nowej funkcji zamiast linii poniżej
+// if (mainMenuSection) mainMenuSection.style.display = 'flex'; // <-- Już niepotrzebne
+if (mainTabBar) mainTabBar.style.display = 'none';
 
   } else {
     // Użytkownik NIE JEST zalogowany
@@ -3914,6 +3948,36 @@ auth.onAuthStateChanged(user => {
     if (konfiguracjaSection) konfiguracjaSection.style.display = 'none';
   }
 });
+// ⬇️ ⬇️ ⬇️ TUTAJ WKLEJ KOD Z PUNKTU 2 ⬇️ ⬇️ ⬇️
+/**
+ * Pokazuje menu główne i AKTYWUJE pułapkę przycisku "wstecz".
+ */
+function showMainMenu() {
+    // 1. Ukryj wszystkie inne sekcje
+    if (kartaSection) kartaSection.style.display = 'none';
+    if (kalkulatorSection) kalkulatorSection.style.display = 'none';
+    if (bazaKlientowSection) bazaKlientowSection.style.display = 'none'; 
+    if (bazaProduktowSection) bazaProduktowSection.style.display = 'none';
+    if (konfiguracjaSection) konfiguracjaSection.style.display = 'none';
+    if (archiwumKartySection) archiwumKartySection.style.display = 'none';
+    if (archiwumParagonySection) archiwumParagonySection.style.display = 'none';
+    if (raportySection) raportySection.style.display = 'none';
+
+    // 2. Pokaż menu, ukryj pasek zakładek
+    if (mainTabBar) mainTabBar.style.display = 'none';
+    if (mainMenuSection) mainMenuSection.style.display = 'flex';
+
+    // 3. Ukryj podmenu (na wszelki wypadek)
+    if (bazaSubMenu) bazaSubMenu.style.display = 'none';
+    if (archiwumSubMenu) archiwumSubMenu.style.display = 'none';
+
+    // 4. ✅ KLUCZOWY KROK: Ustaw pułapkę
+    console.log("Ustawianie pułapki 'back' na menu głównym.");
+    // Wypychamy nowy, fałszywy stan do historii
+    history.pushState({ page: 'mainMenu' }, 'Menu Główne', '#menu'); 
+    isMainMenuTrapActive = true; // Aktywujemy nasz listener z Kroku 1
+}
+// ⬆️ ⬆️ ⬆️ KONIEC KODU Z PUNKTU 2 ⬆️ ⬆️ ⬆️
 /* Plik: index.html (zastąp całą funkcję showSection, ok. linii 1170) */
 
 /* ⬇️ WKLEJ TEN KOD ⬇️ */
@@ -3921,7 +3985,8 @@ auth.onAuthStateChanged(user => {
 function showSection(sectionToShow) {
     // ✅ POCZĄTEK ZABEZPIECZENIA
   // Sprawdź, czy użytkownik próbuje wejść do konfiguracji bez uprawnień
-  if (sectionToShow === 'konfiguracja') {
+  isMainMenuTrapActive = false; // Zdejmij pułapkę, gdy wchodzisz do dowolnej sekcji
+    if (sectionToShow === 'konfiguracja') {
     if (!currentUserProfile || !adminRoles.includes(currentUserProfile.Rola)) {
       console.warn("BLOKADA DOSTĘPU: Próba wejścia do sekcji 'konfiguracja' bez uprawnień.");
       alert("Nie masz uprawnień, aby uzyskać dostęp do tej sekcji.");
@@ -4073,22 +4138,10 @@ tabKalkulatorBtn.addEventListener('click', () => showSection('kalkulator'));
 
 // --- Przycisk Wróć do Menu ---
 if (backToMenuBtn) {
-backToMenuBtn.addEventListener('click', () => {
-// Ukryj wszystkie sekcje
-if (kartaSection) kartaSection.style.display = 'none';
-if (kalkulatorSection) kalkulatorSection.style.display = 'none';
-if (bazaKlientowSection) bazaKlientowSection.style.display = 'none'; 
-if (bazaProduktowSection) bazaProduktowSection.style.display = 'none';
-
-// Ukryj pasek zakładek
-if (mainTabBar) mainTabBar.style.display = 'none';
-
-// Pokaż menu główne
-if (mainMenuSection) mainMenuSection.style.display = 'flex';
-
-// Ukryj podmenu bazy
-if (bazaSubMenu) bazaSubMenu.style.display = 'none';
-});
+    backToMenuBtn.addEventListener('click', () => {
+        // Po prostu wywołaj naszą nową funkcję, która robi to wszystko I ustawia pułapkę
+        showMainMenu();
+    });
 }
 
 // --- Przycisk Menu: Karta Leczenia (Ukrywa menu, pokazuje tab bar, sekcję KARTY i modal) ---
