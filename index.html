@@ -1544,7 +1544,7 @@ background-color: #eef;
 </div>
 <div id="mainMenuSection" style="display: none; flex-direction: column; align-items: center; justify-content: flex-start; padding-top: 30px; width: 100%; box-sizing: border-box;">
   <h2 style="font-size: 24px; color: #333; margin-bottom: 25px;">Menu Główne</h2>
-
+  <button id="menuKalendarzBtn" class="menu-btn">🗓️ Kalendarz wizyt</button>
   <button id="menuKartaBtn" class="menu-btn">📝 Generator kart leczenia</button>
   <button id="menuKalkulatorBtn" class="menu-btn">🧮 Kalkulator wizyty</button>
 
@@ -1569,6 +1569,7 @@ background-color: #eef;
 
 </div> <div id="mainTabBar" style="text-align: center; margin-bottom: 15px; border-bottom: 1px solid #ccc; padding-bottom: 10px; display: none; flex-wrap: wrap; justify-content: center; gap: 8px;">
 <button id="backToMenuBtn" class="btn ghost small" style="font-size: 16px;">⬅️ Menu</button>
+<button id="tabKalendarzBtn" class="btn">🗓️ Kalendarz</button>
 <button id="tabKartaBtn" class="btn primary">📝 Karta</button>
 <button id="tabKalkulatorBtn" class="btn">🧮 Kalkulator</button>
 <button id="tabBazaKlientowBtn" class="btn">👥 Klienci</button>
@@ -2425,11 +2426,134 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
 
     </div>
 
-    <div id="report-placeholder" style="text-align: center; padding: 40px; color: #777;">
-        <p>Wybierz filtry i kliknij "Generuj Raport", aby zobaczyć wyniki.</p>
-    </div>
+   <div id="report-placeholder" style="text-align: center; padding: 40px; color: #777;">
+        <p>Wybierz filtry i kliknij "Generuj Raport", aby zobaczyć wyniki.</p>
+    </div>
 
 </div>
+
+<div id="kalendarzWizytSection" style="display: none; padding: 0 15px 80px 15px;">
+    <h2>🗓️ Kalendarz wizyt</h2>
+
+    <div id="calendarControls" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; background-color: #f9f9f9; padding: 10px; border-radius: 8px; margin-bottom: 15px;">
+        
+        <div class="form-row" style="margin:0;">
+            <label for="calendarUserSelect">Pracownik:</label>
+            <select id="calendarUserSelect" style="width:100%; padding:8px; font-size:16px;">
+                <option value="">Ładowanie...</option>
+            </select>
+        </div>
+        
+        <div class="form-row" style="margin:0;">
+            <label for="calendarStatusFilter">Pokaż wizyty:</label>
+            <select id="calendarStatusFilter" style="width:100%; padding:8px; font-size:16px;">
+                <option value="Nowa" selected>Tylko do realizacji</option>
+                <option value="Zrealizowana">Tylko zrealizowane</option>
+                <option value="Wszystkie">Wszystkie</option>
+            </select>
+        </div>
+
+        <div class="form-row" style="margin:0;">
+            <label>Widok:</label>
+            <div style="display:flex; gap: 5px; margin-top: 5px;">
+                <button id="btnViewToday" class="btn primary small" style="flex:1; font-size: 14px;">Dziś</button>
+                <button id="btnViewMonth" class="btn small" style="flex:1; font-size: 14px;">Miesiąc</button>
+                <button id="btnViewYear" class="btn small" style="flex:1; font-size: 14px;">Rok</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="calendarViewContainer">
+        
+        <div id="todayViewContainer">
+            <h3 id="todayViewTitle" style="text-align: center; border-bottom: 2px solid #6A994E; padding-bottom: 5px;">Dzisiaj (10 listopada 2025)</h3>
+            <div id="todayVisitList">
+                <p style="text-align:center; color:#888; margin-top: 30px;">Brak wizyt do realizacji na dzisiaj.</p>
+            </div>
+        </div>
+
+        <div id="monthViewContainer" style="display: none;">
+            <div id="monthViewHeader" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <button id="btnPrevMonth" class="btn small">◀ Poprzedni</button>
+                <h3 id="monthViewTitle" style="margin:0; text-align: center;">Listopad 2025</h3>
+                <button id="btnNextMonth" class="btn small">Następny ▶</button>
+            </div>
+            <div id="monthGridHeader" class="calendar-grid">
+                <div>Pon</div><div>Wto</div><div>Śro</div><div>Czw</div><div>Pią</div><div>Sob</div><div>Nie</div>
+            </div>
+            <div id="monthGridBody" class="calendar-grid">
+                </div>
+        </div>
+
+         <div id="yearViewContainer" style="display: none;">
+            <p style="text-align:center; color:#888;">Widok roku - do implementacji.</p>
+        </div>
+    </div>
+
+    <button id="addVisitBtn" class="btn primary" style="position: fixed; bottom: 80px; right: 20px; width: 60px; height: 60px; border-radius: 50%; font-size: 30px; line-height: 1; padding: 0; z-index: 1000;">+</button>
+</div>
+
+<div id="visitFormModal" aria-hidden="true" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.48); display: none; z-index: 10003; justify-content: center; align-items: center; overflow: hidden;">
+    <div class="form-card" role="dialog" aria-modal="true" style="max-height: 95vh; overflow-y: auto;">
+        
+        <h3 id="visitFormTitle" style="font-size: 25px;">Nowa wizyta</h3>
+        <input type="hidden" id="visitFormDocId">
+
+        <div class="form-row">
+            <label for="visitFormStatus">Status wizyty</label>
+            <select id="visitFormStatus">
+                <option value="Nowa">Nowa (do realizacji)</option>
+                <option value="Zrealizowana">Zrealizowana</option>
+            </select>
+        </div>
+
+        <div class="form-row">
+            <label for="visitFormKlient">Imię i nazwisko klienta</label>
+            <input id="visitFormKlient" placeholder="Kliknij, aby wyszukać klienta..." readonly style="cursor: pointer; background: #fff;">
+            <div style="font-size: 14px; color: #555; margin-top: 5px;">
+                Adres: <span id="visitFormKlientAdres">...</span><br>
+                Telefon: <span id="visitFormKlientTelefon">...</span>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <label for="visitFormDate">Data wizyty</label>
+            <input type="date" id="visitFormDate">
+        </div>
+
+        <div class="form-row">
+            <label for="visitFormPoraDnia">Pora dnia</label>
+            <select id="visitFormPoraDnia">
+                <option value="6-10">6:00 - 10:00 (Standard)</option>
+                <option value="10-15">10:00 - 15:00 (Standard)</option>
+                <option value="15-20">15:00 - 20:00 (Standard)</option>
+                <option value="Obojętne">Obojętne (Zielony)</option>
+                <option value="Pilne">Pilne (Czerwony)</option>
+            </select>
+        </div>
+
+        <div class="form-row">
+            <label for="visitFormCel">Ogólny cel wizyty</label>
+            <input type="text" id="visitFormCel" placeholder="Np. badanie stada, leczenie...">
+        </div>
+
+        <div class="form-row">
+            <label for="visitFormNotatka">Notatnik</label>
+            <textarea id="visitFormNotatka" placeholder="Dodatkowe uwagi..."></textarea>
+        </div>
+
+        <div class="form-actions">
+            <div class="left">
+                <button id="cancelVisitForm" type="button" class="btn ghost small" style="font-size: 19px;">Anuluj</button>
+            </div>
+            <button id="saveVisitBtn" type="button" class="btn primary" style="font-size: 19px;">Zapisz</button>
+        </div>
+    </div>
+</div>
+<div id="archiveCardViewerModal" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.5); display: none; z-index: 10001; justify-content: center; align-items: center;">
+   <div style="width: 100%; height: 100%; background: white; border-radius: 0; box-shadow: none; display: flex; flex-direction: column;">
+<div style="padding: 10px 15px; border-bottom: 1px solid #ccc; display: flex; justify-content: space-between; align-items: center;">
+    
 <div id="archiveCardViewerModal" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.5); display: none; z-index: 10001; justify-content: center; align-items: center;">
    <div style="width: 100%; height: 100%; background: white; border-radius: 0; box-shadow: none; display: flex; flex-direction: column;">
 <div style="padding: 10px 15px; border-bottom: 1px solid #ccc; display: flex; justify-content: space-between; align-items: center;">
