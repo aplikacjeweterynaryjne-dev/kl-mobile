@@ -1825,8 +1825,9 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
         <input type="search" id="productSearchInputModal" placeholder="Wpisz nazwę produktu...">
         <div id="productSearchListModal" class="product-search-list">
             </div>
-        <div class="form-actions" style="justify-content: flex-end;">
-            <button id="productSearchCloseBtn" class="btn ghost">Anuluj</button>
+       <div class="form-actions" style="justify-content: space-between;">
+            <button type="button" id="clientSearchAddNewBtn" class="btn primary small">＋ Dodaj nowego</button>
+            <button id="clientSearchCloseBtn" class="btn ghost">Anuluj</button>
         </div>
     </div>
 </div>
@@ -1837,8 +1838,9 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
         <input type="search" id="clientSearchInputModal" class="product-search-input" placeholder="Wpisz nazwisko, adres, nr stada...">
         <div id="clientSearchListModal" class="product-search-list">
             </div>
-        <div class="form-actions" style="justify-content: flex-end;">
-            <button id="clientSearchCloseBtn" class="btn ghost">Anuluj</button>
+       <div class="form-actions" style="justify-content: space-between;">
+            <button type="button" id="formClientSearchAddNewBtn" class="btn primary small">＋ Dodaj nowego</button>
+            <button id="formClientSearchCloseBtn" class="btn ghost">Anuluj</button>
         </div>
     </div>
 </div>
@@ -3778,6 +3780,7 @@ const clientFormNrStada = document.getElementById('clientFormNrStada'); // Popra
 // Zmienna do przechowywania wczytanych klientów w pamięci
 let cachedClients = null;
 let currentUserProfile = null; // ✅ DODAJ TĘ LINIĘ
+let clientFormReturnToModal = null; // ⬅️ ⬅️ ⬅️ DODAJ TĘ LINIĘ
 const adminRoles = ['administrator', 'właściciel'];
 // Przyciski ładowania/odświeżania
 const loadClientsBtn = document.getElementById('loadClientsBtn');
@@ -5165,11 +5168,23 @@ clientFormNazwa.focus();
 }
 
 /**
+/**
 * Przycisk "Anuluj" w modalu klienta
 */
 if (cancelClientForm) {
 cancelClientForm.addEventListener('click', () => {
-clientFormModal.style.display = 'none';
+    clientFormModal.style.display = 'none'; // Zawsze ukrywaj formularz
+    
+    // ⬇️ POCZĄTEK POPRAWKI ⬇️
+    // Sprawdź, czy mamy gdzieś wrócić
+    if (clientFormReturnToModal) {
+        const returnModal = document.querySelector(clientFormReturnToModal);
+        if (returnModal) {
+            returnModal.style.display = 'flex'; // Pokaż poprzedni modal
+        }
+        clientFormReturnToModal = null; // Wyczyść stan
+    }
+    // ⬆️ KONIEC POPRAWKI ⬆️
 });
 }
 
@@ -5215,9 +5230,33 @@ await db.collection("klienci").add(klientData);
 showToast('Nowy klient dodany.', 'success');
 }
 
-clientFormModal.style.display = 'none'; // Zamknij modal
-loadAndCacheClients(); // <-- ✅ POPRAWKA: Użyj nowej funkcji
-refreshClientDataLists(); // BARDZO WAŻNE: odśwież listy wyboru w całej aplikacji
+// ⬇️ ⬇️ ⬇️ POCZĄTEK POPRAWKI ⬇️ ⬇️ ⬇️
+
+            // Przeładuj cache i odśwież globalne listy <datalist>
+            loadAndCacheClients(); 
+            refreshClientDataLists(); 
+            
+            clientFormModal.style.display = 'none'; // Ukryj formularz dodawania
+            
+            // Sprawdź, czy mamy gdzieś wrócić
+            if (clientFormReturnToModal) {
+                const returnModal = document.querySelector(clientFormReturnToModal);
+                if (returnModal) {
+                    returnModal.style.display = 'flex'; // Pokaż poprzedni modal
+                    
+                    // DODATKOWO: Odśwież listę w modalu, do którego wracamy
+                    if (clientFormReturnToModal === '#clientSearchModal' && typeof populateAndFilterClientList === 'function') {
+                        console.log("Odświeżanie listy w clientSearchModal...");
+                        populateAndFilterClientList();
+                    }
+                    if (clientFormReturnToModal === '#formClientSearchModal' && typeof populateAndFilterFormClientList === 'function') {
+                        console.log("Odświeżanie listy w formClientSearchModal...");
+                        populateAndFilterFormClientList();
+                    }
+                }
+                clientFormReturnToModal = null; // Wyczyść stan
+            }
+            // ⬆️ ⬆️ ⬆️ KONIEC POPRAWKI ⬆️ ⬆️ ⬆️
 
 } catch (error) {
 console.error('Błąd zapisu klienta: ', error);
@@ -9080,7 +9119,26 @@ try {
     if (clientSearchInputModal) {
         clientSearchInputModal.addEventListener('input', populateAndFilterClientList);
     }
-    
+    // ⬇️ ⬇️ ⬇️ WKLEJ TEN BLOK ⬇️ ⬇️ ⬇️
+
+        // 7. Listener dla przycisku "Dodaj nowego" w modalu karty
+        const clientSearchAddNewBtn = document.getElementById('clientSearchAddNewBtn');
+        if (clientSearchAddNewBtn) {
+            clientSearchAddNewBtn.addEventListener('click', () => {
+                console.log("Otwieranie formularza klienta z modala wyszukiwania (karta)...");
+                // 1. Zapisz, dokąd wrócić
+                clientFormReturnToModal = '#clientSearchModal'; 
+                // 2. Ukryj modal wyszukiwania
+                if (clientSearchModal) clientSearchModal.style.display = 'none';
+                // 3. Otwórz formularz dodawania (symuluj kliknięcie globalnego przycisku)
+                if (addNewClientBtn) {
+                    addNewClientBtn.click(); 
+                } else {
+                    console.error("Nie znaleziono przycisku addNewClientBtn");
+                }
+            });
+        }
+        // ⬆️ ⬆️ ⬆️ KONIEC WKLEJANIA ⬆️ ⬆️ ⬆️
 } catch(err) {
     console.error("Błąd inicjalizacji Modala Wyszukiwania Klientów:", err);
 }
@@ -9111,7 +9169,26 @@ try {
     closeBtn.addEventListener('click', () => { modal.style.display = 'none'; });
     // Filtrowanie listy
     input.addEventListener('input', populateAndFilterFormClientList);
+// ⬇️ ⬇️ ⬇️ WKLEJ TEN BLOK ⬇️ ⬇️ ⬇️
 
+        // Listener dla przycisku "Dodaj nowego" w modalu formularza
+        const formClientSearchAddNewBtn = document.getElementById('formClientSearchAddNewBtn');
+        if (formClientSearchAddNewBtn) {
+            formClientSearchAddNewBtn.addEventListener('click', () => {
+                console.log("Otwieranie formularza klienta z modala wyszukiwania (formularz)...");
+                // 1. Zapisz, dokąd wrócić
+                clientFormReturnToModal = '#formClientSearchModal'; 
+                // 2. Ukryj modal wyszukiwania
+                if (modal) modal.style.display = 'none';
+                // 3. Otwórz formularz dodawania
+                if (addNewClientBtn) {
+                    addNewClientBtn.click();
+                } else {
+                    console.error("Nie znaleziono przycisku addNewClientBtn");
+                }
+            });
+        }
+        // ⬆️ ⬆️ ⬆️ KONIEC WKLEJANIA ⬆️ ⬆️ ⬆️
     // Wypełnianie listy (czyta z głównej <datalist>)
     function populateAndFilterFormClientList() {
         const dataList = document.getElementById('klientList');
