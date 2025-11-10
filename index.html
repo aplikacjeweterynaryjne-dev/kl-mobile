@@ -10123,7 +10123,7 @@ try {
             const statusText = visit.status === 'Nowa' ? 'Oznacz jako Zrobione' : 'Oznacz jako Nowe';
             
             // ✅ KOREKTA 1: Dodano "Pora dnia" (pogrubione)
-            visitDiv.innerHTML = `
+       visitDiv.innerHTML = `
                 <div class="visit-item-info">
                     <strong>${visit.klientNazwa}</strong>
                     <span class="details">
@@ -10137,6 +10137,7 @@ try {
                 <div class="visit-item-actions">
                     <button class="btn btn-quick-status" data-id="${visit.id}" data-new-status="${visit.status === 'Nowa' ? 'Zrealizowana' : 'Nowa'}">${statusText}</button>
                     <button class="btn ghost small btn-edit-visit" data-id="${visit.id}">Edytuj</button>
+                    <button class="btn warn small btn-delete-visit" data-id="${visit.id}" style="margin-top: 5px;">Usuń</button>
                 </div>
             `;
             todayVisitList.appendChild(visitDiv);
@@ -10413,6 +10414,28 @@ try {
                 visitFormModal.style.display = 'flex';
             }
         }
+        // ⬇️ ⬇️ ⬇️ WKLEJ TEN NOWY BLOK ⬇️ ⬇️ ⬇️
+        // Usuwanie wizyty
+        else if (target.classList.contains('btn-delete-visit')) {
+            const docId = target.dataset.id;
+            
+            if (confirm("Czy na pewno chcesz usunąć tę wizytę?\n\nTej operacji nie można cofnąć.")) {
+                target.disabled = true;
+                target.textContent = '...';
+
+                try {
+                    await db.collection('wizyty').doc(docId).delete();
+                    showToast("Wizyta została usunięta.", "success");
+                    fetchAndRenderVisits(); // Odśwież widok
+                } catch (error) {
+                    console.error("Błąd usuwania wizyty:", error);
+                    alert("Wystąpił błąd podczas usuwania wizyty.");
+                    target.disabled = false;
+                    target.textContent = 'Usuń';
+                }
+            }
+        }
+        // ⬆️ ⬆️ ⬆️ KONIEC NOWEGO BLOKU ⬆️ ⬆️ ⬆️
     });
 
 } catch (err) {
