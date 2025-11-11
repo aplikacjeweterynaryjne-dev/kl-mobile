@@ -2037,7 +2037,7 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
         <div id="formRowDetailsContainer" style="display: block;">
 <div class="form-row"><label for="formOpis">Nazwa siedziby stada i opis zwierzęcia</label><input type="text" id="formOpis" placeholder="Opis zwierzęcia"></div>
 <div class="form-row"><label for="formLiczba">Liczba leczonych zwierząt</label><input type="number" id="formLiczba" min="0" placeholder="0"></div>
-<div class="form-row"><label for="formRozpoznanie">Rozpoznanie / wstępne rozpoznanie</label><input type="text" id="formRozpoznanie" placeholder="Kliknij, aby wybrać schemat lub wpisz..." readonly style="cursor: pointer; background: #fff;"></div>
+<div class="form-row"><label for="formRozpoznanie">Rozpoznanie / wstępne rozpoznanie</label><input type="text" id="formRozpoznanie" list="listaRozpoznan" placeholder="Wpisz lub wybierz schemat..."></div>
     </div>      
     <div style="display: flex; align-items: flex-end; gap: 8px; margin-bottom: 8px;">
         
@@ -3188,20 +3188,20 @@ for (let j=1;j<=8;j++){
         input.style.width = '95%';
         input.placeholder = 'Rozpoznanie...';
         
-        // ✅ ZMIANA: Pole jest tylko do odczytu i reaguje na kliknięcie
-        input.readOnly = true;
-        input.style.cursor = 'pointer';
-        input.style.background = '#fefefe'; // Dopasuj tło do innych pól
+        // ⬇️ MODUŁ 4 (Wersja Poprawiona): Pole jest ZAPISYWALNE ⬇️
+        input.readOnly = false;
+        input.style.cursor = 'text'; // Zwykły kursor tekstowy
+        input.style.background = '#fefefe';
 
-        input.addEventListener('click', (e) => {
-            if (typeof openSchemaSearch === 'function') {
-                openSchemaSearch(e); // Otwórz modal wyszukiwania schematów
-            }
-        }); 
-        
-        cell.textContent = '';
-        cell.appendChild(input);
-    }
+        // Listener do zapisu data-print-value (dla drukowania)
+        input.addEventListener('input', function(){
+            this.parentElement.dataset.printValue = this.value;
+        });
+
+        // Uruchom logikę schematów przy WPISYWANIU (nie klikaniu)
+        // Funkcja applySchema sprawdzi, czy wpisany tekst pasuje do schematu
+        input.addEventListener('input', applySchema);
+        // ⬆️ KONIEC MODUŁU 4 (Wersja Poprawiona) ⬆️
 
     // kolumna 3 -> number input
     // ✅ POPRAWIONY BŁĄD SKŁADNI (usunięta dodatkowa klamra)
@@ -11854,11 +11854,12 @@ try {
     if(schemaSearchCloseBtn) schemaSearchCloseBtn.addEventListener('click', closeSchemaSearch);
     if(schemaSearchInput) schemaSearchInput.addEventListener('input', populateAndFilterSchemaSearchList);
 
-    // Podpięcie do triggera w formularzu (Fix 5)
-    const formRozpoznanieInput = document.getElementById('formRozpoznanie');
-    if (formRozpoznanieInput) {
-        formRozpoznanieInput.addEventListener('click', openSchemaSearch);
-    }
+// Podpięcie do triggera w formularzu (Wersja Poprawiona)
+    const formRozpoznanieInput = document.getElementById('formRozpoznanie');
+    if (formRozpoznanieInput) {
+        // Uruchom logikę schematów przy WPISYWANIU (zamiast 'click')
+        formRozpoznanieInput.addEventListener('input', applySchema);
+    }
 
 } catch (err) {
     console.error("BŁĄD KRYTYCZNY w module Modali Wyszukiwania Schematów:", err);
