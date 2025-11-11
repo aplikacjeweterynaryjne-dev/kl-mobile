@@ -11701,6 +11701,246 @@ try {
 /* ======================================================== */
 /* ✅ KONIEC: LOGIKA BAZY LECZENIA (SCHEMATÓW)                */
 /* ======================================================== */
+/* ======================================================== */
+/* ✅ POCZĄTEK: NOWA LOGIKA MODALI (SCHEMATY)                 */
+/* ======================================================== */
+try {
+    // --- Zmienne dla Modala Produktów w Schemacie (Fix 1) ---
+    const schemaProductSearchModal = document.getElementById('schemaProductSearchModal');
+    const schemaProductSearchInput = document.getElementById('schemaProductSearchInput');
+    const schemaProductSearchList = document.getElementById('schemaProductSearchList');
+    const schemaProductSearchCloseBtn = document.getElementById('schemaProductSearchCloseBtn');
+    let currentSchemaProductLineDiv = null; // Przechowuje 'lineDiv', który edytujemy
+
+    // --- Zmienne dla Modala Schematów w Karcie (Fix 4, 5) ---
+    const schemaSearchModal = document.getElementById('schemaSearchModal');
+    const schemaSearchInput = document.getElementById('schemaSearchInput');
+    const schemaSearchList = document.getElementById('schemaSearchList');
+    const schemaSearchCloseBtn = document.getElementById('schemaSearchCloseBtn');
+    let currentSchemaTargetInput = null; // Przechowuje 'input' z tabeli lub formularza
+
+    // === LOGIKA DLA MODALA PRODUKTÓW (Fix 1, 2) ===
+
+    function openSchemaProductSearch(lineDiv) {
+        currentSchemaProductLineDiv = lineDiv;
+        schemaProductSearchInput.value = '';
+        populateAndFilterSchemaProductList();
+        schemaProductSearchModal.style.display = 'flex';
+        setTimeout(() => schemaProductSearchInput.focus(), 50);
+    }
+
+    function closeSchemaProductSearch() {
+        schemaProductSearchModal.style.display = 'none';
+        currentSchemaProductLineDiv = null;
+    }
+
+    function populateAndFilterSchemaProductList() {
+        const filterText = schemaProductSearchInput.value.toLowerCase().trim();
+        schemaProductSearchList.innerHTML = '';
+        let foundItems = 0;
+
+        // Używamy globalnej listy 'nazwyLekow'
+        nazwyLekow.forEach(lekName => {
+            if (filterText === '' || lekName.toLowerCase().includes(filterText)) {
+                const itemDiv = document.createElement('div');
+                itemDiv.className = 'product-search-item';
+                itemDiv.textContent = lekName;
+                itemDiv.addEventListener('click', () => selectSchemaProduct(lekName));
+                schemaProductSearchList.appendChild(itemDiv);
+                foundItems++;
+            }
+        });
+        if (foundItems === 0) schemaProductSearchList.innerHTML = '<div class="product-search-item" style="color: #999;">Brak pasujących produktów.</div>';
+    }
+
+    function selectSchemaProduct(lekName) {
+        if (!currentSchemaProductLineDiv) return;
+
+        // Znajdź pola wewnątrz 'lineDiv'
+        const produktInput = currentSchemaProductLineDiv.querySelector('.schema-produkt-trigger');
+        const dawkowanieInput = currentSchemaProductLineDiv.querySelector('.schema-dawkowanie');
+        const karencjaInput = currentSchemaProductLineDiv.querySelector('.schema-karencja');
+
+        // Wypełnij pola (Fix 2)
+        produktInput.value = lekName;
+        dawkowanieInput.value = mapaIlosci[lekName] || '';
+        karencjaInput.value = mapaKarencji[lekName] || '';
+
+        closeSchemaProductSearch();
+    }
+
+    // Listenery dla Modala Produktów
+    if(schemaProductSearchCloseBtn) schemaProductSearchCloseBtn.addEventListener('click', closeSchemaProductSearch);
+    if(schemaProductSearchInput) schemaProductSearchInput.addEventListener('input', populateAndFilterSchemaProductList);
+
+
+    // === LOGIKA DLA MODALA SCHEMATÓW (Fix 4, 5) ===
+
+    function openSchemaSearch(event) {
+        currentSchemaTargetInput = event.target; // Zapisz <input> (z tabeli lub formularza)
+        schemaSearchInput.value = '';
+        populateAndFilterSchemaSearchList();
+        schemaSearchModal.style.display = 'flex';
+        setTimeout(() => schemaSearchInput.focus(), 50);
+    }
+
+    function closeSchemaSearch() {
+        schemaSearchModal.style.display = 'none';
+        currentSchemaTargetInput = null;
+    }
+
+    function populateAndFilterSchemaSearchList() {
+        const filterText = schemaSearchInput.value.toLowerCase().trim();
+        schemaSearchList.innerHTML = '';
+        let foundItems = 0;
+
+        // Używamy globalnej listy 'cachedSchemas'
+        cachedSchemas.forEach(schema => {
+            if (filterText === '' || schema.rozpoznanie.toLowerCase().includes(filterText)) {
+                const itemDiv = document.createElement('div');
+                itemDiv.className = 'client-search-item'; // Użyjemy tych samych styli
+                itemDiv.innerHTML = `<strong>${schema.rozpoznanie}</strong>`;
+                itemDiv.addEventListener('click', () => selectSchemaFromModal(schema.rozpoznanie));
+                schemaSearchList.appendChild(itemDiv);
+                foundItems++;
+            }
+        });
+        if (foundItems === 0) schemaSearchList.innerHTML = '<div class="client-search-item" style="color: #999;">Brak pasujących schematów.</div>';
+    }
+
+    function selectSchemaFromModal(rozpoznanie) {
+        if (!currentSchemaTargetInput) return;
+
+        // Wpisz wybraną nazwę do inputa (w tabeli lub formularzu)
+        currentSchemaTargetInput.value = rozpoznanie;
+
+        // Ręcznie wywołaj logikę applySchema, przekazując input jako 'target'
+        // To jest "bezpieczne" wywołanie, bo ta funkcja istnieje
+        applySchema({ target: currentSchemaTargetInput });
+
+        closeSchemaSearch();
+    }
+
+    // Listenery dla Modala Schematów
+    if(schemaSearchCloseBtn) schemaSearchCloseBtn.addEventListener('click', closeSchemaSearch);
+    if(schemaSearchInput) schemaSearchInput.addEventListener('input', populateAndFilterSchemaSearchList);
+
+    // Podpięcie do triggera w formularzu (Fix 5)
+    const formRozpoznanieInput = document.getElementById('formRozpoznanie');
+    if (formRozpoznanieInput) {
+        formRozpoznanieInput.addEventListener('click', openSchemaSearch);
+    }
+
+} catch (err) {
+    console.error("BŁĄD KRYTYCZNY w module Modali Wyszukiwania Schematów:", err);
+}
+
+/* ======================================================== */
+/* ✅ ZAKTUALIZOWANA LOGIKA applySchema (Fix 2)               */
+/* ======================================================== */
+
+// ZASTĘPUJEMY starą funkcję 'applySchema' tą nową,
+// aby poprawnie czytała 'ilosc' i 'dawkowanie'
+
+/**
+ * Główna funkcja auto-uzupełniania (podpięta do inputa w kolumnie 4)
+ * WERSJA ZMODYFIKOWANA (Fix 2)
+ */
+function applySchema(event) {
+    const input = event.target;
+    const rozpoznanie = input.value.trim().toLowerCase();
+
+    // 1. Sprawdź, czy checkbox "Użyj schematów" jest zaznaczony
+    if (!schemaCheckbox || !schemaCheckbox.checked) {
+        return; // Nie rób nic, jeśli odznaczone
+    }
+
+    // 2. Sprawdź, czy wpisana nazwa pasuje do schematu w mapie
+    const schema = cachedSchemaMap.get(rozpoznanie);
+    if (!schema) {
+        return; // Brak schematu, pozwól użytkownikowi pisać dalej
+    }
+
+    // 3. Mamy schemat! Rozpocznij wypełnianie tabeli
+    console.log("Znaleziono pasujący schemat:", schema.rozpoznanie);
+
+    // Sprawdź, czy jesteśmy w formularzu (Fix 5)
+    const inFormModal = input.id === 'formRozpoznanie';
+
+    if (inFormModal) {
+        // JESTEŚMY W FORMULARZU KROKOWYM
+        const sel = formRowSelect;
+        const currentLogicalIndex = parseInt(sel.value, 10);
+
+        schema.produkty.forEach(p => {
+            // Znajdź docelowy indeks wiersza ze schematu
+            const targetRowIndex = p.wierszDocelowy;
+
+            // Wypełnij pola formularza *tylko* jeśli schemat dotyczy
+            // aktualnie wybranego wiersza w formularzu
+            if (targetRowIndex === currentLogicalIndex) {
+                try {
+                    document.getElementById('formLek').value = p.produkt;
+                    document.getElementById('formSeria').value = p.seria || '';
+                    document.getElementById('formIlosc').value = p.ilosc || '';
+                    document.getElementById('formDawkowanie').value = p.dawkowanie || '';
+                    document.getElementById('formKarencja').value = p.karencja || '';
+                } catch (e) {
+                     console.error(`Błąd wypełniania formularza ze schematu:`, e);
+                }
+            }
+        });
+
+    } else {
+        // JESTEŚMY W GŁÓWNEJ TABELI (Fix 4)
+        const logicalRows = rowsEditable(); 
+        if (logicalRows.length === 0) return;
+
+        schema.produkty.forEach(p => {
+            const targetRowIndex = p.wierszDocelowy;
+
+            if (targetRowIndex >= 0 && targetRowIndex < logicalRows.length) {
+                const row = logicalRows[targetRowIndex];
+
+                try {
+                    // Wypełnij komórki, symulując wybór produktu
+                    const produktInput = row.cells[4].querySelector('input');
+                    const iloscInput = row.cells[6].querySelector('input');
+
+                    produktInput.value = p.produkt;
+                    // Odpalenie 'input' nie jest już potrzebne, bo schemat ma wszystkie dane
+                    // produktInput.dispatchEvent(new Event('input', { bubbles: true })); 
+
+                    // Schemat ma priorytet
+                    row.cells[5].textContent = p.seria || ''; // Seria
+                    if (iloscInput) {
+                        iloscInput.value = p.ilosc || ''; // ✅ FIX 2
+                    }
+
+                    const dawkaText = p.dawkowanie || ''; // ✅ FIX 2
+                    const textNode = row.cells[6].childNodes[1]; 
+                    if (textNode && textNode.nodeType === Node.TEXT_NODE) {
+                        textNode.textContent = ' ' + dawkaText;
+                    } else if (dawkaText) {
+                        row.cells[6].appendChild(document.createTextNode(' ' + dawkaText));
+                    }
+
+                    row.cells[7].textContent = p.karencja || ''; // Karencja
+
+                    row.cells[4].dataset.printValue = p.produkt;
+
+                } catch (e) {
+                    console.error(`Błąd podczas wypełniania wiersza ${targetRowIndex} ze schematu:`, e);
+                }
+            }
+        });
+    }
+
+    showToast(`Zastosowano schemat: ${schema.rozpoznanie}`, 'success');
+}
+/* ======================================================== */
+/* ✅ KONIEC: NOWA LOGIKA MODALI (SCHEMATY)                   */
+/* ======================================================== */
 </script> 
 
 <div id="toastContainer" style="position: fixed; top: 20px; right: 20px; z-index: 20000; display: flex; flex-direction: column; gap: 10px;">
