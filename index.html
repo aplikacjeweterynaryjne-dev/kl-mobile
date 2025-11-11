@@ -1644,6 +1644,17 @@ table {
         </div>
     </div>
 </div>
+    <div id="calcClientSearchModal" class="product-search-modal" style="display: none; z-index: 10003;">
+    <div class="product-search-card">
+        <h3>Wyszukaj klienta (Kalkulator)</h3>
+        <input type="search" id="calcClientSearchInputModal" placeholder="Wpisz nazwisko, adres, nr stada...">
+        <div id="calcClientSearchListModal" class="product-search-list">
+                    </div>
+        <div class="form-actions" style="justify-content: flex-end;">
+            <button id="calcClientSearchCloseBtn" class="btn ghost">Anuluj</button>
+        </div>
+    </div>
+</div>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
@@ -2180,7 +2191,7 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
     
     <div class="form-row" style="margin-bottom: 0;">
         <label for="calcKlientInput">Klient:</label>
-        <input type="text" id="calcKlientInput" list="klientList" placeholder="Wpisz lub wybierz klienta...">
+        <input type="text" id="calcKlientInput" list="klientList" placeholder="Kliknij, aby wyszukać klienta..." readonly style="cursor: pointer; background: #fff;">
     </div>
     
     <div class="form-row" style="margin-bottom: 0;">
@@ -12116,6 +12127,109 @@ function openSchemaSearchModalIfNeeded(event) {
 /* ======================================================== */
 /* ✅ KONIEC: NOWA FUNKCJA                                   */
 /* ======================================================== */
+/* ⬇️ ⬇️ ⬇️ WKLEJ TEN BLOK KODU NA KOŃCU SKRYPTU (ok. linii 4928) ⬇️ ⬇️ ⬇️ */
+
+/* ======================================================== */
+/* ✅ POCZĄTEK: MODUŁ 6 - Logika Modala Klienta (Kalkulator) */
+/* ======================================================== */
+try {
+    // --- Zmienne dla nowego modala klienta ---
+    const calcClientSearchModal = document.getElementById('calcClientSearchModal');
+    const calcClientSearchInput = document.getElementById('calcClientSearchInputModal');
+    const calcClientSearchList = document.getElementById('calcClientSearchListModal');
+    const calcClientSearchCloseBtn = document.getElementById('calcClientSearchCloseBtn');
+    // To jest input w formularzu Kalkulatora
+    const calcClientTrigger = document.getElementById('calcKlientInput'); 
+
+    // 1. Otwieranie modala
+    function openCalcClientSearchModal(e) {
+        e.preventDefault();
+        if (!calcClientSearchModal) return;
+        
+        // Wypełnij pole wyszukiwania w modalu aktualną wartością
+        calcClientSearchInput.value = (calcClientTrigger.value !== "Kliknij, aby wyszukać klienta...") ? calcClientTrigger.value : "";
+        populateAndFilterCalcClientList(); // Użyjemy nowej funkcji
+        calcClientSearchModal.style.display = 'flex';
+        setTimeout(() => calcClientSearchInput.focus(), 50);
+    }
+
+    // 2. Zamykanie modala
+    function closeCalcClientSearchModal() {
+        if (calcClientSearchModal) calcClientSearchModal.style.display = 'none';
+    }
+
+    // 3. Wypełnianie i filtrowanie listy (czyta z globalnej <datalist id="klientList">)
+    function populateAndFilterCalcClientList() {
+        const dataList = document.getElementById('klientList');
+        if (!dataList || dataList.options.length === 0) {
+            calcClientSearchList.innerHTML = '<div class="client-search-item">Błąd: Brak bazy klientów.</div>';
+            return;
+        }
+
+        const filterText = calcClientSearchInput.value.toLowerCase().trim();
+        calcClientSearchList.innerHTML = '';
+        let foundItems = 0;
+
+        const options = Array.from(dataList.options);
+        options.sort((a, b) => (a.value || '').localeCompare(b.value || '', 'pl'));
+
+        options.forEach(opt => {
+            const nazwa = opt.value || '';
+            const adres = opt.dataset.adres || '';
+            const nrStada = opt.dataset.nrstada || ''; 
+            const searchableText = `${nazwa} ${adres} ${nrStada}`.toLowerCase();
+            
+            if (filterText === '' || searchableText.includes(filterText)) {
+                const itemDiv = document.createElement('div');
+                itemDiv.className = 'client-search-item'; // Użyjemy tych samych styli
+                itemDiv.innerHTML = `
+                    <strong>${nazwa}</strong>
+                    <span class="details">
+                        ${adres ? `Adres: ${adres}` : ''}
+                        ${(adres && nrStada) ? '<br>' : ''}
+                        ${nrStada ? `Nr stada: ${nrStada}` : ''}
+                    </span>
+                `;
+                // Przekazujemy tylko nazwę, bo kalkulator nie potrzebuje adresu/nr stada
+                itemDiv.addEventListener('click', () => {
+                    selectCalcClient(nazwa);
+                });
+                calcClientSearchList.appendChild(itemDiv);
+                foundItems++;
+            }
+        });
+        if (foundItems === 0) calcClientSearchList.innerHTML = '<div class="client-search-item" style="color: #999;">Brak pasujących klientów.</div>';
+    }
+
+    // 4. Funkcja wyboru klienta z modala
+    function selectCalcClient(klientName) {
+        if (!klientName) return;
+
+        // Wpisz wartość do pola w kalkulatorze
+        calcClientTrigger.value = klientName;
+        
+        // (Opcjonalnie) Wywołaj 'input', jeśli jest jakaś logika od tego zależna
+        // calcClientTrigger.dispatchEvent(new Event('input', { bubbles: true })); 
+        
+        closeCalcClientSearchModal();
+        
+        // Ustaw focus na następnym polu, np. "Czynności"
+        document.getElementById('calcCzynnosciInput')?.focus();
+    }
+
+    // 5. Podpięcie listenerów
+    if (calcClientTrigger) calcClientTrigger.addEventListener('click', openCalcClientSearchModal);
+    if (calcClientSearchCloseBtn) calcClientSearchCloseBtn.addEventListener('click', closeCalcClientSearchModal);
+    if (calcClientSearchInput) calcClientSearchInput.addEventListener('input', populateAndFilterCalcClientList);
+
+} catch(err) {
+    console.error("Błąd inicjalizacji Modala Klientów (Kalkulator):", err);
+}
+/* ======================================================== */
+/* ✅ KONIEC: MODUŁ 6 */
+/* ======================================================== */
+
+/* ⬆️ ⬆️ ⬆️ KONIEC WKLEJANIA ⬆️ ⬆️ ⬆️ */
 </script> 
 
 <div id="toastContainer" style="position: fixed; top: 20px; right: 20px; z-index: 20000; display: flex; flex-direction: column; gap: 10px;">
