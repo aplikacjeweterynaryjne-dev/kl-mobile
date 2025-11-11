@@ -5434,6 +5434,7 @@ async function fetchUserProfile(uid) {
     currentUserProfile = { id: doc.id, ...doc.data() };
     
     console.log("Pomyślnie pobrano profil użytkownika:", currentUserProfile);
+      fetchDataFromFirebase(); // <-- URUCHAMIAMY POBIERANIE DANYCH DOPIERO TERAZ
       /* ✅ DODAJ TĘ LINIĘ TUTAJ */
     fetchDataFromFirebase(); // <-- URUCHAMIAMY POBIERANIE DANYCH DOPIERO TERAZ
     // ✅ POCZĄTEK: Moduł 4 - Ustawienie nazwy lecznicy w karcie leczenia
@@ -10650,6 +10651,1016 @@ try {
 }
 /* ======================================================== */
 /* ✅ KONIEC: LOGIKA KALENDARZA WIZYT                         */
+/* ======================================================== */
+/* ======================================================== */
+/* ✅ POCZĄTEK: LOGIKA KALENDARZA WIZYT (Funkcje Główne)      */
+/* ======================================================== */
+try {
+    // --- Podpięcie do Menu i Nawigacji ---
+
+    if (menuKalendarzBtn) {
+        menuKalendarzBtn.addEventListener('click', () => {
+            showSection('kalendarz');
+        });
+    }
+    if (tabKalendarzBtn) {
+        tabKalendarzBtn.addEventListener('click', () => {
+            // Sprawdź, czy karta jest "brudna"
+            if (typeof confirmOnTabChange === 'function' && !confirmOnTabChange()) {
+                return; // Przerwij, jeśli użytkownik anuluje
+            }
+            showSection('kalendarz');
+        });
+    }
+
+    // --- FUNKCJA AUTO-USUWANIA WIZYT (uruchamiana przy wejściu) ---
+    async function runAutoCleanupVisits() {
+        console.log("Uruchamianie auto-usuwania starych wizyt...");
+        const now = new Date();
+
+        // 1. Oblicz daty graniczne
+        // Data dla ZREALIZOWANYCH (7 dni temu)
+        const realizedCutoff = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        // Data dla NOWYCH (14 dni temu)
+        const newCutoff = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+
+        // Konwertuj na Timestamp Firebase
+        const realizedTimestamp = firebase.firestore.Timestamp.fromDate(realizedCutoff);
+        const newTimestamp = firebase.firestore.Timestamp.fromDate(newCutoff);
+
+        try {
+            const batch = db.batch();
+
+            // 2. Zapytanie o stare ZREALIZOWANE wizyty
+            const queryRealized = db.collection('wizyty')
+                .where('status', '==', 'Zrealizowana')
+                .where('createdAt', '<', realizedTimestamp);
+
+            const snapshotRealized = await queryRealized.get();
+            snapshotRealized.docs.forEach(doc => {
+                console.log(`Zaznaczono do usunięcia (Zrealizowana > 7 dni): ${doc.id}`);
+                batch.delete(doc.ref);
+            });
+
+            // 3. Zapytanie o stare NOWE (niezrealizowane) wizyty
+            const queryNew = db.collection('wizyty')
+                .where('status', '==', 'Nowa')
+                .where('createdAt', '<', newTimestamp); // Użyj createdAt, a nie dataWizyty!
+
+            const snapshotNew = await queryNew.get();
+            snapshotNew.docs.forEach(doc => {
+                console.log(`Zaznaczono do usunięcia (Nowa > 14 dni): ${doc.id}`);
+                batch.delete(doc.ref);
+            });
+
+            // 4. Wykonaj usunięcie
+            if (snapshotRealized.empty && snapshotNew.empty) {
+                console.log("Brak starych wizyt do usunięcia.");
+                return;
+            }
+
+            await batch.commit();
+            console.log(`Usunięto ${snapshotRealized.size} zrealizowanych i ${snapshotNew.size} nowych wizyt.`);
+
+        } catch (error) {
+            console.error("Błąd podczas auto-usuwania wizyt:", error);
+            // Prawdopodobnie błąd indeksu
+            if (error.code === 'failed-precondition') {
+                alert("BŁĄD: Wymagane są indeksy Firestore do auto-usuwania wizyt. Sprawdź konsolę (F12).");
+                console.error("BŁĄD INDEKSU: Utwórz indeksy dla 'wizyty': [status(ASC), createdAt(ASC)]");
+            }
+        }
+    }
+
+  // --- 3. Funkcja Startowa (Inicjalizacja) ---
+    function onShowKalendarz() {
+        console.log("Wejście do sekcji Kalendarz.");
+
+        if (!calendarUsersLoaded) {
+            // Jeśli użytkownicy nie są wczytani, uruchom funkcję,
+            // która ich wczyta I WTEDY uruchomi pobieranie wizyt.
+            loadCalendarUsers();
+        } else {
+            // Jeśli użytkownicy SĄ już wczytani (np. wracasz do zakładki),
+            // po prostu odśwież wizyty.
+            fetchAndRenderVisits();
+        }
+
+        // Ustaw domyślną datę w formularzu
+        const todayISO = new Date().toISOString().split('T')[0];
+        visitFormDate.value = todayISO;
+
+        // Ustaw tytuł widoku dnia
+        todayViewTitle.textContent = `Wizyty na dzisiaj (${new Date().toLocaleDateString('pl-PL', { day: 'numeric', month: 'long', year: 'numeric' })})`;
+
+        // Uruchom auto-usuwanie
+        runAutoCleanupVisits();
+
+        // (Usunęliśmy stąd 'fetchAndRenderVisits()', bo jest teraz w logice if/else)
+    }
+    // --- 4. Ładowanie Filtrów ---
+
+    // Wczytuje użytkowników (lekarzy) do listy <select>
+    async function loadCalendarUsers() {
+        if (!calendarUserSelect || !currentUserProfile) return;
+
+        let query;
+        if (currentUserProfile.Rola === 'administrator') {
+            query = db.collection("konfiguracja").orderBy("Nazwisko");
+        } else {
+            const userClinicId = currentUserProfile['ID lecznicy'];
+            if (!userClinicId) return;
+            query = db.collection("konfiguracja").where("ID lecznicy", "==", userClinicId).orderBy("Nazwisko");
+        }
+
+        try {
+            const snapshot = await query.get();
+            calendarUserSelect.innerHTML = ''; // Wyczyść
+            calendarUserSelect.add(new Option("Wszyscy", "ALL")); // Opcja "Wszyscy"
+
+            snapshot.docs.forEach(doc => {
+                const user = doc.data();
+                const optionText = `${user.Imie} ${user.Nazwisko}`;
+                calendarUserSelect.add(new Option(optionText, user.uid)); // Wartością jest UID
+            });
+
+            // Ustaw domyślnie na zalogowanego użytkownika
+            if (currentUserProfile.uid) {
+                calendarUserSelect.value = currentUserProfile.uid;
+            }
+
+            calendarUsersLoaded = true;
+            console.log("Wczytano użytkowników do kalendarza.");
+
+            // ✅ DODANA LINIA: Uruchom pobieranie wizyt DOPIERO TERAZ
+            fetchAndRenderVisits();
+
+        } catch (error) {
+            console.error("Błąd wczytywania użytkowników do kalendarza:", error);
+            calendarUserSelect.innerHTML = '<option value="">Błąd ładowania</option>';
+        }
+    }
+
+    // Listenery filtrów
+    if (calendarUserSelect) calendarUserSelect.addEventListener('change', fetchAndRenderVisits);
+    if (calendarStatusFilter) calendarStatusFilter.addEventListener('change', fetchAndRenderVisits);
+
+    // --- 5. Pobieranie Danych (Firestore) ---
+
+    // Główna funkcja pobierająca dane
+    async function fetchAndRenderVisits() {
+        if (!currentUserProfile) return; // Musimy być zalogowani
+
+        const selectedUserId = calendarUserSelect.value;
+        const selectedStatus = calendarStatusFilter.value;
+
+        // Pokaż loader (można dodać)
+        todayVisitList.innerHTML = '<p style="text-align:center; color:#888; margin-top: 30px;">Ładowanie wizyt... ⏳</p>';
+        monthGridBody.innerHTML = '<p style="text-align:center; color:#888;">Ładowanie... ⏳</p>';
+
+        try {
+            let q = db.collection("wizyty");
+
+            // 1. Filtr Użytkownika
+            if (selectedUserId === "ALL") {
+                // Właściciel/Admin widzi wszystkich w lecznicy
+                const userClinicId = currentUserProfile['ID lecznicy'];
+                if (!userClinicId && currentUserProfile.Rola !== 'administrator') {
+                    throw new Error("Brak ID lecznicy dla właściciela");
+                }
+                // Administrator widzi WSZYSTKO (bez filtra lecznicy)
+                if (currentUserProfile.Rola !== 'administrator') {
+                    q = q.where("id_lecznicy", "==", userClinicId);
+                }
+            } else {
+                // Konkretny lekarz
+                q = q.where("lekarz_uid", "==", selectedUserId);
+            }
+
+            // 2. Filtr Statusu (jeśli nie "Wszystkie")
+            if (selectedStatus !== "Wszystkie") {
+                q = q.where("status", "==", selectedStatus);
+            }
+
+            // !!! WAŻNE: To zapytanie (np. status + id_lecznicy) BĘDZIE WYMAGAĆ INDEKSU w Firestore !!!
+
+            const snapshot = await q.orderBy("dataWizyty", "asc").get();
+            allFetchedVisits = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+            console.log(`Pobrano ${allFetchedVisits.length} wizyt.`);
+
+            // Wyrenderuj oba widoki (jeden będzie ukryty)
+            renderTodayView(allFetchedVisits);
+            renderMonthView(allFetchedVisits, currentMonthView);
+
+        } catch (error) {
+            console.error("Błąd pobierania wizyt z Firestore:", error);
+            if (error.code === 'failed-precondition') {
+                alert("BŁĄD KRYTYCZNY: Aby kalendarz działał, administrator musi utworzyć indeks w bazie danych Firestore.\n\n(Sprawdź konsolę F12, aby zobaczyć link do utworzenia indeksu)");
+                console.error("BŁĄD INDEKSU: Wejdź w konsolę Firebase i utwórz wymagane indeksy kompozytowe dla kolekcji 'wizyty'.");
+            }
+            todayVisitList.innerHTML = '<p style="text-align:center; color:red; margin-top: 30px;">Błąd ładowania wizyt.</p>';
+        }
+    }
+
+    // --- 6. Renderowanie Widoków ---
+
+  // Renderuje widok Dziś (ZMODYFIKOWANA)
+    function renderTodayView(visits) {
+        const todayISO = new Date().toISOString().split('T')[0];
+
+        // Filtruj tylko na dzisiaj
+        const todayVisits = visits.filter(v => v.dataWizyty === todayISO);
+
+        // ✅ KOREKTA 2: Ustaw podsumowanie
+        const totalCount = todayVisits.length;
+        let summaryText = '';
+        const statusFilter = calendarStatusFilter.value;
+
+        if (statusFilter === 'Nowa') {
+            summaryText = `Liczba wizyt do realizacji: ${totalCount}`;
+        } else if (statusFilter === 'Zrealizowana') {
+            summaryText = `Liczba wizyt zrealizowanych: ${totalCount}`;
+        } else {
+            summaryText = `Łączna liczba wizyt: ${totalCount}`;
+        }
+        // Wpisz do nowego elementu P
+        if (todayViewSummary) {
+            // Ukryj tekst "Liczba wizyt: 0"
+            todayViewSummary.textContent = totalCount > 0 ? summaryText : ''; 
+        }
+
+        // Sortuj po porze dnia
+        const poraOrder = {"Pilne": 1, "6-10": 2, "10-15": 3, "15-20": 4, "Obojętne": 5};
+        todayVisits.sort((a, b) => (poraOrder[a.poraDnia] || 99) - (poraOrder[b.poraDnia] || 99));
+
+        todayVisitList.innerHTML = ''; // Wyczyść
+
+        if (todayVisits.length === 0) {
+            const statusMsg = calendarStatusFilter.value === "Nowa" ? "do realizacji" : "zrealizowanych";
+            todayVisitList.innerHTML = `<p style="text-align:center; color:#888; margin-top: 30px;">Brak wizyt ${statusMsg} na dzisiaj.</p>`;
+            return;
+        }
+
+        todayVisits.forEach(visit => {
+            const visitDiv = document.createElement('div');
+            visitDiv.className = 'visit-item';
+            visitDiv.dataset.id = visit.id;
+            visitDiv.dataset.status = visit.status;
+            visitDiv.dataset.pora = visit.poraDnia;
+
+            const statusText = visit.status === 'Nowa' ? 'Oznacz jako Zrobione' : 'Oznacz jako Nowe';
+
+            // ✅ KOREKTA 1: Dodano "Pora dnia" (pogrubione)
+            visitDiv.innerHTML = `
+                <div class="visit-item-info">
+                    <strong>${visit.klientNazwa}</strong>
+                    <span class="details">
+                        ${visit.klientAdres || 'Brak adresu'}<br>
+                        ${visit.klientTelefon || 'Brak telefonu'}
+                    </span>
+                    <span class="purpose">Cel: ${visit.celWizyty || 'Nieokreślony'}</span>
+                    <span class="purpose" style="font-weight: 700;">Pora: ${visit.poraDnia || 'Brak'}</span>
+                    ${visit.notatka ? `<span class="details" style="color: #c0392b; font-style: italic;">Notatka: ${visit.notatka}</span>` : ''}
+                </div>
+                <div class="visit-item-actions">
+                    <button class="btn btn-quick-status" data-id="${visit.id}" data-new-status="${visit.status === 'Nowa' ? 'Zrealizowana' : 'Nowa'}">${statusText}</button>
+                    <button class="btn ghost small btn-edit-visit" data-id="${visit.id}">Edytuj</button>
+                    <button class="btn warn small btn-delete-visit" data-id="${visit.id}" style="margin-top: 5px;">Usuń</button>
+                </div>
+            `;
+            todayVisitList.appendChild(visitDiv);
+        });
+    }
+    // Renderuje widok Miesiąca
+    function renderMonthView(visits, date) {
+        monthGridBody.innerHTML = ''; // Wyczyść
+        const year = date.getFullYear();
+        const month = date.getMonth(); // 0-11
+        monthViewTitle.textContent = date.toLocaleDateString('pl-PL', { month: 'long', year: 'numeric' });
+
+        // Grupuj wizyty po dacie
+        const visitsByDate = new Map();
+        visits.forEach(v => {
+            const dateKey = v.dataWizyty; // np. "2025-11-10"
+            if (!visitsByDate.has(dateKey)) {
+                visitsByDate.set(dateKey, []);
+            }
+            visitsByDate.get(dateKey).push(v);
+        });
+
+        // Logika budowania siatki kalendarza
+        const firstDayOfMonth = new Date(year, month, 1).getDay(); // 0=Niedz, 1=Pon
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+        // Korekta na polski tydzień (Poniedziałek = 0, Niedziela = 6)
+        const startOffset = (firstDayOfMonth === 0) ? 6 : firstDayOfMonth - 1; 
+
+        // Dodaj puste komórki na początku
+        for (let i = 0; i < startOffset; i++) {
+            const cell = document.createElement('div');
+            cell.className = 'day-cell other-month';
+            monthGridBody.appendChild(cell);
+        }
+
+        // Dodaj komórki dni
+        for (let day = 1; day <= daysInMonth; day++) {
+            const cell = document.createElement('div');
+            cell.className = 'day-cell';
+            const dayString = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+            cell.dataset.date = dayString;
+
+            // Sprawdź czy dzisiaj
+            const todayISO = new Date().toISOString().split('T')[0];
+            if (dayString === todayISO) {
+                cell.classList.add('is-today');
+            }
+
+            // Numer dnia
+            cell.innerHTML = `<span class="day-number">${day}</span>`;
+
+            const visitsForThisDay = visitsByDate.get(dayString) || [];
+
+            // Suma wizyt do realizacji (Req. 4)
+            const visitsToDo = visitsForThisDay.filter(v => v.status === 'Nowa').length;
+            if (visitsToDo > 0) {
+                cell.innerHTML += `<div class="day-summary">${visitsToDo}</div>`;
+            }
+
+            // Kropki kolorów (Req. 11)
+            const pory = new Set(visitsForThisDay.map(v => v.poraDnia));
+            let dotsHtml = '<div class="day-dots">';
+            if (pory.has('Pilne')) dotsHtml += '<div class="day-dot dot-pilne"></div>';
+            if (pory.has('Obojętne')) dotsHtml += '<div class="day-dot dot-obojetne"></div>';
+            if (pory.has('6-10') || pory.has('10-15') || pory.has('15-20')) {
+                dotsHtml += '<div class="day-dot dot-standard"></div>';
+            }
+            dotsHtml += '</div>';
+            cell.innerHTML += dotsHtml;
+
+            // Kliknięcie na dzień przełącza na widok "Dziś"
+            cell.addEventListener('click', () => {
+                // (Logika przejścia do widoku dnia - na razie pominięte, przełącza na główne "Dziś")
+                btnViewToday.click();
+            });
+
+            monthGridBody.appendChild(cell);
+        }
+    }
+
+   // --- 7. Logika Przełączania Widoków (Dziś/Miesiąc) ---
+    btnViewToday.addEventListener('click', () => {
+        todayViewContainer.style.display = 'block';
+        monthViewContainer.style.display = 'none';
+        // yearViewContainer.style.display = 'none'; // USUNIĘTE
+        btnViewToday.classList.add('primary');
+        btnViewMonth.classList.remove('primary');
+        // btnViewYear.classList.remove('primary'); // USUNIĘTE
+    });
+
+    btnViewMonth.addEventListener('click', () => {
+        todayViewContainer.style.display = 'none';
+        monthViewContainer.style.display = 'block';
+        // yearViewContainer.style.display = 'none'; // USUNIĘTE
+        btnViewToday.classList.remove('primary');
+        btnViewMonth.classList.add('primary');
+        // btnViewYear.classList.remove('primary'); // USUNIĘTE
+        // Wyrenderuj widok miesiąca dla aktualnie pobranych danych
+        renderMonthView(allFetchedVisits, currentMonthView);
+    });
+
+    // Nawigacja miesiąca
+    btnPrevMonth.addEventListener('click', () => {
+        currentMonthView.setMonth(currentMonthView.getMonth() - 1);
+        // Tu powinniśmy na nowo pobrać dane dla nowego miesiąca, na razie renderujemy z cache
+        fetchAndRenderVisits();
+    });
+    btnNextMonth.addEventListener('click', () => {
+        currentMonthView.setMonth(currentMonthView.getMonth() + 1);
+        fetchAndRenderVisits();
+    });
+
+    // --- 8. Logika Formularza Wizyty (Modal) ---
+
+    // Otwieranie formularza
+    addVisitBtn.addEventListener('click', () => {
+        visitFormTitle.textContent = "Nowa wizyta";
+        visitFormDocId.value = ''; // Tryb dodawania
+        visitFormStatus.value = 'Nowa';
+        visitFormKlient.value = '';
+        visitFormKlientAdres.textContent = '...';
+        visitFormKlientTelefon.textContent = '...';
+        visitFormDate.value = new Date().toISOString().split('T')[0]; // Dziś
+        visitFormPoraDnia.value = '6-10';
+        visitFormCel.value = '';
+        visitFormNotatka.value = '';
+        currentVisitClientData = null; // Wyczyść dane klienta
+        visitFormModal.style.display = 'flex';
+    });
+
+    // Anulowanie
+    cancelVisitForm.addEventListener('click', () => {
+        visitFormModal.style.display = 'none';
+    });
+
+    // Podpięcie wyszukiwania klienta
+    visitFormKlient.addEventListener('click', () => {
+        // Powiedz globalnemu skryptowi, że po dodaniu klienta ma wrócić do modala wizyty
+        if (typeof(clientFormReturnToModal) !== 'undefined') {
+            clientFormReturnToModal = '#visitFormModal';
+        }
+
+        // Ukryj modal wizyty
+        visitFormModal.style.display = 'none';
+
+        // Otwórz modal wyszukiwania klienta (ten sam co w formularzu karty)
+        const formKlientTrigger = document.getElementById('formKlient');
+        if(formKlientTrigger) {
+            formKlientTrigger.click(); // Użyj modala z formularza
+        }
+    });
+
+    // Zapisywanie wizyty (Dodawanie/Edycja)
+    saveVisitBtn.addEventListener('click', async () => {
+        if (!currentUserProfile) {
+            alert("Błąd: Brak danych użytkownika.");
+            return;
+        }
+
+        const dataWizyty = visitFormDate.value;
+        if (!dataWizyty) {
+            alert("Data wizyty jest wymagana.");
+            return;
+        }
+
+        // Pobierz dane klienta
+        let klientNazwa = visitFormKlient.value;
+        let klientAdres = visitFormKlientAdres.textContent;
+        let klientTelefon = visitFormKlientTelefon.textContent;
+
+        if (currentVisitClientData) {
+             klientNazwa = currentVisitClientData.nazwa;
+             klientAdres = currentVisitClientData.adres;
+             klientTelefon = currentVisitClientData.telefon;
+        }
+
+        if (!klientNazwa || klientNazwa === '...') {
+            alert("Klient jest wymagany.");
+            return;
+        }
+
+        const visitData = {
+            lekarz_uid: currentUserProfile.uid,
+            lekarz_nazwisko: `${currentUserProfile.Imie} ${currentUserProfile.Nazwisko}`,
+            id_lecznicy: currentUserProfile['ID lecznicy'],
+            dataWizyty: dataWizyty,
+            status: visitFormStatus.value,
+            klientNazwa: klientNazwa,
+            klientAdres: (klientAdres === '...') ? '' : klientAdres,
+            klientTelefon: (klientTelefon === '...') ? '' : klientTelefon,
+            poraDnia: visitFormPoraDnia.value,
+            celWizyty: visitFormCel.value.trim(),
+            notatka: visitFormNotatka.value.trim(),
+            createdAt: firebase.firestore.FieldValue.serverTimestamp() // Zawsze ustawiaj przy zapisie
+        };
+
+        const docId = visitFormDocId.value;
+
+        saveVisitBtn.disabled = true;
+        saveVisitBtn.textContent = 'Zapisywanie...';
+
+        try {
+            if (docId) {
+                // Tryb Edycji
+                // Usuwamy createdAt, aby nie nadpisać oryginalnej daty utworzenia
+                delete visitData.createdAt; 
+                await db.collection('wizyty').doc(docId).update(visitData);
+                showToast("Wizyta zaktualizowana.", "success");
+            } else {
+                // Tryb Dodawania
+                await db.collection('wizyty').add(visitData);
+                showToast("Wizyta dodana.", "success");
+            }
+            visitFormModal.style.display = 'none';
+            fetchAndRenderVisits(); // Odśwież listę
+        } catch (error) {
+            console.error("Błąd zapisu wizyty:", error);
+            alert("Wystąpił błąd podczas zapisu.");
+        } finally {
+            saveVisitBtn.disabled = false;
+            saveVisitBtn.textContent = 'Zapisz';
+        }
+    });
+
+    // --- 9. Logika Szybkiej Zmiany Statusu i Edycji (Widok Dnia) ---
+    todayVisitList.addEventListener('click', async (e) => {
+        const target = e.target;
+
+        // Szybka zmiana statusu
+        if (target.classList.contains('btn-quick-status')) {
+            const docId = target.dataset.id;
+            const newStatus = target.dataset.newStatus;
+
+            target.disabled = true;
+            target.textContent = '...';
+
+            try {
+                await db.collection('wizyty').doc(docId).update({
+                    status: newStatus
+                });
+                showToast(`Status zmieniony na: ${newStatus}`, 'info');
+                fetchAndRenderVisits(); // Odśwież widok
+            } catch (error) {
+                console.error("Błąd zmiany statusu:", error);
+                alert("Błąd zmiany statusu.");
+                target.disabled = false;
+            }
+        }
+
+        // Edycja wizyty
+        if (target.classList.contains('btn-edit-visit')) {
+            const docId = target.dataset.id;
+            const visitData = allFetchedVisits.find(v => v.id === docId);
+            if (visitData) {
+                visitFormTitle.textContent = "Edytuj wizytę";
+                visitFormDocId.value = visitData.id;
+                visitFormStatus.value = visitData.status;
+                visitFormKlient.value = visitData.klientNazwa;
+                visitFormKlientAdres.textContent = visitData.klientAdres || '...';
+                visitFormKlientTelefon.textContent = visitData.klientTelefon || '...';
+                visitFormDate.value = visitData.dataWizyty;
+                visitFormPoraDnia.value = visitData.poraDnia;
+                visitFormCel.value = visitData.celWizyty;
+                visitFormNotatka.value = visitData.notatka;
+
+                // Zapisz dane klienta na potrzeby zapisu
+                currentVisitClientData = {
+                    nazwa: visitData.klientNazwa,
+                    adres: visitData.klientAdres,
+                    telefon: visitData.klientTelefon
+                };
+
+                visitFormModal.style.display = 'flex';
+            }
+        }
+
+        // ⬇️ ⬇️ ⬇️ WKLEJ TEN NOWY BLOK ⬇️ ⬇️ ⬇️
+        // Usuwanie wizyty
+        else if (target.classList.contains('btn-delete-visit')) {
+            const docId = target.dataset.id;
+
+            if (confirm("Czy na pewno chcesz usunąć tę wizytę?\n\nTej operacji nie można cofnąć.")) {
+                target.disabled = true;
+                target.textContent = '...';
+
+                try {
+                    await db.collection('wizyty').doc(docId).delete();
+                    showToast("Wizyta została usunięta.", "success");
+                    fetchAndRenderVisits(); // Odśwież widok
+                } catch (error) {
+                    console.error("Błąd usuwania wizyty:", error);
+                    alert("Wystąpił błąd podczas usuwania wizyty.");
+                    target.disabled = false;
+                    target.textContent = 'Usuń';
+                }
+            }
+        }
+        // ⬆️ ⬆️ ⬆️ KONIEC NOWEGO BLOKU ⬆️ ⬆️ ⬆️
+
+    });
+
+} catch (err) {
+    console.error("BŁĄD KRYTYCZNY w module Kalendarza Wizyt:", err);
+    // alert("Nie udało się załadować modułu kalendarza.");
+}
+/* ======================================================== */
+/* ✅ KONIEC: LOGIKA KALENDARZA WIZYT                         */
+/* ======================================================== */
+
+/* ======================================================== */
+/* ✅ POCZĄTEK: LOGIKA BAZY LECZENIA (SCHEMATÓW)              */
+/* ======================================================== */
+try {
+    // --- 1. Podpięcie do Menu i Nawigacji ---
+    if (menuSchematyLeczeniaBtn) {
+        menuSchematyLeczeniaBtn.addEventListener('click', () => showSection('bazaSchematow'));
+    }
+    if (tabSchematyLeczeniaBtn) {
+        tabSchematyLeczeniaBtn.addEventListener('click', () => {
+            if (typeof confirmOnTabChange === 'function' && !confirmOnTabChange()) return;
+            showSection('bazaSchematow');
+        });
+    }
+
+    // --- 2. Funkcja Startowa ---
+    function onShowBazaLeczenia() {
+        // Uruchom ładowanie tylko jeśli cache jest pusty
+        if (cachedSchemas.length === 0) {
+            loadAndRenderSchemas();
+        }
+    }
+
+    if (loadSchemasBtn) {
+        loadSchemasBtn.addEventListener('click', loadAndRenderSchemas);
+    }
+
+    // --- 3. Wczytywanie i Renderowanie Schematów ---
+    async function loadAndRenderSchemas() {
+        if (!currentUserProfile) return;
+        schemaListContainer.innerHTML = '<p style="text-align:center; color:#888;">Wczytywanie schematów... ⏳</p>';
+
+        try {
+            const q = db.collection("schematyLeczenia")
+                .where("lekarz_uid", "==", currentUserProfile.uid)
+                .orderBy("rozpoznanie");
+
+            const snapshot = await q.get();
+            cachedSchemas = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+            // Zbuduj mapę dla szybkiego dostępu (Klucz: nazwa rozpoznania)
+            cachedSchemaMap.clear();
+            cachedSchemas.forEach(schema => {
+                cachedSchemaMap.set(schema.rozpoznanie.toLowerCase(), schema);
+            });
+
+            renderSchemaList(cachedSchemas);
+
+            if (snapshot.empty) {
+                schemaListContainer.innerHTML = '<p style="text-align:center; color:#888;">Nie masz jeszcze żadnych zapisanych schematów. Kliknij "Dodaj nowy schemat", aby zacząć.</p>';
+            }
+
+        } catch (error) {
+            console.error("Błąd wczytywania schematów:", error);
+            schemaListContainer.innerHTML = '<p style="text-align:center; color:red;">Błąd wczytywania danych.</p>';
+            if (error.code === 'failed-precondition') {
+                alert("BŁĄD BAZY DANYCH: Wymagany jest indeks Firestore dla 'schematyLeczenia'. Sprawdź konsolę (F12).");
+                console.error("BŁĄD INDEKSU: Utwórz indeks dla 'schematyLeczenia': [lekarz_uid(ASC), rozpoznanie(ASC)]");
+            }
+        }
+    }
+
+    // Funkcja do renderowania listy schematów
+    function renderSchemaList(schemas) {
+        schemaListContainer.innerHTML = ''; // Wyczyść
+        schemas.forEach(schema => {
+            const div = document.createElement('div');
+            div.className = 'schema-item';
+
+            let productsHtml = `
+                <table class="schema-products-table">
+                    <thead>
+                        <tr>
+                            <th>Wiersz</th>
+                            <th>Produkt</th>
+                            <th>Ilość/Dawka</th>
+                            <th>Karencja</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            (schema.produkty || []).sort((a,b) => a.wierszDocelowy - b.wierszDocelowy).forEach(p => {
+                // Konwertuj indeks wiersza na czytelną nazwę
+                let wierszNazwa = `Lecz. ${p.wierszDocelowy + 1}`;
+                if (p.wierszDocelowy >= 9) {
+                    wierszNazwa = `Zost. ${p.wierszDocelowy - 8}`;
+                }
+
+                productsHtml += `
+                    <tr>
+                        <td>${wierszNazwa}</td>
+                        <td>${p.produkt}</td>
+                        <td>${p.iloscDawka}</td>
+                        <td>${p.karencja}</td>
+                    </tr>
+                `;
+            });
+            productsHtml += '</tbody></table>';
+
+            div.innerHTML = `
+                <div class="schema-header">
+                    <h4>${schema.rozpoznanie}</h4>
+                    <div>
+                        <button class="btn small btn-edit-schema" data-id="${schema.id}">Edytuj</button>
+                        <button class="btn warn small btn-delete-schema" data-id="${schema.id}" style="margin-left: 5px;">Usuń</button>
+                    </div>
+                </div>
+                <div class="schema-products">${productsHtml}</div>
+            `;
+            schemaListContainer.appendChild(div);
+        });
+    }
+
+    // --- 4. Logika Modala Schematu (CRUD) ---
+
+    // Otwórz pusty modal
+    if (addNewSchemaBtn) {
+        addNewSchemaBtn.addEventListener('click', () => {
+            openSchemaModal(); // Otwórz bez danych (tryb dodawania)
+        });
+    }
+
+    // Delegacja zdarzeń dla Edycji/Usuwania
+    schemaListContainer.addEventListener('click', (e) => {
+        if (e.target.classList.contains('btn-edit-schema')) {
+            const schemaId = e.target.dataset.id;
+            const schemaData = cachedSchemas.find(s => s.id === schemaId);
+            if (schemaData) {
+                openSchemaModal(schemaData); // Otwórz z danymi (tryb edycji)
+            }
+        }
+        if (e.target.classList.contains('btn-delete-schema')) {
+            const schemaId = e.target.dataset.id;
+            if (confirm("Czy na pewno chcesz usunąć ten schemat?")) {
+                deleteSchema(schemaId);
+            }
+        }
+    });
+
+    // Funkcja otwierająca Modal (nowy lub do edycji)
+    function openSchemaModal(schemaData = null) {
+        schemaProductList.innerHTML = ''; // Wyczyść listę produktów
+
+        if (schemaData) {
+            // Tryb Edycji
+            schemaFormTitle.textContent = "Edytuj Schemat";
+            schemaFormDocId.value = schemaData.id;
+            schemaFormRozpoznanie.value = schemaData.rozpoznanie;
+
+            // Wypełnij istniejące produkty
+            (schemaData.produkty || []).forEach(p => {
+                addSchemaProductLine(p); // Wypełnij linię danymi
+            });
+        } else {
+            // Tryb Dodawania
+            schemaFormTitle.textContent = "Nowy Schemat";
+            schemaFormDocId.value = '';
+            schemaFormRozpoznanie.value = '';
+            addSchemaProductLine(); // Dodaj jedną pustą linię na start
+        }
+        schemaFormModal.style.display = 'flex';
+    }
+
+    // Anuluj
+    if (cancelSchemaForm) {
+        cancelSchemaForm.addEventListener('click', () => {
+            schemaFormModal.style.display = 'none';
+        });
+    }
+
+    // Dodaj nową (pustą) linię produktu do formularza
+    if (addSchemaProductLineBtn) {
+        addSchemaProductLineBtn.addEventListener('click', () => {
+            addSchemaProductLine(); // Dodaj pustą
+        });
+    }
+
+    // Funkcja dynamicznie tworząca wiersz produktu w formularzu
+    function addSchemaProductLine(productData = null) {
+        const lineDiv = document.createElement('div');
+        lineDiv.className = 'schema-product-line';
+
+        lineDiv.innerHTML = `
+            <button type="button" class="btn-remove-line" title="Usuń tę linię">X</button>
+
+            <div class="col-full">
+                <label>Produkt leczniczy</label>
+                <input type="text" class="schema-produkt" list="listaLekow" value="${productData ? productData.produkt : ''}">
+            </div>
+
+            <div class="col-full">
+                <label>Ilość / Dawkowanie (np. "1 ml/10 kg")</label>
+                <input type="text" class="schema-ilosc" value="${productData ? productData.iloscDawka : ''}">
+            </div>
+
+            <div>
+                <label>Karencja</label>
+                <input type="text" class="schema-karencja" value="${productData ? productData.karencja : ''}">
+            </div>
+
+            <div>
+                <label>Wiersz w karcie (1-9 lub Z1-Z3)</label>
+                <select class="schema-wiersz">
+                    <option value="0">Leczenie 1</option>
+                    <option value="1">Leczenie 2</option>
+                    <option value="2">Leczenie 3</option>
+                    <option value="3">Leczenie 4</option>
+                    <option value="4">Leczenie 5</option>
+                    <option value="5">Leczenie 6</option>
+                    <option value="6">Leczenie 7</option>
+                    <option value="7">Leczenie 8</option>
+                    <option value="8">Leczenie 9</option>
+                    <option value="9">Zostawione 1</option>
+                    <option value="10">Zostawione 2</option>
+                    <option value="11">Zostawione 3</option>
+                </select>
+            </div>
+        `;
+
+        // Ustaw domyślną wartość <select>
+        if (productData) {
+            lineDiv.querySelector('.schema-wiersz').value = productData.wierszDocelowy;
+        }
+
+        // Auto-uzupełnianie karencji przy wyborze produktu
+        lineDiv.querySelector('.schema-produkt').addEventListener('input', function(e) {
+            const nazwa = e.target.value;
+            const karencjaInput = lineDiv.querySelector('.schema-karencja');
+            const iloscInput = lineDiv.querySelector('.schema-ilosc');
+            // Używamy globalnych map zdefiniowanych dla Karty Leczenia
+            if (karencjaInput && typeof mapaKarencji !== 'undefined') {
+                karencjaInput.value = mapaKarencji[nazwa] || '';
+            }
+            if (iloscInput && typeof mapaIlosci !== 'undefined') {
+                iloscInput.value = mapaIlosci[nazwa] || '';
+            }
+        });
+
+        // Logika usuwania linii
+        lineDiv.querySelector('.btn-remove-line').addEventListener('click', (e) => {
+            e.target.parentElement.remove();
+        });
+
+        schemaProductList.appendChild(lineDiv);
+    }
+
+    // Zapisywanie Schematu
+    if (saveSchemaBtn) {
+        saveSchemaBtn.addEventListener('click', async () => {
+            const rozpoznanie = schemaFormRozpoznanie.value.trim();
+            if (!rozpoznanie) {
+                alert("Rozpoznanie (nazwa schematu) jest wymagane.");
+                return;
+            }
+
+            const docId = schemaFormDocId.value;
+            const produktyArray = [];
+            const productLines = schemaProductList.querySelectorAll('.schema-product-line');
+
+            productLines.forEach(line => {
+                const produkt = line.querySelector('.schema-produkt').value.trim();
+                // Zapisuj tylko jeśli jest nazwa produktu
+                if (produkt) {
+                    produktyArray.push({
+                        produkt: produkt,
+                        seria: "", // Seria jest dynamiczna, nie zapisujemy jej w schemacie
+                        iloscDawka: line.querySelector('.schema-ilosc').value.trim(),
+                        karencja: line.querySelector('.schema-karencja').value.trim(),
+                        wierszDocelowy: parseInt(line.querySelector('.schema-wiersz').value, 10)
+                    });
+                }
+            });
+
+            if (produktyArray.length === 0) {
+                alert("Musisz dodać przynajmniej jeden produkt do schematu.");
+                return;
+            }
+
+            const schemaData = {
+                lekarz_uid: currentUserProfile.uid,
+                id_lecznicy: currentUserProfile['ID lecznicy'],
+                rozpoznanie: rozpoznanie,
+                produkty: produktyArray
+            };
+
+            saveSchemaBtn.disabled = true;
+            saveSchemaBtn.textContent = 'Zapisywanie...';
+
+            try {
+                if (docId) {
+                    // Edycja
+                    await db.collection('schematyLeczenia').doc(docId).update(schemaData);
+                    showToast("Schemat zaktualizowany.", "success");
+                } else {
+                    // Dodawanie
+                    await db.collection('schematyLeczenia').add(schemaData);
+                    showToast("Nowy schemat zapisany.", "success");
+                }
+                schemaFormModal.style.display = 'none';
+                loadAndRenderSchemas(); // Odśwież listę w tle
+                refreshSchemaDatalist(); // Odśwież datalist w Karcie Leczenia
+            } catch (error) {
+                console.error("Błąd zapisu schematu:", error);
+                alert("Wystąpił błąd podczas zapisu.");
+            } finally {
+                saveSchemaBtn.disabled = false;
+                saveSchemaBtn.textContent = 'Zapisz Schemat';
+            }
+        });
+    }
+
+    // Usuwanie Schematu
+    async function deleteSchema(docId) {
+        try {
+            await db.collection('schematyLeczenia').doc(docId).delete();
+            showToast("Schemat usunięty.", "success");
+            loadAndRenderSchemas(); // Odśwież listę
+            refreshSchemaDatalist(); // Odśwież datalist
+        } catch (error) {
+            console.error("Błąd usuwania schematu:", error);
+            alert("Błąd usuwania schematu.");
+        }
+    }
+
+    // --- 5. Logika Integracji z Kartą Leczenia ---
+
+    // Wczytuje rozpoznania do <datalist id="listaRozpoznan">
+    async function refreshSchemaDatalist() {
+        if (!currentUserProfile) return;
+        const datalist = document.getElementById('listaRozpoznan');
+        if (!datalist) return;
+
+        try {
+            // Pobierz tylko te schematy, które stworzył zalogowany lekarz
+            const q = db.collection("schematyLeczenia")
+                .where("lekarz_uid", "==", currentUserProfile.uid);
+
+            const snapshot = await q.get();
+            datalist.innerHTML = ''; // Wyczyść
+
+            snapshot.docs.forEach(doc => {
+                const schema = doc.data();
+                const opt = document.createElement('option');
+                opt.value = schema.rozpoznanie;
+                datalist.appendChild(opt);
+            });
+            console.log(`Wczytano ${snapshot.size} schematów do datalist.`);
+        } catch (error) {
+            console.error("Błąd wczytywania datalist schematów:", error);
+        }
+    }
+
+    // Główna funkcja auto-uzupełniania (podpięta do inputa w kolumnie 4)
+    function applySchema(event) {
+        const input = event.target;
+        const rozpoznanie = input.value.trim().toLowerCase();
+
+        // 1. Sprawdź, czy checkbox "Użyj schematów" jest zaznaczony
+        if (!schemaCheckbox || !schemaCheckbox.checked) {
+            return; // Nie rób nic, jeśli odznaczone
+        }
+
+        // 2. Sprawdź, czy wpisana nazwa pasuje do schematu w mapie
+        const schema = cachedSchemaMap.get(rozpoznanie);
+        if (!schema) {
+            return; // Brak schematu, pozwól użytkownikowi pisać dalej
+        }
+
+        // 3. Mamy schemat! Rozpocznij wypełnianie tabeli
+        console.log("Znaleziono pasujący schemat:", schema.rozpoznanie);
+
+        // Pobierz wszystkie edytowalne wiersze z tabeli
+        const logicalRows = rowsEditable(); 
+        if (logicalRows.length === 0) return;
+
+        schema.produkty.forEach(p => {
+            const targetRowIndex = p.wierszDocelowy;
+
+            // Upewnij się, że wiersz istnieje (0-11)
+            if (targetRowIndex >= 0 && targetRowIndex < logicalRows.length) {
+                const row = logicalRows[targetRowIndex];
+
+                try {
+                    // Wypełnij komórki, symulując wybór produktu
+                    const produktInput = row.cells[4].querySelector('input');
+                    const iloscInput = row.cells[6].querySelector('input');
+
+                    produktInput.value = p.produkt;
+                    produktInput.dispatchEvent(new Event('input', { bubbles: true })); // Odpal logikę (wypełni serie/karencje jeśli są w bazie LEKÓW)
+
+                    // Schemat ma priorytet - nadpisz dane z bazy leków
+                    row.cells[5].textContent = p.seria; // Seria (ze schematu, zwykle pusta)
+                    if (iloscInput) {
+                        // Wpisz tylko część liczbową, jeśli jest (np. "1")
+                        const iloscMatch = p.iloscDawka.match(/^[\d,.]+/);
+                        iloscInput.value = iloscMatch ? iloscMatch[0] : '';
+                    }
+                    // Wpisz tekst dawkowania (np. "ml/kg")
+                    const dawkaText = p.iloscDawka.replace(/^[\d,.]+/, '').trim();
+                    const textNode = row.cells[6].childNodes[1]; // Znajdź węzeł tekstowy
+                    if (textNode && textNode.nodeType === Node.TEXT_NODE) {
+                        textNode.textContent = ' ' + dawkaText;
+                    }
+
+                    row.cells[7].textContent = p.karencja; // Karencja (ze schematu)
+
+                    // Ustaw wartość do druku (bardzo ważne)
+                    row.cells[4].dataset.printValue = p.produkt;
+
+                } catch (e) {
+                    console.error(`Błąd podczas wypełniania wiersza ${targetRowIndex} ze schematu:`, e);
+                }
+            }
+        });
+
+        showToast(`Zastosowano schemat: ${schema.rozpoznanie}`, 'success');
+    }
+
+} catch (err) {
+    console.error("BŁĄD KRYTYCZNY w module Bazy Schematów:", err);
+}
+/* ======================================================== */
+/* ✅ KONIEC: LOGIKA BAZY LECZENIA (SCHEMATÓW)                */
 /* ======================================================== */
 </script> 
 
