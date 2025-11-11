@@ -1497,6 +1497,119 @@ table {
 /* ======================================================== */
 /* ✅ KONIEC: STYLE DLA KALENDARZA WIZYT                      */
 /* ======================================================== */
+/* ======================================================== */
+/* ✅ POCZĄTEK: STYLE DLA BAZY LECZENIA (SCHEMATÓW)           */
+/* ======================================================== */
+
+/* --- Lista schematów --- */
+.schema-item {
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    margin-bottom: 10px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+.schema-header {
+    padding: 12px 15px;
+    background: #f9f9f9;
+    border-bottom: 1px solid #eee;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.schema-header h4 {
+    margin: 0;
+    font-size: 18px;
+    color: #000;
+}
+.schema-products {
+    padding: 10px 15px;
+}
+.schema-products-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+}
+.schema-products-table th, 
+.schema-products-table td {
+    border: 1px solid #eee;
+    padding: 4px;
+    text-align: left;
+}
+.schema-products-table th {
+    background: #f7f7f7;
+    font-size: 11px;
+}
+
+/* --- Modal formularza schematu --- */
+.schema-product-line {
+    background: #fdfdfd;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    padding: 10px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    position: relative;
+}
+.schema-product-line label {
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 2px;
+    display: block;
+}
+.schema-product-line input,
+.schema-product-line select {
+    width: 100%;
+    padding: 6px;
+    font-size: 15px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    box-sizing: border-box;
+}
+/* Pole "Wiersz" i "Produkt" w jednej linii */
+.schema-product-line .col-full { grid-column: 1 / -1; }
+
+.btn-remove-line {
+    position: absolute;
+    top: -10px;
+    right: -10px;
+    background: #c0392b;
+    color: white;
+    border: 2px solid white;
+    border-radius: 50%;
+    width: 28px;
+    height: 28px;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+    line-height: 1;
+    padding: 0;
+}
+
+/* --- Nowy input w tabeli Karty Leczenia --- */
+#karta tbody tr td:nth-child(4) {
+    padding: 0; /* Usuń padding, aby input wypełnił komórkę */
+}
+#karta tbody tr td:nth-child(4) input[list="listaRozpoznan"] {
+    width: 100%;
+    height: 100%;
+    border: none;
+    padding: 4px; /* Zachowaj wewnętrzny padding */
+    box-sizing: border-box;
+    font-family: 'Nunito', sans-serif;
+    font-size: 11px;
+    text-align: center;
+    background: transparent;
+}
+/* Podświetlenie przy edycji */
+#karta tbody tr td:nth-child(4) input[list="listaRozpoznan"]:focus {
+    outline: 2px solid #6A994E;
+    background: #fff;
+}
+/* ======================================================== */
+/* ✅ KONIEC: STYLE DLA BAZY LECZENIA (SCHEMATÓW)             */
+/* ======================================================== */
 </style>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
@@ -1702,8 +1815,8 @@ background-color: #eef;
   <div id="bazaSubMenu" style="display: none; width: 90%; max-width: 400px; margin-top: -10px; margin-bottom: 10px;">
     <button id="menuBazaKlientowBtn" class="submenu-btn">👥 Baza klientów</button>
     <button id="menuBazaProduktowBtn" class="submenu-btn">📦 Baza produktów</button>
-    <button id="menuBazaLeczeniaBtn" class="submenu-btn">⚕️ Baza leczenia</button>
-  </div>
+    <button id="menuSchematyLeczeniaBtn" class="submenu-btn">⚕️ Baza leczenia (Schematy)</button>
+  </div>
   <button id="menuRaportyBtn" class="menu-btn">📊 Raporty</button>
   <button id="menuArchiwumBtn" class="menu-btn">🗄️ Archiwum</button>
   <div id="archiwumSubMenu" style="display: none; width: 90%; max-width: 400px; margin-top: -10px; margin-bottom: 10px;">
@@ -1724,6 +1837,7 @@ background-color: #eef;
 <button id="tabKalkulatorBtn" class="btn">🧮 Kalkulator</button>
 <button id="tabBazaKlientowBtn" class="btn">👥 Klienci</button>
 <button id="tabBazaProduktowBtn" class="btn">📦 Produkty</button>
+<button id="tabSchematyLeczeniaBtn" class="btn">⚕️ Schematy</button>
 <button id="logoutBtn" class="btn warn small" style="font-size: 16px; margin-left: auto;">Wyloguj ➡️</button>
 </div> <div id="kartaLeczeniaSection" style="display: none;">
 <h2>KARTA LECZENIA ZWIERZĄT GOSPODARSKICH ORAZ ZWIERZĄT, Z KTÓRYCH POZYSKANE TKANKI LUB PRODUKTY SĄ PRZEZNACZONE DO SPOŻYCIA PRZEZ LUDZI / EWIDENCJA LECZENIA ZWIERZĄT</h2>
@@ -1964,8 +2078,12 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
 <button id="metodaTradycyjnaBtn" class="btn primary" style="font-size: 18px; padding: 12px;">Metoda tradycyjna (Tabela)</button>
 <button id="metodaFormularzBtn" class="btn" style="font-size: 18px; padding: 12px;">Formularz (Krok po kroku)</button>
 </div>
-<div class="form-actions" style="margin-top: 25px;">
-<button id="cancelMetodaBtn" class="btn ghost small" style="font-size: 16px;">Anuluj</button>
+<div class="form-actions" style="margin-top: 25px; justify-content: space-between; align-items: center;">
+    <div style="font-size: 16px; font-weight: 600;">
+        <input type="checkbox" id="schemaCheckbox" checked>
+        <label for="schemaCheckbox">Użyj schematów</label>
+    </div>
+    <button id="cancelMetodaBtn" class="btn ghost small" style="font-size: 16px;">Anuluj</button>
 </div>
 </div>
 </div>
@@ -2020,6 +2138,7 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
     </div>
 </div>
 <datalist id="listaLekow"></datalist>
+<datalist id="listaRozpoznan"></datalist>
 
 </div> <div id="kalkulatorWizytySection" style="display: none;">
 <h2>Kalkulator Wizyty</h2>
@@ -2640,7 +2759,45 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
 
     <button id="addVisitBtn" class="btn primary" style="position: fixed; bottom: 80px; right: 20px; width: 60px; height: 60px; border-radius: 50%; font-size: 30px; line-height: 1; padding: 0; z-index: 1000;">+</button>
 </div>
+<div id="bazaSchematowSection" style="display: none; padding: 0 15px 80px 15px;">
+    <h2>⚕️ Baza Leczenia (Moje Schematy)</h2>
 
+    <div style="margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 10px;">
+        <button id="loadSchemasBtn" class="btn primary">📥 Wczytaj moje schematy</button>
+        <button id="addNewSchemaBtn" class="btn primary" style="margin-left: 10px;">＋ Dodaj nowy schemat</button>
+    </div>
+
+    <div id="schemaListContainer">
+        <p style="text-align:center; color:#888;">Kliknij "Wczytaj", aby zobaczyć zapisane schematy.</p>
+        </div>
+</div>
+
+<div id="schemaFormModal" aria-hidden="true" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.48); display: none; z-index: 10003; justify-content: center; align-items: center; overflow: hidden;">
+    <div class="form-card" role="dialog" aria-modal="true" style="max-height: 95vh; overflow-y: auto;">
+        
+        <h3 id="schemaFormTitle" style="font-size: 25px;">Nowy Schemat Leczenia</h3>
+        <input type="hidden" id="schemaFormDocId">
+
+        <div class="form-row">
+            <label for="schemaFormRozpoznanie">Rozpoznanie (Nazwa schematu)</label>
+            <input type="text" id="schemaFormRozpoznanie" placeholder="Np. Zapalenie płuc, Mastitis...">
+        </div>
+
+        <hr style="margin: 15px 0;">
+        <h4 style="margin-top: 0;">Produkty w schemacie:</h4>
+        
+        <div id="schemaProductList" style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 15px;">
+            </div>
+
+        <button id="addSchemaProductLineBtn" type="button" class="btn small" style="width: 100%; background: #f0f8ff;">＋ Dodaj kolejny produkt</button>
+        <hr style="margin: 15px 0;">
+
+        <div class="form-actions" style="justify-content: space-between;">
+            <button id="cancelSchemaForm" type="button" class="btn ghost small" style="font-size: 19px;">Anuluj</button>
+            <button id="saveSchemaBtn" type="button" class="btn primary" style="font-size: 19px;">Zapisz Schemat</button>
+        </div>
+    </div>
+</div>
 <div id="visitFormModal" aria-hidden="true" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.48); display: none; z-index: 10003; justify-content: center; align-items: center; overflow: hidden;">
     <div class="form-card" role="dialog" aria-modal="true" style="max-height: 95vh; overflow-y: auto;">
         
