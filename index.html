@@ -11353,11 +11353,15 @@ try {
                     wierszNazwa = `Zost. ${p.wierszDocelowy - 8}`;
                 }
 
+//...
+                // ✅ FIX 2: Połącz 'ilosc' i 'dawkowanie'
+                const iloscDawkaDisplay = [p.ilosc, p.dawkowanie].filter(Boolean).join(' ');
+
                 productsHtml += `
                     <tr>
                         <td>${wierszNazwa}</td>
                         <td>${p.produkt}</td>
-                        <td>${p.iloscDawka}</td>
+                        <td>${iloscDawkaDisplay}</td>
                         <td>${p.karencja}</td>
                     </tr>
                 `;
@@ -11442,65 +11446,66 @@ try {
         });
     }
 
-    // Funkcja dynamicznie tworząca wiersz produktu w formularzu
+ // Funkcja dynamicznie tworząca wiersz produktu w formularzu (ZMODYFIKOWANA)
     function addSchemaProductLine(productData = null) {
         const lineDiv = document.createElement('div');
         lineDiv.className = 'schema-product-line';
+        
+        // Użyj danych z 'productData' lub pustych stringów
+        const produktNazwa = productData ? productData.produkt : '';
+        const iloscWartosc = productData ? productData.ilosc : '';
+        const dawkowanieWartosc = productData ? productData.dawkowanie : '';
+        const karencjaWartosc = productData ? productData.karencja : '';
+        const wierszWartosc = productData ? productData.wierszDocelowy : 0;
 
         lineDiv.innerHTML = `
             <button type="button" class="btn-remove-line" title="Usuń tę linię">X</button>
-
+            
             <div class="col-full">
-                <label>Produkt leczniczy</label>
-                <input type="text" class="schema-produkt" list="listaLekow" value="${productData ? productData.produkt : ''}">
+                <label>Produkt leczniczy (Wybierz z listy)</label>
+                <input type="text" class="schema-produkt-trigger" placeholder="Kliknij, aby wybrać produkt..." value="${produktNazwa}" readonly style="cursor: pointer; background: #fff;">
             </div>
-
-            <div class="col-full">
-                <label>Ilość / Dawkowanie (np. "1 ml/10 kg")</label>
-                <input type="text" class="schema-ilosc" value="${productData ? productData.iloscDawka : ''}">
+            
+            <div>
+                <label>Ilość</label>
+                <input type="number" class="schema-ilosc" placeholder="0" value="${iloscWartosc}">
+            </div>
+            <div>
+                <label>Dawkowanie (auto)</label>
+                <input type="text" class="schema-dawkowanie" value="${dawkowanieWartosc}" readonly style="background: #eee;">
             </div>
 
             <div>
-                <label>Karencja</label>
-                <input type="text" class="schema-karencja" value="${productData ? productData.karencja : ''}">
+                <label>Karencja (auto)</label>
+                <input type="text" class="schema-karencja" value="${karencjaWartosc}" readonly style="background: #eee;">
             </div>
-
+            
             <div>
-                <label>Wiersz w karcie (1-9 lub Z1-Z3)</label>
+                <label>Wiersz w karcie</label>
                 <select class="schema-wiersz">
-                    <option value="0">Leczenie 1</option>
-                    <option value="1">Leczenie 2</option>
-                    <option value="2">Leczenie 3</option>
-                    <option value="3">Leczenie 4</option>
-                    <option value="4">Leczenie 5</option>
-                    <option value="5">Leczenie 6</option>
-                    <option value="6">Leczenie 7</option>
-                    <option value="7">Leczenie 8</option>
-                    <option value="8">Leczenie 9</option>
-                    <option value="9">Zostawione 1</option>
-                    <option value="10">Zostawione 2</option>
-                    <option value="11">Zostawione 3</option>
+                    <option value="0">Wiersz 1</option>
+                    <option value="1">Wiersz 2</option>
+                    <option value="2">Wiersz 3</option>
+                    <option value="3">Wiersz 4</option>
+                    <option value="4">Wiersz 5</option>
+                    <option value="5">Wiersz 6</option>
+                    <option value="6">Wiersz 7</option>
+                    <option value="7">Wiersz 8</option>
+                    <option value="8">Wiersz 9</option>
+                    <option value="9">Pozostawione 1</option>
+                    <option value="10">Pozostawione 2</option>
+                    <option value="11">Pozostawione 3</option>
                 </select>
             </div>
         `;
-
+        
         // Ustaw domyślną wartość <select>
-        if (productData) {
-            lineDiv.querySelector('.schema-wiersz').value = productData.wierszDocelowy;
-        }
+        lineDiv.querySelector('.schema-wiersz').value = wierszWartosc;
 
-        // Auto-uzupełnianie karencji przy wyborze produktu
-        lineDiv.querySelector('.schema-produkt').addEventListener('input', function(e) {
-            const nazwa = e.target.value;
-            const karencjaInput = lineDiv.querySelector('.schema-karencja');
-            const iloscInput = lineDiv.querySelector('.schema-ilosc');
-            // Używamy globalnych map zdefiniowanych dla Karty Leczenia
-            if (karencjaInput && typeof mapaKarencji !== 'undefined') {
-                karencjaInput.value = mapaKarencji[nazwa] || '';
-            }
-            if (iloscInput && typeof mapaIlosci !== 'undefined') {
-                iloscInput.value = mapaIlosci[nazwa] || '';
-            }
+        // Auto-uzupełnianie (teraz jako listener 'click')
+        lineDiv.querySelector('.schema-produkt-trigger').addEventListener('click', function(e) {
+            // Otwórz nowy modal wyszukiwania produktów dla schematów
+            openSchemaProductSearch(lineDiv); // Przekaż 'lineDiv' jako cel
         });
 
         // Logika usuwania linii
@@ -11510,6 +11515,7 @@ try {
 
         schemaProductList.appendChild(lineDiv);
     }
+
 
     // Zapisywanie Schematu
     if (saveSchemaBtn) {
@@ -11524,14 +11530,16 @@ try {
             const produktyArray = [];
             const productLines = schemaProductList.querySelectorAll('.schema-product-line');
 
-            productLines.forEach(line => {
-                const produkt = line.querySelector('.schema-produkt').value.trim();
+                productLines.forEach(line => {
+                // Czytamy z nowego pola 'schema-produkt-trigger'
+                const produkt = line.querySelector('.schema-produkt-trigger').value.trim(); 
                 // Zapisuj tylko jeśli jest nazwa produktu
                 if (produkt) {
                     produktyArray.push({
                         produkt: produkt,
-                        seria: "", // Seria jest dynamiczna, nie zapisujemy jej w schemacie
-                        iloscDawka: line.querySelector('.schema-ilosc').value.trim(),
+                        seria: "", // Seria jest dynamiczna
+                        ilosc: line.querySelector('.schema-ilosc').value.trim(), // ✅ FIX 2
+                        dawkowanie: line.querySelector('.schema-dawkowanie').value.trim(), // ✅ FIX 2
                         karencja: line.querySelector('.schema-karencja').value.trim(),
                         wierszDocelowy: parseInt(line.querySelector('.schema-wiersz').value, 10)
                     });
