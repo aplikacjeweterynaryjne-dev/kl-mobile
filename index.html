@@ -1631,7 +1631,19 @@ table {
 /* ======================================================== */
 /* ✅ KONIEC: POPRAWKA Z-INDEX                                */
 /* ======================================================== */
+
 </style>
+    <div id="calcProductSearchModal" class="product-search-modal" style="display: none; z-index: 10003;">
+    <div class="product-search-card">
+        <h3>Wyszukaj produkt (Kalkulator)</h3>
+        <input type="search" id="calcProductSearchInputModal" placeholder="Wpisz nazwę produktu...">
+        <div id="calcProductSearchListModal" class="product-search-list">
+        </div>
+        <div class="form-actions" style="justify-content: flex-end;">
+            <button id="calcProductSearchCloseBtn" class="btn ghost">Anuluj</button>
+        </div>
+    </div>
+</div>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
@@ -2198,7 +2210,7 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
 
 <div style="flex-grow: 1;">
 <label for="productSelect">Wybierz produkt:</label><br>
-<input list="listaLekow" id="productSelect" style="width: 100%; padding: 5px; box-sizing: border-box;">
+<input list="listaLekow" id="productSelect" style="width: 100%; padding: 5px; box-sizing: border-box; cursor: pointer; background: #fff;" readonly placeholder="Kliknij, aby wyszukać produkt...">
 </div>
 
 <div>
@@ -11957,6 +11969,87 @@ function applySchema(event) {
 }
 /* ======================================================== */
 /* ✅ KONIEC: NOWA LOGIKA MODALI (SCHEMATY)                   */
+/* ======================================================== */
+/* ======================================================== */
+/* ✅ POCZĄTEK: MODUŁ 5 - Logika Modala Kalkulatora          */
+/* ======================================================== */
+try {
+    // Zmienne dla nowego modala
+    const calcProductSearchModal = document.getElementById('calcProductSearchModal');
+    const calcProductSearchInput = document.getElementById('calcProductSearchInputModal');
+    const calcProductSearchList = document.getElementById('calcProductSearchListModal');
+    const calcProductSearchCloseBtn = document.getElementById('calcProductSearchCloseBtn');
+    const calcProductTrigger = document.getElementById('productSelect'); // Input w kalkulatorze
+
+    // 1. Otwieranie modala
+    function openCalcProductSearchModal(e) {
+        e.preventDefault();
+        if (!calcProductSearchModal) return;
+        
+        calcProductSearchInput.value = (calcProductTrigger.value !== "Kliknij, aby wyszukać produkt...") ? calcProductTrigger.value : "";
+        populateAndFilterCalcProductList(); // Użyjemy nowej funkcji
+        calcProductSearchModal.style.display = 'flex';
+        setTimeout(() => calcProductSearchInput.focus(), 50);
+    }
+
+    // 2. Zamykanie modala
+    function closeCalcProductSearchModal() {
+        if (calcProductSearchModal) calcProductSearchModal.style.display = 'none';
+    }
+
+    // 3. Wypełnianie i filtrowanie listy (czyta z globalnej `nazwyLekow`)
+    function populateAndFilterCalcProductList() {
+        if (typeof nazwyLekow === 'undefined' || nazwyLekow.length === 0) {
+            calcProductSearchList.innerHTML = '<div class="product-search-item">Błąd: Brak bazy leków.</div>';
+            return;
+        }
+
+        const filterText = calcProductSearchInput.value.toLowerCase().trim();
+        calcProductSearchList.innerHTML = '';
+        let foundItems = 0;
+
+        nazwyLekow.forEach(lekName => {
+            if (filterText === '' || lekName.toLowerCase().includes(filterText)) {
+                const itemDiv = document.createElement('div');
+                itemDiv.className = 'product-search-item';
+                itemDiv.textContent = lekName;
+                itemDiv.dataset.lekName = lekName;
+                itemDiv.addEventListener('click', () => {
+                    selectCalcProduct(lekName);
+                });
+                calcProductSearchList.appendChild(itemDiv);
+                foundItems++;
+            }
+        });
+        if (foundItems === 0) calcProductSearchList.innerHTML = '<div class="product-search-item" style="color: #999;">Brak pasujących produktów.</div>';
+    }
+
+    // 4. Funkcja wyboru produktu z modala
+    function selectCalcProduct(lekName) {
+        if (!lekName) return;
+
+        // Wpisz wartość do pola w kalkulatorze
+        calcProductTrigger.value = lekName;
+        
+        // Wywołaj 'input', aby zaktualizować jednostkę miary (Twoja istniejąca logika)
+        calcProductTrigger.dispatchEvent(new Event('input', { bubbles: true }));
+        
+        closeCalcProductSearchModal();
+        
+        // Ustaw focus na ilości
+        document.getElementById('productQuantityInput')?.focus();
+    }
+
+    // 5. Podpięcie listenerów
+    if (calcProductTrigger) calcProductTrigger.addEventListener('click', openCalcProductSearchModal);
+    if (calcProductSearchCloseBtn) calcProductSearchCloseBtn.addEventListener('click', closeCalcProductSearchModal);
+    if (calcProductSearchInput) calcProductSearchInput.addEventListener('input', populateAndFilterCalcProductList);
+
+} catch(err) {
+    console.error("Błąd inicjalizacji Modala Produktów (Kalkulator):", err);
+}
+/* ======================================================== */
+/* ✅ KONIEC: MODUŁ 5                                       */
 /* ======================================================== */
 </script> 
 
