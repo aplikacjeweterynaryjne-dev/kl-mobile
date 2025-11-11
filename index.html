@@ -2037,8 +2037,7 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
         <div id="formRowDetailsContainer" style="display: block;">
 <div class="form-row"><label for="formOpis">Nazwa siedziby stada i opis zwierzęcia</label><input type="text" id="formOpis" placeholder="Opis zwierzęcia"></div>
 <div class="form-row"><label for="formLiczba">Liczba leczonych zwierząt</label><input type="number" id="formLiczba" min="0" placeholder="0"></div>
-<div class="form-row"><label for="formRozpoznanie">Rozpoznanie / wstępne rozpoznanie</label><input type="text" id="formRozpoznanie" list="listaRozpoznan" placeholder="Wpisz lub wybierz schemat..."></div>
-    </div>      
+<div class="form-row"><label for="formRozpoznanie">Rozpoznanie / wstępne rozpoznanie</label><input type="text" id="formRozpoznanie" placeholder="Kliknij, aby wpisać/wybrać rozpoznanie..." readonly style="cursor: pointer; background: #fff;"></div> 
     <div style="display: flex; align-items: flex-end; gap: 8px; margin-bottom: 8px;">
         
         <button id="prevRow" class="btn small">◀</button>
@@ -2901,15 +2900,22 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
 </div>
 
 <div id="schemaSearchModal" class="product-search-modal" style="display: none;">
-    <div class="product-search-card">
-        <h3>Wyszukaj schemat leczenia</h3>
-        <input type="search" id="schemaSearchInput" placeholder="Wpisz nazwę rozpoznania...">
-        <div id="schemaSearchList" class="product-search-list">
-            </div>
-        <div class="form-actions" style="justify-content: flex-end;">
-            <button id="schemaSearchCloseBtn" class="btn ghost">Anuluj</button>
-        </div>
-    </div>
+    <div class="product-search-card">
+        <h3>Wpisz rozpoznanie</h3>
+        
+                <input type="search" id="schemaSearchInput" placeholder="Wpisz własny tekst lub filtruj schematy...">
+        
+                <div id="schemaSearchListContainer" style="margin-top: 10px;">
+            <label id="schemaListLabel" style="font-size: 14px; font-weight: 600; color: #555;">Dostępne schematy:</label>
+            <div id="schemaSearchList" class="product-search-list" style="max-height: 200px;">
+                            </div>
+        </div>
+        
+        <div class="form-actions" style="justify-content: space-between; margin-top: 15px;">
+            <button id="schemaSearchCloseBtn" class="btn ghost">Anuluj</button>
+                        <button id="schemaSearchSaveTextBtn" class="btn primary">Zatwierdź wpisany tekst</button>
+        </div>
+    </div>
 </div>
 <div id="archiveCardViewerModal" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.5); display: none; z-index: 10001; justify-content: center; align-items: center;">
    <div style="width: 100%; height: 100%; background: white; border-radius: 0; box-shadow: none; display: flex; flex-direction: column;">
@@ -3188,20 +3194,19 @@ for (let j=1;j<=8;j++){
         input.style.width = '95%';
         input.placeholder = 'Rozpoznanie...';
         
-        // ⬇️ MODUŁ 4 (Wersja Poprawiona): Pole jest ZAPISYWALNE ⬇️
-        input.readOnly = false;
-        input.style.cursor = 'text'; // Zwykły kursor tekstowy
+       // ⬇️ PRZYWRACAMY 'readonly' I LISTENER 'click' DLA MODALA ⬇️
+        input.readOnly = true;
+        input.style.cursor = 'pointer';
         input.style.background = '#fefefe';
 
-        // Listener do zapisu data-print-value (dla drukowania)
+        // Listener do zapisu data-print-value (dla drukowania) - zostaje
         input.addEventListener('input', function(){
             this.parentElement.dataset.printValue = this.value;
         });
 
-        // Uruchom logikę schematów przy WPISYWANIU (nie klikaniu)
-        // Funkcja applySchema sprawdzi, czy wpisany tekst pasuje do schematu
-        input.addEventListener('input', applySchema);
-        // ⬆️ KONIEC MODUŁU 4 (Wersja Poprawiona) ⬆️
+        // Otwieraj modal po kliknięciu
+        input.addEventListener('click', openSchemaSearch); 
+        // ⬆️ KONIEC PRZYWRACANIA ⬆️
         
         // ⬇️ TE LINIE BYŁY BRAKUJĄCE / W ZŁYM MIEJSCU ⬇️
         cell.textContent = '';
@@ -11794,69 +11799,110 @@ try {
     // Listenery dla Modala Produktów
     if(schemaProductSearchCloseBtn) schemaProductSearchCloseBtn.addEventListener('click', closeSchemaProductSearch);
     if(schemaProductSearchInput) schemaProductSearchInput.addEventListener('input', populateAndFilterSchemaProductList);
+// === LOGIKA DLA MODALA SCHEMATÓW (Wersja Hybrydowa) ===
+    try {
+        // Zmienne dla Modala Schematów w Karcie
+        const schemaSearchModal = document.getElementById('schemaSearchModal');
+        const schemaSearchInput = document.getElementById('schemaSearchInput');
+        const schemaSearchListContainer = document.getElementById('schemaSearchListContainer');
+        const schemaSearchList = document.getElementById('schemaSearchList');
+        const schemaSearchCloseBtn = document.getElementById('schemaSearchCloseBtn');
+        const schemaSearchSaveTextBtn = document.getElementById('schemaSearchSaveTextBtn'); // Nowy przycisk
+        let currentSchemaTargetInput = null; // Przechowuje 'input' z tabeli lub formularza
 
+        // 1. Otwieranie Modala
+        function openSchemaSearch(event) {
+            currentSchemaTargetInput = event.target; // Zapisz <input> (z tabeli lub formularza)
+            
+            // Wczytaj tekst, który już jest w polu
+            schemaSearchInput.value = currentSchemaTargetInput.value || '';
+            
+            // Sprawdź, czy "Użyj schematów" jest zaznaczone (używamy ID z modala wyboru metody)
+            if (schemaCheckbox.checked) {
+                // POKAŻ listę schematów i ją wypełnij
+                schemaSearchListContainer.style.display = 'block';
+                populateAndFilterSchemaSearchList();
+            } else {
+                // UKRYJ listę schematów
+                schemaSearchListContainer.style.display = 'none';
+                schemaSearchList.innerHTML = ''; // Wyczyść na wszelki wypadek
+            }
+            
+            schemaSearchModal.style.display = 'flex';
+            setTimeout(() => schemaSearchInput.focus(), 50);
+        }
 
-    // === LOGIKA DLA MODALA SCHEMATÓW (Fix 4, 5) ===
+        // 2. Zamykanie Modala
+        function closeSchemaSearch() {
+            schemaSearchModal.style.display = 'none';
+            currentSchemaTargetInput = null;
+        }
 
-    function openSchemaSearch(event) {
-        currentSchemaTargetInput = event.target; // Zapisz <input> (z tabeli lub formularza)
-        schemaSearchInput.value = '';
-        populateAndFilterSchemaSearchList();
-        schemaSearchModal.style.display = 'flex';
-        setTimeout(() => schemaSearchInput.focus(), 50);
-    }
+        // 3. Wypełnianie listy (jeśli jest widoczna)
+        function populateAndFilterSchemaSearchList() {
+            // Ta funkcja jest teraz wywoływana tylko, gdy checkbox jest zaznaczony
+            const filterText = schemaSearchInput.value.toLowerCase().trim();
+            schemaSearchList.innerHTML = '';
+            let foundItems = 0;
 
-    function closeSchemaSearch() {
-        schemaSearchModal.style.display = 'none';
-        currentSchemaTargetInput = null;
-    }
+            cachedSchemas.forEach(schema => {
+                if (filterText === '' || schema.rozpoznanie.toLowerCase().includes(filterText)) {
+                    const itemDiv = document.createElement('div');
+                    itemDiv.className = 'client-search-item';
+                    itemDiv.innerHTML = `<strong>${schema.rozpoznanie}</strong>`;
+                    // KLIKNIĘCIE W SCHEMAT -> ZASTOSUJ SCHEMAT
+                    itemDiv.addEventListener('click', () => selectSchemaFromModal(schema.rozpoznanie));
+                    schemaSearchList.appendChild(itemDiv);
+                    foundItems++;
+                }
+            });
+            if (foundItems === 0) schemaSearchList.innerHTML = '<div class="client-search-item" style="color: #999;">Brak pasujących schematów.</div>';
+        }
 
-    function populateAndFilterSchemaSearchList() {
-        const filterText = schemaSearchInput.value.toLowerCase().trim();
-        schemaSearchList.innerHTML = '';
-        let foundItems = 0;
+        // 4. Funkcja wyboru SCHEMATU z listy
+        function selectSchemaFromModal(rozpoznanie) {
+            if (!currentSchemaTargetInput) return;
+            currentSchemaTargetInput.value = rozpoznanie;
+            // Uruchom logikę, która wypełni tabelę produktami
+            applySchema({ target: currentSchemaTargetInput });
+            closeSchemaSearch();
+        }
 
-        // Używamy globalnej listy 'cachedSchemas'
-        cachedSchemas.forEach(schema => {
-            if (filterText === '' || schema.rozpoznanie.toLowerCase().includes(filterText)) {
-                const itemDiv = document.createElement('div');
-                itemDiv.className = 'client-search-item'; // Użyjemy tych samych styli
-                itemDiv.innerHTML = `<strong>${schema.rozpoznanie}</strong>`;
-                itemDiv.addEventListener('click', () => selectSchemaFromModal(schema.rozpoznanie));
-                schemaSearchList.appendChild(itemDiv);
-                foundItems++;
-            }
-        });
-        if (foundItems === 0) schemaSearchList.innerHTML = '<div class="client-search-item" style="color: #999;">Brak pasujących schematów.</div>';
-    }
+        // 5. NOWA funkcja zapisu WŁASNEGO TEKSTU
+        function selectCustomText() {
+            if (!currentSchemaTargetInput) return;
+            const customText = schemaSearchInput.value.trim();
+            
+            // Wpisz tekst do pola
+            currentSchemaTargetInput.value = customText;
+            
+            // Ustaw data-print-value (dla Modułu 4)
+            if (currentSchemaTargetInput.parentElement) {
+                currentSchemaTargetInput.parentElement.dataset.printValue = customText;
+            }
+            
+            // NIE wywołuj applySchema()
+            closeSchemaSearch();
+        }
 
-    function selectSchemaFromModal(rozpoznanie) {
-        if (!currentSchemaTargetInput) return;
+        // 6. Podpięcie Listenerów
+        if(schemaSearchCloseBtn) schemaSearchCloseBtn.addEventListener('click', closeSchemaSearch);
+        if(schemaSearchSaveTextBtn) schemaSearchSaveTextBtn.addEventListener('click', selectCustomText);
+        // Aktualizuj listę schematów (jeśli jest widoczna) przy każdym wpisaniu
+        if(schemaSearchInput) schemaSearchInput.addEventListener('input', () => {
+            if (schemaCheckbox.checked) {
+                populateAndFilterSchemaSearchList();
+            }
+        });
 
-        // Wpisz wybraną nazwę do inputa (w tabeli lub formularzu)
-        currentSchemaTargetInput.value = rozpoznanie;
-
-        // Ręcznie wywołaj logikę applySchema, przekazując input jako 'target'
-        // To jest "bezpieczne" wywołanie, bo ta funkcja istnieje
-        applySchema({ target: currentSchemaTargetInput });
-
-        closeSchemaSearch();
-    }
-
-    // Listenery dla Modala Schematów
-    if(schemaSearchCloseBtn) schemaSearchCloseBtn.addEventListener('click', closeSchemaSearch);
-    if(schemaSearchInput) schemaSearchInput.addEventListener('input', populateAndFilterSchemaSearchList);
-
-// Podpięcie do triggera w formularzu (Wersja Poprawiona)
-    const formRozpoznanieInput = document.getElementById('formRozpoznanie');
-    if (formRozpoznanieInput) {
-        // Uruchom logikę schematów przy WPISYWANIU (zamiast 'click')
-        formRozpoznanieInput.addEventListener('input', applySchema);
+        // Podpięcie do triggera w formularzu (formRozpoznanie)
+        const formRozpoznanieInput = document.getElementById('formRozpoznanie');
+        if (formRozpoznanieInput) {
+            formRozpoznanieInput.addEventListener('click', openSchemaSearch);
+        }
+    } catch (err) {
+        console.error("BŁĄD KRYTYCZNY w module Modali Wyszukiwania Schematów:", err);
     }
-
-} catch (err) {
-    console.error("BŁĄD KRYTYCZNY w module Modali Wyszukiwania Schematów:", err);
-}
 
 /* ======================================================== */
 /* ✅ ZAKTUALIZOWANA LOGIKA applySchema (Fix 2)               */
