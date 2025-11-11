@@ -5470,7 +5470,44 @@ if(importActionsContainer) importActionsContainer.style.display = 'flex'; // Uż
 if(loadClientsBtn) loadClientsBtn.style.display = 'none';
 if(refreshClientsBtn) refreshClientsBtn.style.display = 'inline-block';
 }
+ async function loadAndRenderSchemas() {
+        if (!currentUserProfile) return;
+        schemaListContainer.innerHTML = '<p style="text-align:center; color:#888;">Wczytywanie schematów... ⏳</p>';
 
+        try {
+            const q = db.collection("schematyLeczenia")
+                .where("lekarz_uid", "==", currentUserProfile.uid)
+                .orderBy("rozpoznanie");
+
+            const snapshot = await q.get();
+            cachedSchemas = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+            // Zbuduj mapę dla szybkiego dostępu (Klucz: nazwa rozpoznania)
+            cachedSchemaMap.clear();
+            cachedSchemas.forEach(schema => {
+                cachedSchemaMap.set(schema.rozpoznanie.toLowerCase(), schema);
+            });
+
+            renderSchemaList(cachedSchemas);
+            // ⬇️ DODAJ TĘ LINIĘ ⬇️
+            // Po wczytaniu schematów, odśwież też datalist w Karcie Leczenia
+            if (typeof refreshSchemaDatalist === 'function') {
+                refreshSchemaDatalist();
+            }
+
+            if (snapshot.empty) {
+                schemaListContainer.innerHTML = '<p style="text-align:center; color:#888;">Nie masz jeszcze żadnych zapisanych schematów. Kliknij "Dodaj nowy schemat", aby zacząć.</p>';
+            }
+
+        } catch (error) {
+            console.error("Błąd wczytywania schematów:", error);
+            schemaListContainer.innerHTML = '<p style="text-align:center; color:red;">Błąd wczytywania danych.</p>';
+            if (error.code === 'failed-precondition') {
+                alert("BŁĄD BAZY DANYCH: Wymagany jest indeks Firestore dla 'schematyLeczenia'. Sprawdź konsolę (F12).");
+                console.error("BŁĄD INDEKSU: Utwórz indeks dla 'schematyLeczenia': [lekarz_uid(ASC), rozpoznanie(ASC)]");
+            }
+        }
+    }
 /**
 * Pobiera dane klientów z Firestore, zapisuje je do cache i wywołuje renderowanie.
 */
@@ -11367,45 +11404,7 @@ try {
     }
 
     // --- 3. Wczytywanie i Renderowanie Schematów ---
-    async function loadAndRenderSchemas() {
-        if (!currentUserProfile) return;
-        schemaListContainer.innerHTML = '<p style="text-align:center; color:#888;">Wczytywanie schematów... ⏳</p>';
-
-        try {
-            const q = db.collection("schematyLeczenia")
-                .where("lekarz_uid", "==", currentUserProfile.uid)
-                .orderBy("rozpoznanie");
-
-            const snapshot = await q.get();
-            cachedSchemas = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-
-            // Zbuduj mapę dla szybkiego dostępu (Klucz: nazwa rozpoznania)
-            cachedSchemaMap.clear();
-            cachedSchemas.forEach(schema => {
-                cachedSchemaMap.set(schema.rozpoznanie.toLowerCase(), schema);
-            });
-
-            renderSchemaList(cachedSchemas);
-            // ⬇️ DODAJ TĘ LINIĘ ⬇️
-            // Po wczytaniu schematów, odśwież też datalist w Karcie Leczenia
-            if (typeof refreshSchemaDatalist === 'function') {
-                refreshSchemaDatalist();
-            }
-
-            if (snapshot.empty) {
-                schemaListContainer.innerHTML = '<p style="text-align:center; color:#888;">Nie masz jeszcze żadnych zapisanych schematów. Kliknij "Dodaj nowy schemat", aby zacząć.</p>';
-            }
-
-        } catch (error) {
-            console.error("Błąd wczytywania schematów:", error);
-            schemaListContainer.innerHTML = '<p style="text-align:center; color:red;">Błąd wczytywania danych.</p>';
-            if (error.code === 'failed-precondition') {
-                alert("BŁĄD BAZY DANYCH: Wymagany jest indeks Firestore dla 'schematyLeczenia'. Sprawdź konsolę (F12).");
-                console.error("BŁĄD INDEKSU: Utwórz indeks dla 'schematyLeczenia': [lekarz_uid(ASC), rozpoznanie(ASC)]");
-            }
-        }
-    }
-
+   
     // Funkcja do renderowania listy schematów
     function renderSchemaList(schemas) {
         schemaListContainer.innerHTML = ''; // Wyczyść
