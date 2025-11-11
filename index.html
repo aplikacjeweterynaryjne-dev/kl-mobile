@@ -2008,7 +2008,7 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
         <div id="formRowDetailsContainer" style="display: block;">
 <div class="form-row"><label for="formOpis">Nazwa siedziby stada i opis zwierzęcia</label><input type="text" id="formOpis" placeholder="Opis zwierzęcia"></div>
 <div class="form-row"><label for="formLiczba">Liczba leczonych zwierząt</label><input type="number" id="formLiczba" min="0" placeholder="0"></div>
-<div class="form-row"><label for="formRozpoznanie">Rozpoznanie / wstępne rozpoznanie</label><input type="text" id="formRozpoznanie" placeholder="Rozpoznanie"></div>
+<div class="form-row"><label for="formRozpoznanie">Rozpoznanie / wstępne rozpoznanie</label><input type="text" id="formRozpoznanie" placeholder="Kliknij, aby wybrać schemat lub wpisz..." readonly style="cursor: pointer; background: #fff;"></div>
     </div>      
     <div style="display: flex; align-items: flex-end; gap: 8px; margin-bottom: 8px;">
         
@@ -3152,20 +3152,24 @@ for (let j=1;j<=8;j++){
     }
     if (j>=2 && j<=4) cell.classList.add('center-text');
 
-    // ✅ NOWY BLOK DLA KOLUMNY 4 (ROZPOZNANIE) - WERSJA BEZPIECZNA
+   // ✅ NOWY BLOK DLA KOLUMNY 4 (ROZPOZNANIE) - WERSJA MODAL (Fix 4)
     if (j === 4 && i !== 10) {
         const input = document.createElement('input');
         input.setAttribute('list', 'listaRozpoznan');
         input.style.width = '95%';
         input.placeholder = 'Rozpoznanie...';
+        
+        // ✅ ZMIANA: Pole jest tylko do odczytu i reaguje na kliknięcie
+        input.readOnly = true;
+        input.style.cursor = 'pointer';
+        input.style.background = '#fefefe'; // Dopasuj tło do innych pól
 
-        // ✅ POPRAWKA: Użyj "proxy" funkcji.
-        input.addEventListener('input', (e) => {
-            if (typeof applySchema === 'function') {
-                applySchema(e);
+        input.addEventListener('click', (e) => {
+            if (typeof openSchemaSearch === 'function') {
+                openSchemaSearch(e); // Otwórz modal wyszukiwania schematów
             }
         }); 
-
+        
         cell.textContent = '';
         cell.appendChild(input);
     }
