@@ -5478,6 +5478,31 @@ if(refreshClientsBtn) refreshClientsBtn.style.display = 'inline-block';
  * Pobiera profil użytkownika z kolekcji 'konfiguracja' na podstawie jego UID.
  * Zapisuje dane do globalnej zmiennej 'currentUserProfile'.
  */
+  // Wczytuje rozpoznania do <datalist id="listaRozpoznan">
+    async function refreshSchemaDatalist() {
+        if (!currentUserProfile) return;
+        const datalist = document.getElementById('listaRozpoznan');
+        if (!datalist) return;
+
+        try {
+            // Pobierz tylko te schematy, które stworzył zalogowany lekarz
+            const q = db.collection("schematyLeczenia")
+                .where("lekarz_uid", "==", currentUserProfile.uid);
+
+            const snapshot = await q.get();
+            datalist.innerHTML = ''; // Wyczyść
+
+            snapshot.docs.forEach(doc => {
+                const schema = doc.data();
+                const opt = document.createElement('option');
+                opt.value = schema.rozpoznanie;
+                datalist.appendChild(opt);
+            });
+            console.log(`Wczytano ${snapshot.size} schematów do datalist.`);
+        } catch (error) {
+            console.error("Błąd wczytywania datalist schematów:", error);
+        }
+    }
 async function fetchUserProfile(uid) {
   try {
     console.log(`Pobieranie profilu dla UID: ${uid}...`);
@@ -5499,13 +5524,13 @@ async function fetchUserProfile(uid) {
     console.log("Pomyślnie pobrano profil użytkownika:", currentUserProfile);
       fetchDataFromFirebase(); // <-- Ta linia ładuje leki i klientów
 
-      // ⬇️ WKLEJ TĘ LINIĘ TUTAJ ⬇️
-      refreshSchemaDatalist(); // <-- Ta linia załaduje schematy
-      // ⬆️ KONIEC WKLEJANIA ⬆️
       
       /* ✅ DODAJ TĘ LINIĘ TUTAJ */
       fetchDataFromFirebase(); // (Tę zduplikowaną linię możesz przy okazji usunąć)
-    // ✅ POCZĄTEK: Moduł 4 - Ustawienie nazwy lecznicy w karcie leczenia
+   // ⬇️ DODAJ TĘ LINIĘ TUTAJ ⬇️
+      refreshSchemaDatalist(); // <-- Teraz jest to bezpieczne, bo funkcja jest zdefiniowana
+      // ⬆️ KONIEC DODAWANIA ⬆️
+      // ✅ POCZĄTEK: Moduł 4 - Ustawienie nazwy lecznicy w karcie leczenia
     const nazwaLecznicySpan = document.getElementById('nazwaLecznicy');
     const nazwaLecznicyZProfilu = currentUserProfile['Nazwa lecznicy'];
     if (nazwaLecznicySpan && nazwaLecznicyZProfilu) {
@@ -11640,31 +11665,7 @@ try {
 
     // --- 5. Logika Integracji z Kartą Leczenia ---
 
-    // Wczytuje rozpoznania do <datalist id="listaRozpoznan">
-    async function refreshSchemaDatalist() {
-        if (!currentUserProfile) return;
-        const datalist = document.getElementById('listaRozpoznan');
-        if (!datalist) return;
-
-        try {
-            // Pobierz tylko te schematy, które stworzył zalogowany lekarz
-            const q = db.collection("schematyLeczenia")
-                .where("lekarz_uid", "==", currentUserProfile.uid);
-
-            const snapshot = await q.get();
-            datalist.innerHTML = ''; // Wyczyść
-
-            snapshot.docs.forEach(doc => {
-                const schema = doc.data();
-                const opt = document.createElement('option');
-                opt.value = schema.rozpoznanie;
-                datalist.appendChild(opt);
-            });
-            console.log(`Wczytano ${snapshot.size} schematów do datalist.`);
-        } catch (error) {
-            console.error("Błąd wczytywania datalist schematów:", error);
-        }
-    }
+  
 
     // Główna funkcja auto-uzupełniania (podpięta do inputa w kolumnie 4)
     function applySchema(event) {
