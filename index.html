@@ -2854,11 +2854,15 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
             <button id="saveVisitBtn" type="button" class="btn primary" style="font-size: 19px;">Zapisz</button>
         </div>
     </div>
-</div> <div id="archiveCardViewerModal" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.5); display: none; z-index: 10001; justify-content: center; align-items: center;">
-    <div style="width: 100%; height: 100%; background: white; border-radius: 0; box-shadow: none; display: flex; flex-direction: column;">
-        
-        <div style="padding: 10px 15px; border-bottom: 1px solid #ccc; display: flex; justify-content: space-between; align-items: center;">
-            <h3 style="margin: 0; font-size: 20px; display: none;">Podgląd Karty Leczenia</h3>
+</div>
+<div id="archiveCardViewerModal" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.5); display: none; z-index: 10001; justify-content: center; align-items: center;">
+   <div style="width: 100%; height: 100%; background: white; border-radius: 0; box-shadow: none; display: flex; flex-direction: column;">
+<div style="padding: 10px 15px; border-bottom: 1px solid #ccc; display: flex; justify-content: space-between; align-items: center;">
+    
+<div id="archiveCardViewerModal" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.5); display: none; z-index: 10001; justify-content: center; align-items: center;">
+   <div style="width: 100%; height: 100%; background: white; border-radius: 0; box-shadow: none; display: flex; flex-direction: column;">
+<div style="padding: 10px 15px; border-bottom: 1px solid #ccc; display: flex; justify-content: space-between; align-items: center;">
+    <h3 style="margin: 0; font-size: 20px; display: none;">Podgląd Karty Leczenia</h3>
             <div>
                 <button id="archivePrintBtn" class="btn small">Drukuj / PDF</button>
                 <button id="archiveCloseBtn" class="btn warn small" style="margin-left: 10px;">Zamknij</button>
@@ -3114,33 +3118,13 @@ openFormAtRow(logicalIndex);
 cell.appendChild(btn);
 }
 // Ustaw contentEditable TYLKO dla komórek, które NIE mają własnego inputa
-// j=3 (Liczba), j=4 (Rozpoznanie), j=5 (Produkt), j=7 (Ilość) będą miały inputy
-if (i !== 10 && j !== 3 && j !== 4 && j !== 5 && j !== 7) { // ✅ ZMIANA: Dodano j !== 4
-    cell.contentEditable = true;
+// j=3 (Liczba), j=5 (Nazwa produktu), j=7 (Ilość) będą miały inputy, więc je pomijamy
+if (i !== 10 && j !== 3 && j !== 5 && j !== 7) {
+    cell.contentEditable = true;
 }
 if (j>=2 && j<=4) cell.classList.add('center-text');
-
-// ✅ NOWY BLOK DLA KOLUMNY 4 (ROZPOZNANIE) - WERSJA BEZPIECZNA
-if (j === 4 && i !== 10) {
-    const input = document.createElement('input');
-    input.setAttribute('list', 'listaRozpoznan');
-    input.style.width = '95%';
-    input.placeholder = 'Rozpoznanie...';
-    
-    // ✅ POPRAWKA: Użyj "proxy" funkcji.
-    // Ta funkcja jest zdefiniowana tutaj i wywoła 'applySchema'
-    // dopiero gdy skrypt 2 (po zalogowaniu) ją zdefiniuje.
-    input.addEventListener('input', (e) => {
-        if (typeof applySchema === 'function') {
-            applySchema(e);
-        }
-    }); 
-    
-    cell.textContent = '';
-    cell.appendChild(input);
-}
 // kolumna 3 -> number input
-if (j===3 && i!==10){{
+if (j===3 && i!==10){
 const input = document.createElement('input');
 input.type = 'number';
 input.min = '0';
@@ -4450,14 +4434,12 @@ if (archiwumKartySection) archiwumKartySection.style.display = 'none'; // ✅ DO
 if (archiwumParagonySection) archiwumParagonySection.style.display = 'none'; // ✅ DODANE
 if (raportySection) raportySection.style.display = 'none';
 if (kalendarzWizytSection) kalendarzWizytSection.style.display = 'none'; // ✅ DODANA LINIA
-if (bazaSchematowSection) bazaSchematowSection.style.display = 'none'; // <-- ✅ DODAJ TĘ LINIĘ
 // Odznacz wszystkie przyciski
   if (tabKartaBtn) tabKartaBtn.classList.remove('primary');
   if (tabKalkulatorBtn) tabKalkulatorBtn.classList.remove('primary');
   if (tabBazaKlientowBtn) tabBazaKlientowBtn.classList.remove('primary'); 
   if (tabBazaProduktowBtn) tabBazaProduktowBtn.classList.remove('primary'); 
   if (tabKalendarzBtn) tabKalendarzBtn.classList.remove('primary'); // ✅ DODANA LINIA
-    if (tabSchematyLeczeniaBtn) tabSchematyLeczeniaBtn.classList.remove('primary'); // <-- ✅ DODAJ TĘ LINIĘ
 // (Nie musimy odznaczać tabKonfiguracjaBtn ani tabArchiwumBtn, bo je usunęliśmy)
 
  if (sectionToShow === 'karta' && kartaSection) {
@@ -4578,13 +4560,7 @@ loadArchiveReceiptUsers();
       if (tabKalendarzBtn) tabKalendarzBtn.classList.add('primary');
       onShowKalendarz(); // Wywołaj funkcję startową
   }
-    else if (sectionToShow === 'bazaSchematow' && bazaSchematowSection) {
-      bazaSchematowSection.style.display = 'block';
-      if (tabSchematyLeczeniaBtn) tabSchematyLeczeniaBtn.classList.add('primary');
-      onShowBazaLeczenia(); // Wywołaj funkcję startową
-  }
   // ⬆️ ⬆️ ⬆️ KONIEC NOWEGO BLOKU ⬆️ ⬆️ ⬆️
-
   }
 
 if (tabKartaBtn && tabKalkulatorBtn) {
@@ -5431,7 +5407,6 @@ async function fetchUserProfile(uid) {
     console.log("Pomyślnie pobrano profil użytkownika:", currentUserProfile);
       /* ✅ DODAJ TĘ LINIĘ TUTAJ */
     fetchDataFromFirebase(); // <-- URUCHAMIAMY POBIERANIE DANYCH DOPIERO TERAZ
-    refreshSchemaDatalist(); // <-- ✅ DODAJ TĘ LINIĘ (Wczytaj schematy do datalist)
     // ✅ POCZĄTEK: Moduł 4 - Ustawienie nazwy lecznicy w karcie leczenia
     const nazwaLecznicySpan = document.getElementById('nazwaLecznicy');
     const nazwaLecznicyZProfilu = currentUserProfile['Nazwa lecznicy'];
@@ -8774,27 +8749,7 @@ let calendarUsersLoaded = false;
 let currentMonthView = new Date(); // Data do śledzenia widoku miesiąca
 let allFetchedVisits = []; // Cache na wizyty
 let currentVisitClientData = null; // Przechowuje dane klienta dla formularza
-// --- 1. Zmienne globalne Bazy Schematów ---
-const bazaSchematowSection = document.getElementById('bazaSchematowSection');
-const menuSchematyLeczeniaBtn = document.getElementById('menuSchematyLeczeniaBtn');
-const tabSchematyLeczeniaBtn = document.getElementById('tabSchematyLeczeniaBtn');
-const loadSchemasBtn = document.getElementById('loadSchemasBtn');
-const addNewSchemaBtn = document.getElementById('addNewSchemaBtn');
-const schemaListContainer = document.getElementById('schemaListContainer');
-const schemaCheckbox = document.getElementById('schemaCheckbox');
 
-// Zmienne Modala Schematu
-const schemaFormModal = document.getElementById('schemaFormModal');
-const schemaFormTitle = document.getElementById('schemaFormTitle');
-const schemaFormDocId = document.getElementById('schemaFormDocId');
-const schemaFormRozpoznanie = document.getElementById('schemaFormRozpoznanie');
-const schemaProductList = document.getElementById('schemaProductList');
-const addSchemaProductLineBtn = document.getElementById('addSchemaProductLineBtn');
-const cancelSchemaForm = document.getElementById('cancelSchemaForm');
-const saveSchemaBtn = document.getElementById('saveSchemaBtn');
-
-let cachedSchemas = []; // Cache na wczytane schematy
-let cachedSchemaMap = new Map(); // Mapa dla szybkiego dostępu (Rozpoznanie -> Schema)
 // --- 1. Podpięcie do Menu i showSection ---
 
 // Zmodyfikuj istniejący listener przycisku w menu
@@ -10646,431 +10601,6 @@ try {
 }
 /* ======================================================== */
 /* ✅ KONIEC: LOGIKA KALENDARZA WIZYT                         */
-/* ======================================================== */
-/* ======================================================== */
-/* ✅ POCZĄTEK: LOGIKA BAZY LECZENIA (SCHEMATÓW)              */
-/* ======================================================== */
-try {
-    // --- 1. Podpięcie do Menu i Nawigacji ---
-    if (menuSchematyLeczeniaBtn) {
-        menuSchematyLeczeniaBtn.addEventListener('click', () => showSection('bazaSchematow'));
-    }
-    if (tabSchematyLeczeniaBtn) {
-        tabSchematyLeczeniaBtn.addEventListener('click', () => {
-            if (typeof confirmOnTabChange === 'function' && !confirmOnTabChange()) return;
-            showSection('bazaSchematow');
-        });
-    }
-
-    // --- 2. Funkcja Startowa ---
-    function onShowBazaLeczenia() {
-        // Uruchom ładowanie tylko jeśli cache jest pusty
-        if (cachedSchemas.length === 0) {
-            loadAndRenderSchemas();
-        }
-    }
-
-    if (loadSchemasBtn) {
-        loadSchemasBtn.addEventListener('click', loadAndRenderSchemas);
-    }
-
-    // --- 3. Wczytywanie i Renderowanie Schematów ---
-    async function loadAndRenderSchemas() {
-        if (!currentUserProfile) return;
-        schemaListContainer.innerHTML = '<p style="text-align:center; color:#888;">Wczytywanie schematów... ⏳</p>';
-        
-        try {
-            const q = db.collection("schematyLeczenia")
-                .where("lekarz_uid", "==", currentUserProfile.uid)
-                .orderBy("rozpoznanie");
-
-            const snapshot = await q.get();
-            cachedSchemas = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            
-            // Zbuduj mapę dla szybkiego dostępu (Klucz: nazwa rozpoznania)
-            cachedSchemaMap.clear();
-            cachedSchemas.forEach(schema => {
-                cachedSchemaMap.set(schema.rozpoznanie.toLowerCase(), schema);
-            });
-
-            renderSchemaList(cachedSchemas);
-            
-            if (snapshot.empty) {
-                schemaListContainer.innerHTML = '<p style="text-align:center; color:#888;">Nie masz jeszcze żadnych zapisanych schematów. Kliknij "Dodaj nowy schemat", aby zacząć.</p>';
-            }
-
-        } catch (error) {
-            console.error("Błąd wczytywania schematów:", error);
-            schemaListContainer.innerHTML = '<p style="text-align:center; color:red;">Błąd wczytywania danych.</p>';
-            if (error.code === 'failed-precondition') {
-                alert("BŁĄD BAZY DANYCH: Wymagany jest indeks Firestore dla 'schematyLeczenia'. Sprawdź konsolę (F12).");
-                console.error("BŁĄD INDEKSU: Utwórz indeks dla 'schematyLeczenia': [lekarz_uid(ASC), rozpoznanie(ASC)]");
-            }
-        }
-    }
-
-    // Funkcja do renderowania listy schematów
-    function renderSchemaList(schemas) {
-        schemaListContainer.innerHTML = ''; // Wyczyść
-        schemas.forEach(schema => {
-            const div = document.createElement('div');
-            div.className = 'schema-item';
-            
-            let productsHtml = `
-                <table class="schema-products-table">
-                    <thead>
-                        <tr>
-                            <th>Wiersz</th>
-                            <th>Produkt</th>
-                            <th>Ilość/Dawka</th>
-                            <th>Karencja</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-            `;
-            
-            (schema.produkty || []).sort((a,b) => a.wierszDocelowy - b.wierszDocelowy).forEach(p => {
-                // Konwertuj indeks wiersza na czytelną nazwę
-                let wierszNazwa = `Lecz. ${p.wierszDocelowy + 1}`;
-                if (p.wierszDocelowy >= 9) {
-                    wierszNazwa = `Zost. ${p.wierszDocelowy - 8}`;
-                }
-
-                productsHtml += `
-                    <tr>
-                        <td>${wierszNazwa}</td>
-                        <td>${p.produkt}</td>
-                        <td>${p.iloscDawka}</td>
-                        <td>${p.karencja}</td>
-                    </tr>
-                `;
-            });
-            productsHtml += '</tbody></table>';
-
-            div.innerHTML = `
-                <div class="schema-header">
-                    <h4>${schema.rozpoznanie}</h4>
-                    <div>
-                        <button class="btn small btn-edit-schema" data-id="${schema.id}">Edytuj</button>
-                        <button class="btn warn small btn-delete-schema" data-id="${schema.id}" style="margin-left: 5px;">Usuń</button>
-                    </div>
-                </div>
-                <div class="schema-products">${productsHtml}</div>
-            `;
-            schemaListContainer.appendChild(div);
-        });
-    }
-
-    // --- 4. Logika Modala Schematu (CRUD) ---
-
-    // Otwórz pusty modal
-    if (addNewSchemaBtn) {
-        addNewSchemaBtn.addEventListener('click', () => {
-            openSchemaModal(); // Otwórz bez danych (tryb dodawania)
-        });
-    }
-
-    // Delegacja zdarzeń dla Edycji/Usuwania
-    schemaListContainer.addEventListener('click', (e) => {
-        if (e.target.classList.contains('btn-edit-schema')) {
-            const schemaId = e.target.dataset.id;
-            const schemaData = cachedSchemas.find(s => s.id === schemaId);
-            if (schemaData) {
-                openSchemaModal(schemaData); // Otwórz z danymi (tryb edycji)
-            }
-        }
-        if (e.target.classList.contains('btn-delete-schema')) {
-            const schemaId = e.target.dataset.id;
-            if (confirm("Czy na pewno chcesz usunąć ten schemat?")) {
-                deleteSchema(schemaId);
-            }
-        }
-    });
-
-    // Funkcja otwierająca Modal (nowy lub do edycji)
-    function openSchemaModal(schemaData = null) {
-        schemaProductList.innerHTML = ''; // Wyczyść listę produktów
-        
-        if (schemaData) {
-            // Tryb Edycji
-            schemaFormTitle.textContent = "Edytuj Schemat";
-            schemaFormDocId.value = schemaData.id;
-            schemaFormRozpoznanie.value = schemaData.rozpoznanie;
-            
-            // Wypełnij istniejące produkty
-            (schemaData.produkty || []).forEach(p => {
-                addSchemaProductLine(p); // Wypełnij linię danymi
-            });
-        } else {
-            // Tryb Dodawania
-            schemaFormTitle.textContent = "Nowy Schemat";
-            schemaFormDocId.value = '';
-            schemaFormRozpoznanie.value = '';
-            addSchemaProductLine(); // Dodaj jedną pustą linię na start
-        }
-        schemaFormModal.style.display = 'flex';
-    }
-
-    // Anuluj
-    if (cancelSchemaForm) {
-        cancelSchemaForm.addEventListener('click', () => {
-            schemaFormModal.style.display = 'none';
-        });
-    }
-
-    // Dodaj nową (pustą) linię produktu do formularza
-    if (addSchemaProductLineBtn) {
-        addSchemaProductLineBtn.addEventListener('click', () => {
-            addSchemaProductLine(); // Dodaj pustą
-        });
-    }
-
-    // Funkcja dynamicznie tworząca wiersz produktu w formularzu
-    function addSchemaProductLine(productData = null) {
-        const lineDiv = document.createElement('div');
-        lineDiv.className = 'schema-product-line';
-        
-        lineDiv.innerHTML = `
-            <button type="button" class="btn-remove-line" title="Usuń tę linię">X</button>
-            
-            <div class="col-full">
-                <label>Produkt leczniczy</label>
-                <input type="text" class="schema-produkt" list="listaLekow" value="${productData ? productData.produkt : ''}">
-            </div>
-            
-            <div class="col-full">
-                <label>Ilość / Dawkowanie (np. "1 ml/10 kg")</label>
-                <input type="text" class="schema-ilosc" value="${productData ? productData.iloscDawka : ''}">
-            </div>
-
-            <div>
-                <label>Karencja</label>
-                <input type="text" class="schema-karencja" value="${productData ? productData.karencja : ''}">
-            </div>
-            
-            <div>
-                <label>Wiersz w karcie (1-9 lub Z1-Z3)</label>
-                <select class="schema-wiersz">
-                    <option value="0">Leczenie 1</option>
-                    <option value="1">Leczenie 2</option>
-                    <option value="2">Leczenie 3</option>
-                    <option value="3">Leczenie 4</option>
-                    <option value="4">Leczenie 5</option>
-                    <option value="5">Leczenie 6</option>
-                    <option value="6">Leczenie 7</option>
-                    <option value="7">Leczenie 8</option>
-                    <option value="8">Leczenie 9</option>
-                    <option value="9">Zostawione 1</option>
-                    <option value="10">Zostawione 2</option>
-                    <option value="11">Zostawione 3</option>
-                </select>
-            </div>
-        `;
-        
-        // Ustaw domyślną wartość <select>
-        if (productData) {
-            lineDiv.querySelector('.schema-wiersz').value = productData.wierszDocelowy;
-        }
-
-        // Auto-uzupełnianie karencji przy wyborze produktu
-        lineDiv.querySelector('.schema-produkt').addEventListener('input', function(e) {
-            const nazwa = e.target.value;
-            const karencjaInput = lineDiv.querySelector('.schema-karencja');
-            const iloscInput = lineDiv.querySelector('.schema-ilosc');
-            // Używamy globalnych map zdefiniowanych dla Karty Leczenia
-            if (karencjaInput && typeof mapaKarencji !== 'undefined') {
-                karencjaInput.value = mapaKarencji[nazwa] || '';
-            }
-            if (iloscInput && typeof mapaIlosci !== 'undefined') {
-                iloscInput.value = mapaIlosci[nazwa] || '';
-            }
-        });
-
-        // Logika usuwania linii
-        lineDiv.querySelector('.btn-remove-line').addEventListener('click', (e) => {
-            e.target.parentElement.remove();
-        });
-
-        schemaProductList.appendChild(lineDiv);
-    }
-
-    // Zapisywanie Schematu
-    if (saveSchemaBtn) {
-        saveSchemaBtn.addEventListener('click', async () => {
-            const rozpoznanie = schemaFormRozpoznanie.value.trim();
-            if (!rozpoznanie) {
-                alert("Rozpoznanie (nazwa schematu) jest wymagane.");
-                return;
-            }
-
-            const docId = schemaFormDocId.value;
-            const produktyArray = [];
-            const productLines = schemaProductList.querySelectorAll('.schema-product-line');
-
-            productLines.forEach(line => {
-                const produkt = line.querySelector('.schema-produkt').value.trim();
-                // Zapisuj tylko jeśli jest nazwa produktu
-                if (produkt) {
-                    produktyArray.push({
-                        produkt: produkt,
-                        seria: "", // Seria jest dynamiczna, nie zapisujemy jej w schemacie
-                        iloscDawka: line.querySelector('.schema-ilosc').value.trim(),
-                        karencja: line.querySelector('.schema-karencja').value.trim(),
-                        wierszDocelowy: parseInt(line.querySelector('.schema-wiersz').value, 10)
-                    });
-                }
-            });
-
-            if (produktyArray.length === 0) {
-                alert("Musisz dodać przynajmniej jeden produkt do schematu.");
-                return;
-            }
-
-            const schemaData = {
-                lekarz_uid: currentUserProfile.uid,
-                id_lecznicy: currentUserProfile['ID lecznicy'],
-                rozpoznanie: rozpoznanie,
-                produkty: produktyArray
-            };
-
-            saveSchemaBtn.disabled = true;
-            saveSchemaBtn.textContent = 'Zapisywanie...';
-
-            try {
-                if (docId) {
-                    // Edycja
-                    await db.collection('schematyLeczenia').doc(docId).update(schemaData);
-                    showToast("Schemat zaktualizowany.", "success");
-                } else {
-                    // Dodawanie
-                    await db.collection('schematyLeczenia').add(schemaData);
-                    showToast("Nowy schemat zapisany.", "success");
-                }
-                schemaFormModal.style.display = 'none';
-                loadAndRenderSchemas(); // Odśwież listę w tle
-                refreshSchemaDatalist(); // Odśwież datalist w Karcie Leczenia
-            } catch (error) {
-                console.error("Błąd zapisu schematu:", error);
-                alert("Wystąpił błąd podczas zapisu.");
-            } finally {
-                saveSchemaBtn.disabled = false;
-                saveSchemaBtn.textContent = 'Zapisz Schemat';
-            }
-        });
-    }
-
-    // Usuwanie Schematu
-    async function deleteSchema(docId) {
-        try {
-            await db.collection('schematyLeczenia').doc(docId).delete();
-            showToast("Schemat usunięty.", "success");
-            loadAndRenderSchemas(); // Odśwież listę
-            refreshSchemaDatalist(); // Odśwież datalist
-        } catch (error) {
-            console.error("Błąd usuwania schematu:", error);
-            alert("Błąd usuwania schematu.");
-        }
-    }
-
-    // --- 5. Logika Integracji z Kartą Leczenia ---
-
-    // Wczytuje rozpoznania do <datalist id="listaRozpoznan">
-    async function refreshSchemaDatalist() {
-        if (!currentUserProfile) return;
-        const datalist = document.getElementById('listaRozpoznan');
-        if (!datalist) return;
-
-        try {
-            // Pobierz tylko te schematy, które stworzył zalogowany lekarz
-            const q = db.collection("schematyLeczenia")
-                .where("lekarz_uid", "==", currentUserProfile.uid);
-            
-            const snapshot = await q.get();
-            datalist.innerHTML = ''; // Wyczyść
-            
-            snapshot.docs.forEach(doc => {
-                const schema = doc.data();
-                const opt = document.createElement('option');
-                opt.value = schema.rozpoznanie;
-                datalist.appendChild(opt);
-            });
-            console.log(`Wczytano ${snapshot.size} schematów do datalist.`);
-        } catch (error) {
-            console.error("Błąd wczytywania datalist schematów:", error);
-        }
-    }
-
-    // Główna funkcja auto-uzupełniania (podpięta do inputa w kolumnie 4)
-    function applySchema(event) {
-        const input = event.target;
-        const rozpoznanie = input.value.trim().toLowerCase();
-        
-        // 1. Sprawdź, czy checkbox "Użyj schematów" jest zaznaczony
-        if (!schemaCheckbox || !schemaCheckbox.checked) {
-            return; // Nie rób nic, jeśli odznaczone
-        }
-
-        // 2. Sprawdź, czy wpisana nazwa pasuje do schematu w mapie
-        const schema = cachedSchemaMap.get(rozpoznanie);
-        if (!schema) {
-            return; // Brak schematu, pozwól użytkownikowi pisać dalej
-        }
-
-        // 3. Mamy schemat! Rozpocznij wypełnianie tabeli
-        console.log("Znaleziono pasujący schemat:", schema.rozpoznanie);
-        
-        // Pobierz wszystkie edytowalne wiersze z tabeli
-        const logicalRows = rowsEditable(); 
-        if (logicalRows.length === 0) return;
-
-        schema.produkty.forEach(p => {
-            const targetRowIndex = p.wierszDocelowy;
-            
-            // Upewnij się, że wiersz istnieje (0-11)
-            if (targetRowIndex >= 0 && targetRowIndex < logicalRows.length) {
-                const row = logicalRows[targetRowIndex];
-                
-                try {
-                    // Wypełnij komórki, symulując wybór produktu
-                    const produktInput = row.cells[4].querySelector('input');
-                    const iloscInput = row.cells[6].querySelector('input');
-
-                    produktInput.value = p.produkt;
-                    produktInput.dispatchEvent(new Event('input', { bubbles: true })); // Odpal logikę (wypełni serie/karencje jeśli są w bazie LEKÓW)
-                    
-                    // Schemat ma priorytet - nadpisz dane z bazy leków
-                    row.cells[5].textContent = p.seria; // Seria (ze schematu, zwykle pusta)
-                    if (iloscInput) {
-                        // Wpisz tylko część liczbową, jeśli jest (np. "1")
-                        const iloscMatch = p.iloscDawka.match(/^[\d,.]+/);
-                        iloscInput.value = iloscMatch ? iloscMatch[0] : '';
-                    }
-                    // Wpisz tekst dawkowania (np. "ml/kg")
-                    const dawkaText = p.iloscDawka.replace(/^[\d,.]+/, '').trim();
-                    const textNode = row.cells[6].childNodes[1]; // Znajdź węzeł tekstowy
-                    if (textNode && textNode.nodeType === Node.TEXT_NODE) {
-                        textNode.textContent = ' ' + dawkaText;
-                    }
-
-                    row.cells[7].textContent = p.karencja; // Karencja (ze schematu)
-                    
-                    // Ustaw wartość do druku (bardzo ważne)
-                    row.cells[4].dataset.printValue = p.produkt;
-
-                } catch (e) {
-                    console.error(`Błąd podczas wypełniania wiersza ${targetRowIndex} ze schematu:`, e);
-                }
-            }
-        });
-
-        showToast(`Zastosowano schemat: ${schema.rozpoznanie}`, 'success');
-    }
-
-} catch (err) {
-    console.error("BŁĄD KRYTYCZNY w module Bazy Schematów:", err);
-}
-/* ======================================================== */
-/* ✅ KONIEC: LOGIKA BAZY LECZENIA (SCHEMATÓW)                */
 /* ======================================================== */
 </script> 
 
