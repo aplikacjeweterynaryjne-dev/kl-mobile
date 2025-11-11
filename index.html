@@ -447,27 +447,6 @@ th, td {
 }
 
 /* ⬇️ KROK 2: WKLEJ TEN NOWY BLOK ⬇️ */
-/* ⬇️ MODUŁ 4: WKLEJ TEN NOWY BLOK ⬇️ */
-/* Logika drukowania dla komórki rozpoznania (to jest 4-ta kolumna) */
-#karta tbody tr td:nth-child(4) {
-    position: relative; 
-    /* Tekst w tej komórce ma być wyśrodkowany */
-    text-align: center; 
-}
-/* 1. Ukryj input rozpoznania podczas drukowania */
-#karta tbody tr td:nth-child(4) input {
-    display: none !important;
-}
-/* 2. Pokaż zawartość z data-print-value jako tekst, który może się łamać */
-#karta tbody tr td:nth-child(4)::after {
-    content: attr(data-print-value);
-    white-space: normal; /* Pozwól tekstowi się łamać */
-    word-break: break-word; /* Wymuś łamanie */
-    display: block;
-    width: 100%;
-    text-align: center; /* Zachowaj wyśrodkowanie z komórki */
-}
-/* ⬆️ KONIEC MODUŁU 4 ⬆️ */
 /* Logika drukowania dla komórki produktu (to jest 5-ta kolumna) */
 #karta tbody tr td:nth-child(5) {
     position: relative; 
@@ -3213,10 +3192,7 @@ for (let j=1;j<=8;j++){
         input.readOnly = true;
         input.style.cursor = 'pointer';
         input.style.background = '#fefefe'; // Dopasuj tło do innych pól
-        // MODUŁ 4: Zapisuj wartość do data-print-value przy każdej zmianie
-        input.addEventListener('input', function(){
-            this.parentElement.dataset.printValue = this.value;
-        });
+
         input.addEventListener('click', (e) => {
             if (typeof openSchemaSearch === 'function') {
                 openSchemaSearch(e); // Otwórz modal wyszukiwania schematów
@@ -3552,9 +3528,7 @@ if (!row) return;
 row.cells[1].textContent = document.getElementById('formOpis').value;
 const inp2 = row.cells[2].querySelector('input');
 if (inp2) inp2.value = document.getElementById('formLiczba').value;
-const rozpoznanieValue = document.getElementById('formRozpoznanie').value;
-row.cells[3].textContent = rozpoznanieValue;
-row.cells[3].dataset.printValue = rozpoznanieValue; // MODUŁ 4
+row.cells[3].textContent = document.getElementById('formRozpoznanie').value;
 const produktInput = row.cells[4].querySelector('input');
 if (produktInput) {
     const lekName = document.getElementById('formLek').value; // ⬅️ NOWA LINIA
@@ -11889,140 +11863,113 @@ try {
 } catch (err) {
     console.error("BŁĄD KRYTYCZNY w module Modali Wyszukiwania Schematów:", err);
 }
+
 /* ======================================================== */
-/* ✅ POCZĄTEK: MODUŁ 2 + MODUŁ 4 (Wersja połączona)         */
+/* ✅ ZAKTUALIZOWANA LOGIKA applySchema (Fix 2)               */
 /* ======================================================== */
+
+// ZASTĘPUJEMY starą funkcję 'applySchema' tą nową,
+// aby poprawnie czytała 'ilosc' i 'dawkowanie'
+
 /**
- * Główna funkcja auto-uzupełniania (podpięta do inputa w kolumnie 4)
- * WERSJA ZMODYFIKOWANA (Fix 2 + Moduł 2 + Moduł 4)
- */
+ * Główna funkcja auto-uzupełniania (podpięta do inputa w kolumnie 4)
+ * WERSJA ZMODYFIKOWANA (Fix 2)
+ */
 function applySchema(event) {
-    const input = event.target;
-    const rozpoznanie = input.value.trim().toLowerCase();
+    const input = event.target;
+    const rozpoznanie = input.value.trim().toLowerCase();
 
-    // 1. Sprawdź, czy checkbox "Użyj schematów" jest zaznaczony
-    if (!schemaCheckbox || !schemaCheckbox.checked) {
-        return; // Nie rób nic, jeśli odznaczone
-    }
+    // 1. Sprawdź, czy checkbox "Użyj schematów" jest zaznaczony
+    if (!schemaCheckbox || !schemaCheckbox.checked) {
+        return; // Nie rób nic, jeśli odznaczone
+    }
 
-    // 2. Sprawdź, czy wpisana nazwa pasuje do schematu w mapie
-    const schema = cachedSchemaMap.get(rozpoznanie);
-    if (!schema) {
-        return; // Brak schematu, pozwól użytkownikowi pisać dalej
-    }
+    // 2. Sprawdź, czy wpisana nazwa pasuje do schematu w mapie
+    const schema = cachedSchemaMap.get(rozpoznanie);
+    if (!schema) {
+        return; // Brak schematu, pozwól użytkownikowi pisać dalej
+    }
 
-    // 3. Mamy schemat! Rozpocznij wypełnianie tabeli
-    console.log("Znaleziono pasujący schemat:", schema.rozpoznanie);
+    // 3. Mamy schemat! Rozpocznij wypełnianie tabeli
+    console.log("Znaleziono pasujący schemat:", schema.rozpoznanie);
 
-    // Sprawdź, czy jesteśmy w formularzu (Fix 5)
-    const inFormModal = input.id === 'formRozpoznanie';
+    // Sprawdź, czy jesteśmy w formularzu (Fix 5)
+    const inFormModal = input.id === 'formRozpoznanie';
 
-    if (inFormModal) {
-        // JESTEŚMY W FORMULARZU KROKOWYM
-        const sel = formRowSelect;
-        const currentLogicalIndex = parseInt(sel.value, 10);
+    if (inFormModal) {
+        // JESTEŚMY W FORMULARZU KROKOWYM
+        const sel = formRowSelect;
+        const currentLogicalIndex = parseInt(sel.value, 10);
 
-        schema.produkty.forEach(p => {
-            // Znajdź docelowy indeks wiersza ze schematu
-            const targetRowIndex = p.wierszDocelowy;
+        schema.produkty.forEach(p => {
+            // Znajdź docelowy indeks wiersza ze schematu
+            const targetRowIndex = p.wierszDocelowy;
 
-            // Wypełnij pola formularza *tylko* jeśli schemat dotyczy
-            // aktualnie wybranego wiersza w formularzu
-            if (targetRowIndex === currentLogicalIndex) {
-                try {
-                    // --- MODUŁ 2: Logika kompatybilności ---
-                    let ilosc = p.ilosc || '';
-                    let dawkowanie = p.dawkowanie || '';
-                    // Sprawdź stary format 'iloscDawka'
-                    if (!ilosc && !dawkowanie && p.iloscDawka) {
-                        const iloscMatch = p.iloscDawka.match(/^[\d,.]+/);
-                        ilosc = iloscMatch ? iloscMatch[0] : '';
-                        dawkowanie = p.iloscDawka.replace(/^[\d,.]+/, '').trim();
-                    }
-                    // --- Koniec logiki ---
+            // Wypełnij pola formularza *tylko* jeśli schemat dotyczy
+            // aktualnie wybranego wiersza w formularzu
+            if (targetRowIndex === currentLogicalIndex) {
+                try {
+                    document.getElementById('formLek').value = p.produkt;
+                    document.getElementById('formSeria').value = p.seria || '';
+                    document.getElementById('formIlosc').value = p.ilosc || '';
+                    document.getElementById('formDawkowanie').value = p.dawkowanie || '';
+                    document.getElementById('formKarencja').value = p.karencja || '';
+                } catch (e) {
+                     console.error(`Błąd wypełniania formularza ze schematu:`, e);
+                }
+            }
+        });
 
-                    document.getElementById('formLek').value = p.produkt;
-                    document.getElementById('formSeria').value = p.seria || '';
-                    document.getElementById('formIlosc').value = ilosc;
-                    document.getElementById('formDawkowanie').value = dawkowanie;
-                    document.getElementById('formKarencja').value = p.karencja || '';
+    } else {
+        // JESTEŚMY W GŁÓWNEJ TABELI (Fix 4)
+        const logicalRows = rowsEditable(); 
+        if (logicalRows.length === 0) return;
 
-                    // ⬇️ MODUŁ 4: Ustaw data-print-value w formularzu ⬇️
-                    if (input && input.parentElement) {
-                        input.parentElement.dataset.printValue = input.value;
-                    }
-                    // ⬆️ KONIEC MODUŁU 4 ⬆️
+        schema.produkty.forEach(p => {
+            const targetRowIndex = p.wierszDocelowy;
 
-                } catch (e) {
-                     console.error(`Błąd wypełniania formularza ze schematu:`, e);
-                }
-            }
-        });
+            if (targetRowIndex >= 0 && targetRowIndex < logicalRows.length) {
+                const row = logicalRows[targetRowIndex];
 
-    } else {
-        // JESTEŚMY W GŁÓWNEJ TABELI (Fix 4)
-        const logicalRows = rowsEditable(); 
-        if (logicalRows.length === 0) return;
+                try {
+                    // Wypełnij komórki, symulując wybór produktu
+                    const produktInput = row.cells[4].querySelector('input');
+                    const iloscInput = row.cells[6].querySelector('input');
 
-        schema.produkty.forEach(p => {
-            const targetRowIndex = p.wierszDocelowy;
+                    produktInput.value = p.produkt;
+                    // Odpalenie 'input' nie jest już potrzebne, bo schemat ma wszystkie dane
+                    // produktInput.dispatchEvent(new Event('input', { bubbles: true })); 
 
-            if (targetRowIndex >= 0 && targetRowIndex < logicalRows.length) {
-                const row = logicalRows[targetRowIndex];
+                    // Schemat ma priorytet
+                    row.cells[5].textContent = p.seria || ''; // Seria
+                    if (iloscInput) {
+                        iloscInput.value = p.ilosc || ''; // ✅ FIX 2
+                    }
 
-                try {
-                    // Wypełnij komórki, symulując wybór produktu
-                    const produktInput = row.cells[4].querySelector('input');
-                    const iloscInput = row.cells[6].querySelector('input');
+                    const dawkaText = p.dawkowanie || ''; // ✅ FIX 2
+                    const textNode = row.cells[6].childNodes[1]; 
+                    if (textNode && textNode.nodeType === Node.TEXT_NODE) {
+                        textNode.textContent = ' ' + dawkaText;
+                    } else if (dawkaText) {
+                        row.cells[6].appendChild(document.createTextNode(' ' + dawkaText));
+                    }
 
-                    produktInput.value = p.produkt;
-                    
-                    // --- MODUŁ 2: Logika kompatybilności ---
-                    let ilosc = p.ilosc || '';
-                    let dawkowanie = p.dawkowanie || '';
-                    if (!ilosc && !dawkowanie && p.iloscDawka) {
-                        const iloscMatch = p.iloscDawka.match(/^[\d,.]+/);
-                        ilosc = iloscMatch ? iloscMatch[0] : '';
-                        dawkowanie = p.iloscDawka.replace(/^[\d,.]+/, '').trim();
-                    }
-                    // --- Koniec logiki ---
+                    row.cells[7].textContent = p.karencja || ''; // Karencja
 
-                    row.cells[5].textContent = p.seria || ''; // Seria
-                    if (iloscInput) {
-                        iloscInput.value = ilosc;
-                    }
+                    row.cells[4].dataset.printValue = p.produkt;
 
-                    const dawkaText = dawkowanie;
-                    const textNode = row.cells[6].childNodes[1]; 
-                    if (textNode && textNode.nodeType === Node.TEXT_NODE) {
-                        textNode.textContent = ' ' + dawkaText;
-                    } else if (dawkaText) {
-                        row.cells[6].appendChild(document.createTextNode(' ' + dawkaText));
-        _**[... code for catch block ...]**_         }
+                } catch (e) {
+                    console.error(`Błąd podczas wypełniania wiersza ${targetRowIndex} ze schematu:`, e);
+                }
+            }
+        });
+    }
 
-                    row.cells[7].textContent = p.karencja || ''; // Karencja
-                    row.cells[4].dataset.printValue = p.produkt;
-
-                    // ⬇️ MODUŁ 4: Ustaw data-print-value dla rozpoznania ⬇️
-                    // 'input' to input rozpoznania, który wywołał zdarzenie
-                    if (input && input.parentElement) {
-                        input.parentElement.dataset.printValue = input.value;
-                    }
-                    // ⬆️ KONIEC MODUŁU 4 ⬆️
-
-                } catch (e) {
-                    console.error(`Błąd podczas wypełniania wiersza ${targetRowIndex} ze schematu:`, e);
-                }
-            }
-        });
-    }
-
-    showToast(`Zastosowano schemat: ${schema.rozpoznanie}`, 'success');
+    showToast(`Zastosowano schemat: ${schema.rozpoznanie}`, 'success');
 }
 /* ======================================================== */
-/* ✅ KONIEC: MODUŁ 2 + MODUŁ 4                             */
+/* ✅ KONIEC: NOWA LOGIKA MODALI (SCHEMATY)                   */
 /* ======================================================== */
-
 /* ======================================================== */
 /* ✅ POCZĄTEK: MODUŁ 5 - Logika Modala Kalkulatora          */
 /* ======================================================== */
