@@ -3201,7 +3201,9 @@ for (let j=1;j<=8;j++){
         // Uruchom logikę schematów przy WPISYWANIU (nie klikaniu)
         // Funkcja applySchema sprawdzi, czy wpisany tekst pasuje do schematu
         input.addEventListener('input', applySchema);
-        // ⬆️ KONIEC MODUŁU 4 (Wersja Poprawiona) ⬆️
+       // ⬇️ DODAJ TĘ LINIĘ ⬇️
+        input.addEventListener('click', openSchemaSearchModalIfNeeded);
+        // ⬆️ KONIEC MODUŁU 4 (Wersja Poprawiona) ⬆️
         
         // ⬇️ TE LINIE BYŁY BRAKUJĄCE / W ZŁYM MIEJSCU ⬇️
         cell.textContent = '';
@@ -3521,7 +3523,11 @@ if (!row) return;
 row.cells[1].textContent = document.getElementById('formOpis').value;
 const inp2 = row.cells[2].querySelector('input');
 if (inp2) inp2.value = document.getElementById('formLiczba').value;
-row.cells[3].textContent = document.getElementById('formRozpoznanie').value;
+
+// ⬇️ POPRAWKA ⬇️
+const inp3_save = row.cells[3].querySelector('input');
+if (inp3_save) inp3_save.value = document.getElementById('formRozpoznanie').value;
+
 const produktInput = row.cells[4].querySelector('input');
 if (produktInput) {
     const lekName = document.getElementById('formLek').value; // ⬅️ NOWA LINIA
@@ -3619,9 +3625,13 @@ function selectRowInForm(logicalIndex){
 
     // Wczytaj dane do pól (tak jak było)
     document.getElementById('formOpis').value = row.cells[1].textContent.trim();
-    const inp = row.cells[2].querySelector('input');
+const inp = row.cells[2].querySelector('input');
     document.getElementById('formLiczba').value = inp ? inp.value : '';
-    document.getElementById('formRozpoznanie').value = row.cells[3].textContent.trim();
+
+    // ⬇️ POPRAWKA ⬇️
+    const inp3_select = row.cells[3].querySelector('input');
+    document.getElementById('formRozpoznanie').value = inp3_select ? inp3_select.value : '';
+
     const lekInput = row.cells[4].querySelector('input');
     document.getElementById('formLek').value = lekInput ? lekInput.value : ''; 
     document.getElementById('formSeria').value = row.cells[5].textContent.trim();
@@ -11852,6 +11862,8 @@ try {
     if (formRozpoznanieInput) {
         // Uruchom logikę schematów przy WPISYWANIU (zamiast 'click')
         formRozpoznanieInput.addEventListener('input', applySchema);
+        // ⬇️ DODAJ TĘ LINIĘ ⬇️
+        formRozpoznanieInput.addEventListener('click', openSchemaSearchModalIfNeeded);
     }
 
 } catch (err) {
@@ -12044,6 +12056,48 @@ try {
 }
 /* ======================================================== */
 /* ✅ KONIEC: MODUŁ 5                                       */
+/* ======================================================== */
+/* ======================================================== */
+/* ✅ POCZĄTEK: NOWA FUNKCJA (ZADANIE UŻYTKOWNIKA)           */
+/* ======================================================== */
+
+/**
+ * Decyduje, czy otworzyć modal wyszukiwania schematów, czy pozwolić na pisanie.
+ * Jest wywoływana przy KLIKNIĘCIU na polu Rozpoznanie.
+ */
+function openSchemaSearchModalIfNeeded(event) {
+    // 1. Znajdź globalny checkbox
+    const schemaCheckbox = document.getElementById('schemaCheckbox');
+    
+    // 2. Sprawdź, czy checkbox jest zaznaczony
+    if (schemaCheckbox && schemaCheckbox.checked) {
+        // JEST ZAZNACZONY: Chcemy modal
+        console.log("Checkbox schematów jest zaznaczony. Otwieranie modala wyszukiwania...");
+        
+        // Zatrzymaj domyślne zachowanie (np. fokusowanie inputa)
+        event.preventDefault();
+        event.stopPropagation();
+        
+        // Wywołaj istniejącą funkcję otwierającą modal
+        // (Przekazujemy 'event', aby funkcja 'openSchemaSearch' wiedziała, który input wywołał)
+        if (typeof openSchemaSearch === 'function') {
+            openSchemaSearch(event);
+        } else {
+            console.error("Błąd krytyczny: Nie znaleziono funkcji openSchemaSearch()");
+        }
+        
+    } else {
+        // NIE JEST ZAZNACZONY: Chcemy pisać ręcznie
+        console.log("Checkbox schematów jest odznaczony. Zezwolenie na ręczne wpisywanie.");
+        // Nie robimy nic - pozwalamy na normalne kliknięcie i pisanie.
+        // Użytkownik może klikać, fokusować i pisać.
+        // Funkcja 'applySchema' (podpięta pod 'input') i tak nie zadziała,
+        // ponieważ ona również sprawdza ten sam checkbox.
+    }
+}
+
+/* ======================================================== */
+/* ✅ KONIEC: NOWA FUNKCJA                                   */
 /* ======================================================== */
 </script> 
 
