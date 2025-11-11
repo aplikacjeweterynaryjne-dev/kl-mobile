@@ -2854,15 +2854,11 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
             <button id="saveVisitBtn" type="button" class="btn primary" style="font-size: 19px;">Zapisz</button>
         </div>
     </div>
-</div>
-<div id="archiveCardViewerModal" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.5); display: none; z-index: 10001; justify-content: center; align-items: center;">
-   <div style="width: 100%; height: 100%; background: white; border-radius: 0; box-shadow: none; display: flex; flex-direction: column;">
-<div style="padding: 10px 15px; border-bottom: 1px solid #ccc; display: flex; justify-content: space-between; align-items: center;">
-    
-<div id="archiveCardViewerModal" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.5); display: none; z-index: 10001; justify-content: center; align-items: center;">
-   <div style="width: 100%; height: 100%; background: white; border-radius: 0; box-shadow: none; display: flex; flex-direction: column;">
-<div style="padding: 10px 15px; border-bottom: 1px solid #ccc; display: flex; justify-content: space-between; align-items: center;">
-    <h3 style="margin: 0; font-size: 20px; display: none;">Podgląd Karty Leczenia</h3>
+</div> <div id="archiveCardViewerModal" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.5); display: none; z-index: 10001; justify-content: center; align-items: center;">
+    <div style="width: 100%; height: 100%; background: white; border-radius: 0; box-shadow: none; display: flex; flex-direction: column;">
+        
+        <div style="padding: 10px 15px; border-bottom: 1px solid #ccc; display: flex; justify-content: space-between; align-items: center;">
+            <h3 style="margin: 0; font-size: 20px; display: none;">Podgląd Karty Leczenia</h3>
             <div>
                 <button id="archivePrintBtn" class="btn small">Drukuj / PDF</button>
                 <button id="archiveCloseBtn" class="btn warn small" style="margin-left: 10px;">Zamknij</button>
@@ -3124,14 +3120,22 @@ if (i !== 10 && j !== 3 && j !== 4 && j !== 5 && j !== 7) { // ✅ ZMIANA: Dodan
 }
 if (j>=2 && j<=4) cell.classList.add('center-text');
 
-// ✅ NOWY BLOK DLA KOLUMNY 4 (ROZPOZNANIE)
+// ✅ NOWY BLOK DLA KOLUMNY 4 (ROZPOZNANIE) - WERSJA BEZPIECZNA
 if (j === 4 && i !== 10) {
     const input = document.createElement('input');
     input.setAttribute('list', 'listaRozpoznan');
     input.style.width = '95%';
     input.placeholder = 'Rozpoznanie...';
-    // Podpinamy listener, który odpali magię
-    input.addEventListener('input', applySchema); 
+    
+    // ✅ POPRAWKA: Użyj "proxy" funkcji.
+    // Ta funkcja jest zdefiniowana tutaj i wywoła 'applySchema'
+    // dopiero gdy skrypt 2 (po zalogowaniu) ją zdefiniuje.
+    input.addEventListener('input', (e) => {
+        if (typeof applySchema === 'function') {
+            applySchema(e);
+        }
+    }); 
+    
     cell.textContent = '';
     cell.appendChild(input);
 }
