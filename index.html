@@ -10413,8 +10413,6 @@ try {
         const todayISO = new Date().toISOString().split('T')[0];
         visitFormDate.value = todayISO;
         
-        // Ustaw tytuł widoku dnia
-        todayViewTitle.textContent = `Wizyty na dzisiaj (${new Date().toLocaleDateString('pl-PL', { day: 'numeric', month: 'long', year: 'numeric' })})`;
 
         // Uruchom auto-usuwanie
         runAutoCleanupVisits();
@@ -10530,9 +10528,9 @@ try {
 
     // --- 6. Renderowanie Widoków ---
 
-  // Renderuje widok Dziś (ZMODYFIKOWANA)
-  function renderTodayView(visits, dateToShow) { // <-- ZMIANA 1: Dodany argument 'dateToShow'
-        // ⬇️ ⬇️ ⬇️ POCZĄTEK ZMIAN (MODUŁ 2.5 / KROK 3) ⬇️ ⬇️ ⬇️
+// Renderuje widok Dnia (ZMODYFIKOWANA)
+    function renderTodayView(visits, dateToShow) { // <-- ZMIANA 1: Dodany argument 'dateToShow'
+        // ⬇️ ⬇️ ⬇️ POCZĄTEK ZMIAN (MODUŁ 2.5) ⬇️ ⬇️ ⬇️
         // Użyj przekazanej daty lub dzisiejszej, jeśli nic nie podano
         const targetDate = dateToShow || new Date();
         const todayISO = targetDate.toISOString().split('T')[0];
@@ -10546,7 +10544,7 @@ try {
         } else {
             todayViewTitle.textContent = `Wizyty na dzień: ${titleDateString}`;
         }
-        // ⬆️ ⬆️ ⬆️ KONIEC ZMIAN (MODUŁ 2.5 / KROK 3) ⬆️ ⬆️ ⬆️
+        // ⬆️ ⬆️ ⬆️ KONIEC ZMIAN (MODUŁ 2.5) ⬆️ ⬆️ ⬆️
         
         // Filtruj wizyty dla wybranego dnia (zamiast tylko "dzisiaj")
         const todayVisits = visits.filter(v => v.dataWizyty === todayISO);
@@ -10687,15 +10685,13 @@ try {
         }
     }
 
-   // --- 7. Logika Przełączania Widoków (Dziś/Miesiąc) ---
-    btnViewToday.addEventListener('click', () => {
-        todayViewContainer.style.display = 'block';
-        monthViewContainer.style.display = 'none';
-        // yearViewContainer.style.display = 'none'; // USUNIĘTE
-        btnViewToday.classList.add('primary');
-        btnViewMonth.classList.remove('primary');
-        // btnViewYear.classList.remove('primary'); // USUNIĘTE
-    });
+ // --- 7. Logika Przełączania Widoków (Dziś/Miesiąc) ---
+    // MODYFIKACJA (Moduł 2.5)
+    btnViewToday.addEventListener('click', () => {
+        // Przełączamy na widok dnia dla "dzisiaj"
+        const todayISO = new Date().toISOString().split('T')[0];
+        switchToDayView(todayISO);
+    });
 
     btnViewMonth.addEventListener('click', () => {
         todayViewContainer.style.display = 'none';
@@ -11257,11 +11253,11 @@ try {
             dotsHtml += '</div>';
             cell.innerHTML += dotsHtml;
 
-            // Kliknięcie na dzień przełącza na widok "Dziś"
-            cell.addEventListener('click', () => {
-                // (Logika przejścia do widoku dnia - na razie pominięte, przełącza na główne "Dziś")
-                btnViewToday.click();
-            });
+      // Kliknięcie na dzień przełącza na widok DNIA (Moduł 2.5)
+            cell.addEventListener('click', () => {
+                // Przekaż datę tej komórki (np. "2025-11-20") do nowej funkcji
+                switchToDayView(dayString);
+            });
 
             monthGridBody.appendChild(cell);
         }
