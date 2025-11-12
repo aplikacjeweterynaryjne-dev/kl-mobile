@@ -2270,7 +2270,7 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
         <div style="margin-top: 10px; display: flex; gap: 10px; align-items: flex-end;">
             <div>
                 <label for="pluCodeInput"><strong>Kod PLU:</strong></label><br>
-                <input type="text" id="pluCodeInput" style="width: 80px; padding: 5px;">
+                <input type="tel" id="pluCodeInput" inputmode="numeric" pattern="[0-9]*" style="width: 80px; padding: 5px;" placeholder="PLU...">
             </div>
             <button id="pluBtn" class="btn small">PLU</button>
         </div>
@@ -4398,7 +4398,10 @@ const produktTable = document.getElementById('produktTable'); // Potrzebne do im
 
 // Zmienna cache dla produktów
 let cachedProducts = null;
-
+// ⬇️ ⬇️ ⬇️ DODAJ TE DWIE LINIE ⬇️ ⬇️ ⬇️
+let pluToNameMap = new Map();
+let nameToPluMap = new Map();
+// ⬆️ ⬆️ ⬆️ KONIEC ⬆️ ⬆️ ⬆️
 // Zmienne modala produktu
 const productFormModal = document.getElementById('productFormModal');
 const productFormTitle = document.getElementById('productFormTitle');
@@ -5289,19 +5292,46 @@ async function saveReceiptToArchive(receiptData) {
     await db.collection("archiwumParagony").add(dataDoZapisu);
 }
 
-// Obsługa PLU (używa addItemToReceipt)
+/* Plik: index.html (ok. linii 2623) */
+
+// ⬇️ ⬇️ ⬇️ POCZĄTEK MODUŁU 2 (Logika PLU) ⬇️ ⬇️ ⬇️
+// Obsługa PLU (Moduł 2 - Poprawiona logika)
 if (pluBtn) {
-pluBtn.addEventListener('click', () => {
-const code = pluCodeInput ? pluCodeInput.value.trim() : '';
-if(code){
-const productName = code; // Uproszczenie: kod = nazwa
-if (typeof nazwyLekow !== 'undefined' && nazwyLekow.includes(productName)) {
-addItemToReceipt(productName, 1); // Domyślnie 1 szt.
-if (pluCodeInput) pluCodeInput.value = '';
-} else { alert(`Nie znaleziono produktu dla kodu PLU: ${code}`); }
+    pluBtn.addEventListener('click', () => {
+        const code = pluCodeInput ? pluCodeInput.value.trim() : '';
+        if (!code) {
+            // Jeśli pole puste, po prostu ustaw focus (dla klawiatury numerycznej)
+            pluCodeInput.focus();
+            return;
+        }
+
+        // 1. Wyszukaj nazwę produktu używając mapy PLU
+        const productName = pluToNameMap.get(code);
+
+        if (productName) {
+            // 2. Znaleziono! Ustaw produkt w polu wyboru
+            if (productSelect) {
+                productSelect.value = productName;
+                // Wywołaj 'input', aby zaktualizować jednostkę miary (istniejąca logika)
+                productSelect.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+            
+            // 3. Ustaw focus na ilości, gotowe do dodania
+            if (quantityInput) {
+                quantityInput.focus();
+                quantityInput.select(); // Zaznacz "1", aby łatwo nadpisać
+            }
+        } else {
+            // Nie znaleziono
+            alert(`Nie znaleziono produktu dla kodu PLU: ${code}`);
+            if (pluCodeInput) {
+                pluCodeInput.focus();
+                pluCodeInput.select();
+            }
+        }
+    });
 }
-});
-}
+// ⬆️ ⬆️ ⬆️ KONIEC MODUŁU 2 (Logika PLU) ⬆️ ⬆️ ⬆️
 
     // ✅ Moduł 2: Logika przełączania statusu płatności
 if (paymentStatusPaidBtn && paymentStatusDebtBtn) {
@@ -5317,19 +5347,29 @@ if (paymentStatusPaidBtn && paymentStatusDebtBtn) {
     hidePaymentError(); // ⬇️ DODANA LINIA
   });
 }
-// ✅ DODANO: Aktualizacja jednostki/dawkowania po wyborze produktu
-if (productSelect && productUnitDisplay) {
-productSelect.addEventListener('input', () => {
-const selectedProductName = productSelect.value;
-// Sprawdź, czy mapaIlosci istnieje i czy zawiera wybrany produkt
-if (typeof mapaIlosci !== 'undefined' && mapaIlosci.hasOwnProperty(selectedProductName)) {
-// Wyświetl całe dawkowanie jako jednostkę
-productUnitDisplay.textContent = mapaIlosci[selectedProductName] || '';
-} else {
-productUnitDisplay.textContent = ''; // Wyczyść, jeśli nie znaleziono dawkowania
+/* Plik: index.html (ok. linii 2639) */
+
+// ⬇️ ⬇️ ⬇️ POCZĄTEK MODUŁU 2 (Logika Produkt -> PLU) ⬇️ ⬇️ ⬇️
+// Aktualizacja jednostki ORAZ kodu PLU po wyborze produktu
+if (productSelect && productUnitDisplay && pluCodeInput) { // Dodano sprawdzenie pluCodeInput
+    productSelect.addEventListener('input', () => {
+        const selectedProductName = productSelect.value;
+
+        // 1. Logika jednostki (tak jak było)
+        if (typeof mapaIlosci !== 'undefined' && mapaIlosci.hasOwnProperty(selectedProductName)) {
+            productUnitDisplay.textContent = mapaIlosci[selectedProductName] || '';
+        } else {
+            productUnitDisplay.textContent = ''; 
+        }
+
+        // 2. NOWA LOGIKA: Znajdź i ustaw kod PLU
+        if (typeof nameToPluMap !== 'undefined') {
+            const pluCode = nameToPluMap.get(selectedProductName);
+            pluCodeInput.value = pluCode || ''; // Wstaw kod PLU lub wyczyść pole
+        }
+    });
 }
-});
-}
+// ⬆️ ⬆️ ⬆️ KONIEC MODUŁU 2 (Logika Produkt -> PLU) ⬆️ ⬆️ ⬆️
 // ✅ DODANO: KONIEC
 // Pierwsze renderowanie paragonu
 if (document.readyState === 'loading') {
@@ -5731,21 +5771,31 @@ return;
 console.log("Odświeżanie globalnych list i map produktów...");
 nazwyLekow = [];
 mapaSerii = {}; // W Firestore leków nie ma nr serii, więc ta mapa będzie pusta
+/* Plik: index.html (ok. linii 2147) */
 mapaIlosci = {}; // Mapa dla dawkowania
 mapaKarencji = {};
 mapaCen = {};
+// ⬇️ ⬇️ ⬇️ POCZĄTEK MODUŁU 2 (JS-Mapy) ⬇️ ⬇️ ⬇️
+pluToNameMap.clear();
+nameToPluMap.clear();
+// ⬆️ ⬆️ ⬆️ KONIEC ⬆️ ⬆️ ⬆️
 
 cachedProducts.forEach(p => {
-if (p.nazwa) { // Upewnij się, że produkt ma nazwę
-nazwyLekow.push(p.nazwa);
-// mapaSerii[p.nazwa] = p.nrSerii || ''; // Nr serii nie ma w bazie leków
-mapaIlosci[p.nazwa] = p.dawkowanie || ''; // Używamy pola dawkowanie
-mapaKarencji[p.nazwa] = p.karencja || '';
-// Upewnij się, że cena jest liczbą
-mapaCen[p.nazwa] = parseFloat(p.cena) || 0;
-}
+    if (p.nazwa) { // Upewnij się, że produkt ma nazwę
+        nazwyLekow.push(p.nazwa);
+        // ... (reszta kodu map) ...
+        mapaCen[p.nazwa] = parseFloat(p.cena) || 0;
+        
+        // ⬇️ ⬇️ ⬇️ POCZĄTEK MODUŁU 2 (JS-Mapy) ⬇️ ⬇️ ⬇️
+        // Wypełnij mapy PLU
+        if (p.plu && p.plu.trim() !== '') {
+            const trimmedPlu = p.plu.trim();
+            pluToNameMap.set(trimmedPlu, p.nazwa);
+            nameToPluMap.set(p.nazwa, trimmedPlu);
+        }
+        // ⬆️ ⬆️ ⬆️ KONIEC ⬆️ ⬆️ ⬆️
+    }
 });
-
 // Przebuduj <datalist id="listaLekow">
 rebuildListaLekow(); // Ta funkcja już istnieje i używa globalnej 'nazwyLekow'
 
