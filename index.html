@@ -1364,43 +1364,43 @@ table {
 }
 
 .visit-item {
-            background: #fff;
-            border: 1px solid #ddd;
-            border-left-width: 5px; /* Tu będzie kolor */
-            border-radius: 8px;
-            padding: 8px 10px; /* ZMIANA: Mniejszy padding */
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-            display: grid;
-            /* Dwie kolumny: Info | Akcje */
-            grid-template-columns: 1fr auto;
-            gap: 8px; /* ZMIANA: Mniejszy odstęp */
-        }
+    background: #fff;
+    border: 1px solid #ddd;
+    border-left-width: 5px; /* Tu będzie kolor */
+    border-radius: 8px;
+    padding: 12px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    display: grid;
+    /* Dwie kolumny: Info | Akcje */
+    grid-template-columns: 1fr auto;
+    gap: 10px;
+}
 
-        .visit-item-info strong {
-            font-size: 16px; /* ZMIANA: Mniejsza czcionka */
-            display: block;
-            margin-bottom: 2px; /* ZMIANA: Mniejszy margines */
-        }
-        .visit-item-info .details {
-            font-size: 13px; /* ZMIANA: Mniejsza czcionka */
-            color: #333;
-            line-height: 1.3; /* ZMIANA: Mniejsza interlinia */
-        }
-        .visit-item-info .purpose {
-            font-size: 14px; /* ZMIANA: Mniejsza czcionka */
-            color: #000;
-            font-weight: 600;
-            margin-top: 4px; /* ZMIANA: Mniejszy odstęp */
-            display: block;
-        }
+.visit-item-info strong {
+    font-size: 18px;
+    display: block;
+    margin-bottom: 4px;
+}
+.visit-item-info .details {
+    font-size: 14px;
+    color: #333;
+    line-height: 1.4;
+}
+.visit-item-info .purpose {
+    font-size: 15px;
+    color: #000;
+    font-weight: 600;
+    margin-top: 5px;
+    display: block;
+}
 
-       .visit-item-actions {
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: flex-end; /* ✅ POPRAWKA: Wyrównuje przyciski do prawej */
-            gap: 5px; 
-        }
+.visit-item-actions {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+}
 
 .btn-quick-status {
     padding: 8px;
@@ -11120,87 +11120,73 @@ try {
 
     // --- 6. Renderowanie Widoków ---
 
-// Renderuje widok Dnia (ZMODYFIKOWANA)
-    function renderTodayView(visits, dateToShow) { // <-- ZMIANA 1: Dodany argument 'dateToShow'
-        // ⬇️ ⬇️ ⬇️ POCZĄTEK ZMIAN (MODUŁ 2.5) ⬇️ ⬇️ ⬇️
-        // Użyj przekazanej daty lub dzisiejszej, jeśli nic nie podano
-        const targetDate = dateToShow || new Date();
-        const todayISO = targetDate.toISOString().split('T')[0];
+  // Renderuje widok Dziś (ZMODYFIKOWANA)
+    function renderTodayView(visits) {
+        const todayISO = new Date().toISOString().split('T')[0];
 
-        // 2. Zaktualizuj tytuł widoku dnia
-        const isToday = (new Date().toISOString().split('T')[0] === todayISO);
-        const titleDateString = targetDate.toLocaleDateString('pl-PL', { day: 'numeric', month: 'long', year: 'numeric' });
-        
-        if (isToday) {
-            todayViewTitle.textContent = `Wizyty na dzisiaj (${titleDateString})`;
-        } else {
-            todayViewTitle.textContent = `Wizyty na dzień: ${titleDateString}`;
-        }
-        // ⬆️ ⬆️ ⬆️ KONIEC ZMIAN (MODUŁ 2.5) ⬆️ ⬆️ ⬆️
-        
-        // Filtruj wizyty dla wybranego dnia (zamiast tylko "dzisiaj")
-        const todayVisits = visits.filter(v => v.dataWizyty === todayISO);
-        
-        // ✅ KOREKTA 2: Ustaw podsumowanie
-        const totalCount = todayVisits.length;
-        let summaryText = '';
-        const statusFilter = calendarStatusFilter.value;
-        
-        if (statusFilter === 'Nowa') {
-            summaryText = `Liczba wizyt do realizacji: ${totalCount}`;
-        } else if (statusFilter === 'Zrealizowana') {
-            summaryText = `Liczba wizyt zrealizowanych: ${totalCount}`;
-        } else {
-            summaryText = `Łączna liczba wizyt: ${totalCount}`;
-        }
-        // Wpisz do nowego elementu P
-        if (todayViewSummary) {
-            // Ukryj tekst "Liczba wizyt: 0"
-            todayViewSummary.textContent = totalCount > 0 ? summaryText : ''; 
-        }
+        // Filtruj tylko na dzisiaj
+        const todayVisits = visits.filter(v => v.dataWizyty === todayISO);
 
-        // Sortuj po porze dnia
-        const poraOrder = {"Pilne": 1, "6-10": 2, "10-15": 3, "15-20": 4, "Obojętne": 5};
-        todayVisits.sort((a, b) => (poraOrder[a.poraDnia] || 99) - (poraOrder[b.poraDnia] || 99));
+        // ✅ KOREKTA 2: Ustaw podsumowanie
+        const totalCount = todayVisits.length;
+        let summaryText = '';
+        const statusFilter = calendarStatusFilter.value;
 
-        todayVisitList.innerHTML = ''; // Wyczyść
-        
-        if (todayVisits.length === 0) {
-            const statusMsg = calendarStatusFilter.value === "Nowa" ? "do realizacji" : (isToday ? "na dzisiaj" : "na ten dzień");
-            todayVisitList.innerHTML = `<p style="text-align:center; color:#888; margin-top: 30px;">Brak wizyt ${statusMsg}.</p>`;
-            return;
-        }
+        if (statusFilter === 'Nowa') {
+            summaryText = `Liczba wizyt do realizacji: ${totalCount}`;
+        } else if (statusFilter === 'Zrealizowana') {
+            summaryText = `Liczba wizyt zrealizowanych: ${totalCount}`;
+        } else {
+            summaryText = `Łączna liczba wizyt: ${totalCount}`;
+        }
+        // Wpisz do nowego elementu P
+        if (todayViewSummary) {
+            // Ukryj tekst "Liczba wizyt: 0"
+            todayViewSummary.textContent = totalCount > 0 ? summaryText : ''; 
+        }
 
-        todayVisits.forEach(visit => {
-            const visitDiv = document.createElement('div');
-            visitDiv.className = 'visit-item';
-            visitDiv.dataset.id = visit.id;
-            visitDiv.dataset.status = visit.status;
-            visitDiv.dataset.pora = visit.poraDnia;
+        // Sortuj po porze dnia
+        const poraOrder = {"Pilne": 1, "6-10": 2, "10-15": 3, "15-20": 4, "Obojętne": 5};
+        todayVisits.sort((a, b) => (poraOrder[a.poraDnia] || 99) - (poraOrder[b.poraDnia] || 99));
 
-            const statusText = visit.status === 'Nowa' ? 'Oznacz jako Zrobione' : 'Oznacz jako Nowe';
-            
-            // ✅ KOREKTA 1: Dodano "Pora dnia" (pogrubione)
-            visitDiv.innerHTML = `
-                <div class="visit-item-info">
-                    <strong>${visit.klientNazwa}</strong>
-                    <span class="details">
-                        ${visit.klientAdres || 'Brak adresu'}<br>
-                        ${visit.klientTelefon || 'Brak telefonu'}
-                    </span>
-                    <span class="purpose">Cel: ${visit.celWizyty || 'Nieokreślony'}</span>
-                    <span class="purpose" style="font-weight: 700;">Pora: ${visit.poraDnia || 'Brak'}</span>
-                    ${visit.notatka ? `<span class="details" style="color: #c0392b; font-style: italic;">Notatka: ${visit.notatka}</span>` : ''}
-                </div>
-                <div class="visit-item-actions">
-                    <button class="btn btn-quick-status" data-id="${visit.id}" data-new-status="${visit.status === 'Nowa' ? 'Zrealizowana' : 'Nowa'}">${statusText}</button>
-                    <button class="btn ghost small btn-edit-visit" data-id="${visit.id}">Edytuj</button>
-                    <button class="btn warn small btn-delete-visit" data-id="${visit.id}" style="margin-top: 5px;">Usuń</button>
-                </div>
-            `;
-            todayVisitList.appendChild(visitDiv);
-        });
-    }
+        todayVisitList.innerHTML = ''; // Wyczyść
+
+        if (todayVisits.length === 0) {
+            const statusMsg = calendarStatusFilter.value === "Nowa" ? "do realizacji" : "zrealizowanych";
+            todayVisitList.innerHTML = `<p style="text-align:center; color:#888; margin-top: 30px;">Brak wizyt ${statusMsg} na dzisiaj.</p>`;
+            return;
+        }
+
+        todayVisits.forEach(visit => {
+            const visitDiv = document.createElement('div');
+            visitDiv.className = 'visit-item';
+            visitDiv.dataset.id = visit.id;
+            visitDiv.dataset.status = visit.status;
+            visitDiv.dataset.pora = visit.poraDnia;
+
+            const statusText = visit.status === 'Nowa' ? 'Oznacz jako Zrobione' : 'Oznacz jako Nowe';
+
+            // ✅ KOREKTA 1: Dodano "Pora dnia" (pogrubione)
+            visitDiv.innerHTML = `
+                <div class="visit-item-info">
+                    <strong>${visit.klientNazwa}</strong>
+                    <span class="details">
+                        ${visit.klientAdres || 'Brak adresu'}<br>
+                        ${visit.klientTelefon || 'Brak telefonu'}
+                    </span>
+                    <span class="purpose">Cel: ${visit.celWizyty || 'Nieokreślony'}</span>
+                    <span class="purpose" style="font-weight: 700;">Pora: ${visit.poraDnia || 'Brak'}</span>
+                    ${visit.notatka ? `<span class="details" style="color: #c0392b; font-style: italic;">Notatka: ${visit.notatka}</span>` : ''}
+                </div>
+                <div class="visit-item-actions">
+                    <button class="btn btn-quick-status" data-id="${visit.id}" data-new-status="${visit.status === 'Nowa' ? 'Zrealizowana' : 'Nowa'}">${statusText}</button>
+                    <button class="btn ghost small btn-edit-visit" data-id="${visit.id}">Edytuj</button>
+                    <button class="btn warn small btn-delete-visit" data-id="${visit.id}" style="margin-top: 5px;">Usuń</button>
+                </div>
+            `;
+            todayVisitList.appendChild(visitDiv);
+        });
+    }
     // Renderuje widok Miesiąca
     function renderMonthView(visits, date) {
         monthGridBody.innerHTML = ''; // Wyczyść
