@@ -1631,7 +1631,25 @@ table {
 /* ======================================================== */
 /* ✅ KONIEC: POPRAWKA Z-INDEX                                */
 /* ======================================================== */
+/* ⬇️ ⬇️ ⬇️ WKLEJ TEN BLOK KODU (ok. linii 1410) ⬇️ ⬇️ ⬇️ */
 
+/* --- Style dla sekcji Kalkulatora (Moduł 1) --- */
+#kalkulatorWizytySection details > summary {
+    list-style: none; /* Ukryj domyślną strzałkę */
+    padding: 5px 0;
+}
+#kalkulatorWizytySection details > summary::-webkit-details-marker {
+    display: none; /* Ukryj strzałkę (Safari) */
+}
+#kalkulatorWizytySection details > summary::before {
+    content: '▼'; /* Strzałka (rozwinięte) - domyślnie otwarte */
+    font-size: 0.8em;
+    margin-right: 10px;
+}
+#kalkulatorWizytySection details:not([open]) > summary::before {
+    content: '▶'; /* Domyślna strzałka (zwinięte) */
+}
+/* ⬆️ ⬆️ ⬆️ KONIEC MODUŁU 1 (CSS) ⬆️ ⬆️ ⬆️ */
 </style>
     <div id="calcProductSearchModal" class="product-search-modal" style="display: none; z-index: 10003;">
     <div class="product-search-card">
@@ -5002,9 +5020,19 @@ const productName = productSelect ? productSelect.value.trim() : '';
 const quantity = quantityInput ? parseInt(quantityInput.value, 10) : 0;
 
 if (productName && quantity > 0) {
-if (typeof nazwyLekow !== 'undefined' && nazwyLekow.includes(productName)) {
-addItemToReceipt(productName, quantity); // Użyj funkcji pomocniczej
-if (productSelect) productSelect.value = '';
+// ... (linia 2502)
+    if (typeof nazwyLekow !== 'undefined' && nazwyLekow.includes(productName)) {
+        addItemToReceipt(productName, quantity); // Użyj funkcji pomocniczej
+        
+        // ⬇️ ⬇️ ⬇️ POCZĄTEK MODUŁU 1 (JS) ⬇️ ⬇️ ⬇️
+        // Auto-zwiń sekcję Danych Podstawowych po dodaniu pierwszego produktu
+        const danePodstawoweSekcja = document.getElementById('calcDanePodstawowe');
+        if (danePodstawoweSekcja) {
+            danePodstawoweSekcja.open = false; // To zwinie sekcję
+        }
+        // ⬆️ ⬆️ ⬆️ KONIEC MODUŁU 1 (JS) ⬆️ ⬆️ ⬆️
+        
+        if (productSelect) productSelect.value = '';
 if (quantityInput) quantityInput.value = 1;
 } else { alert('Wybrany produkt nie znajduje się w bazie leków.'); }
 } else { alert('Wybierz produkt i podaj poprawną ilość.'); }
