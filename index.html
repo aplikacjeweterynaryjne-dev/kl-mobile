@@ -10316,6 +10316,7 @@ try {
         }
         // ⬆️ ⬆️ ⬆️ KONIEC WKLEJANIA ⬆️ ⬆️ ⬆️
 /* ======================================================== */
+
 /* ✅ POCZĄTEK: LOGIKA KALENDARZA WIZYT (Funkcje Główne)      */
 /* ======================================================== */
 try {
@@ -10340,7 +10341,7 @@ try {
     async function runAutoCleanupVisits() {
         console.log("Uruchamianie auto-usuwania starych wizyt...");
         const now = new Date();
-        
+
         // 1. Oblicz daty graniczne
         // Data dla ZREALIZOWANYCH (7 dni temu)
         const realizedCutoff = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
@@ -10353,12 +10354,12 @@ try {
 
         try {
             const batch = db.batch();
-            
+
             // 2. Zapytanie o stare ZREALIZOWANE wizyty
             const queryRealized = db.collection('wizyty')
                 .where('status', '==', 'Zrealizowana')
                 .where('createdAt', '<', realizedTimestamp);
-            
+
             const snapshotRealized = await queryRealized.get();
             snapshotRealized.docs.forEach(doc => {
                 console.log(`Zaznaczono do usunięcia (Zrealizowana > 7 dni): ${doc.id}`);
@@ -10369,7 +10370,7 @@ try {
             const queryNew = db.collection('wizyty')
                 .where('status', '==', 'Nowa')
                 .where('createdAt', '<', newTimestamp); // Użyj createdAt, a nie dataWizyty!
-            
+
             const snapshotNew = await queryNew.get();
             snapshotNew.docs.forEach(doc => {
                 console.log(`Zaznaczono do usunięcia (Nowa > 14 dni): ${doc.id}`);
@@ -10381,7 +10382,7 @@ try {
                 console.log("Brak starych wizyt do usunięcia.");
                 return;
             }
-            
+
             await batch.commit();
             console.log(`Usunięto ${snapshotRealized.size} zrealizowanych i ${snapshotNew.size} nowych wizyt.`);
 
@@ -10398,7 +10399,7 @@ try {
   // --- 3. Funkcja Startowa (Inicjalizacja) ---
     function onShowKalendarz() {
         console.log("Wejście do sekcji Kalendarz.");
-        
+
         if (!calendarUsersLoaded) {
             // Jeśli użytkownicy nie są wczytani, uruchom funkcję,
             // która ich wczyta I WTEDY uruchomi pobieranie wizyt.
@@ -10408,11 +10409,11 @@ try {
             // po prostu odśwież wizyty.
             fetchAndRenderVisits();
         }
-        
+
         // Ustaw domyślną datę w formularzu
         const todayISO = new Date().toISOString().split('T')[0];
         visitFormDate.value = todayISO;
-        
+
 
         // Uruchom auto-usuwanie
         runAutoCleanupVisits();
@@ -10420,7 +10421,7 @@ try {
         // (Usunęliśmy stąd 'fetchAndRenderVisits()', bo jest teraz w logice if/else)
     }
     // --- 4. Ładowanie Filtrów ---
-    
+
     // Wczytuje użytkowników (lekarzy) do listy <select>
     async function loadCalendarUsers() {
         if (!calendarUserSelect || !currentUserProfile) return;
@@ -10438,20 +10439,18 @@ try {
             const snapshot = await query.get();
             calendarUserSelect.innerHTML = ''; // Wyczyść
             calendarUserSelect.add(new Option("Wszyscy", "ALL")); // Opcja "Wszyscy"
-            
+
             snapshot.docs.forEach(doc => {
                 const user = doc.data();
                 const optionText = `${user.Imie} ${user.Nazwisko}`;
                 calendarUserSelect.add(new Option(optionText, user.uid)); // Wartością jest UID
             });
-            
-// ... (kod dodający opcje do selecta) ...
-            
+
             // Ustaw domyślnie na zalogowanego użytkownika
             if (currentUserProfile.uid) {
                 calendarUserSelect.value = currentUserProfile.uid;
             }
-            
+
             calendarUsersLoaded = true;
             console.log("Wczytano użytkowników do kalendarza.");
 
@@ -10469,14 +10468,14 @@ try {
     if (calendarStatusFilter) calendarStatusFilter.addEventListener('change', fetchAndRenderVisits);
 
     // --- 5. Pobieranie Danych (Firestore) ---
-    
+
     // Główna funkcja pobierająca dane
     async function fetchAndRenderVisits() {
         if (!currentUserProfile) return; // Musimy być zalogowani
 
         const selectedUserId = calendarUserSelect.value;
         const selectedStatus = calendarStatusFilter.value;
-        
+
         // Pokaż loader (można dodać)
         todayVisitList.innerHTML = '<p style="text-align:center; color:#888; margin-top: 30px;">Ładowanie wizyt... ⏳</p>';
         monthGridBody.innerHTML = '<p style="text-align:center; color:#888;">Ładowanie... ⏳</p>';
@@ -10504,12 +10503,12 @@ try {
             if (selectedStatus !== "Wszystkie") {
                 q = q.where("status", "==", selectedStatus);
             }
-            
+
             // !!! WAŻNE: To zapytanie (np. status + id_lecznicy) BĘDZIE WYMAGAĆ INDEKSU w Firestore !!!
-            
+
             const snapshot = await q.orderBy("dataWizyty", "asc").get();
             allFetchedVisits = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            
+
             console.log(`Pobrano ${allFetchedVisits.length} wizyt.`);
 
             // Wyrenderuj oba widoki (jeden będzie ukryty)
@@ -10528,32 +10527,18 @@ try {
 
     // --- 6. Renderowanie Widoków ---
 
-// Renderuje widok Dnia (ZMODYFIKOWANA)
-    function renderTodayView(visits, dateToShow) { // <-- ZMIANA 1: Dodany argument 'dateToShow'
-        // ⬇️ ⬇️ ⬇️ POCZĄTEK ZMIAN (MODUŁ 2.5) ⬇️ ⬇️ ⬇️
-        // Użyj przekazanej daty lub dzisiejszej, jeśli nic nie podano
-        const targetDate = dateToShow || new Date();
-        const todayISO = targetDate.toISOString().split('T')[0];
+  // Renderuje widok Dziś (ZMODYFIKOWANA)
+    function renderTodayView(visits) {
+        const todayISO = new Date().toISOString().split('T')[0];
 
-        // 2. Zaktualizuj tytuł widoku dnia
-        const isToday = (new Date().toISOString().split('T')[0] === todayISO);
-        const titleDateString = targetDate.toLocaleDateString('pl-PL', { day: 'numeric', month: 'long', year: 'numeric' });
-        
-        if (isToday) {
-            todayViewTitle.textContent = `Wizyty na dzisiaj (${titleDateString})`;
-        } else {
-            todayViewTitle.textContent = `Wizyty na dzień: ${titleDateString}`;
-        }
-        // ⬆️ ⬆️ ⬆️ KONIEC ZMIAN (MODUŁ 2.5) ⬆️ ⬆️ ⬆️
-        
-        // Filtruj wizyty dla wybranego dnia (zamiast tylko "dzisiaj")
-        const todayVisits = visits.filter(v => v.dataWizyty === todayISO);
-        
+        // Filtruj tylko na dzisiaj
+        const todayVisits = visits.filter(v => v.dataWizyty === todayISO);
+
         // ✅ KOREKTA 2: Ustaw podsumowanie
         const totalCount = todayVisits.length;
         let summaryText = '';
         const statusFilter = calendarStatusFilter.value;
-        
+
         if (statusFilter === 'Nowa') {
             summaryText = `Liczba wizyt do realizacji: ${totalCount}`;
         } else if (statusFilter === 'Zrealizowana') {
@@ -10572,7 +10557,7 @@ try {
         todayVisits.sort((a, b) => (poraOrder[a.poraDnia] || 99) - (poraOrder[b.poraDnia] || 99));
 
         todayVisitList.innerHTML = ''; // Wyczyść
-        
+
         if (todayVisits.length === 0) {
             const statusMsg = calendarStatusFilter.value === "Nowa" ? "do realizacji" : "zrealizowanych";
             todayVisitList.innerHTML = `<p style="text-align:center; color:#888; margin-top: 30px;">Brak wizyt ${statusMsg} na dzisiaj.</p>`;
@@ -10587,9 +10572,9 @@ try {
             visitDiv.dataset.pora = visit.poraDnia;
 
             const statusText = visit.status === 'Nowa' ? 'Oznacz jako Zrobione' : 'Oznacz jako Nowe';
-            
+
             // ✅ KOREKTA 1: Dodano "Pora dnia" (pogrubione)
-       visitDiv.innerHTML = `
+            visitDiv.innerHTML = `
                 <div class="visit-item-info">
                     <strong>${visit.klientNazwa}</strong>
                     <span class="details">
@@ -10629,10 +10614,10 @@ try {
         // Logika budowania siatki kalendarza
         const firstDayOfMonth = new Date(year, month, 1).getDay(); // 0=Niedz, 1=Pon
         const daysInMonth = new Date(year, month + 1, 0).getDate();
-        
+
         // Korekta na polski tydzień (Poniedziałek = 0, Niedziela = 6)
         const startOffset = (firstDayOfMonth === 0) ? 6 : firstDayOfMonth - 1; 
-        
+
         // Dodaj puste komórki na początku
         for (let i = 0; i < startOffset; i++) {
             const cell = document.createElement('div');
@@ -10655,9 +10640,9 @@ try {
 
             // Numer dnia
             cell.innerHTML = `<span class="day-number">${day}</span>`;
-            
+
             const visitsForThisDay = visitsByDate.get(dayString) || [];
-            
+
             // Suma wizyt do realizacji (Req. 4)
             const visitsToDo = visitsForThisDay.filter(v => v.status === 'Nowa').length;
             if (visitsToDo > 0) {
@@ -10675,7 +10660,7 @@ try {
             dotsHtml += '</div>';
             cell.innerHTML += dotsHtml;
 
-            // Kliknięcie na dzień przełącza na widok DNIA (Moduł 2.5)
+      // Kliknięcie na dzień przełącza na widok DNIA (Moduł 2.5)
             cell.addEventListener('click', () => {
                 // Przekaż datę tej komórki (np. "2025-11-20") do nowej funkcji
                 switchToDayView(dayString);
@@ -10684,9 +10669,31 @@ try {
             monthGridBody.appendChild(cell);
         }
     }
+/* ⬇️ ⬇️ ⬇️ WKLEJ TĘ NOWĄ FUNKCJĘ (ok. linii 2139) ⬇️ ⬇️ ⬇️ */
 
- // --- 7. Logika Przełączania Widoków (Dziś/Miesiąc) ---
-    // MODYFIKACJA (Moduł 2.5)
+    /**
+     * Przełącza na widok dnia dla wybranej daty.
+     */
+    function switchToDayView(dateString) {
+        // 1. Pokaż/Ukryj odpowiednie kontenery
+        todayViewContainer.style.display = 'block';
+        monthViewContainer.style.display = 'none';
+
+        // 2. Zaktualizuj przyciski nawigacyjne
+        btnViewToday.classList.add('primary');
+        btnViewMonth.classList.remove('primary');
+
+        // 3. Stwórz obiekt Date z daty string (Obejście problemu ze strefą czasową)
+        const parts = dateString.split('-').map(Number);
+        // (Miesiąc w new Date() jest 0-indeksowany, więc odejmujemy 1)
+        const clickedDate = new Date(parts[0], parts[1] - 1, parts[2]); 
+
+        // 4. Wywołaj zmodyfikowaną funkcję renderTodayView (modyfikacja w Kroku 3)
+        renderTodayView(allFetchedVisits, clickedDate);
+    }
+/* ⬆️ ⬆️ ⬆️ KONIEC NOWEJ FUNKCJI ⬆️ ⬆️ ⬆️ */
+   // --- 7. Logika Przełączania Widoków (Dziś/Miesiąc) ---
+   // MODYFIKACJA (Moduł 2.5)
     btnViewToday.addEventListener('click', () => {
         // Przełączamy na widok dnia dla "dzisiaj"
         const todayISO = new Date().toISOString().split('T')[0];
@@ -10703,7 +10710,7 @@ try {
         // Wyrenderuj widok miesiąca dla aktualnie pobranych danych
         renderMonthView(allFetchedVisits, currentMonthView);
     });
-    
+
     // Nawigacja miesiąca
     btnPrevMonth.addEventListener('click', () => {
         currentMonthView.setMonth(currentMonthView.getMonth() - 1);
@@ -10716,7 +10723,7 @@ try {
     });
 
     // --- 8. Logika Formularza Wizyty (Modal) ---
-    
+
     // Otwieranie formularza
     addVisitBtn.addEventListener('click', () => {
         visitFormTitle.textContent = "Nowa wizyta";
@@ -10744,17 +10751,17 @@ try {
         if (typeof(clientFormReturnToModal) !== 'undefined') {
             clientFormReturnToModal = '#visitFormModal';
         }
-        
+
         // Ukryj modal wizyty
         visitFormModal.style.display = 'none';
-        
+
         // Otwórz modal wyszukiwania klienta (ten sam co w formularzu karty)
         const formKlientTrigger = document.getElementById('formKlient');
         if(formKlientTrigger) {
             formKlientTrigger.click(); // Użyj modala z formularza
         }
     });
-    
+
     // Zapisywanie wizyty (Dodawanie/Edycja)
     saveVisitBtn.addEventListener('click', async () => {
         if (!currentUserProfile) {
@@ -10778,7 +10785,7 @@ try {
              klientAdres = currentVisitClientData.adres;
              klientTelefon = currentVisitClientData.telefon;
         }
-        
+
         if (!klientNazwa || klientNazwa === '...') {
             alert("Klient jest wymagany.");
             return;
@@ -10835,7 +10842,7 @@ try {
         if (target.classList.contains('btn-quick-status')) {
             const docId = target.dataset.id;
             const newStatus = target.dataset.newStatus;
-            
+
             target.disabled = true;
             target.textContent = '...';
 
@@ -10867,7 +10874,7 @@ try {
                 visitFormPoraDnia.value = visitData.poraDnia;
                 visitFormCel.value = visitData.celWizyty;
                 visitFormNotatka.value = visitData.notatka;
-                
+
                 // Zapisz dane klienta na potrzeby zapisu
                 currentVisitClientData = {
                     nazwa: visitData.klientNazwa,
@@ -10878,11 +10885,12 @@ try {
                 visitFormModal.style.display = 'flex';
             }
         }
+
         // ⬇️ ⬇️ ⬇️ WKLEJ TEN NOWY BLOK ⬇️ ⬇️ ⬇️
         // Usuwanie wizyty
         else if (target.classList.contains('btn-delete-visit')) {
             const docId = target.dataset.id;
-            
+
             if (confirm("Czy na pewno chcesz usunąć tę wizytę?\n\nTej operacji nie można cofnąć.")) {
                 target.disabled = true;
                 target.textContent = '...';
@@ -10900,6 +10908,7 @@ try {
             }
         }
         // ⬆️ ⬆️ ⬆️ KONIEC NOWEGO BLOKU ⬆️ ⬆️ ⬆️
+
     });
 
 } catch (err) {
@@ -10909,7 +10918,6 @@ try {
 /* ======================================================== */
 /* ✅ KONIEC: LOGIKA KALENDARZA WIZYT                         */
 /* ======================================================== */
-
 /* ======================================================== */
 /* ✅ POCZĄTEK: LOGIKA BAZY LECZENIA (SCHEMATÓW)              */
 /* ======================================================== */
