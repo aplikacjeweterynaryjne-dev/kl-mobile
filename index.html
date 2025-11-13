@@ -7994,22 +7994,47 @@ async function generateAndSetReceiptDocumentNumber() {
  * Resetuje stan zapisu i przycisk 'Zapisz w Archiwum'.
  */
 function onShowKarta() {
-    isCurrentCardSaved = false; // Karta jest "brudna" (niezapisana) po wejściu
+    // 1. Sprawdź, czy karta jest "brudna" (wypełniona)
+    if (isKartaDirty()) {
+        
+        // 2. Jeśli jest brudna, zapytaj użytkownika co robić
+        // [OK] = Dokonaj edycji (Kontynuuj)
+        // [Anuluj] = Rozpocznij nową (Wyczyść)
+        if (confirm("Wykryto uzupełnioną kartę leczenia.\n\n[OK] = Kontynuuj edycję\n[Anuluj] = Rozpocznij nową (wyczyść dane)")) {
+            
+            // Użytkownik chce KONTYNUOWAĆ EDYCJĘ (kliknął OK)
+            // Nie robimy nic, zostawiamy dane.
+            // Ustawiamy tylko flagę zapisu (tak jak wcześniej)
+            isCurrentCardSaved = false; 
+            if (saveCardToArchiveBtn) {
+                saveCardToArchiveBtn.disabled = false;
+                saveCardToArchiveBtn.textContent = '💾 Zapisz w Archiwum';
+            }
+            
+        } else {
+            // Użytkownik chce ROZPOCZĄĆ NOWĄ (kliknął Anuluj)
+            clearKartaLeczenia();
+        }
+        
+    } else {
+        // 3. Karta jest CZYSTA, więc rozpocznij nową automatycznie
+        // (Wyczyść pole nr dok. i wygeneruj nowy)
+        isCurrentCardSaved = false;
+        if (saveCardToArchiveBtn) {
+            saveCardToArchiveBtn.disabled = false;
+            saveCardToArchiveBtn.textContent = '💾 Zapisz w Archiwum';
+        }
+        
+        // Wymuś wyczyszczenie pola numeru, aby generator zadziałał poprawnie
+        document.getElementById('nrDokumentu').value = ''; 
+        generateAndSetDocumentNumber();
+    }
 
-    // Przywróć domyślny wygląd przycisku zapisu
-    if (saveCardToArchiveBtn) {
-        saveCardToArchiveBtn.disabled = false;
-        saveCardToArchiveBtn.textContent = '💾 Zapisz w Archiwum'; // Poprawiona literówka
-    }
-
-    // Wywołaj generowanie numeru
-    generateAndSetDocumentNumber();
-    // ⬇️ DODAJ TEN BLOK ⬇️
-    // Wymuś odświeżenie listy schematów (datalist) przy każdym wejściu na kartę
-    if (typeof refreshSchemaDatalist === 'function') {
-        console.log("onShowKarta: Wymuszone odświeżenie datalist schematów.");
-        refreshSchemaDatalist();
-}
+    // 4. Zawsze odświeżaj listę schematów przy wejściu
+    if (typeof refreshSchemaDatalist === 'function') {
+        console.log("onShowKarta: Wymuszone odświeżenie datalist schematów.");
+        refreshSchemaDatalist();
+    }
 }
 // Zmodyfikuj oryginalny listener dla tabKartaBtn
 if (tabKartaBtn) {
@@ -8020,7 +8045,26 @@ if (tabKartaBtn) {
     });
 }
 function onShowKalkulator() {
-    generateAndSetReceiptDocumentNumber();
+    // 1. Sprawdź, czy kalkulator jest "brudny"
+    if (isKalkulatorDirty()) {
+        
+        // 2. Jeśli jest brudny, zapytaj użytkownika
+        // [OK] = Dokonaj edycji (Kontynuuj)
+        // [Anuluj] = Rozpocznij nową (Wyczyść)
+        if (confirm("Wykryto uzupełniony kalkulator.\n\n[OK] = Kontynuuj edycję\n[Anuluj] = Rozpocznij nowy paragon (wyczyść dane)")) {
+            // Użytkownik chce KONTYNUOWAĆ EDYCJĘ (kliknął OK)
+            // Nie robimy nic, zostawiamy dane.
+        } else {
+            // Użytkownik chce ROZPOCZĄĆ NOWY (kliknął Anuluj)
+            clearKalkulator();
+        }
+        
+    } else {
+        // 3. Kalkulator jest CZYSTY, więc rozpocznij nowy automatycznie
+        // (Wyczyść pole nr dok. i wygeneruj nowy)
+        document.getElementById('calcNrDokInput').value = '';
+        generateAndSetReceiptDocumentNumber();
+    }
 }
 // Zmodyfikuj też listener dla menuKartaBtn
 if (menuKartaBtn) {
@@ -12009,6 +12053,160 @@ function handleLiczbaChange(e) {
 }
 /* ======================================================== */
 /* ✅ KONIEC: Logika dynamicznego przeliczania ilości      */
+/* ======================================================== */
+/* ======================================================== */
+/* ✅ POCZĄTEK: Logika czyszczenia "brudnych" formularzy      */
+/* ======================================================== */
+
+/**
+ * Sprawdza, czy Karta Leczenia zawiera dane wprowadzone przez użytkownika.
+ * @returns {boolean} - true jeśli karta jest "brudna", false jeśli czysta.
+ */
+function isKartaDirty() {
+    // 1. Sprawdź, czy wybrano klienta
+    const klient = document.getElementById('klientSelect').value;
+    if (klient && klient.trim() !== '' && klient !== "Kliknij, aby wybrać klienta...") {
+        console.log("Karta 'brudna': Wybrano klienta.");
+        return true;
+    }
+
+    // 2. Sprawdź, czy jakikolwiek wiersz tabeli jest wypełniony
+    // Używamy istniejących funkcji 'rowsEditable' i 'isRowEmpty'
+    try {
+        const logicalRows = rowsEditable();
+        for (const row of logicalRows) {
+            if (!isRowEmpty(row)) {
+                // Znaleziono wiersz z danymi
+                console.log("Karta 'brudna': Znaleziono wypełniony wiersz.");
+                return true;
+            }
+        }
+    } catch (e) {
+        console.error("Błąd podczas sprawdzania wierszy w isKartaDirty:", e);
+    }
+    
+    // Jeśli nic nie znaleziono, karta jest czysta
+    console.log("Karta 'czysta'.");
+    return false;
+}
+
+/**
+ * Sprawdza, czy Kalkulator Wizyty zawiera dane (inne niż nr dokumentu).
+ * @returns {boolean} - true jeśli kalkulator jest "brudny", false jeśli czysty.
+ */
+function isKalkulatorDirty() {
+    // 1. Sprawdź klienta
+    if (document.getElementById('calcKlientInput').value.trim() !== '') {
+        console.log("Kalkulator 'brudny': Wpisano klienta.");
+        return true;
+    }
+    // 2. Sprawdź czynności
+    if (document.getElementById('calcCzynnosciInput').value.trim() !== '') {
+        console.log("Kalkulator 'brudny': Wpisano czynności.");
+        return true;
+    }
+    // 3. Sprawdź pozycje na paragonie
+    if (typeof receiptItems !== 'undefined' && receiptItems.length > 0) {
+        console.log("Kalkulator 'brudny': Dodano produkty do paragonu.");
+        return true;
+    }
+    // 4. Sprawdź notatkę
+    if (document.getElementById('calcNotatkaInput').value.trim() !== '') {
+        console.log("Kalkulator 'brudny': Wpisano notatkę.");
+        return true;
+    }
+    // 5. Sprawdź status płatności
+    if (document.querySelector('.payment-status-btn.active')) {
+        console.log("Kalkulator 'brudny': Wybrano status płatności.");
+        return true;
+    }
+
+    console.log("Kalkulator 'czysty'.");
+    return false;
+}
+
+/**
+ * Czyści kompletnie formularz Karty Leczenia i przygotowuje do nowej.
+ */
+function clearKartaLeczenia() {
+    console.log("Czyszczenie Karty Leczenia na żądanie użytkownika...");
+    
+    // 1. Wyczyść pola nagłówka
+    document.getElementById('klientSelect').value = '';
+    document.getElementById('adresKlienta').textContent = '';
+    document.getElementById('nrStada').textContent = '';
+    
+    // 2. Zresetuj daty na dzisiejsze
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('dataZgloszenia').value = today;
+    document.getElementById('dataWykonania').value = today;
+    
+    // 3. Wyczyść pole Nr Dokumentu (WAŻNE: to wymusi wygenerowanie nowego)
+    document.getElementById('nrDokumentu').value = ''; 
+
+    // 4. Wyczyść tabelę (przez jej ponowne wygenerowanie)
+    if (typeof generateRows === 'function') {
+        generateRows(); 
+    }
+    
+    // 5. Wyczyść podpis posiadacza
+    const clearSign = document.getElementById('clearSignBtn');
+    if (clearSign) {
+        clearSign.click();
+    }
+    
+    // 6. Zresetuj stan zapisu
+    isCurrentCardSaved = false;
+    
+    // 7. Wygeneruj nowy numer dokumentu
+    if (typeof generateAndSetDocumentNumber === 'function') {
+        generateAndSetDocumentNumber();
+    }
+    
+    showToast('Rozpoczęto nową kartę leczenia.', 'info');
+}
+
+/**
+ * Czyści kompletnie formularz Kalkulatora Wizyty.
+ */
+function clearKalkulator() {
+    console.log("Czyszczenie Kalkulatora Wizyty na żądanie użytkownika...");
+
+    // 1. Wyczyść pola nagłówka
+    document.getElementById('calcKlientInput').value = '';
+    document.getElementById('calcCzynnosciInput').value = '';
+    
+    // 2. Wyczyść pole Nr Dokumentu (WAŻNE: to wymusi wygenerowanie nowego)
+    document.getElementById('calcNrDokInput').value = '';
+
+    // 3. Wyczyść paragon (listę produktów i sumę)
+    receiptItems = [];
+    if (typeof renderReceipt === 'function') {
+        renderReceipt();
+    }
+
+    // 4. Wyczyść notatkę
+    document.getElementById('calcNotatkaInput').value = '';
+
+    // 5. Wyczyść status płatności
+    const activeStatusBtn = document.querySelector('.payment-status-btn.active');
+    if (activeStatusBtn) {
+        activeStatusBtn.classList.remove('active');
+    }
+    
+    // 6. Wyczyść podsumowanie zapisanego paragonu
+    if(savedReceiptSummary) savedReceiptSummary.innerHTML = '';
+
+    // 7. Wygeneruj nowy numer paragonu
+    if (typeof generateAndSetReceiptDocumentNumber === 'function') {
+        generateAndSetReceiptDocumentNumber();
+    }
+    
+    showToast('Rozpoczęto nowy paragon.', 'info');
+}
+
+/* ======================================================== */
+/* ✅ KONIEC: Logika czyszczenia "brudnych" formularzy      */
 /* ======================================================== */
 </script> 
 
