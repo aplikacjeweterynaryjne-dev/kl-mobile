@@ -11408,14 +11408,23 @@ try {
  * Sprawdza, czy dany wiersz (<tr>) jest pusty.
  * Wiersz jest pusty, jeśli kluczowe pola (opis, liczba, rozpoznanie, lek) są puste.
  */
+/* ======================================================== */
+/* ✅ KROK 1: ZASTĄP TĘ FUNKCJĘ                             */
+/* ======================================================== */
+
+/**
+ * Sprawdza, czy dany wiersz (<tr>) jest pusty.
+ * Wiersz jest pusty, jeśli kluczowe pola (opis, liczba, lek) są puste.
+ * CELOWO IGNORUJEMY 'Rozpoznanie', bo to jest pole-wyzwalacz.
+ */
 function isRowEmpty(row) {
     if (!row) return false;
     try {
         const opis = row.cells[1].textContent.trim();
         const liczba = row.cells[2].querySelector('input')?.value.trim();
-        const rozpoznanie = row.cells[3].querySelector('input')?.value.trim();
+        // const rozpoznanie = row.cells[3].querySelector('input')?.value.trim(); // <-- IGNOROWANE
         const lek = row.cells[4].querySelector('input')?.value.trim();
-        return !opis && !liczba && !rozpoznanie && !lek;
+        return !opis && !liczba && !lek;
     } catch (e) {
         console.error("Błąd w isRowEmpty:", e, row);
         return false;
@@ -11446,14 +11455,14 @@ function findNextAvailableRow(startIndex = 0) {
  * Wersja 2.0 - używa ABSOLUTNYCH indeksów wierszy.
  */
 /* ======================================================== */
-/* ✅ KROK 1: ZASTĄP TĘ FUNKCJĘ                             */
+/* ✅ KROK 2: ZASTĄP TĘ FUNKCJĘ                             */
 /* ======================================================== */
 
 /**
  * Sprawdza, czy schemat zmieści się w tabeli, ORAZ CZY DOCELOWE WIERSZE SĄ PUSTE.
- * Wersja 2.1 - ignoruje pole 'Rozpoznanie' w wierszu, z którego wywołano schemat.
+ * Wersja 2.2 - używa nowej, prostszej funkcji isRowEmpty().
  */
-function checkSchemaFit(schema, logicalRows, triggerRowIndex) {
+function checkSchemaFit(schema, logicalRows) {
     if (!schema.produkty || schema.produkty.length === 0) return true; // Pusty schemat pasuje
 
     for (const p of schema.produkty) {
@@ -11465,26 +11474,8 @@ function checkSchemaFit(schema, logicalRows, triggerRowIndex) {
             return false; // Poza granicami
         }
 
-        // --- NOWA LOGIKA SPRAWDZANIA PUSTEGO WIERSZA ---
-        let rowIsEmpty;
-        if (targetIndex === triggerRowIndex) {
-            // To jest wiersz, w którym piszemy. Sprawdzamy, czy jest pusty,
-            // IGNORUJĄC pole "Rozpoznanie".
-            const row = logicalRows[targetIndex];
-            const opis = row.cells[1].textContent.trim();
-            const liczba = row.cells[2].querySelector('input')?.value.trim();
-            // celowo pomijamy 'rozpoznanie' (row.cells[3])
-            const lek = row.cells[4].querySelector('input')?.value.trim();
-            rowIsEmpty = !opis && !liczba && !lek;
-        } else {
-            // To jest inny wiersz docelowy (np. "Pozostawione 1"). 
-            // Musi być CAŁKOWICIE pusty.
-            rowIsEmpty = isRowEmpty(logicalRows[targetIndex]);
-        }
-        // --- KONIEC NOWEJ LOGIKI ---
-
-        // 3. Sprawdź wynik
-        if (!rowIsEmpty) {
+        // 2. Sprawdź, czy docelowy wiersz jest pusty (nowa isRowEmpty załatwia sprawę)
+        if (!isRowEmpty(logicalRows[targetIndex])) {
             console.log(`checkSchemaFit: FAILED (Occupied). Target: ${targetIndex} is not empty.`);
             return false; // Wiersz zajęty
         }
@@ -11500,12 +11491,10 @@ function checkSchemaFit(schema, logicalRows, triggerRowIndex) {
 
 /* ⬇️ ⬇️ ⬇️ WKLEJ TEN BLOK (zastępuje starą funkcję applySchema) ⬇️ ⬇️ ⬇️ */
 /* ======================================================== */
-/* ======================================================== */
-/* ✅ KROK 2: ZASTĄP TĘ FUNKCJĘ                             */
+/* ✅ KROK 3: ZASTĄP TĘ FUNKCJĘ                             */
 /* ======================================================== */
 function applySchema(event) {
     const input = event.target;
-    // Zapiszmy oryginalną nazwę schematu (np. "Mastitis"), a nie tylko małe litery
     const oryginalnaNazwaRozpoznania = input.value.trim();
     const rozpoznanieKey = oryginalnaNazwaRozpoznania.toLowerCase();
 
@@ -11524,29 +11513,16 @@ function applySchema(event) {
     const logicalRows = rowsEditable();
     if (logicalRows.length === 0) return;
 
-    // --- LOGIKA WYSZUKIWANIA MIEJSCA (FIX 5.1) ---
+    // --- LOGIKA WYSZUKIWANIA MIEJSCA (FIX 5.2) ---
 
-    // 3. Ustal, który wiersz wywołał zdarzenie (TO JEST NASZ TRIGGER)
-    let triggerRowIndex = 0;
-    const inFormModal = (input.id === 'formRozpoznanie');
-
-    if (inFormModal) {
-        triggerRowIndex = parseInt(formRowSelect.value, 10);
-    } else {
-        const currentRow = input.closest('tr');
-        triggerRowIndex = logicalRows.indexOf(currentRow);
-    }
-    if (triggerRowIndex === -1) triggerRowIndex = 0;
-    
-    // 4. Sprawdź, czy schemat pasuje (przekazujemy 'triggerRowIndex')
-    if (!checkSchemaFit(schema, logicalRows, triggerRowIndex)) {
+    // 3. Sprawdź, czy schemat pasuje (używa nowej checkSchemaFit)
+    if (!checkSchemaFit(schema, logicalRows)) {
         showToast("Wiersze docelowe są zajęte lub schemat nie mieści się w tabeli.", "error");
         input.value = ''; // Wyczyść pole
         return;
     }
 
-    // 5. Wypełnij pole Rozpoznanie (w pierwszym wierszu schematu)
-    // Znajdź najniższy indeks wiersza, którego używa schemat (np. 0 lub 9)
+    // 4. Wypełnij pole Rozpoznanie (w pierwszym wierszu schematu)
     const diagRowIndex = Math.min(...schema.produkty.map(p => p.wierszDocelowy));
     
     if (diagRowIndex >= 0 && diagRowIndex < logicalRows.length) {
@@ -11559,7 +11535,7 @@ function applySchema(event) {
         console.error("Błąd schematu: nie można znaleźć wiersza dla rozpoznania.");
     }
 
-    // 6. Wypełnij wiersze produktów
+    // 5. Wypełnij wiersze produktów
     schema.produkty.forEach(p => {
         const targetRowIndex = p.wierszDocelowy; // ABSOLUTNY indeks
         const row = logicalRows[targetRowIndex];
@@ -11598,14 +11574,29 @@ function applySchema(event) {
         }
     });
 
-    // 7. Odśwież formularz (jeśli był używany) lub wyczyść input
+    // 6. Odśwież formularz (jeśli był używany) lub wyczyść input
+    const inFormModal = (input.id === 'formRozpoznanie');
+    
     if (inFormModal) {
         setTimeout(() => {
             selectRowInForm(diagRowIndex); 
             input.value = ''; // Wyczyść input formularza
         }, 0);
     } else {
-         input.value = ''; // Zawsze czyść input w tabeli
+         // --- POPRAWKA (BUG A) ---
+         // Nie czyścimy 'input.value' natychmiast, bo to jest 'diagInput'!
+         // Pozwalamy, aby pole 'Rozpoznanie' zostało wypełnione.
+         // Użytkownik sam je wyczyści, jeśli będzie chciał dodać następny schemat.
+         // input.value = ''; // USUNIĘTA LINIA
+         
+         // Zamiast tego, wyczyść pole, z którego wywołano, TYLKO jeśli nie jest 
+         // to pole docelowe dla diagnozy (co jest teraz rzadkie, ale bezpieczne)
+         const triggerRow = input.closest('tr');
+         const triggerIndex = logicalRows.indexOf(triggerRow);
+         if (triggerIndex !== diagRowIndex) {
+            input.value = '';
+         }
+         // --- KONIEC POPRAWKI ---
     }
     
     showToast(`Zastosowano schemat: ${schema.rozpoznanie}`, 'success');
