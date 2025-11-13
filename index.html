@@ -10535,16 +10535,23 @@ try {
     }
 
     // --- 6. Renderowanie Widoków ---
-
-  // Renderuje widok Dziś (ZMODYFIKOWANA)
+    
 // Renderuje widok Dnia (ZMODYFIKOWANA)
-    function renderTodayView(visits, dateToShow) { // <-- ZMIANA 1: Dodany argument 'dateToShow'
-        // ⬇️ ⬇️ ⬇️ POCZĄTEK ZMIAN (MODUŁ 2.5) ⬇️ ⬇️ ⬇️
+    function renderTodayView(visits, dateToShow) { // <-- Ta linia jest już poprawna
+        // ⬇️ ⬇️ ⬇️ POCZĄTEK POPRAWKI (BŁĄD STREFY CZASOWEJ) ⬇️ ⬇️ ⬇️
         // Użyj przekazanej daty lub dzisiejszej, jeśli nic nie podano
         const targetDate = dateToShow || new Date();
-        const todayISO = targetDate.toISOString().split('T')[0];
 
-        // 2. Zaktualizuj tytuł widoku dnia
+        // BŁĄD był tutaj: .toISOString() konwertuje na czas UTC, cofając datę.
+        // const todayISO = targetDate.toISOString().split('T')[0]; // <-- ZŁY KOD
+
+        // POPRAWKA: Ręcznie formatujemy datę do stringa YYYY-MM-DD w LOKALNEJ strefie czasowej
+        const y = targetDate.getFullYear();
+        const m = String(targetDate.getMonth() + 1).padStart(2, '0'); // Miesiące są 0-11
+        const d = String(targetDate.getDate()).padStart(2, '0');
+        const todayISO = `${y}-${m}-${d}`; // To jest teraz poprawny string, np. "2025-11-14"
+
+        // 2. Zaktualizuj tytuł widoku dnia (ta logika jest poprawna)
         const isToday = (new Date().toISOString().split('T')[0] === todayISO);
         const titleDateString = targetDate.toLocaleDateString('pl-PL', { day: 'numeric', month: 'long', year: 'numeric' });
         
@@ -10553,9 +10560,9 @@ try {
         } else {
             todayViewTitle.textContent = `Wizyty na dzień: ${titleDateString}`;
         }
-        // ⬆️ ⬆️ ⬆️ KONIEC ZMIAN (MODUŁ 2.5) ⬆️ ⬆️ ⬆️
+        // ⬆️ ⬆️ ⬆️ KONIEC POPRAWKI ⬆️ ⬆️ ⬆️
         
-        // Filtruj wizyty dla wybranego dnia (zamiast tylko "dzisiaj")
+        // Filtruj wizyty dla wybranego dnia (teraz używa poprawnego 'todayISO')
         const todayVisits = visits.filter(v => v.dataWizyty === todayISO);
 
         // ✅ KOREKTA 2: Ustaw podsumowanie
