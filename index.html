@@ -1655,6 +1655,107 @@ table {
     content: '▶'; /* Domyślna strzałka (zwinięte) */
 }
 /* ⬆️ ⬆️ ⬆️ KONIEC MODUŁU 1 (CSS) ⬆️ ⬆️ ⬆️ */
+/* ⬇️ ⬇️ ⬇️ WKLEJ TEN BLOK KODU (KROK 2) ⬇️ ⬇️ ⬇️ */
+
+/* --- Definicja strony dla drukarki 110mm --- */
+@page receipt-110mm {
+    size: 110mm auto; /* Szerokość 110mm, wysokość automatyczna */
+    margin: 5mm; /* Marginesy 5mm */
+}
+
+/* --- Style dla paragonu 110mm (widoczne tylko przy drukowaniu) --- */
+#receiptPrintContainer {
+    font-family: 'Courier New', Courier, monospace !important;
+    color: #000 !important;
+    font-size: 10pt !important;
+    line-height: 1.3 !important;
+}
+#receiptPrintContainer h2 {
+    font-size: 11pt !important;
+    text-align: left; /* Zmienione na lewo dla dopasowania do nr KL */
+    margin: 0 0 10px 0;
+    font-weight: bold;
+    text-transform: uppercase;
+}
+#receiptPrintContainer h3 {
+    font-size: 10pt !important;
+    font-weight: bold;
+    margin-top: 15px;
+    margin-bottom: 5px;
+    border-bottom: 1px dashed #000;
+    padding-bottom: 3px;
+}
+#receiptPrintContainer p {
+    font-size: 10pt !important;
+    margin: 2px 0;
+    word-wrap: break-word; /* Łamanie długich linii */
+}
+#receiptPrintContainer .data-block {
+    margin-bottom: 10px;
+}
+#receiptPrintContainer .receipt-row-item {
+    border-top: 1px solid #ccc;
+    padding: 5px 0;
+    margin-top: 5px;
+}
+#receiptPrintContainer .receipt-row-item p {
+    margin: 3px 0;
+    display: block;
+}
+#receiptPrintContainer .receipt-row-item strong {
+    font-size: 9pt; /* Mniejsze etykiety w wierszu */
+}
+#receiptPrintContainer .signatures-110mm {
+    margin-top: 25px;
+}
+#receiptPrintContainer .sig-box-110mm {
+    margin-top: 10px;
+}
+#receiptPrintContainer .sig-box-110mm strong {
+    display: block;
+    font-size: 10pt;
+}
+#receiptPrintContainer .sig-box-110mm img {
+    max-width: 180px; /* Ogranicz szerokość podpisu */
+    height: 60px;
+    object-fit: contain;
+    border: 1px solid #eee;
+    margin-top: 5px;
+}
+#receiptPrintContainer .footer-legend {
+    margin-top: 20px;
+    font-size: 8pt !important;
+    border-top: 1px dashed #000;
+    padding-top: 5px;
+}
+
+/* --- Logika ukrywania/pokazywania przy druku 110mm --- */
+@media print {
+    /* Kiedy body ma klasę .print-mode-110mm... */
+    body.print-mode-110mm {
+        page: receipt-110mm; /* Zastosuj format strony 110mm */
+        transform: none !important; /* Zresetuj skalowanie */
+    }
+    body.print-mode-110mm #app-container > *:not(#receiptPrintContainer) {
+        display: none !important; /* Ukryj wszystko... */
+        visibility: hidden !important;
+    }
+    
+    body.print-mode-110mm #receiptPrintContainer {
+        display: block !important; /* ...oprócz kontenera paragonu */
+        visibility: visible !important;
+        position: static !important;
+        width: 100% !important; /* Rozciągnij na całą szerokość strony (110mm) */
+        height: auto !important;
+        background: none !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        box-shadow: none !important;
+        border: none !important;
+    }
+}
+
+/* ⬆️ ⬆️ ⬆️ KONIEC BLOKU KODU (KROK 2) ⬆️ ⬆️ ⬆️ */
 </style>
     <div id="calcProductSearchModal" class="product-search-modal" style="display: none; z-index: 10003;">
     <div class="product-search-card">
@@ -3036,6 +3137,21 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
 </div>
     </div>
 </div>
+<div id="printFormatModal" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.48); display: none; z-index: 10001; justify-content: center; align-items: center;">
+    <div class="form-card" style="width: 90vw; max-width: 400px; height: auto;">
+        <h3 style="font-size: 22px; text-align: center; margin-top: 0;">Wybierz format wydruku</h3>
+        <div style="display: flex; flex-direction: column; gap: 15px; margin-top: 20px;">
+            <button id="printFormatA4" class="btn primary" style="font-size: 18px; padding: 12px;">Standardowy A4</button>
+            <button id="printFormat110" class="btn" style="font-size: 18px; padding: 12px;">Drukarka paragonowa (110mm)</button>
+        </div>
+        <div class="form-actions" style="margin-top: 25px; justify-content: flex-end;">
+            <button id="printFormatCancel" class="btn ghost small" style="font-size: 16px;">Anuluj</button>
+        </div>
+    </div>
+</div>
+
+<div id="receiptPrintContainer" style="display: none; font-family: 'Courier New', Courier, monospace; color: #000;">
+    </div>
 <script>
 /* ----- Inicjalizacja Firebase (Uruchamia się na starcie) ----- */
 // ... reszta kodu pierwszego bloku script ...
@@ -4076,26 +4192,261 @@ console.warn('Rozpoznawanie mowy nie jest obsługiwane w tej przeglądarce.');
 // === Obsługa przycisku Drukuj i zapisu e-maila ===
 
 // Drukuj (NOWA LOGIKA - dodaje klasę, aby naprawić błąd białej strony)
-const drukujBtn = document.getElementById('printBtn'); // ‼️ ZMIANA na printBtn
-if (drukujBtn) {
-    // Usuń stary atrybut onclick, jeśli istnieje (na wszelki wypadek)
+/* ⬇️ ⬇️ ⬇️ ZASTĄP STARY BLOK `drukujBtn` TYM NOWYM (KROK 3) ⬇️ ⬇️ ⬇️ */
+
+// === OBSŁUGA PRZYCISKU DRUKUJ (WERSJA Z MODALEM WYBORU) ===
+
+// Znajdź główny przycisk drukowania
+const drukujBtn = document.getElementById('printBtn'); 
+
+// Zmienne dla nowego modala
+const printFormatModal = document.getElementById('printFormatModal');
+const printFormatA4 = document.getElementById('printFormatA4');
+const printFormat110 = document.getElementById('printFormat110');
+const printFormatCancel = document.getElementById('printFormatCancel');
+const receiptPrintContainer = document.getElementById('receiptPrintContainer');
+
+// 1. Przechwyć kliknięcie głównego przycisku "Drukuj"
+if (drukujBtn && printFormatModal) {
+    // Upewnij się, że stary listener jest usunięty (na wszelki wypadek)
     drukujBtn.removeAttribute('onclick');
     
     drukujBtn.addEventListener('click', () => {
-        // Dodaj klasę do body, aby aktywować style drukowania
-        document.body.classList.add('print-mode-karta');
-        
-        // Daj przeglądarce chwilę na zastosowanie styli
-        setTimeout(() => {
-            window.print();
-        }, 100); // 100ms opóźnienia
-
-        // Usuń klasę po wydruku (z dłuższym opóźnieniem)
-        setTimeout(() => {
-            document.body.classList.remove('print-mode-karta');
-        }, 1000);
+        // Zamiast drukować, pokaż modal wyboru formatu
+        printFormatModal.style.display = 'flex';
     });
 }
+
+// 2. Listener dla przycisku "Anuluj" w modalu
+if (printFormatCancel) {
+    printFormatCancel.addEventListener('click', () => {
+        printFormatModal.style.display = 'none';
+    });
+}
+
+// 3. Listener dla przycisku "A4" (uruchamia starą logikę)
+if (printFormatA4) {
+    printFormatA4.addEventListener('click', () => {
+        printFormatModal.style.display = 'none'; // Ukryj modal
+        
+        console.log("Drukowanie w formacie A4...");
+        // Uruchom starą logikę drukowania A4
+        document.body.classList.add('print-mode-karta');
+        setTimeout(() => { window.print(); }, 100);
+        setTimeout(() => { document.body.classList.remove('print-mode-karta'); }, 1000);
+    });
+}
+
+// 4. Listener dla przycisku "110mm" (uruchamia nową logikę)
+if (printFormat110 && receiptPrintContainer) {
+    printFormat110.addEventListener('click', () => {
+        printFormatModal.style.display = 'none'; // Ukryj modal
+        showToast('Generowanie wydruku 110mm...', 'info', 2000);
+
+        try {
+            // Wywołaj nową funkcję generującą
+            const receiptHTML = generate110mmReceiptHTML();
+            receiptPrintContainer.innerHTML = receiptHTML;
+            
+            // Dodaj nową klasę do body (CSS z @media print ją wykryje)
+            document.body.classList.add('print-mode-110mm');
+            
+            setTimeout(() => {
+                window.print();
+            }, 100); // Daj czas na renderowanie
+            
+            // Usuń klasę po drukowaniu
+            setTimeout(() => {
+                document.body.classList.remove('print-mode-110mm');
+                // receiptPrintContainer.innerHTML = ''; // Opcjonalnie wyczyść
+            }, 1000);
+
+        } catch (e) {
+            console.error("Błąd podczas generowania paragonu 110mm:", e);
+            showToast('Błąd generowania wydruku 110mm.', 'error');
+        }
+    });
+}
+
+/**
+ * NOWA FUNKCJA: Zbiera dane z aktywnej Karty Leczenia i generuje HTML dla paragonu 110mm.
+ * @returns {string} - Surowy HTML do wstrzyknięcia do #receiptPrintContainer.
+ */
+function generate110mmReceiptHTML() {
+    console.log("Rozpoczynam generowanie HTML dla 110mm...");
+
+    // --- 1. POBIERZ DANE NAGŁÓWKA ---
+    const nrKL = document.getElementById('nrDokumentu')?.value || 'B/N';
+    const lecznica = document.getElementById('nazwaLecznicy')?.textContent || 'Brak danych';
+    const klient = document.getElementById('klientSelect')?.value || 'Brak danych';
+    const adres = document.getElementById('adresKlienta')?.textContent || 'Brak danych';
+    const nrStada = document.getElementById('nrStada')?.textContent || 'Brak danych';
+    const dataWizyty = document.getElementById('dataWykonania')?.value || 'Brak danych';
+
+    // --- 2. POBIERZ PODPISY ---
+    const podpisLekarzaImg = document.getElementById('doctor-signature')?.src || '';
+    const podpisLekarzaLinia = document.getElementById('doctor-signature-name')?.textContent || '';
+    const podpisKlientaImg = document.getElementById('canvasPosiadacz')?.toDataURL() || '';
+
+    // --- 3. POBIERZ WIERSZE TABELI ---
+    const logicalRows = rowsEditable(); // Używamy istniejącej funkcji
+    const leczenieNaMiejscu = logicalRows.slice(0, 9); // Indeksy 0-8
+    const leczeniePozostawione = logicalRows.slice(9); // Indeksy 9, 10, 11
+    
+    // --- 4. FUNKCJA POMOCNICZA DO RENDEROWANIA WIERSZY (Leczenie na miejscu) ---
+    const renderReceiptRow = (row, lp) => {
+        if (!row || isRowEmpty(row)) return ''; // Pomiń puste wiersze
+
+        const opis = row.cells[1]?.textContent || '';
+        const liczba = row.cells[2]?.querySelector('input')?.value || '';
+        const rozpoznanie = row.cells[3]?.querySelector('input')?.value || '';
+        const produkt = row.cells[4]?.querySelector('input')?.value || '';
+        const seria = row.cells[5]?.textContent || '';
+        
+        // Logika dla ilości/dawkowania (komórka 6)
+        const iloscInput = row.cells[6]?.querySelector('input[type="number"]');
+        const ilosc = iloscInput?.value || '';
+        let dawkaText = '';
+        if (iloscInput && iloscInput.nextSibling && iloscInput.nextSibling.nodeType === Node.TEXT_NODE) {
+            dawkaText = iloscInput.nextSibling.textContent.trim();
+        }
+        const iloscDawka = [ilosc, dawkaText].filter(Boolean).join(' '); // Łączy np. "10" i "ml"
+
+        const karencja = row.cells[7]?.textContent || '';
+
+        // Generuje HTML na podstawie Twojego szablonu
+        return `
+        <div class="receipt-row-item">
+            <p><strong>3. Opis lecz. zwierzęcia (Lp. ${lp}):</strong> ${opis}</p>
+            <p><strong>4. Liczba lecz. zwierząt:</strong> ${liczba}</p>
+            <p><strong>5. Rozpoznanie:</strong> ${rozpoznanie}</p>
+            <p><strong>6. Zastosowane produkty:</strong></p>
+            <p style="padding-left: 10px;">
+                ${produkt || 'B/N'} / ${seria || 'B/N'} / ${iloscDawka || 'B/N'} / ${karencja || 'B/N'}
+            </p>
+        </div>
+        `;
+    };
+    
+    // Funkcja dla wierszy "Pozostawionych" (pkt 7.1 - 7.4)
+    const renderReceiptRowPozostawione = (row, lp) => {
+        if (!row || isRowEmpty(row)) return '';
+
+        const opis = row.cells[1]?.textContent || '';
+        const liczba = row.cells[2]?.querySelector('input')?.value || '';
+        const rozpoznanie = row.cells[3]?.querySelector('input')?.value || '';
+        const produkt = row.cells[4]?.querySelector('input')?.value || '';
+        const seria = row.cells[5]?.textContent || '';
+        const iloscInput = row.cells[6]?.querySelector('input[type="number"]');
+        const ilosc = iloscInput?.value || '';
+        let dawkaText = '';
+        if (iloscInput && iloscInput.nextSibling && iloscInput.nextSibling.nodeType === Node.TEXT_NODE) {
+            dawkaText = iloscInput.nextSibling.textContent.trim();
+        }
+        const iloscDawka = [ilosc, dawkaText].filter(Boolean).join(' ');
+        const karencja = row.cells[7]?.textContent || '';
+
+        return `
+        <div class="receipt-row-item">
+            <p><strong>7.1 Opis lecz. zwierzęcia (Lp. ${lp}):</strong> ${opis}</p>
+            <p><strong>7.2 Liczba lecz. zwierząt:</strong> ${liczba}</p>
+            <p><strong>7.3 Rozpoznanie:</strong> ${rozpoznanie}</p>
+            <p><strong>7.4 Zastosowane produkty:</strong></p>
+            <p style="padding-left: 10px;">
+                ${produkt || 'B/N'} / ${seria || 'B/N'} / ${iloscDawka || 'B/N'} / ${karencja || 'B/N'}
+            </p>
+        </div>
+        `;
+    };
+
+    // --- 5. BUDOWANIE FINALNEGO HTML ---
+    let html = '';
+
+    // Nagłówek paragonu
+    html += `
+        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+            <h2 style="text-align: left; max-width: 70%;">KARTA LECZENIA ZWIERZĄT... (EWIDENCJA LECZENIA ZWIERZĄT)</h2>
+            <strong style="font-size: 11pt; text-align: right; white-space: nowrap;">KARTA NR:<br>${nrKL}</strong>
+        </div>
+    `;
+
+    // Blok 1: Dane Lecznic
+    html += `
+        <div class="data-block">
+            <h3>1. Nazwa i adres zakładu leczniczego</h3>
+            <p>${lecznica.replace('<br>', '\n')}</p>
+        </div>
+    `;
+
+    // Blok 2: Dane Posiadacza
+    html += `
+        <div class="data-block">
+            <h3>2. Imię, nazwisko i adres posiadacza</h3>
+            <p><strong>Klient:</strong> ${klient}</p>
+            <p><strong>Adres:</strong> ${adres}</p>
+            <p><strong>Nr stada:</strong> ${nrStada}</p>
+        </div>
+    `;
+    
+    // Blok 3: Data
+    html += `
+        <div class="data-block">
+            <h3>3. Wykonanie czynności dnia:</h3>
+            <p>${dataWizyty}</p>
+        </div>
+    `;
+
+    // Blok Leczenia na Miejscu (Wiersze 1-9)
+    html += `<h3>Leczenie na miejscu (Pkt 3-6)</h3>`;
+    html += `<p style="font-size: 9pt;"><strong>SCHEMAT:</strong> Opis / Liczba / Rozpoznanie</p>`;
+    html += `<p style="font-size: 9pt;"><strong>PRODUKT:</strong> Nazwa / Seria / Ilość(Dawka) / Karencja</p>`;
+    
+    let rowCounterLNM = 1;
+    for (const row of leczenieNaMiejscu) {
+        html += renderReceiptRow(row, `${rowCounterLNM}.`);
+        rowCounterLNM++;
+    }
+
+    // Blok Leczenia Pozostawionego (Wiersze 10-12)
+    html += `<h3>7. Potwierdzenie nabycia (Pkt 7.1-7.4)</h3>`;
+    html += `<p style="font-size: 9pt;"><strong>SCHEMAT:</strong> Opis / Liczba / Rozpoznanie</p>`;
+    html += `<p style="font-size: 9pt;"><strong>PRODUKT:</strong> Nazwa / Seria / Ilość(Dawka) / Karencja</p>`;
+    
+    let rowCounterLP = 1;
+    for (const row of leczeniePozostawione) {
+        html += renderReceiptRowPozostawione(row, `${rowCounterLP}.`);
+        rowCounterLP++;
+    }
+
+    // Blok Podpisów
+    html += `
+        <div class="signatures-110mm">
+            <div class="sig-box-110mm">
+                <strong>Podpis lekarza weterynarii:</strong>
+                <img src="${podpisLekarzaImg}" alt="Podpis lekarza">
+                <p>${podpisLekarzaLinia}</p>
+            </div>
+            <div class="sig-box-110mm">
+                <strong>Podpis posiadacza zwierzęcia:</strong>
+                <img src="${podpisKlientaImg}" alt="Podpis klienta">
+            </div>
+        </div>
+    `;
+
+    // Stopka (Legenda)
+    html += `
+        <div class="footer-legend">
+            <p>*Nazwa produktu leczniczego/ produktu leczniczego weterynaryjnego/ paszy leczniczej<br>
+            **Numer serii produktu leczniczego lub produktu leczniczego weterynaryjnego<br>
+            ***Ilość, dawkowanie zastosowanego produktu leczniczego lub ilość, dawkowanie i okres stosowanie nabytego produktu leczniczego, weterynaryjnego/paszy leczniczej<br>
+            ****Okres karencji oraz zabieg leczniczy lub profilaktyczne zalecenia lekarskie oraz uwagi</p>
+        </div>
+    `;
+
+    console.log("Generowanie HTML 110mm zakończone.");
+    return html;
+}
+/* ⬆️ ⬆️ ⬆️ KONIEC BLOKU KODU (KROK 3) ⬆️ ⬆️ ⬆️ */
 
 // Elementy e-mail
 const emailInput = document.getElementById('userEmail');
