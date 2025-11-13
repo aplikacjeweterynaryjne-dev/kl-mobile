@@ -11461,47 +11461,63 @@ function checkSchemaFit(schema, startingIndex) {
 /* ⬇️ ⬇️ ⬇️ WKLEJ TEN BLOK (zastępuje starą funkcję applySchema) ⬇️ ⬇️ ⬇️ */
 
 /* ======================================================== */
-/* ✅ ZAKTUALIZOWANA LOGIKA applySchema (Moduł 4)          */
-/* Obsługuje wiele schematów i sprawdzanie miejsca      */
+/* ✅ ZAKTUALIZOWANA LOGIKA applySchema (Moduł 4.1)       */
+/* Poprawia błąd wiersza startowego ORAZ wstawia diagnozę */
 /* ======================================================== */
 function applySchema(event) {
     const input = event.target;
     const rozpoznanie = input.value.trim().toLowerCase();
 
-    // 1. Sprawdź, czy checkbox "Użyj schematów" jest zaznaczony
+    // 1. Sprawdź checkbox
     if (!schemaCheckbox || !schemaCheckbox.checked) {
         return; // Nie rób nic, jeśli odznaczone
     }
 
-    // 2. Sprawdź, czy wpisana nazwa pasuje do schematu w mapie
+    // 2. Znajdź schemat
     const schema = cachedSchemaMap.get(rozpoznanie);
     if (!schema) {
         return; // Brak pasującego schematu
     }
 
     console.log("Znaleziono pasujący schemat:", schema.rozpoznanie);
-
     const logicalRows = rowsEditable();
     if (logicalRows.length === 0) return;
 
-    // --- NOWA LOGIKA WYSZUKIWANIA MIEJSCA ---
+    // --- NOWA LOGIKA WYSZUKIWANIA MIEJSCA (FIX 1) ---
 
-    // 3. Ustal, od którego wiersza zacząć szukanie
+    // 3. Ustal, który wiersz wywołał zdarzenie
     let currentIndex = 0;
     const inFormModal = (input.id === 'formRozpoznanie');
 
     if (inFormModal) {
-        // Jesteśmy w formularzu, wierszem startowym jest ten z listy rozwijanej
         currentIndex = parseInt(formRowSelect.value, 10);
     } else {
-        // Jesteśmy w tabeli, wierszem startowym jest ten, w którym jest input
         const currentRow = input.closest('tr');
         currentIndex = logicalRows.indexOf(currentRow);
     }
-    if (currentIndex === -1) currentIndex = 0; // Zabezpieczenie
+    if (currentIndex === -1) currentIndex = 0;
 
-    // 4. Znajdź następny dostępny wiersz (zaczynając od bieżącego)
-    const actualStartingIndex = findNextAvailableRow(currentIndex);
+    // 4. Sprawdź, czy ten wiersz jest pusty (poza polem rozpoznania)
+    const triggerRow = logicalRows[currentIndex];
+    
+    // Zapisz tymczasowo wpisaną wartość i wyczyść pole, aby sprawdzić "pustość"
+    const originalValue = input.value; 
+    input.value = ''; 
+    const startingRowIsEmpty = isRowEmpty(triggerRow); // Sprawdź, czy reszta jest pusta
+    input.value = originalValue; // Przywróć na chwilę
+
+    let actualStartingIndex;
+    if (startingRowIsEmpty) {
+        // Użyj bieżącego wiersza
+        actualStartingIndex = currentIndex;
+        console.log(`Wiersz ${currentIndex} jest pusty. Używam go jako startowy.`);
+    } else {
+        // Szukaj następnego wolnego wiersza
+        console.log(`Wiersz ${currentIndex} jest zajęty. Szukam następnego...`);
+        actualStartingIndex = findNextAvailableRow(currentIndex + 1); // Szukaj OD NASTĘPNEGO
+    }
+    
+    // --- KONIEC FIX 1 ---
 
     if (actualStartingIndex === -1) {
         showToast("Brak wolnych wierszy od tego miejsca.", "error");
@@ -11511,18 +11527,23 @@ function applySchema(event) {
 
     // 5. Sprawdź, czy schemat zmieści się w tabeli
     const canFit = checkSchemaFit(schema, actualStartingIndex);
-
     if (!canFit) {
         showToast("Za mało miejsca w tabeli, schemat zablokowany!", "error");
         input.value = ''; // Wyczyść pole
         return;
     }
 
-    // --- KONIEC NOWEJ LOGIKI ---
+    // --- NOWA LOGIKA (FIX 2: Wstaw rozpoznanie) ---
+    // 6. Wypełnij pole Rozpoznanie w docelowym wierszu
+    const startingRow = logicalRows[actualStartingIndex];
+    const diagInput = startingRow.cells[3].querySelector('input');
+    if (diagInput) {
+        diagInput.value = schema.rozpoznanie; // Wstaw pełną nazwę
+    }
+    // --- KONIEC FIX 2 ---
 
-    // 6. Wypełnij wiersze (używamy logiki z poprzedniej poprawki)
+    // 7. Wypełnij wiersze produktów (logika z poprzedniej poprawki)
     schema.produkty.forEach(p => {
-        // Użyj znalezionego 'actualStartingIndex' jako bazy
         const targetRowIndex = actualStartingIndex + p.wierszDocelowy; 
 
         if (targetRowIndex >= 0 && targetRowIndex < logicalRows.length) {
@@ -11537,31 +11558,24 @@ function applySchema(event) {
                 // 2. TERAZ dopiero wyszukaj pole ilości, które właśnie powstało
                 const iloscInput = row.cells[6].querySelector('input[type="number"]');
 
-                // 3. Wypełnij pola ze schematu (nadpisując dane z auto-uzupełniania)
-                
-                // Seria
+                // 3. Wypełnij pola ze schematu
                 row.cells[5].textContent = p.seria || ''; 
-
-                // Ilość
+                
                 if (iloscInput) {
-                    iloscInput.value = p.ilosc || ''; // Wpisz ILOŚĆ ze schematu
+                    iloscInput.value = p.ilosc || ''; // Wpisz ILOŚĆ
                 } else {
                     console.warn("Nie znaleziono pola input ilości w wierszu " + targetRowIndex);
                 }
                 
-                // Dawkowanie
                 const dawkaText = p.dawkowanie || '';
-                const textNode = row.cells[6].childNodes[1]; // Znajdź węzeł tekstowy
+                const textNode = row.cells[6].childNodes[1]; 
                 if (textNode && textNode.nodeType === Node.TEXT_NODE) {
                     textNode.textContent = ' ' + dawkaText;
                 } else if (dawkaText) {
                     row.cells[6].appendChild(document.createTextNode(' ' + dawkaText));
                 }
                 
-                // Karencja
                 row.cells[7].textContent = p.karencja || ''; 
-
-                // Ustaw wartość do druku (bardzo ważne)
                 row.cells[4].dataset.printValue = p.produkt;
 
                 row.classList.add('highlight-row');
@@ -11573,19 +11587,20 @@ function applySchema(event) {
         }
     });
 
-    // 7. Odśwież formularz (jeśli był używany) i wyczyść pole
+    // 8. Odśwież formularz (jeśli był używany)
     if (inFormModal) {
-        // Odśwież formularz, aby pokazać dane z wiersza, który właśnie wypełniliśmy
         setTimeout(() => {
-            selectRowInForm(actualStartingIndex);
+            // Odśwież widok formularza do wiersza, w którym wstawiono schemat
+            selectRowInForm(actualStartingIndex); 
         }, 0);
     }
 
-    // 8. Wyczyść pole rozpoznania, aby umożliwić dodanie kolejnego schematu
+    // 9. Wyczyść ORYGINALNY input (ten, który wywołał zdarzenie), aby umożliwić dodanie kolejnego schematu
     input.value = ''; 
     
     showToast(`Zastosowano schemat: ${schema.rozpoznanie}`, 'success');
 }
+
 /* ======================================================== */
 /* ✅ KONIEC: NOWA LOGIKA MODALI (SCHEMATY)                   */
 /* ======================================================== */
