@@ -10540,11 +10540,26 @@ try {
     // --- 6. Renderowanie Widoków ---
 
   // Renderuje widok Dziś (ZMODYFIKOWANA)
-    function renderTodayView(visits) {
-        const todayISO = new Date().toISOString().split('T')[0];
+// Renderuje widok Dnia (ZMODYFIKOWANA)
+    function renderTodayView(visits, dateToShow) { // <-- ZMIANA 1: Dodany argument 'dateToShow'
+        // ⬇️ ⬇️ ⬇️ POCZĄTEK ZMIAN (MODUŁ 2.5) ⬇️ ⬇️ ⬇️
+        // Użyj przekazanej daty lub dzisiejszej, jeśli nic nie podano
+        const targetDate = dateToShow || new Date();
+        const todayISO = targetDate.toISOString().split('T')[0];
 
-        // Filtruj tylko na dzisiaj
-        const todayVisits = visits.filter(v => v.dataWizyty === todayISO);
+        // 2. Zaktualizuj tytuł widoku dnia
+        const isToday = (new Date().toISOString().split('T')[0] === todayISO);
+        const titleDateString = targetDate.toLocaleDateString('pl-PL', { day: 'numeric', month: 'long', year: 'numeric' });
+        
+        if (isToday) {
+            todayViewTitle.textContent = `Wizyty na dzisiaj (${titleDateString})`;
+        } else {
+            todayViewTitle.textContent = `Wizyty na dzień: ${titleDateString}`;
+        }
+        // ⬆️ ⬆️ ⬆️ KONIEC ZMIAN (MODUŁ 2.5) ⬆️ ⬆️ ⬆️
+        
+        // Filtruj wizyty dla wybranego dnia (zamiast tylko "dzisiaj")
+        const todayVisits = visits.filter(v => v.dataWizyty === todayISO);
 
         // ✅ KOREKTA 2: Ustaw podsumowanie
         const totalCount = todayVisits.length;
