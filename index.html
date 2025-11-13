@@ -11542,7 +11542,21 @@ function applySchema(event) {
         input.value = ''; // Wyczyść pole
         return;
     }
+    // --- NOWA LOGIKA: Pobranie Mnożnika (Liczby Zwierząt) ---
     
+    // Pobierz wiersz, od którego zaczynamy (ten, w którym wpisano diagnozę)
+    const startingRowForSchema = logicalRows[actualStartingIndex];
+    const liczbaInput = startingRowForSchema.cells[2].querySelector('input[type="number"]');
+    let liczbaZwierzaDlaSchematu = 1; // Domyślnie 1, jeśli pole jest puste
+
+    if (liczbaInput && liczbaInput.value.trim() !== '') {
+        const parsedLiczba = parseInt(liczbaInput.value, 10);
+        if (!isNaN(parsedLiczba) && parsedLiczba > 0) {
+            liczbaZwierzaDlaSchematu = parsedLiczba;
+        }
+    }
+    console.log(`Mnożnik schematu (liczba zwierząt): ${liczbaZwierzaDlaSchematu}`);
+    // --- KONIEC NOWEJ LOGIKI ---
     // --- KONIEC LOGIKI WYSZUKIWANIA MIEJSCA ---
 
 
@@ -11599,15 +11613,41 @@ if (firstPozostawioneProduct) {
                 produktInput.value = p.produkt;
                 produktInput.dispatchEvent(new Event('input', { bubbles: true })); 
                 
-                const iloscInput = row.cells[6].querySelector('input[type="number"]');
+               const iloscInput = row.cells[6].querySelector('input[type="number"]');
 
-                row.cells[5].textContent = p.seria || ''; 
-                
-                if (iloscInput) {
-                    iloscInput.value = p.ilosc || ''; 
-                } else {
-                    console.warn("Nie znaleziono pola input ilości w wierszu " + targetRowIndex);
+            row.cells[5].textContent = p.seria || '';  
+            
+            // --- START ZMODYFIKOWANEJ LOGIKI (Mnożenie ilości) ---
+
+            // 1. Pobierz ilość ze schematu (obsługuje "0.5" i "0,5")
+            let schemaIlosc = 0;
+            if (p.ilosc && String(p.ilosc).trim() !== '') {
+                const parsedSchemaIlosc = parseFloat(String(p.ilosc).replace(',', '.')); 
+                if (!isNaN(parsedSchemaIlosc)) {
+                    schemaIlosc = parsedSchemaIlosc;
                 }
+            }
+
+            // 2. Oblicz końcową ilość (Ilość * Liczba Zwierząt)
+            const finalIlosc = schemaIlosc * liczbaZwierzaDlaSchematu;
+
+            // 3. Wstaw obliczoną wartość do pola
+            if (iloscInput) {
+                let finalValue = finalIlosc;
+                
+                // Formatuj do 2 miejsc po przecinku, jeśli jest ułamkiem
+                if (finalIlosc % 1 !== 0) {
+                    // .toFixed(2) zwraca string, np. "2.50"
+                    finalValue = finalIlosc.toFixed(2);
+                }
+                
+                // Wstaw jako string (na wypadek ułamków)
+                iloscInput.value = finalValue > 0 ? String(finalValue) : ''; 
+            } else {
+                console.warn("Nie znaleziono pola input ilości w wierszu " + targetRowIndex);
+            }
+            
+            // --- KONIEC ZMODYFIKOWANEJ LOGIKI ---
                 
                 const dawkaText = p.dawkowanie || '';
                 const textNode = row.cells[6].childNodes[1]; 
