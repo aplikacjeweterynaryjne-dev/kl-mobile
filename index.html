@@ -11542,12 +11542,12 @@ function applySchema(event) {
         input.value = ''; // Wyczyść pole
         return;
     }
-    // --- NOWA LOGIKA: Pobranie Mnożnika (Liczby Zwierząt) ---
+// --- NOWA LOGIKA: Pobranie Mnożnika i podpięcie listenera ---
     
-    // Pobierz wiersz, od którego zaczynamy (ten, w którym wpisano diagnozę)
+    // Pobierz wiersz, od którego zaczynamy
     const startingRowForSchema = logicalRows[actualStartingIndex];
     const liczbaInput = startingRowForSchema.cells[2].querySelector('input[type="number"]');
-    let liczbaZwierzaDlaSchematu = 1; // Domyślnie 1, jeśli pole jest puste
+    let liczbaZwierzaDlaSchematu = 1; // Domyślnie 1
 
     if (liczbaInput && liczbaInput.value.trim() !== '') {
         const parsedLiczba = parseInt(liczbaInput.value, 10);
@@ -11556,6 +11556,16 @@ function applySchema(event) {
         }
     }
     console.log(`Mnożnik schematu (liczba zwierząt): ${liczbaZwierzaDlaSchematu}`);
+    
+    // Nadaj unikalne ID polu "Liczba" (np. "liczba-zwierzat-0")
+    const liczbaInputId = 'liczba-zwierzat-' + actualStartingIndex;
+    if (liczbaInput) {
+        liczbaInput.id = liczbaInputId;
+        
+        // Usuń stary listener (na wszelki wypadek) i dodaj nowy
+        liczbaInput.removeEventListener('input', handleLiczbaChange); 
+        liczbaInput.addEventListener('input', handleLiczbaChange);
+    }
     // --- KONIEC NOWEJ LOGIKI ---
     // --- KONIEC LOGIKI WYSZUKIWANIA MIEJSCA ---
 
@@ -11631,18 +11641,29 @@ if (firstPozostawioneProduct) {
             // 2. Oblicz końcową ilość (Ilość * Liczba Zwierząt)
             const finalIlosc = schemaIlosc * liczbaZwierzaDlaSchematu;
 
-            // 3. Wstaw obliczoną wartość do pola
+ // 3. Wstaw obliczoną wartość do pola i OTAGUJ POLE
             if (iloscInput) {
                 let finalValue = finalIlosc;
                 
-                // Formatuj do 2 miejsc po przecinku, jeśli jest ułamkiem
                 if (finalIlosc % 1 !== 0) {
-                    // .toFixed(2) zwraca string, np. "2.50"
                     finalValue = finalIlosc.toFixed(2);
                 }
                 
-                // Wstaw jako string (na wypadek ułamków)
                 iloscInput.value = finalValue > 0 ? String(finalValue) : ''; 
+
+                // --- START TAGOWANIA ---
+                // Zapisz w polu "Ilość", jaka jest jego bazowa ilość na 1 szt.
+                iloscInput.dataset.schemaBaseQty = String(schemaIlosc);
+                
+                // Zapisz w polu "Ilość", które pole "Liczba" je kontroluje
+                iloscInput.dataset.schemaControllerId = liczbaInputId;
+                
+                // Dodaj listener, który zerwie to połączenie, jeśli użytkownik zacznie pisać
+                // Używamy "keydown", aby odpalił się ZANIM "input" (co pozwala nam odróżnić wpisanie ręczne od programistycznego)
+                iloscInput.removeEventListener('keydown', handleIloscOverride);
+                iloscInput.addEventListener('keydown', handleIloscOverride);
+                // --- KONIEC TAGOWANIA ---
+
             } else {
                 console.warn("Nie znaleziono pola input ilości w wierszu " + targetRowIndex);
             }
@@ -11916,6 +11937,72 @@ try {
 /* ======================================================== */
 
 /* ⬆️ ⬆️ ⬆️ KONIEC WKLEJANIA ⬆️ ⬆️ ⬆️ */
+/* ======================================================== */
+/* ✅ POCZĄTEK: Logika dynamicznego przeliczania ilości     */
+/* ======================================================== */
+
+/**
+ * Ta funkcja jest wywoływana, gdy użytkownik ręcznie wpisuje
+ * coś w pole "Ilość". Zrywa ona automatyczne połączenie.
+ */
+function handleIloscOverride(e) {
+    const iloscInput = e.target;
+    
+    // Sprawdź, czy to pole jest połączone ze schematem
+    if (iloscInput.dataset.schemaBaseQty) {
+        console.log("Wykryto ręczną edycję ilości. Zerwano automatyczne łącze.");
+        
+        // Usuń tagi, aby 'handleLiczbaChange' przestał je aktualizować
+        delete iloscInput.dataset.schemaBaseQty;
+        delete iloscInput.dataset.schemaControllerId;
+        
+        // Usuń ten listener, aby nie odpalał się przy każdym kolejnym naciśnięciu klawisza
+        iloscInput.removeEventListener('keydown', handleIloscOverride);
+    }
+}
+
+/**
+ * Ta funkcja jest wywoływana, gdy użytkownik zmienia wartość
+ * w polu "Liczba leczonych zwierząt".
+ */
+function handleLiczbaChange(e) {
+    const controllerInput = e.target; // To jest pole "Liczba leczonych zwierząt"
+    const controllerId = controllerInput.id;
+    if (!controllerId) return;
+
+    // Pobierz nowy mnożnik (liczbę zwierząt)
+    const mnoznik = parseFloat(controllerInput.value.replace(',', '.')) || 0;
+    console.log(`Zmiana liczby zwierząt (${controllerId}): Nowy mnożnik = ${mnoznik}`);
+
+    // Znajdź wszystkie pola "Ilość", które są kontrolowane przez to pole "Liczba"
+    const controlledInputs = document.querySelectorAll('input[data-schema-controller-id="' + controllerId + '"]');
+    
+    controlledInputs.forEach(iloscInput => {
+        // Pobierz bazową ilość "na 1 sztukę" zapisaną w tagu
+        const baseQtyStr = iloscInput.dataset.schemaBaseQty;
+        
+        // Sprawdź, czy łącze wciąż istnieje (czy użytkownik go nie zerwał)
+        if (baseQtyStr) {
+            const baseQty = parseFloat(baseQtyStr);
+            if (!isNaN(baseQty)) {
+                // Oblicz nową końcową ilość
+                const finalIlosc = baseQty * mnożnik;
+                
+                // Sformatuj wynik (tak jak robiliśmy to wcześniej)
+                let finalValue = finalIlosc;
+                if (finalIlosc % 1 !== 0) {
+                    finalValue = finalIlosc.toFixed(2);
+                }
+                
+                // Zaktualizuj wartość w polu "Ilość"
+                iloscInput.value = finalValue > 0 ? String(finalValue) : '';
+            }
+        }
+    });
+}
+/* ======================================================== */
+/* ✅ KONIEC: Logika dynamicznego przeliczania ilości      */
+/* ======================================================== */
 </script> 
 
 <div id="toastContainer" style="position: fixed; top: 20px; right: 20px; z-index: 20000; display: flex; flex-direction: column; gap: 10px;">
