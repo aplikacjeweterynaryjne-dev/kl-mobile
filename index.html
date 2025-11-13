@@ -11470,13 +11470,14 @@ try {
 
 /* ⬇️ ⬇️ ⬇️ WKLEJ TEN BLOK (zastępuje starą funkcję applySchema) ⬇️ ⬇️ ⬇️ */
 
+/* ⬇️ ⬇️ ⬇️ WKLEJ TEN BLOK (zastępuje starą funkcję applySchema) ⬇️ ⬇️ ⬇️ */
+
 /* ======================================================== */
-/* ✅ ZAKTUALIZOWANA LOGIKA applySchema (Naprawa Moduł 3)    */
+/* ✅ ZAKTUALIZOWANA LOGIKA applySchema (Moduł 3 - POPRAWKA) */
 /* ======================================================== */
 /**
  * Główna funkcja auto-uzupełniania (zastosowania schematu).
- * Działa zarówno w tabeli, jak i w formularzu.
- * Naprawia błąd "Ilości" (Problem 1) oraz błąd "Wiersza 1" (Problem 3).
+ * Naprawia Błąd 1 (Ilość) i Błąd 2 (Odświeżanie formularza).
  */
 function applySchema(event) {
     const input = event.target;
@@ -11490,7 +11491,7 @@ function applySchema(event) {
     // 2. Sprawdź, czy wpisana nazwa pasuje do schematu w mapie
     const schema = cachedSchemaMap.get(rozpoznanie);
     if (!schema) {
-        return; // Brak pasującego schematu, pozwól pisać ręcznie
+        return; // Brak pasującego schematu
     }
 
     // 3. Mamy schemat! Rozpocznij wypełnianie tabeli
@@ -11519,39 +11520,35 @@ function applySchema(event) {
 
     // 5. Wypełnij wiersze tabeli
     schema.produkty.forEach(p => {
-        // Oblicz docelowy wiersz (np. wiersz schematu 0 + wiersz startowy 0 = 0; wiersz schematu 1 + wiersz startowy 0 = 1)
+        // Oblicz docelowy wiersz
         const targetRowIndex = startingIndex + p.wierszDocelowy;
 
-        // Upewnij się, że wiersz docelowy mieści się w tabeli
         if (targetRowIndex >= 0 && targetRowIndex < logicalRows.length) {
             const row = logicalRows[targetRowIndex];
             try {
                 const produktInput = row.cells[4].querySelector('input');
-                const iloscInput = row.cells[6].querySelector('input[type="number"]'); // BARDZIEJ PRECYZYJNY SELEKTOR
+                const iloscInput = row.cells[6].querySelector('input[type="number"]');
 
                 produktInput.value = p.produkt;
                 row.cells[5].textContent = p.seria || ''; // Seria
                 
-                // *** POCZĄTEK POPRAWKI PROBLEMU 1 (ILOŚĆ) ***
+                // --- POPRAWKA BŁĘDU 2 (ILOŚĆ) ---
                 if (iloscInput) {
-                    iloscInput.value = p.ilosc || ''; // Wypełnij pole ILOŚĆ
+                    iloscInput.value = p.ilosc || ''; // Poprawnie czytaj 'p.ilosc'
                 }
-                const dawkaText = p.dawkowanie || ''; // Wypełnij pole DAWKOWANIE
-                // *** KONIEC POPRAWKI PROBLEMU 1 ***
+                const dawkaText = p.dawkowanie || ''; // Poprawnie czytaj 'p.dawkowanie'
+                // --- KONIEC POPRAWKI ---
 
-                // Znajdź węzeł tekstowy dla dawkowania (aby nie usunąć inputa)
                 const textNode = row.cells[6].childNodes[1];
                 if (textNode && textNode.nodeType === Node.TEXT_NODE) {
                     textNode.textContent = ' ' + dawkaText;
                 } else if (dawkaText) {
-                    // Jeśli węzeł tekstowy nie istnieje (np. wiersz był pusty), dodaj go
                     row.cells[6].appendChild(document.createTextNode(' ' + dawkaText));
                 }
 
                 row.cells[7].textContent = p.karencja || ''; // Karencja
                 row.cells[4].dataset.printValue = p.produkt; // Dla druku
                 
-                // Podświetl wiersz, który został zmieniony
                 row.classList.add('highlight-row');
                 setTimeout(() => row.classList.remove('highlight-row'), 2000);
 
@@ -11561,13 +11558,17 @@ function applySchema(event) {
         }
     });
 
-    // 6. POPRAWKA PROBLEMU 3 (Formularz Wiersz 1)
-    // Jeśli akcja była wywołana z formularza, musimy odświeżyć jego widok,
-    // aby pokazać dane, które właśnie wstawiliśmy do tabeli.
+    // 6. POPRAWKA BŁĘDU 1 (FORMULARZ)
+    // Jeśli akcja była wywołana z formularza, odświeżamy jego widok.
     if (inFormModal) {
-        console.log("Odświeżanie formularza po zastosowaniu schematu...");
-        // Wczytaj dane z tabeli (które właśnie zaktualizowaliśmy) z powrotem do pól formularza
-        selectRowInForm(startingIndex);
+        console.log("Wymuszenie odświeżenia formularza...");
+        
+        // Używamy setTimeout(..., 0) aby dać przeglądarce "chwilę oddechu".
+        // To umieszcza odświeżenie na końcu kolejki zdarzeń,
+        // co rozwiązuje problem z nieodświeżaniem się aktywnego wiersza.
+        setTimeout(() => {
+            selectRowInForm(startingIndex);
+        }, 0);
     }
 
     showToast(`Zastosowano schemat: ${schema.rozpoznanie}`, 'success');
