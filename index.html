@@ -11437,22 +11437,36 @@ function findNextAvailableRow(startIndex = 0) {
 }
 
 /**
- * Sprawdza, czy schemat zmieści się w tabeli, zaczynając od 'startingIndex'.
+/* ======================================================== */
+/* ✅ KROK 1: ZASTĄP TĘ FUNKCJĘ                             */
+/* ======================================================== */
+
+/**
+ * Sprawdza, czy schemat zmieści się w tabeli, ORAZ CZY DOCELOWE WIERSZE SĄ PUSTE.
+ * Wersja 2.0 - używa ABSOLUTNYCH indeksów wierszy.
  */
-function checkSchemaFit(schema, startingIndex) {
-    const logicalRows = rowsEditable();
-    const totalRows = logicalRows.length; // Całkowita liczba wierszy (np. 12)
+function checkSchemaFit(schema, logicalRows) {
+    if (!schema.produkty || schema.produkty.length === 0) return true; // Pusty schemat pasuje
 
-    if (!schema.produkty || schema.produkty.length === 0) return true; // Pusty schemat zawsze pasuje
+    for (const p of schema.produkty) {
+        const targetIndex = p.wierszDocelowy; // To jest ABSOLUTNY indeks (0-11)
 
-    // Znajdź najwyższy indeks wiersza, jakiego potrzebuje schemat (np. 0, 1, lub 9)
-    const maxRelativeIndex = Math.max(...schema.produkty.map(p => p.wierszDocelowy));
+        // 1. Sprawdź, czy mieści się w granicach tabeli
+        if (targetIndex < 0 || targetIndex >= logicalRows.length) {
+            console.log(`checkSchemaFit: FAILED (OOB). Target: ${targetIndex}`);
+            return false; // Poza granicami
+        }
+
+        // 2. Sprawdź, czy docelowy wiersz jest pusty
+        if (!isRowEmpty(logicalRows[targetIndex])) {
+            console.log(`checkSchemaFit: FAILED (Occupied). Target: ${targetIndex} is not empty.`);
+            return false; // Wiersz zajęty
+        }
+    }
     
-    // Oblicz, którego wiersza w tabeli będzie potrzebować (np. 2 + 9 = 11)
-    const requiredAbsoluteIndex = startingIndex + maxRelativeIndex;
-    
-    // Sprawdź, czy mieści się w tabeli (np. 11 < 12)
-    return (requiredAbsoluteIndex < totalRows);
+    // Jeśli pętla przeszła, wszystkie wiersze są wolne
+    console.log(`checkSchemaFit: SUCCESS. Schema requires rows: [${schema.produkty.map(p => p.wierszDocelowy).join(', ')}]`);
+    return true;
 }
 /* ======================================================== */
 /* ✅ KONIEC: NOWE FUNKCJE POMOCNICZE                      */
@@ -11460,11 +11474,11 @@ function checkSchemaFit(schema, startingIndex) {
 
 /* ⬇️ ⬇️ ⬇️ WKLEJ TEN BLOK (zastępuje starą funkcję applySchema) ⬇️ ⬇️ ⬇️ */
 /* ======================================================== */
-/* ✅ ZAKTUALIZOWANA LOGIKA applySchema (Moduł 4.3)       */
-/* Naprawia błąd rozpoznania ORAZ błąd pustego wiersza. */
+/* ✅ KROK 2: ZASTĄP TĘ FUNKCJĘ                             */
 /* ======================================================== */
 function applySchema(event) {
     const input = event.target;
+    // Zapiszmy oryginalną nazwę schematu (np. "Mastitis"), a nie tylko małe litery
     const oryginalnaNazwaRozpoznania = input.value.trim();
     const rozpoznanieKey = oryginalnaNazwaRozpoznania.toLowerCase();
 
@@ -11483,138 +11497,78 @@ function applySchema(event) {
     const logicalRows = rowsEditable();
     if (logicalRows.length === 0) return;
 
-    // --- NOWA LOGIKA WYSZUKIWANIA MIEJSCA (FIX 4.0) ---
+    // --- NOWA LOGIKA (FIX 5.0 - Absolute Positioning) ---
 
-    // 3. Ustal, od którego wiersza zacząć szukanie
-    let currentIndex = 0;
-    const inFormModal = (input.id === 'formRozpoznanie');
-
-    if (inFormModal) {
-        currentIndex = parseInt(formRowSelect.value, 10);
-    } else {
-        const currentRow = input.closest('tr');
-        currentIndex = logicalRows.indexOf(currentRow);
-    }
-    if (currentIndex === -1) currentIndex = 0;
-
-    // 4. Znajdź pierwszy wolny wiersz, ZACZYNAJĄC OD MIEJSCA KLIKNIĘCIA
-    let actualStartingIndex = -1;
-    
-    // Pętla szuka pierwszego wolnego wiersza 'i', który może być początkiem schematu
-    for (let i = currentIndex; i < logicalRows.length; i++) {
-        
-        // A. Sprawdź, czy ten wiersz 'i' jest wolny
-        // Musimy sprawdzić, czy jest pusty, IGNORUJĄC pole, w którym piszemy
-        let rowToCheck = logicalRows[i];
-        let rowIsEmpty = false;
-
-        if (i === currentIndex && !inFormModal) {
-            // To jest wiersz, w którym piszemy (w tabeli)
-            // Musimy sprawdzić, czy jest pusty, ignorując pole diagnozy
-            const originalValue = input.value;
-            input.value = ''; // Wyczyść na chwilę
-            rowIsEmpty = isRowEmpty(rowToCheck);
-            input.value = originalValue; // Przywróć
-        } else {
-            // To inny wiersz LUB jesteśmy w formularzu (tam pole jest zawsze "puste" dla tej logiki)
-            rowIsEmpty = isRowEmpty(rowToCheck);
-        }
-
-        // B. Jeśli kandydat 'i' jest wolny, sprawdź, czy cały schemat się zmieści
-        if (rowIsEmpty) {
-            
-            let canFit = true;
-            for (const p of schema.produkty) {
-                const targetIndex = i + p.wierszDocelowy;
-                
-                if (targetIndex >= logicalRows.length) {
-                    canFit = false; break; // Poza tabelą
-                }
-                
-                // Wiersz docelowy MUSI być pusty, CHYBA ŻE to ten sam wiersz co startowy
-                if (targetIndex !== i && !isRowEmpty(logicalRows[targetIndex])) {
-                    canFit = false; break; // Inny wymagany wiersz (np. Pozostawione 1) jest już zajęty
-                }
-            }
-            
-            // Jeśli 'canFit' jest nadal true, znaleźliśmy idealne miejsce!
-            if (canFit) {
-                actualStartingIndex = i; // Użyj tego wiersza
-                break; // Przerwij pętlę szukania 'i'
-            }
-            // Jeśli canFit=false, pętla 'i' idzie dalej i sprawdza następny wolny wiersz
-        }
-    }
-    
-    // 5. Ostateczne sprawdzenie
-    if (actualStartingIndex === -1) {
-        showToast("Za mało miejsca w tabeli lub wiersze są zajęte. Schemat zablokowany!", "error");
+    // 3. Sprawdź, czy WSZYSTKIE wiersze docelowe (ABSOLUTNE) są wolne
+    // Przekazujemy 'logicalRows', aby funkcja mogła je sprawdzić
+    if (!checkSchemaFit(schema, logicalRows)) {
+        showToast("Wiersze docelowe są zajęte lub schemat nie mieści się w tabeli.", "error");
         input.value = ''; // Wyczyść pole
         return;
     }
+
+    // 4. Wypełnij pole Rozpoznanie (w pierwszym wierszu schematu)
+    // Znajdź najniższy indeks wiersza, którego używa schemat (np. 0 lub 9)
+    const diagRowIndex = Math.min(...schema.produkty.map(p => p.wierszDocelowy));
     
-    // --- KONIEC LOGIKI WYSZUKIWANIA MIEJSCA ---
-
-
-    // 6. Wypełnij pole Rozpoznanie w docelowym wierszu
-    // (To jest wiersz, w którym schemat faktycznie startuje)
-    const startingRow = logicalRows[actualStartingIndex];
-    const diagInput = startingRow.cells[3].querySelector('input');
-    if (diagInput) {
-        diagInput.value = schema.rozpoznanie; // Wstaw pełną nazwę
+    if (diagRowIndex >= 0 && diagRowIndex < logicalRows.length) {
+        const startingRow = logicalRows[diagRowIndex];
+        const diagInput = startingRow.cells[3].querySelector('input');
+        if (diagInput) {
+            diagInput.value = schema.rozpoznanie; // Wstaw pełną nazwę
+        }
+    } else {
+        console.error("Błąd schematu: nie można znaleźć wiersza dla rozpoznania.");
     }
 
-    // 7. Wypełnij wiersze produktów
+
+    // 5. Wypełnij wiersze produktów
     schema.produkty.forEach(p => {
-        const targetRowIndex = actualStartingIndex + p.wierszDocelowy; 
+        const targetRowIndex = p.wierszDocelowy; // ABSOLUTNY indeks
+        const row = logicalRows[targetRowIndex];
+        
+        try {
+            const produktInput = row.cells[4].querySelector('input');
 
-        if (targetRowIndex >= 0 && targetRowIndex < logicalRows.length) {
-            const row = logicalRows[targetRowIndex];
-            try {
-                const produktInput = row.cells[4].querySelector('input');
-                produktInput.value = p.produkt;
-                produktInput.dispatchEvent(new Event('input', { bubbles: true })); 
-                
-                const iloscInput = row.cells[6].querySelector('input[type="number"]');
-                row.cells[5].textContent = p.seria || ''; 
-                
-                if (iloscInput) {
-                    iloscInput.value = p.ilosc || ''; 
-                } else {
-                    console.warn("Nie znaleziono pola input ilości w wierszu " + targetRowIndex);
-                }
-                
-                const dawkaText = p.dawkowanie || '';
-                const textNode = row.cells[6].childNodes[1]; 
-                if (textNode && textNode.nodeType === Node.TEXT_NODE) {
-                    textNode.textContent = ' ' + dawkaText;
-                } else if (dawkaText) {
-                    row.cells[6].appendChild(document.createTextNode(' ' + dawkaText));
-                }
-                
-                row.cells[7].textContent = p.karencja || ''; 
-                row.cells[4].dataset.printValue = p.produkt;
-
-                row.classList.add('highlight-row');
-                setTimeout(() => row.classList.remove('highlight-row'), 2000);
-
-            } catch (e) {
-                console.error(`Błąd podczas wypełniania wiersza ${targetRowIndex} ze schematu:`, e);
+            produktInput.value = p.produkt;
+            produktInput.dispatchEvent(new Event('input', { bubbles: true })); 
+            
+            const iloscInput = row.cells[6].querySelector('input[type="number"]');
+            row.cells[5].textContent = p.seria || ''; 
+            
+            if (iloscInput) {
+                iloscInput.value = p.ilosc || ''; 
+            } else {
+                console.warn("Nie znaleziono pola input ilości w wierszu " + targetRowIndex);
             }
+            
+            const dawkaText = p.dawkowanie || '';
+            const textNode = row.cells[6].childNodes[1]; 
+            if (textNode && textNode.nodeType === Node.TEXT_NODE) {
+                textNode.textContent = ' ' + dawkaText;
+            } else if (dawkaText) {
+                row.cells[6].appendChild(document.createTextNode(' ' + dawkaText));
+            }
+            
+            row.cells[7].textContent = p.karencja || ''; 
+            row.cells[4].dataset.printValue = p.produkt;
+
+            row.classList.add('highlight-row');
+            setTimeout(() => row.classList.remove('highlight-row'), 2000);
+
+        } catch (e) {
+            console.error(`Błąd podczas wypełniania wiersza ${targetRowIndex} ze schematu:`, e);
         }
     });
 
-    // 8. Odśwież formularz (jeśli był używany) lub wyczyść input
-    if (inFormModal) {
+    // 6. Odśwież formularz (jeśli był używany) lub wyczyść input
+    if (input.id === 'formRozpoznanie') { // Sprawdźmy jawnie
         setTimeout(() => {
-            selectRowInForm(actualStartingIndex); 
+            selectRowInForm(diagRowIndex); 
             input.value = ''; // Wyczyść input formularza
         }, 0);
     } else {
-         // Jesteśmy w tabeli. Wyczyść input, w którym pisaliśmy (trigger).
-         // Robimy to niezależnie od tego, czy był to ten sam wiersz,
-         // ponieważ pole diagnozy w 'actualStartingIndex' zostało już wypełnione.
-         input.value = '';
+         input.value = ''; // Zawsze czyść input w tabeli
     }
     
     showToast(`Zastosowano schemat: ${schema.rozpoznanie}`, 'success');
