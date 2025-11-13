@@ -11542,13 +11542,19 @@ function applySchema(event) {
         input.value = ''; // Wyczyść pole
         return;
     }
-// --- NOWA LOGIKA: Pobranie Mnożnika i podpięcie listenera ---
+// --- POPRAWIONA LOGIKA (v2): Pobranie Mnożnika i podpięcie listenera ---
     
-    // Pobierz wiersz, od którego zaczynamy
-    const startingRowForSchema = logicalRows[actualStartingIndex];
-    const liczbaInput = startingRowForSchema.cells[2].querySelector('input[type="number"]');
+    // 1. Znajdź wiersz KONTROLUJĄCY (ten, w którym wpisano rozpoznanie)
+    const controllerRow = logicalRows[currentIndex];
+    if (!controllerRow) {
+        console.error("Błąd krytyczny: Nie można znaleźć wiersza kontrolującego schemat.");
+        return;
+    }
+    
+    const liczbaInput = controllerRow.cells[2].querySelector('input[type="number"]');
     let liczbaZwierzaDlaSchematu = 1; // Domyślnie 1
 
+    // 2. Odczytaj aktualną wartość mnożnika
     if (liczbaInput && liczbaInput.value.trim() !== '') {
         const parsedLiczba = parseInt(liczbaInput.value, 10);
         if (!isNaN(parsedLiczba) && parsedLiczba > 0) {
@@ -11557,16 +11563,17 @@ function applySchema(event) {
     }
     console.log(`Mnożnik schematu (liczba zwierząt): ${liczbaZwierzaDlaSchematu}`);
     
-    // Nadaj unikalne ID polu "Liczba" (np. "liczba-zwierzat-0")
-    const liczbaInputId = 'liczba-zwierzat-' + actualStartingIndex;
+    // 3. Nadaj unikalne ID polu "Liczba" (na podstawie wiersza, w którym jest)
+    const liczbaInputId = 'liczba-zwierzat-' + currentIndex; // Użyj 'currentIndex'
     if (liczbaInput) {
         liczbaInput.id = liczbaInputId;
         
-        // Usuń stary listener (na wszelki wypadek) i dodaj nowy
+        // 4. Podepnij listener do WŁAŚCIWEGO pola "Liczba"
         liczbaInput.removeEventListener('input', handleLiczbaChange); 
         liczbaInput.addEventListener('input', handleLiczbaChange);
+        console.log(`Podpięto listener 'handleLiczbaChange' do ${liczbaInputId}`);
     }
-    // --- KONIEC NOWEJ LOGIKI ---
+    // --- KONIEC POPRAWIONEJ LOGIKI (v2) ---
     // --- KONIEC LOGIKI WYSZUKIWANIA MIEJSCA ---
 
 
