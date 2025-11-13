@@ -11546,13 +11546,46 @@ function applySchema(event) {
     // --- KONIEC LOGIKI WYSZUKIWANIA MIEJSCA ---
 
 
-    // 6. Wypełnij pole Rozpoznanie w docelowym wierszu
-    const startingRow = logicalRows[actualStartingIndex];
-    const diagInput = startingRow.cells[3].querySelector('input');
-    if (diagInput) {
-        // Użyj nazwy ze schematu (np. "Mastitis"), a nie "mastitis"
-        diagInput.value = schema.rozpoznanie; 
+ // 6. Wypełnij pole Rozpoznanie (NOWA, INTELIGENTNA LOGIKA)
+    
+// Znajdź pierwszy wiersz "Leczenie" (0-8), którego wymaga schemat
+const firstLeczenieProduct = schema.produkty
+    .filter(p => p.wierszDocelowy < 9)
+    .sort((a, b) => a.wierszDocelowy - b.wierszDocelowy)[0];
+
+// Znajdź pierwszy wiersz "Pozostawione" (9-11), którego wymaga schemat
+const firstPozostawioneProduct = schema.produkty
+    .filter(p => p.wierszDocelowy >= 9)
+    .sort((a, b) => a.wierszDocelowy - b.wierszDocelowy)[0];
+
+// A. Wpisz diagnozę w wierszu "Leczenie"
+if (firstLeczenieProduct) {
+    // Jeśli schemat używa wierszy "Leczenie", wpisz diagnozę w pierwszym z nich.
+    const targetIndex = actualStartingIndex + firstLeczenieProduct.wierszDocelowy;
+    if (targetIndex < logicalRows.length) {
+        const diagInput = logicalRows[targetIndex].cells[3].querySelector('input');
+        if (diagInput) {
+            diagInput.value = schema.rozpoznanie;
+        }
     }
+} else {
+    // FIX 2: Jeśli schemat NIE MA wierszy "Leczenie" (jest tylko dla "Pozostawione"),
+    // NIE wpisuj diagnozy w wierszu `actualStartingIndex` (np. 0 lub 1).
+    // To zapobiega "brudzeniu" wierszy Leczenie i rozwiązuje problem z pustym wierszem.
+    console.log("Schemat tylko dla 'Pozostawione'. Pomijanie diagnozy w wierszu 'Leczenie'.");
+}
+
+// B. Wpisz diagnozę w wierszu "Pozostawione" (FIX 1)
+if (firstPozostawioneProduct) {
+    // Jeśli schemat używa wierszy "Pozostawione", wpisz diagnozę w pierwszym z nich.
+    const targetIndex = actualStartingIndex + firstPozostawioneProduct.wierszDocelowy;
+    if (targetIndex < logicalRows.length) {
+        const diagInput = logicalRows[targetIndex].cells[3].querySelector('input');
+        if (diagInput) {
+            diagInput.value = schema.rozpoznanie;
+        }
+    }
+}
 
     // 7. Wypełnij wiersze produktów
     schema.produkty.forEach(p => {
