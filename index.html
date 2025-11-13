@@ -11299,16 +11299,22 @@ try {
                     // Schemat ma priorytet - nadpisz dane z bazy leków
                     row.cells[5].textContent = p.seria; // Seria (ze schematu, zwykle pusta)
                     if (iloscInput) {
-                        // Wpisz tylko część liczbową, jeśli jest (np. "1")
-                        const iloscMatch = p.iloscDawka.match(/^[\d,.]+/);
-                        iloscInput.value = iloscMatch ? iloscMatch[0] : '';
-                    }
-                    // Wpisz tekst dawkowania (np. "ml/kg")
-                    const dawkaText = p.iloscDawka.replace(/^[\d,.]+/, '').trim();
-                    const textNode = row.cells[6].childNodes[1]; // Znajdź węzeł tekstowy
-                    if (textNode && textNode.nodeType === Node.TEXT_NODE) {
-                        textNode.textContent = ' ' + dawkaText;
-                    }
+    // --- POPRAWIONA LOGIKA ODCZYTU ---
+if (iloscInput) {
+    // Poprawnie odczytaj oddzielne pole 'ilosc' ze schematu
+    iloscInput.value = p.ilosc || '';
+}
+// Poprawnie odczytaj oddzielne pole 'dawkowanie' ze schematu
+const dawkaText = p.dawkowanie || '';
+// --- KONIEC POPRAWKI ---
+
+const textNode = row.cells[6].childNodes[1]; // Znajdź węzeł tekstowy
+if (textNode && textNode.nodeType === Node.TEXT_NODE) {
+    textNode.textContent = ' ' + dawkaText;
+} else if (dawkaText) {
+    // Dodaj węzeł tekstowy, jeśli go nie ma
+    row.cells[6].appendChild(document.createTextNode(' ' + dawkaText));
+}
 
                     row.cells[7].textContent = p.karencja; // Karencja (ze schematu)
 
