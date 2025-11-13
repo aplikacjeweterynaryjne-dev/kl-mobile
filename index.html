@@ -11289,41 +11289,42 @@ try {
                 const row = logicalRows[targetRowIndex];
 
                 try {
-                    // Wypełnij komórki, symulując wybór produktu
-                    const produktInput = row.cells[4].querySelector('input');
-                    const iloscInput = row.cells[6].querySelector('input');
+    // Wypełnij komórki, symulując wybór produktu
+    const produktInput = row.cells[4].querySelector('input');
+    const iloscInput = row.cells[6].querySelector('input[type="number"]'); // Sprecyzowałem selektor
 
-                    produktInput.value = p.produkt;
-                    produktInput.dispatchEvent(new Event('input', { bubbles: true })); // Odpal logikę (wypełni serie/karencje jeśli są w bazie LEKÓW)
+    produktInput.value = p.produkt;
+    produktInput.dispatchEvent(new Event('input', { bubbles: true })); // Odpal logikę (wypełni serie/karencje jeśli są w bazie LEKÓW)
 
-                    // Schemat ma priorytet - nadpisz dane z bazy leków
-                    row.cells[5].textContent = p.seria; // Seria (ze schematu, zwykle pusta)
-                    if (iloscInput) {
-    // --- POPRAWIONA LOGIKA ODCZYTU ---
-if (iloscInput) {
-    // Poprawnie odczytaj oddzielne pole 'ilosc' ze schematu
-    iloscInput.value = p.ilosc || '';
+    // Schemat ma priorytet - nadpisz dane z bazy leków
+    row.cells[5].textContent = p.seria || ''; // Seria (ze schematu)
+
+    // --- POPRAWIONA LOGIKA ODCZYTU ILOŚCI ---
+    if (iloscInput) {
+        // Poprawnie odczytaj oddzielne pole 'ilosc' ze schematu
+        iloscInput.value = p.ilosc || '';
+    }
+    // Poprawnie odczytaj oddzielne pole 'dawkowanie' ze schematu
+    const dawkaText = p.dawkowanie || '';
+    // --- KONIEC POPRAWKI ---
+
+    const textNode = row.cells[6].childNodes[1]; // Znajdź węzeł tekstowy
+    if (textNode && textNode.nodeType === Node.TEXT_NODE) {
+        textNode.textContent = ' ' + dawkaText;
+    } else if (dawkaText) {
+        // Dodaj węzeł tekstowy, jeśli go nie ma
+        row.cells[6].appendChild(document.createTextNode(' ' + dawkaText));
+    }
+    // --- KONIEC LOGIKI ILOŚCI ---
+
+    row.cells[7].textContent = p.karencja || ''; // Karencja (ze schematu)
+
+    // Ustaw wartość do druku (bardzo ważne)
+    row.cells[4].dataset.printValue = p.produkt;
+
+} catch (e) {
+    console.error(`Błąd podczas wypełniania wiersza ${targetRowIndex} ze schematu:`, e);
 }
-// Poprawnie odczytaj oddzielne pole 'dawkowanie' ze schematu
-const dawkaText = p.dawkowanie || '';
-// --- KONIEC POPRAWKI ---
-
-const textNode = row.cells[6].childNodes[1]; // Znajdź węzeł tekstowy
-if (textNode && textNode.nodeType === Node.TEXT_NODE) {
-    textNode.textContent = ' ' + dawkaText;
-} else if (dawkaText) {
-    // Dodaj węzeł tekstowy, jeśli go nie ma
-    row.cells[6].appendChild(document.createTextNode(' ' + dawkaText));
-}
-
-                    row.cells[7].textContent = p.karencja; // Karencja (ze schematu)
-
-                    // Ustaw wartość do druku (bardzo ważne)
-                    row.cells[4].dataset.printValue = p.produkt;
-
-                } catch (e) {
-                    console.error(`Błąd podczas wypełniania wiersza ${targetRowIndex} ze schematu:`, e);
-                }
             }
         });
 
