@@ -11439,41 +11439,20 @@ function findNextAvailableRow(startIndex = 0) {
 /**
  * Sprawdza, czy schemat zmieści się w tabeli, zaczynając od 'startingIndex'.
  */
-/* ======================================================== */
-/* ✅ KROK 1: ZASTĄP TĘ FUNKCJĘ                             */
-/* ======================================================== */
-
-/**
- * Sprawdza, czy schemat zmieści się w tabeli, ORAZ CZY DOCELOWE WIERSZE SĄ PUSTE.
- */
-function checkSchemaFit(schema, startingIndex, logicalRows) {
+function checkSchemaFit(schema, startingIndex) {
+    const logicalRows = rowsEditable();
     const totalRows = logicalRows.length; // Całkowita liczba wierszy (np. 12)
 
     if (!schema.produkty || schema.produkty.length === 0) return true; // Pusty schemat zawsze pasuje
 
-    for (const p of schema.produkty) {
-        const targetIndex = startingIndex + p.wierszDocelowy;
-
-        // 1. Sprawdź, czy mieści się w granicach tabeli
-        if (targetIndex >= totalRows) {
-            console.log(`checkSchemaFit: FAILED (OOB). Start: ${startingIndex}, Target: ${targetIndex}`);
-            return false; // Poza granicami
-        }
-
-        // 2. Sprawdź, czy docelowy wiersz jest pusty
-        if (!isRowEmpty(logicalRows[targetIndex])) {
-            // Dopuszczamy JEDEN wyjątek: jeśli to jest ten sam wiersz co startowy
-            // (np. schemat na 1 wiersz, a my jesteśmy w tym wierszu)
-            if (targetIndex !== startingIndex) {
-                 console.log(`checkSchemaFit: FAILED (Occupied). Start: ${startingIndex}, Target: ${targetIndex} is not empty.`);
-                 return false; // Docelowy wiersz jest zajęty
-            }
-        }
-    }
+    // Znajdź najwyższy indeks wiersza, jakiego potrzebuje schemat (np. 0, 1, lub 9)
+    const maxRelativeIndex = Math.max(...schema.produkty.map(p => p.wierszDocelowy));
     
-    // Jeśli pętla przeszła, wszystkie wiersze są wolne i w granicach
-    console.log(`checkSchemaFit: SUCCESS. Start: ${startingIndex}`);
-    return true;
+    // Oblicz, którego wiersza w tabeli będzie potrzebować (np. 2 + 9 = 11)
+    const requiredAbsoluteIndex = startingIndex + maxRelativeIndex;
+    
+    // Sprawdź, czy mieści się w tabeli (np. 11 < 12)
+    return (requiredAbsoluteIndex < totalRows);
 }
 /* ======================================================== */
 /* ✅ KONIEC: NOWE FUNKCJE POMOCNICZE                      */
@@ -11482,8 +11461,8 @@ function checkSchemaFit(schema, startingIndex, logicalRows) {
 /* ⬇️ ⬇️ ⬇️ WKLEJ TEN BLOK (zastępuje starą funkcję applySchema) ⬇️ ⬇️ ⬇️ */
 
 /* ======================================================== */
-/* ======================================================== */
-/* ✅ KROK 2: ZASTĄP TĘ FUNKCJĘ                             */
+/* ✅ ZAKTUALIZOWANA LOGIKA applySchema (Moduł 4.1)       */
+/* Poprawia błąd wiersza startowego ORAZ wstawia diagnozę */
 /* ======================================================== */
 function applySchema(event) {
     const input = event.target;
@@ -11491,22 +11470,22 @@ function applySchema(event) {
 
     // 1. Sprawdź checkbox
     if (!schemaCheckbox || !schemaCheckbox.checked) {
-        return; 
+        return; // Nie rób nic, jeśli odznaczone
     }
 
     // 2. Znajdź schemat
     const schema = cachedSchemaMap.get(rozpoznanie);
     if (!schema) {
-        return; 
+        return; // Brak pasującego schematu
     }
 
     console.log("Znaleziono pasujący schemat:", schema.rozpoznanie);
     const logicalRows = rowsEditable();
     if (logicalRows.length === 0) return;
 
-    // --- NOWA LOGIKA WYSZUKIWANIA MIEJSCA (FIX 2.0) ---
+    // --- NOWA LOGIKA WYSZUKIWANIA MIEJSCA (FIX 1) ---
 
-    // 3. Ustal, od którego wiersza zacząć szukanie
+    // 3. Ustal, który wiersz wywołał zdarzenie
     let currentIndex = 0;
     const inFormModal = (input.id === 'formRozpoznanie');
 
@@ -11518,35 +11497,52 @@ function applySchema(event) {
     }
     if (currentIndex === -1) currentIndex = 0;
 
-    // 4. Znajdź następny dostępny "slot" (wiersz startowy + puste wiersze docelowe)
-    let actualStartingIndex = -1;
-    for (let i = currentIndex; i < logicalRows.length; i++) {
-        // Sprawdź, czy sam wiersz 'i' jest pusty ORAZ czy cały schemat się w nim zmieści
-        if (isRowEmpty(logicalRows[i]) && checkSchemaFit(schema, i, logicalRows)) {
-            actualStartingIndex = i; // Znaleziono idealny slot!
-            break; // Przerwij pętlę
-        }
+    // 4. Sprawdź, czy ten wiersz jest pusty (poza polem rozpoznania)
+    const triggerRow = logicalRows[currentIndex];
+    
+    // Zapisz tymczasowo wpisaną wartość i wyczyść pole, aby sprawdzić "pustość"
+    const originalValue = input.value; 
+    input.value = ''; 
+    const startingRowIsEmpty = isRowEmpty(triggerRow); // Sprawdź, czy reszta jest pusta
+    input.value = originalValue; // Przywróć na chwilę
+
+    let actualStartingIndex;
+    if (startingRowIsEmpty) {
+        // Użyj bieżącego wiersza
+        actualStartingIndex = currentIndex;
+        console.log(`Wiersz ${currentIndex} jest pusty. Używam go jako startowy.`);
+    } else {
+        // Szukaj następnego wolnego wiersza
+        console.log(`Wiersz ${currentIndex} jest zajęty. Szukam następnego...`);
+        actualStartingIndex = findNextAvailableRow(currentIndex + 1); // Szukaj OD NASTĘPNEGO
     }
+    
+    // --- KONIEC FIX 1 ---
 
     if (actualStartingIndex === -1) {
-        // Jeśli nie znaleziono od 'currentIndex', spróbuj od początku (jeśli user chce)
-        // Na razie twardy błąd:
-        showToast("Za mało miejsca w tabeli lub wiersze są zajęte. Schemat zablokowany!", "error");
+        showToast("Brak wolnych wierszy od tego miejsca.", "error");
+        input.value = ''; // Wyczyść pole, aby nie próbować ponownie
+        return;
+    }
+
+    // 5. Sprawdź, czy schemat zmieści się w tabeli
+    const canFit = checkSchemaFit(schema, actualStartingIndex);
+    if (!canFit) {
+        showToast("Za mało miejsca w tabeli, schemat zablokowany!", "error");
         input.value = ''; // Wyczyść pole
         return;
     }
-    
-    // --- KONIEC LOGIKI WYSZUKIWANIA MIEJSCA ---
 
-
-    // 5. Wypełnij pole Rozpoznanie w docelowym wierszu
+    // --- NOWA LOGIKA (FIX 2: Wstaw rozpoznanie) ---
+    // 6. Wypełnij pole Rozpoznanie w docelowym wierszu
     const startingRow = logicalRows[actualStartingIndex];
     const diagInput = startingRow.cells[3].querySelector('input');
     if (diagInput) {
         diagInput.value = schema.rozpoznanie; // Wstaw pełną nazwę
     }
+    // --- KONIEC FIX 2 ---
 
-    // 6. Wypełnij wiersze produktów
+    // 7. Wypełnij wiersze produktów (logika z poprzedniej poprawki)
     schema.produkty.forEach(p => {
         const targetRowIndex = actualStartingIndex + p.wierszDocelowy; 
 
@@ -11555,15 +11551,18 @@ function applySchema(event) {
             try {
                 const produktInput = row.cells[4].querySelector('input');
 
+                // 1. Ustaw produkt i ODPAŁ EVENT (to tworzy pole ilości)
                 produktInput.value = p.produkt;
                 produktInput.dispatchEvent(new Event('input', { bubbles: true })); 
                 
+                // 2. TERAZ dopiero wyszukaj pole ilości, które właśnie powstało
                 const iloscInput = row.cells[6].querySelector('input[type="number"]');
 
+                // 3. Wypełnij pola ze schematu
                 row.cells[5].textContent = p.seria || ''; 
                 
                 if (iloscInput) {
-                    iloscInput.value = p.ilosc || ''; 
+                    iloscInput.value = p.ilosc || ''; // Wpisz ILOŚĆ
                 } else {
                     console.warn("Nie znaleziono pola input ilości w wierszu " + targetRowIndex);
                 }
@@ -11585,26 +11584,6 @@ function applySchema(event) {
             } catch (e) {
                 console.error(`Błąd podczas wypełniania wiersza ${targetRowIndex} ze schematu:`, e);
             }
-        }
-    });
-
-    // 7. Odśwież formularz (jeśli był używany)
-    if (inFormModal) {
-        // --- POPRAWKA BŁĘDU 1 (Race Condition) ---
-        setTimeout(() => {
-            // Odśwież widok formularza do wiersza, w którym wstawiono schemat
-            selectRowInForm(actualStartingIndex); 
-            // Wyczyść input formularza DOPIERO PO odświeżeniu
-            input.value = ''; 
-        }, 0);
-        // --- KONIEC POPRAWKI ---
-    } else {
-         // Jesteśmy w tabeli, po prostu wyczyść input
-         input.value = '';
-    }
-    
-    showToast(`Zastosowano schemat: ${schema.rozpoznanie}`, 'success');
-}
         }
     });
 
