@@ -4319,11 +4319,12 @@ if (printFormat110 && receiptPrintContainer) {
         showToast('Otwieranie podglądu 110mm...', 'info', 1500);
 
         try {
-            // 2. Wygeneruj HTML (używając NOWEJ funkcji, którą wkleisz w Kroku 2)
+            // 2. Wygeneruj HTML (używając funkcji grupującej z poprzedniego kroku)
             const receiptContentHTML = generate110mmReceiptHTML_Grouped();
             
-            // 3. Otwórz nowe okno
-            const printWindow = window.open('', '_blank', 'width=450,height=700,scrollbars=yes,resizable=yes');
+            // 3. Otwórz nowe okno (POPRAWKA: Szerokość 2/3 ekranu)
+            const newWidth = Math.round(window.screen.width * 0.66);
+            const printWindow = window.open('', '_blank', `width=${newWidth},height=700,scrollbars=yes,resizable=yes`);
             
             if (!printWindow) {
                 showToast('Nie udało się otworzyć nowego okna. Wyłącz blokowanie wyskakujących okienek.', 'error');
@@ -4340,20 +4341,20 @@ if (printFormat110 && receiptPrintContainer) {
                     <style>
                         /* --- Style dla nowego okna --- */
                         body { 
-                            font-family: 'Courier New', Courier, monospace;
+                            /* (POPRAWKA: Czcionka z PDF) */
+                            font-family: Times, 'Times New Roman', serif;
                             margin: 0;
                             padding: 0;
                             background-color: #f0f0f0;
                         }
                         
-                        /* --- (Pkt 1) Kontener na przyciski --- */
+                        /* --- Kontener na przyciski (na dole) --- */
                         .print-controls {
-                            padding: 20px 0; /* Odstęp na dole */
+                            padding: 20px 0;
                             text-align: center;
-                            background-color: #f0f0f0; /* Tło jak body */
+                            background-color: #f0f0f0;
                         }
                         .print-controls button {
-                            /* (Pkt 1) Duże przyciski */
                             padding: 15px 25px;
                             font-size: 20px;
                             margin: 0 10px;
@@ -4375,29 +4376,28 @@ if (printFormat110 && receiptPrintContainer) {
                         .receipt-page {
                             width: 105mm; 
                             min-height: 150mm;
-                            margin: 20px auto; /* Centrowanie kartki */
+                            margin: 20px auto;
                             padding: 5mm;
                             box-sizing: border-box;
                             background-color: #ffffff;
                             box-shadow: 0 0 10px rgba(0,0,0,0.15);
                         }
                         
-                        /* --- Style dla treści paragonu (ze zmianami Pkt 2, 4) --- */
+                        /* --- Style dla treści paragonu (z Pkt 2, 4) --- */
                         .receipt-page {
-                            font-family: 'Courier New', Courier, monospace !important;
+                            /* (POPRAWKA: Czcionka z PDF) */
+                            font-family: Times, 'Times New Roman', serif !important;
                             color: #000 !important;
                             font-size: 10pt !important;
                             line-height: 1.3 !important;
                         }
-                        /* (Pkt 2) Tytuł większy o 1pt */
                         .receipt-page h2 {
-                            font-size: 12pt !important; /* BYŁO 11pt */
+                            font-size: 12pt !important;
                             text-align: center; 
-                            margin: 0 0 0 0; /* Zmieniony margines */
+                            margin: 0 0 0 0;
                             font-weight: bold; 
                             text-transform: uppercase;
                         }
-                        /* (Pkt 4) Tytuły sekcji podkreślone */
                         .receipt-page h3 {
                             font-size: 10pt !important; 
                             font-weight: bold; 
@@ -4406,8 +4406,8 @@ if (printFormat110 && receiptPrintContainer) {
                             border-bottom: 1px dashed #000;
                             padding-bottom: 3px; 
                             page-break-before: avoid;
-                            text-decoration: underline; /* DODANE */
-                            text-decoration-thickness: 1px; /* DODANE */
+                            text-decoration: underline;
+                            text-decoration-thickness: 1px;
                         }
                         .receipt-page p {
                             font-size: 10pt !important; margin: 2px 0;
@@ -4416,7 +4416,6 @@ if (printFormat110 && receiptPrintContainer) {
                         .receipt-page .data-block {
                             margin-bottom: 10px; page-break-inside: avoid;
                         }
-                        /* Style dla nowej sekcji produktów (Pkt 6) */
                         .receipt-page .product-item {
                             margin-left: 5mm;
                             margin-bottom: 4px;
@@ -4444,11 +4443,9 @@ if (printFormat110 && receiptPrintContainer) {
                         
                         /* --- Style dla drukowania tego nowego okna --- */
                         @media print {
-                            /* (Pkt 1) Ukryj przyciski */
                             .print-controls {
                                 display: none !important;
                             }
-                            /* Zresetuj tło i cienie kartki */
                             body {
                                 background-color: #ffffff !important;
                             }
@@ -4460,7 +4457,6 @@ if (printFormat110 && receiptPrintContainer) {
                                 border: none !important;
                                 min-height: unset !important;
                             }
-                            /* Zachowaj definicję strony 110mm */
                             @page {
                                 size: 110mm auto;
                                 margin: 5mm;
@@ -4470,11 +4466,11 @@ if (printFormat110 && receiptPrintContainer) {
                     </style>
                 </head>
                 <body>
-                                        <div class="receipt-page">
+                    <div class="receipt-page">
                         ${receiptContentHTML}
                     </div>
                     
-                                        <div class="print-controls">
+                    <div class="print-controls">
                         <button class="print-btn" onclick="window.print();">Drukuj</button>
                         <button class="close-btn" onclick="window.close();">Zamknij okno</button>
                     </div>
