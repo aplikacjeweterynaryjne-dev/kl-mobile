@@ -4319,8 +4319,8 @@ if (printFormat110 && receiptPrintContainer) {
         showToast('Otwieranie podglądu 110mm...', 'info', 1500);
 
         try {
-            // 2. Wygeneruj HTML (używając funkcji grupującej z poprzedniego kroku)
-            const receiptContentHTML = generate110mmReceiptHTML_Grouped();
+            // 2. Wygeneruj HTML (używając funkcji grupującej z Kroku 2)
+            const receiptContentHTML = generate110mmReceiptHTML_Grouped_Styled();
             
             // 3. Otwórz nowe okno (POPRAWKA: Szerokość 2/3 ekranu)
             const newWidth = Math.round(window.screen.width * 0.66);
@@ -4362,6 +4362,8 @@ if (printFormat110 && receiptPrintContainer) {
                             border: none;
                             border-radius: 8px;
                             font-weight: bold;
+                            /* (POPRAWKA: Czcionka z PDF) */
+                            font-family: Times, 'Times New Roman', serif;
                         }
                         .print-controls .print-btn {
                             background-color: #4CAF50;
@@ -4392,48 +4394,72 @@ if (printFormat110 && receiptPrintContainer) {
                             line-height: 1.3 !important;
                         }
                         .receipt-page h2 {
-                            font-size: 12pt !important;
-                            text-align: center; 
+                            font-size: 11pt !important; /* Zmieniono z 12pt na 11pt - bliżej PDF */
+                            text-align: left; /* Zmieniono na "left" jak w PDF */
                             margin: 0 0 0 0;
                             font-weight: bold; 
                             text-transform: uppercase;
                         }
+                        /* Styl dla numeru karty (jak w PDF) */
+                        .receipt-page .card-number {
+                            font-size: 11pt;
+                            font-weight: bold;
+                            margin: 2px 0 15px 0;
+                            text-align: left;
+                        }
                         .receipt-page h3 {
                             font-size: 10pt !important; 
                             font-weight: bold; 
                             margin-top: 15px;
                             margin-bottom: 5px; 
-                            border-bottom: 1px dashed #000;
-                            padding-bottom: 3px; 
+                            /* (POPRAWKA: Usunięto podkreślenie i border) */
+                            border-bottom: none;
+                            padding-bottom: 0; 
                             page-break-before: avoid;
-                            text-decoration: underline;
-                            text-decoration-thickness: 1px;
+                            text-decoration: none;
                         }
                         .receipt-page p {
                             font-size: 10pt !important; margin: 2px 0;
                             word-wrap: break-word; page-break-inside: avoid;
+                            padding-left: 5mm; /* Dodano wcięcie dla danych (jak w PDF) */
                         }
                         .receipt-page .data-block {
                             margin-bottom: 10px; page-break-inside: avoid;
                         }
-                        .receipt-page .product-item {
-                            margin-left: 5mm;
-                            margin-bottom: 4px;
-                            font-size: 9.5pt !important;
-                        }
-                        .receipt-page .product-item .prefix {
-                            font-style: italic;
-                            color: #333;
+                        /* (POPRAWKA: Styl dla schematu jak w PDF) */
+                        .receipt-page .schema-header {
                             font-size: 9pt !important;
+                            font-weight: normal;
+                            padding-left: 5mm;
+                            margin-top: 5px;
+                            margin-bottom: 5px;
+                        }
+                        .receipt-page .product-item {
+                            padding-left: 10mm; /* Większe wcięcie dla produktów */
+                            margin-bottom: 4px;
+                            font-size: 10pt !important;
+                        }
+                        /* Usunęliśmy prefix, bo PDF go nie ma */
+                        .receipt-page .product-item .prefix {
+                           display: none;
                         }
                         .receipt-page .signatures-110mm {
                             margin-top: 25px; page-break-inside: avoid; page-break-before: auto;
+                            display: flex; /* Dodane dla układu podpisów obok siebie */
+                            justify-content: space-between; /* Rozdzielenie podpisów */
+                            padding-left: 5mm; /* Wyrównanie z danymi */
+                            padding-right: 5mm;
                         }
-                        .receipt-page .sig-box-110mm { margin-top: 10px; }
+                        .receipt-page .sig-box-110mm { 
+                            margin-top: 10px; 
+                            width: 48%; /* Aby zmieściły się obok siebie */
+                        }
                         .receipt-page .sig-box-110mm strong { display: block; font-size: 10pt; }
                         .receipt-page .sig-box-110mm img {
-                            max-width: 180px; height: 60px; object-fit: contain;
-                            border: 1px solid #eee; margin-top: 5px;
+                            max-width: 100%; /* Dopasuj do kontenera 48% */
+                            height: 60px; object-fit: contain;
+                            border: none; /* Usunięto ramkę */
+                            margin-top: 5px;
                         }
                         .receipt-page .footer-legend {
                             margin-top: 20px; font-size: 8pt !important;
@@ -4441,7 +4467,7 @@ if (printFormat110 && receiptPrintContainer) {
                             page-break-inside: avoid;
                         }
                         
-                        /* --- Style dla drukowania tego nowego okna --- */
+                        /* --- Style dla drukowania --- */
                         @media print {
                             .print-controls {
                                 display: none !important;
