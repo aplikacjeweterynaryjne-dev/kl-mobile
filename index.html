@@ -4484,37 +4484,34 @@ A                         }
 /* ⬇️ ⬇️ ⬇️ ZASTĄP CAŁĄ FUNKCJĘ "generate110mmReceiptHTML" TĄ NOWĄ WERSJĄ ⬇️ ⬇️ ⬇️ */
 
 /**
- * NOWA FUNKCJA (v4): Zbiera dane i generuje HTML dla 110mm.
- * ŁĄCZY nagłówki (Opis, Liczba, Rozpoznanie) i TWORZY listy produktów
- * z podtytułami, zgodnie z formatem "starej karty".
+ * NOWA FUNKCJA (v5): Poprawki kosmetyczne (B/N, schemat, podtytuły, nr karty, przyciski).
  * @returns {string} - Surowy HTML do wstrzyknięcia.
  */
 function generate110mmReceiptHTML() {
-    console.log("Rozpoczynam generowanie HTML dla 110mm (v4 - Scalanie nagłówków)...");
+    console.log("Rozpoczynam generowanie HTML dla 110mm (v5 - Poprawki)...");
 
-    // --- 1. FUNKCJE POMOCNICZE (bez zmian z v3) ---
+    // --- 1. FUNKCJE POMOCNICZE ---
 
     /**
      * Pobiera informacje o produkcie z danego wiersza <tr> tabeli.
-     * @param {HTMLTableRowElement} row - Wiersz tabeli
-     * @returns {object|null} - Obiekt z danymi produktu lub null, jeśli produkt jest pusty.
+     * POPRAWKA: Zmieniono 'B/N' na 'Brak danych'.
      */
     const getProductInfo = (row) => {
         try {
             const produkt = row.cells[4]?.querySelector('input')?.value.trim() || '';
-            // Jeśli nie ma nazwy produktu, to jest to pusty wpis
             if (!produkt) {
                 return null;
             }
-            const seria = row.cells[5]?.textContent.trim() || 'B/N';
+
+            const seria = row.cells[5]?.textContent.trim() || 'Brak danych';
             const iloscInput = row.cells[6]?.querySelector('input[type="number"]');
             const ilosc = iloscInput?.value.trim() || '';
             let dawkaText = '';
             if (iloscInput && iloscInput.nextSibling && iloscInput.nextSibling.nodeType === Node.TEXT_NODE) {
                 dawkaText = iloscInput.nextSibling.textContent.trim();
             }
-            const iloscDawka = [ilosc, dawkaText].filter(Boolean).join(' ') || 'B/N';
-            const karencja = row.cells[7]?.textContent.trim() || 'B/N';
+            const iloscDawka = [ilosc, dawkaText].filter(Boolean).join(' ') || 'Brak danych';
+            const karencja = row.cells[7]?.textContent.trim() || 'Brak danych';
             return { produkt, seria, iloscDawka, karencja };
         } catch (e) {
             console.error("Błąd w getProductInfo dla wiersza:", row, e);
@@ -4523,35 +4520,27 @@ function generate110mmReceiptHTML() {
     };
 
     /**
-     * Przetwarza listę wierszy (z tabeli A4) i grupuje je logicznie.
-     * @param {Array<HTMLTableRowElement>} rows - Tablica wierszy <tr>
-     * @returns {Array<object>} - Tablica obiektów grup
+     * Przetwarza listę wierszy (z tabeli A4) i grupuje je logicznie. (Bez zmian z v4)
      */
     const groupRows = (rows) => {
         const grupy = [];
         let currentGroup = null;
 
         for (const row of rows) {
-            // Pobierz dane nagłówka grupy (zwierzę/diagnoza)
             const opis = row.cells[1]?.textContent.trim() || '';
             const liczba = row.cells[2]?.querySelector('input')?.value.trim() || '';
             const rozpoznanie = row.cells[3]?.querySelector('input')?.value.trim() || '';
             const productInfo = getProductInfo(row);
 
-            // Uznaj za nowy nagłówek, jeśli którekolwiek z tych pól jest wypełnione
-            // Poprawka: usuń "---" jeśli jest (pochodzi z Twojego przykładu V1)
             const isHeaderRow = (opis && opis !== '---') || (liczba && liczba !== '---') || (rozpoznanie && rozpoznanie !== '---');
 
             if (isHeaderRow) {
-                // To jest nowy nagłówek, stwórz nową grupę
                 currentGroup = { opis, liczba, rozpoznanie, products: [] };
                 grupy.push(currentGroup);
             }
 
             if (productInfo) {
-                // Jeśli wiersz zawiera produkt
                 if (!currentGroup) {
-                    // Sytuacja awaryjna: pierwszy wiersz ma produkt, ale nie ma nagłówka
                     currentGroup = { 
                         opis: (opis && opis !== '---') ? opis : '', 
                         liczba: (liczba && liczba !== '---') ? liczba : '', 
@@ -4560,16 +4549,14 @@ function generate110mmReceiptHTML() {
                     };
                     grupy.push(currentGroup);
                 }
-                // Dodaj produkt do OSTATNIEJ utworzonej grupy
                 currentGroup.products.push(productInfo);
             }
         }
-        // Filtruj puste grupy, które mogły powstać (np. wiersz z samym "---")
         return grupy.filter(g => (g.opis && g.opis !== '---') || (g.liczba && g.liczba !== '---') || (g.rozpoznanie && g.rozpoznanie !== '---') || g.products.length > 0);
     };
 
     // --- 2. POBIERZ DANE NAGŁÓWKA ---
-    const nrKL = document.getElementById('nrDokumentu')?.value || 'B/N';
+    const nrKL = document.getElementById('nrDokumentu')?.value || 'Brak danych';
     const lecznica = document.getElementById('nazwaLecznicy')?.textContent || 'Brak danych';
     const klient = document.getElementById('klientSelect')?.value || 'Brak danych';
     const adres = document.getElementById('adresKlienta')?.textContent || 'Brak danych';
@@ -4583,26 +4570,29 @@ function generate110mmReceiptHTML() {
 
     // --- 4. POBIERZ I POGRUPUJ WIERSZE ---
     const logicalRows = rowsEditable();
-    const leczenieNaMiejscuRows = logicalRows.slice(0, 9); // Wiersze 1-9
-    const leczeniePozostawioneRows = logicalRows.slice(9); // Wiersze 10-12
-
+    const leczenieNaMiejscuRows = logicalRows.slice(0, 9);
+    const leczeniePozostawioneRows = logicalRows.slice(9);
     const leczenieGrupy = groupRows(leczenieNaMiejscuRows);
     const pozostawioneGrupy = groupRows(leczeniePozostawioneRows);
+    
+    // Zmienna na tekst schematu
+    const schematText = "<strong>SCHEMAT:</strong> nazwa zastosowanego produktu** / nr serii*** / zastosowana ilość(dawkowanie)**** / karencja, zalecenia *****";
+
 
     // --- 5. BUDOWANIE FINALNEGO HTML ---
     let html = '';
 
-    // Nagłówek paragonu (bez zmian)
+    // Nagłówek paragonu (POPRAWKA: Nr Karty przeniesiony)
     html += `
-        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-            <h2 style="text-align: left; max-width: 70%; font-size: 10pt !important; line-height: 1.2;">KARTA LECZENIA ZWIERZĄT GOSPODARSKICH ORAZ ZWIERZĄT, Z KTÓRYCH POZYSKANE TKANKI LUB PRODUKTY SĄ PRZEZNACZONE DO SPOŻYCIA PRZEZ LUDZI / EWIDENCJA LECZENIA ZWIERZĄT</h2>
-            <strong style="font-size: 11pt; text-align: right; white-space: nowrap; padding-left: 5px;">KARTA NR:<br>${nrKL}</strong>
+        <div>
+            <h2 style="text-align: left; font-size: 10pt !important; line-height: 1.2; display: inline; margin: 0; vertical-align: middle;">KARTA LECZENIA ZWIERZĄT GOSPODARSKICH ORAZ ZWIERZĄT, Z KTÓRYCH POZYSKANE TKANKI LUB PRODUKTY SĄ PRZEZNACZONE DO SPOŻYCIA PRZEZ LUDZI / EWIDENCJA LECZENIA ZWIERZĄT</h2>
+            <strong style="font-size: 11pt; white-space: nowrap; margin-left: 20px; vertical-align: middle;">KARTA NR: ${nrKL}</strong>
         </div>
     `;
 
     // Bloki 1, 2, 3 (Dane lecznicy, klienta, data) (bez zmian)
     html += `
-        <div class="data-block">
+        <div class="data-block" style="padding-top: 10px;">
             <h3>1. Nazwa i adres zakładu leczniczego dla zwierząt:</h3>
             <p>${lecznica.replace('<br>', '\n')}</p>
         </div>
@@ -4624,25 +4614,30 @@ function generate110mmReceiptHTML() {
 
     // 4. Opis zwierzęcia (Scalone)
     const allOpisLNM = leczenieGrupy.map(g => g.opis).filter(Boolean).join(', ');
-    html += `  <p><strong>4. Nazwa siedziby stada i opis leczonego zwierzęcia...:</strong><br>${allOpisLNM || '---'}</p>`;
+    html += `  <p><strong>4. Nazwa siedziby stada i opis leczonego zwierzęcia...:</strong><br>${allOpisLNM || 'Brak danych'}</p>`;
 
     // 5. Liczba leczonych (Suma)
     const allLiczbaLNM = leczenieGrupy.reduce((sum, g) => sum + (parseInt(g.liczba, 10) || 0), 0);
-    html += `  <p><strong>5. Liczba leczonych zwierząt:</strong> ${allLiczbaLNM > 0 ? allLiczbaLNM : '---'}</p>`;
+    html += `  <p><strong>5. Liczba leczonych zwierząt:</strong> ${allLiczbaLNM > 0 ? allLiczbaLNM : 'Brak danych'}</p>`;
 
     // 6. Rozpoznanie (Scalone)
     const allRozpoznanieLNM = leczenieGrupy.map(g => g.rozpoznanie).filter(Boolean).join(', ');
-    html += `  <p><strong>6. Rozpoznanie albo wstępne rozpoznanie choroby:</strong><br>${allRozpoznanieLNM || '---'}</p>`;
+    html += `  <p><strong>6. Rozpoznanie albo wstępne rozpoznanie choroby:</strong><br>${allRozpoznanieLNM || 'Brak danych'}</p>`;
 
     // 7. Zastosowane produkty (Lista z podtytułami)
     html += `  <p><strong>7. Zastosowane u poszczególnych zwierząt produkty lecznicze...:</strong></p>`;
-    html += `  <p style="font-size: 9pt; padding-left: 10px;">(Nazwa** / Seria*** / Ilość(Dawka)**** / Karencja*****)</p>`;
+    // POPRAWKA: Wstawiono tekst SCHEMATU
+    html += `  <p style="font-size: 9pt; padding-left: 10px;">${schematText}</p>`;
     
     let globalProductCounterLNM = 1;
     for (const group of leczenieGrupy) {
         if (group.products.length > 0) {
-            // Dodaj "mały tekst" (podtytuł grupy) - tylko jeśli jest co wyświetlić
-            const podtytul = [group.opis, group.rozpoznanie].filter(Boolean).join(' ');
+            // POPRAWKA: Format podtytułu
+            let podtytulParts = [];
+            if (group.opis) podtytulParts.push(`Nazwa: ${group.opis}`);
+            if (group.rozpoznanie) podtytulParts.push(`Rozpoznanie: ${group.rozpoznanie}`);
+            const podtytul = podtytulParts.join(' , ');
+            
             if (podtytul) {
                 html += `<p style="font-size: 9pt; font-weight: bold; margin-top: 5px; margin-bottom: 2px; padding-left: 5px;">${podtytul}</p>`;
             }
@@ -4653,7 +4648,7 @@ function generate110mmReceiptHTML() {
             }
         }
     }
-    if (globalProductCounterLNM === 1) { // Jeśli nie dodano żadnych produktów
+    if (globalProductCounterLNM === 1) {
          html += `<p style="padding-left: 10px;">--- Brak produktów ---</p>`;
     }
     html += `</div>`; // Koniec .data-block dla Leczenia na Miejscu
@@ -4661,29 +4656,34 @@ function generate110mmReceiptHTML() {
     // === NOWA SEKCJA: Potwierdzenie Nabycia (Scalone) ===
     html += `<div class="data-block" style="border-top: 1px dashed #000; padding-top: 5px;">`;
     html += `  <h3 style="margin: 0 0 5px 0;">8. Potwierdzenie nabycia produktu leczniczego weterynaryjnego / paszy leczniczej</h3>`;
-    html += `  <p style="font-size: 9pt; border-bottom: 1px solid #ccc; padding-bottom: 3px;"><strong>SCHEMAT:</strong> nazwa zastosowanego produktu** / nr serii*** / zastosowana ilość(dawkowanie)**** / karencja, zalecenia *****</p>`;
+    // POPRAWKA: Usunięto stary tekst SCHEMAT stąd
 
     // 8.1 Opis zwierzęcia (Scalone)
     const allOpisLP = pozostawioneGrupy.map(g => g.opis).filter(Boolean).join(', ');
-    html += `  <p><strong>8.1 Nazwa siedziby stada i opis leczonego zwierzęcia...:</strong><br>${allOpisLP || '---'}</p>`;
+    html += `  <p><strong>8.1 Nazwa siedziby stada i opis leczonego zwierzęcia...:</strong><br>${allOpisLP || 'Brak danych'}</p>`;
 
     // 8.2 Liczba leczonych (Suma)
     const allLiczbaLP = pozostawioneGrupy.reduce((sum, g) => sum + (parseInt(g.liczba, 10) || 0), 0);
-    html += `  <p><strong>8.2 Liczba leczonych zwierząt:</strong> ${allLiczbaLP > 0 ? allLiczbaLP : '---'}</p>`;
+    html += `  <p><strong>8.2 Liczba leczonych zwierząt:</strong> ${allLiczbaLP > 0 ? allLiczbaLP : 'Brak danych'}</p>`;
 
     // 8.3 Rozpoznanie (Scalone)
     const allRozpoznanieLP = pozostawioneGrupy.map(g => g.rozpoznanie).filter(Boolean).join(', ');
-    html += `  <p><strong>8.3 Rozpoznanie albo wstępne rozpoznanie choroby:</strong><br>${allRozpoznanieLP || '---'}</p>`;
+    html += `  <p><strong>8.3 Rozpoznanie albo wstępne rozpoznanie choroby:</strong><br>${allRozpoznanieLP || 'Brak danych'}</p>`;
 
     // 8.4 Zastosowane produkty (Lista z podtytułami)
     html += `  <p><strong>8.4 Zastosowane u poszczególnych zwierząt produkty lecznicze...:</strong></p>`;
-    html += `  <p style="font-size: 9pt; padding-left: 10px;">(Nazwa** / Seria*** / Ilość(Dawka)**** / Karencja*****)</p>`;
+    // POPRAWKA: Wstawiono tekst SCHEMATU
+    html += `  <p style="font-size: 9pt; padding-left: 10px;">${schematText}</p>`;
     
     let globalProductCounterLP = 1;
     for (const group of pozostawioneGrupy) {
         if (group.products.length > 0) {
-            // Dodaj "mały tekst" (podtytuł grupy)
-            const podtytul = [group.opis, group.rozpoznanie].filter(Boolean).join(' ');
+            // POPRAWKA: Format podtytułu
+            let podtytulParts = [];
+            if (group.opis) podtytulParts.push(`Nazwa: ${group.opis}`);
+            if (group.rozpoznanie) podtytulParts.push(`Rozpoznanie: ${group.rozpoznanie}`);
+            const podtytul = podtytulParts.join(' , ');
+
             if (podtytul) {
                 html += `<p style="font-size: 9pt; font-weight: bold; margin-top: 5px; margin-bottom: 2px; padding-left: 5px;">${podtytul}</p>`;
             }
@@ -4694,7 +4694,7 @@ function generate110mmReceiptHTML() {
             }
         }
     }
-    if (globalProductCounterLP === 1) { // Jeśli nie dodano żadnych produktów
+    if (globalProductCounterLP === 1) {
          html += `<p style="padding-left: 10px;">--- Brak produktów ---</p>`;
     }
     html += `</div>`; // Koniec .data-block dla Potwierdzenia Nabycia
@@ -4722,7 +4722,7 @@ function generate110mmReceiptHTML() {
         </div>
     `;
 
-    console.log("Generowanie HTML 110mm (v4 - Scalanie) zakończone.");
+    console.log("Generowanie HTML 110mm (v5 - Poprawki) zakończone.");
     return html;
 }
 
