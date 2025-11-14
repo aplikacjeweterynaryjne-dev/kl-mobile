@@ -4311,22 +4311,18 @@ if (printFormatA4) {
 
 // ⬇️ ⬇️ ⬇️ WKLEJ TEN NOWY BLOK W MIEJSCE STAREGO ⬇️ ⬇️ ⬇️
 
-// ⬇️ ⬇️ ⬇️ WKLEJ TEN NOWY BLOK W MIEJSCE STAREGO ⬇️ ⬇️ ⬇️
-
-// ⬇️ ⬇️ ⬇️ WKLEJ TEN NOWY BLOK W MIEJSCE STAREGO ⬇️ ⬇️ ⬇️
-
 if (printFormat110 && receiptPrintContainer) {
     printFormat110.addEventListener('click', () => {
         printFormatModal.style.display = 'none'; // 1. Ukryj modal wyboru
         showToast('Otwieranie podglądu 110mm...', 'info', 1500);
 
         try {
-            // 2. Wygeneruj HTML (używając funkcji grupującej)
-            const receiptContentHTML = generate110mmReceiptHTML_Grouped_Styled();
+            // 2. Wygeneruj HTML tak jak wcześniej
+            const receiptContentHTML = generate110mmReceiptHTML();
             
-            // 3. Otwórz nowe okno (Szerokość 2/3 ekranu)
-            const newWidth = Math.round(window.screen.width * 0.66);
-            const printWindow = window.open('', '_blank', `width=${newWidth},height=700,scrollbars=yes,resizable=yes`);
+            // 3. Otwórz nowe okno (Twój "nowy widok")
+            // Ustawiamy wymiary okna podglądu, aby przypominało paragon
+            const printWindow = window.open('', '_blank', 'width=450,height=700,scrollbars=yes,resizable=yes');
             
             if (!printWindow) {
                 showToast('Nie udało się otworzyć nowego okna. Wyłącz blokowanie wyskakujących okienek.', 'error');
@@ -4343,130 +4339,88 @@ if (printFormat110 && receiptPrintContainer) {
                     <style>
                         /* --- Style dla nowego okna --- */
                         body { 
-                            /* (POPRAWKA: Powrót do pierwotnej czcionki) */
                             font-family: 'Courier New', Courier, monospace;
                             margin: 0;
                             padding: 0;
-                            background-color: #f0f0f0;
+                            background-color: #f0f0f0; /* Tło dla widoku "poza kartką" */
                         }
                         
-                        /* --- Kontener na przyciski (na dole) --- */
+                        /* --- Kontener na przyciski (nie do druku) --- */
                         .print-controls {
-                            padding: 20px 0;
+                            padding: 15px;
                             text-align: center;
-                            background-color: #f0f0f0;
+                            background-color: #333;
+                            position: sticky; /* Przyklejony u góry */
+                            top: 0;
+                            z-index: 100;
                         }
                         .print-controls button {
-                            padding: 15px 25px;
-                            font-size: 20px;
-                            margin: 0 10px;
+                            padding: 8px 16px;
+                            font-size: 16px;
+                            margin: 0 5px;
                             cursor: pointer;
                             border: none;
-                            border-radius: 8px;
+                            border-radius: 5px;
                             font-weight: bold;
-                            /* (POPRAWKA: Powrót do pierwotnej czcionki) */
-                            font-family: 'Courier New', Courier, monospace;
                         }
                         .print-controls .print-btn {
-                            background-color: #4CAF50;
+                            background-color: #4CAF50; /* Zielony */
                             color: white;
                         }
                         .print-controls .close-btn {
-                            background-color: #f44336;
+                            background-color: #f44336; /* Czerwony */
                             color: white;
                         }
                         
                         /* --- Kontener na paragon (symulacja kartki) --- */
                         .receipt-page {
-                            width: 105mm; 
+                            width: 105mm; /* Szerokość kartki (zostawia 5mm marginesu drukarki) */
                             min-height: 150mm;
-                            margin: 20px auto;
-                            padding: 5mm;
+                            margin: 20px auto; /* Centrowanie kartki */
+                            padding: 5mm; /* Wewnętrzny margines (jak w @page) */
                             box-sizing: border-box;
                             background-color: #ffffff;
                             box-shadow: 0 0 10px rgba(0,0,0,0.15);
                         }
                         
-                        /* --- Style dla treści paragonu --- */
+                        /* --- Style dla treści paragonu (skopiowane z Twojego CSS) --- */
+                        /* Używamy .receipt-page jako kontenera zamiast #receiptPrintContainer */
                         .receipt-page {
-                            /* (POPRAWKA: Powrót do pierwotnej czcionki) */
                             font-family: 'Courier New', Courier, monospace !important;
                             color: #000 !important;
                             font-size: 10pt !important;
                             line-height: 1.3 !important;
                         }
                         .receipt-page h2 {
-                            font-size: 11pt !important;
-                            text-align: left;
-                            margin: 0 0 0 0;
-                            font-weight: bold; 
-                            text-transform: uppercase;
+                            font-size: 11pt !important; text-align: left; margin: 0 0 10px 0;
+                            font-weight: bold; text-transform: uppercase;
                         }
-                        .receipt-page .card-number {
-                            font-size: 11pt;
-                            font-weight: bold;
-                            margin: 2px 0 15px 0;
-                            text-align: left;
-                        }
                         .receipt-page h3 {
-                            font-size: 10pt !important; 
-                            font-weight: bold; 
-                            margin-top: 10px; /* ZWARTY ODSTĘP */
-                            margin-bottom: 2px; /* ZWARTY ODSTĘP */
-                            border-bottom: none;
-                            padding-bottom: 0; 
-                            page-break-before: avoid;
-                            text-decoration: none;
+                            font-size: 10pt !important; font-weight: bold; margin-top: 15px;
+                            margin-bottom: 5px; border-bottom: 1px dashed #000;
+                            padding-bottom: 3px; page-break-before: avoid;
                         }
                         .receipt-page p {
-                            font-size: 10pt !important; 
-                            margin: 2px 0;
-                            word-wrap: break-word; 
-                            page-break-inside: avoid;
-                            padding-left: 5mm;
+                            font-size: 10pt !important; margin: 2px 0;
+                            word-wrap: break-word; page-break-inside: avoid;
                         }
                         .receipt-page .data-block {
-                            margin-bottom: 0; /* ZWARTY UKŁAD */
-                            page-break-inside: avoid;
-                            border-bottom: none; /* ZWARTY UKŁAD */
-                            padding-bottom: 0; /* ZWARTY UKŁAD */
+                            margin-bottom: 10px; page-break-inside: avoid;
                         }
-                        .receipt-page .schema-header {
-                            font-size: 9pt !important;
-                            font-weight: normal;
-                            padding-left: 5mm;
-                            margin-top: 5px;
-                            margin-bottom: 5px;
-                        }
-                        .receipt-page .product-item {
-                            padding-left: 10mm;
-                            margin-bottom: 4px;
-                            font-size: 10pt !important;
-                        }
-                        .receipt-page .product-item .prefix {
-                           display: none;
-                        }
+                        .receipt-page .receipt-row-item {
+                            border-top: 1px solid #ccc; padding: 5px 0; margin-top: 5px;
+                            page-break-inside: avoid;
+                        }
+                        .receipt-page .receipt-row-item p { margin: 3px 0; display: block; }
+                        .receipt-page .receipt-row-item strong { font-size: 9pt; }
                         .receipt-page .signatures-110mm {
-                            margin-top: 25px; 
-                            page-break-inside: avoid; 
-                            page-break-before: auto;
-                            display: flex;
-                            justify-content: space-between;
-                            padding-left: 5mm;
-                            padding-right: 5mm;
-                            border-top: 1px solid #ccc;
-                            padding-top: 10px;
+                            margin-top: 25px; page-break-inside: avoid; page-break-before: auto;
                         }
-                        .receipt-page .sig-box-110mm { 
-                            margin-top: 10px; 
-                            width: 48%;
-                        }
+                        .receipt-page .sig-box-110mm { margin-top: 10px; }
                         .receipt-page .sig-box-110mm strong { display: block; font-size: 10pt; }
                         .receipt-page .sig-box-110mm img {
-                            max-width: 100%;
-                            height: 60px; object-fit: contain;
-                            border: none;
-                            margin-top: 5px;
+                            max-width: 180px; height: 60px; object-fit: contain;
+                            border: 1px solid #eee; margin-top: 5px;
                         }
                         .receipt-page .footer-legend {
                             margin-top: 20px; font-size: 8pt !important;
@@ -4474,41 +4428,41 @@ if (printFormat110 && receiptPrintContainer) {
                             page-break-inside: avoid;
                         }
                         
-                        /* --- Style dla drukowania --- */
+                        /* --- Style dla drukowania tego nowego okna --- */
                         @media print {
+                            /* Ukryj przyciski */
                             .print-controls {
                                 display: none !important;
                             }
+                            /* Zresetuj tło i cienie kartki */
                             body {
                                 background-color: #ffffff !important;
                             }
                             .receipt-page {
-                                width: 105mm !important;
+                                width: 105mm !important; /* Użyj pełnej szerokości */
                                 margin: 0 !important;
-                                padding: 0 !important;
+                                padding: 0 !important; /* Marginesy będą z @page */
                                 box-shadow: none !important;
                                 border: none !important;
                                 min-height: unset !important;
-                            }
-                            .receipt-page .signatures-110mm {
-                                border-top: 1px solid #ccc !important;
-                            }
+A                         }
+                            /* Zachowaj definicję strony 110mm */
                             @page {
                                 size: 110mm auto;
                                 margin: 5mm;
                                 orientation: portrait !important;
-G;
+                            }
                         }
                     </style>
                 </head>
                 <body>
-                    <div class="receipt-page">
-dot                     ${receiptContentHTML}
-                    </div>
-                    
-                    <div class="print-controls">
+                                        <div class="print-controls">
                         <button class="print-btn" onclick="window.print();">Drukuj</button>
                         <button class="close-btn" onclick="window.close();">Zamknij okno</button>
+                    </div>
+                    
+                                        <div class="receipt-page">
+                        ${receiptContentHTML}
                     </div>
                 </body>
                 </html>
@@ -4521,256 +4475,191 @@ dot                     ${receiptContentHTML}
 
         } catch (e) {
             console.error("Błąd podczas generowania podglądu 110mm:", e);
-section           showToast('Błąd generowania podglądu 110mm.', 'error');
+            showToast('Błąd generowania podglądu 110mm.', 'error');
         }
     });
 }
 
-// ⬆️ ⬆️ ⬆️ KONIEC NOWEGO BLOKU 1 ⬆️ ⬆️ ⬆️
+// ⬆️ ⬆️ ⬆️ KONIEC NOWEGO BLOKU ⬆️ ⬆️ ⬆️
 /* ⬇️ ⬇️ ⬇️ ZASTĄP CAŁĄ FUNKCJĘ "generate110mmReceiptHTML" TĄ NOWĄ WERSJĄ ⬇️ ⬇️ ⬇️ */
 
 /**
-// ⬇️ ⬇️ ⬇️ WKLEJ TEN NOWY BLOK W MIEJSCE STAREJ FUNKCJI ⬇️ ⬇️ ⬇️
-
-/**
- * POMOCNICZA FUNKCJA (dla Pkt 6): Renderuje pojedynczą linię produktu w nowym widoku.
+ * NOWA FUNKCJA (v2): Zbiera dane i generuje HTML dla 110mm UŻYWAJĄC PEŁNYCH TYTUŁÓW.
+ * @returns {string} - Surowy HTML do wstrzyknięcia do #receiptPrintContainer.
  */
-// ⬇️ ⬇️ ⬇️ WKLEJ TEN NOWY BLOK W MIEJSCE STARYCH FUNKCJI ⬇️ ⬇️ ⬇️
-
-/**
- * POMOCNICZA FUNKCJA (Wersja v2 - Styl PDF): Renderuje pojedynczą linię produktu.
- */
-function renderReceiptProductLine_Styled(item, lp) {
-    // Formatowanie jak w PDF: "1. Nazwa Seria Ilość Karencja"
-    const iloscDawka = [item.ilosc, item.dawkaText].filter(Boolean).join(' ');
-    
-    // Dzielimy karencję na linie, jeśli zawiera '\n' lub jest długa
-    let karencjaHtml = (item.karencja || '0').replace(/\n/g, '<br>');
-    // Jeśli nie ma ręcznych enterów, ale jest długa, spróbujmy złamać
-    if (!karencjaHtml.includes('<br>') && karencjaHtml.length > 20) {
-        // To jest trudne bez pełnego renderowania, ale spróbujmy
-        // Nie, zostawmy to przeglądarce, `word-wrap` powinien zadziałać.
-    }
-
-    // Formatowanie z PDF: "1. Glukoza 20% 500ml 15THC320 3 szt \n 0"
-    // Formatowanie z PDF: "2. Metriguard 240136 1 szt domacicznie[...]\n T-7 d, M-12h"
-    
-    // Wersja uproszczona, ale czysta:
-    let produktLinia = `${lp}. ${item.produkt} ${item.seria || ''} ${iloscDawka || ''}`;
-    
-    return `
-        <div class="product-item">
-            ${produktLinia}
-            <br>
-            ${karencjaHtml || ''}
-        </div>
-    `;
-}
-
-/**
- * NOWA FUNKCJA (v4 - STYL PDF): Zbiera dane i generuje HTML 
- * zgodnie ze stylem PDF (grupowanie + czcionka Times).
- * @returns {string} - Surowy HTML do wstrzyknięcia do okna podglądu.
- */
-function generate110mmReceiptHTML_Grouped_Styled() {
-    console.log("Rozpoczynam generowanie HTML dla 110mm (v4 - Styl PDF)...");
-
-    // --- 1. POBIERZ DANE NAGŁÓWKA ---
-    const nrKL = document.getElementById('nrDokumentu')?.value || 'B/N';
-    const lecznica = document.getElementById('nazwaLecznicy')?.textContent || 'Brak danych';
-    const klient = document.getElementById('klientSelect')?.value || 'Brak danych';
-    const adres = document.getElementById('adresKlienta')?.textContent || 'Brak danych';
-    const nrStada = document.getElementById('nrStada')?.textContent || 'Brak danych';
-    const dataWizyty = document.getElementById('dataWykonania')?.value || 'Brak danych';
-
-    // --- 2. POBIERZ PODPISY ---
-    const podpisLekarzaImg = document.getElementById('doctor-signature')?.src || '';
-    const podpisLekarzaLinia = document.getElementById('doctor-signature-name')?.textContent || '';
-    const podpisKlientaImg = document.getElementById('canvasPosiadacz')?.toDataURL() || '';
-
-    // --- 3. AGREGACJA DANYCH (Jak w v3) ---
-    const logicalRows = rowsEditable();
-    
-    const allOpisy = new Set();
-    const allRozpoznania = new Set();
-    let totalLiczba = 0;
-    const aggregatedProduktyNaMiejscu = [];
-    const aggregatedProduktyPozostawione = [];
-
-    logicalRows.forEach((row, index) => {
-        if (isRowEmpty(row)) {
-            return;
-        }
-
-        const opis = row.cells[1]?.textContent || '';
-        const liczbaVal = row.cells[2]?.querySelector('input')?.value || '0';
-        const liczba = parseInt(liczbaVal, 10) || 0;
-        const rozpoznanie = row.cells[3]?.querySelector('input')?.value || '';
-        const produkt = row.cells[4]?.querySelector('input')?.value || '';
-        const seria = row.cells[5]?.textContent || '';
-        
-        const iloscInput = row.cells[6]?.querySelector('input[type="number"]');
-        const ilosc = iloscInput?.value || '';
-        let dawkaText = '';
-        if (iloscInput && iloscInput.nextSibling && iloscInput.nextSibling.nodeType === Node.TEXT_NODE) {
-            dawkaText = iloscInput.nextSibling.textContent.trim();
-        }
-        const karencja = row.cells[7]?.textContent || '';
-
-        if (opis) allOpisy.add(opis);
-        if (rozpoznanie) allRozpoznania.add(rozpoznanie);
-
-        let produktItem = null;
-        if (produkt) {
-            produktItem = {
-                // Usuwamy prefix, bo PDF go nie używa w ten sposób
-                produkt: produkt,
-                seria: seria,
-                ilosc: ilosc,
-                dawkaText: dawkaText,
-                karencja: karencja
-            };
-        }
-
-        if (index < 9) { // Leczenie na miejscu
-            totalLiczba += liczba; 
-            if (produktItem) {
-                aggregatedProduktyNaMiejscu.push(produktItem);
-            }
-        } else { // Produkty pozostawione
-            if (produktItem) {
-                aggregatedProduktyPozostawione.push(produktItem);
-            }
-        }
-    });
-
-    // --- 4. BUDOWANIE FINALNEGO HTML (Styl PDF) ---
-    let html = '';
-
-    // (Pkt 2 i 3) Nagłówek paragonu i Nr Karty
-    html += `
-        <h2>KARTA LECZENIA ZWIERZĄT GOSPODARSKICH ORAZ ZWIERZĄT
-            <br>Z KTÓRYCH POZYSKANE TKANKI LUB PRODUKTY SĄ
-            <br>PRZEZNACZONE DO SPOŻYCIA PRZEZ LUDZI/EWIDENCJA
-            <br>LECZENIA ZWIERZĄT
-        </h2>
-        <p class="card-number">
-            KARTA NR ${nrKL}
-        </p>
-    `;
-
-    // Bloki danych (z numeracją i wcięciem jak w PDF)
-    html += `
-        <div class="data-block">
-            <h3>1. Nazwa i adres zakładu leczniczego dla zwierząt</h3>
-            <p>${lecznica.replace('<br>', '<br>')}</p>
-        </div>
-        <div class="data-block">
-            <h3>2. Imię, nazwisko i adres albo nazwa siedziby i adres<br>posiadacza zwierzęcia:</h3>
-            <p>${klient}<br>${adres}<br>${nrStada}</p>
-        </div>
-        <div class="data-block">
-            <h3>3. Wykonanie czynności lekarsko-weterynaryjnych data</h3>
-            <p>${dataWizyty}</p>
-        </div>
-    `;
-
-    // --- Sekcje zgrupowane (jak w PDF) ---
-    html += `
-        <div class="data-block">
-            <h3>3. Nazwa siedziby stada i opis leczonego zwierzęcia<br>(gatunek, płeć numer identyfikacyjny, sposób<br>oznakowania, wiek, masa ciała)</h3>
-            <p>${Array.from(allOpisy).join(', ') || '---'}</p>
-        </div>
-        <div class="data-block">
-            <h3>4. Liczba leczonych zwierząt</h3>
-            <p>${totalLiczba > 0 ? totalLiczba : '0'}</p>
-        </div>
-        <div class="data-block">
-            <h3>5. Rozpoznanie albo wstępne rozpoznanie choroby</h3>
-            <p>${Array.from(allRozpoznania).join(', ') || '---'}</p>
-        </div>
-    `;
-
-    // Blok "Leczenie na Miejscu"
-    html += `
-        <div class="data-block">
-            <h3>6. Zastosowane u poszczególnych zwierząt produkty lecznicze lub<br>nabyte przez posiadacza zwierzęcia produkty lecznicze<br>weterynaryjne lub pasze lecznicze</h3>
-            <p class="schema-header">SCHEMAT: nazwa zastosowanego produktu** / nr serii*** /<br>zastosowana ilość(dawkowanie)****/ karencja, zalecenia *****</p>
-        </div>
-    `;
-    if (aggregatedProduktyNaMiejscu.length > 0) {
-        aggregatedProduktyNaMiejscu.forEach((item, index) => {
-            html += renderReceiptProductLine_Styled(item, index + 1);
-        });
-    } else {
-        html += '<p style="padding-left: 10mm; font-size: 9pt;">--- Brak ---</p>';
-    }
-
-    // Blok "Leczenie Pozostawione"
-    html += `
-        <div class="data-block">
-            <h3>7.Potwierdzenie nabycia produktu leczniczego<br>weterynaryjnego / paszy leczniczej</h3>
-            <!-- Tutaj PDF powtarza dane (7.1, 7.2, 7.3), ale my grupujemy, więc pomijamy -->
-            <h3>7.4 Zastosowane u poszczególnych zwierząt produkty lecznicze...</h3>
-            <p class="schema-header">SCHEMAT: nazwa zastosowanego produktu** / nr serii*** / zastosowana ilość(dawkowanie)****/ karencja, zalecenia *****</p>
-        </div>
-    `;
-    if (aggregatedProduktyPozostawione.length > 0) {
-        aggregatedProduktyPozostawione.forEach((item, index) => {
-            html += renderReceiptProductLine_Styled(item, index + 1);
-        });
-    } else {
-        html += '<p style="padding-left: 10mm; font-size: 9pt;">--- Brak ---</p>';
-    }
-
-    // Blok Podpisów
-    html += `
-        <div class="signatures-110mm">
-            <div class="sig-box-110mm">
-                <strong>podpis lekarza weterynarii</strong>
-                <img src="${podpisLekarzaImg}" alt="Podpis lekarza">
-                <p style="padding-left: 0;">${podpisLekarzaLinia}</p>
-            </div>
-            <div class="sig-box-110mm">
-                <strong>podpis posiadacza zwierzęcia</strong>
-                <img src="${podpisKlientaImg}" alt="Podpis klienta">
-            </div>
-        </div>
-    `;
-
-    // Stopka (Legenda)
-    html += `
-        <div class="footer-legend">
-            <p style="padding-left: 0;">*Nazwa produktu leczniczego/ produktu leczniczego<br>
-            weterynaryjnego/ paszy leczniczej<br>
-            **Numer serii produktu leczniczego lub produktu leczniczego<br>
-            weterynaryjnego<br>
-            ***Ilość, dawkowanie zastosowanego produktu leczniczego lub<br>
-            ilość, dawkowanie i okres stosowanie nabytego produktu<br>
-            leczniczego, weterynaryjnego/paszy leczniczej<br>
-            ****Okres karencji oraz zabieg leczniczy lub profilaktyczne<br>
-            zalecenia lekarskie oraz uwagi</p>
-        </div>
-    `;
-
-    console.log("Generowanie HTML 110mm (v4) zakończone.");
-    return html;
-}
-
-// Zmieniamy nazwę starej funkcji, aby uniknąć konfliktu
 function generate110mmReceiptHTML() {
-    console.warn("WYWOŁANO STARĄ FUNKCJĘ generate110mmReceiptHTML(). Przekierowuję na generate110mmReceiptHTML_Grouped_Styled().");
-    return generate110mmReceiptHTML_Grouped_Styled();
-}
-// Zmieniamy również nazwę v3, aby uniknąć wywołania
-function generate110mmReceiptHTML_Grouped() {
-     console.warn("WYWOŁANO STARĄ FUNKCJĘ generate110mmReceiptHTML_Grouped(). Przekierowuję na generate110mmReceiptHTML_Grouped_Styled().");
-    return generate110mmReceiptHTML_Grouped_Styled();
-}
+    console.log("Rozpoczynam generowanie HTML dla 110mm (v2 - pełne tytuły)...");
 
-// ⬆️ ⬆️ ⬆️ KONIEC NOWEGO BLOKU 2 ⬆️ ⬆️ ⬆️
+    // --- 1. POBIERZ DANE NAGŁÓWKA ---
+    const nrKL = document.getElementById('nrDokumentu')?.value || 'B/N';
+    const lecznica = document.getElementById('nazwaLecznicy')?.textContent || 'Brak danych';
+    const klient = document.getElementById('klientSelect')?.value || 'Brak danych';
+    const adres = document.getElementById('adresKlienta')?.textContent || 'Brak danych';
+    const nrStada = document.getElementById('nrStada')?.textContent || 'Brak danych';
+    const dataWizyty = document.getElementById('dataWykonania')?.value || 'Brak danych';
 
-// ⬆️ ⬆️ ⬆️ KONIEC NOWEGO BLOKU 2 ⬆️ ⬆️ ⬆️
+    // --- 2. POBIERZ PODPISY ---
+    const podpisLekarzaImg = document.getElementById('doctor-signature')?.src || '';
+    const podpisLekarzaLinia = document.getElementById('doctor-signature-name')?.textContent || '';
+    const podpisKlientaImg = document.getElementById('canvasPosiadacz')?.toDataURL() || '';
+
+    // --- 3. POBIERZ WIERSZE TABELI ---
+    const logicalRows = rowsEditable(); // Używamy istniejącej funkcji
+    const leczenieNaMiejscu = logicalRows.slice(0, 9); // Indeksy 0-8
+    const leczeniePozostawione = logicalRows.slice(9); // Indeksy 9, 10, 11
+    
+    // --- 4. FUNKCJA POMOCNICZA DO RENDEROWANIA WIERSZY (Leczenie na miejscu) ---
+    const renderReceiptRow = (row, lp) => {
+        if (!row || isRowEmpty(row)) return ''; // Pomiń puste wiersze
+
+        const opis = row.cells[1]?.textContent || '';
+        const liczba = row.cells[2]?.querySelector('input')?.value || '';
+        const rozpoznanie = row.cells[3]?.querySelector('input')?.value || '';
+        const produkt = row.cells[4]?.querySelector('input')?.value || '';
+        const seria = row.cells[5]?.textContent || '';
+        
+        const iloscInput = row.cells[6]?.querySelector('input[type="number"]');
+        const ilosc = iloscInput?.value || '';
+        let dawkaText = '';
+        if (iloscInput && iloscInput.nextSibling && iloscInput.nextSibling.nodeType === Node.TEXT_NODE) {
+            dawkaText = iloscInput.nextSibling.textContent.trim();
+        }
+        const iloscDawka = [ilosc, dawkaText].filter(Boolean).join(' '); // Łączy np. "10" i "ml"
+
+        const karencja = row.cells[7]?.textContent || '';
+
+        // Generuje HTML na podstawie Twojego szablonu z PEŁNYMI tytułami
+        return `
+        <div class="receipt-row-item">
+            <p><strong>(Lp. ${lp}) 3. Nazwa siedziby stada i opis leczonego zwierzęcia (gatunek, płeć numer identyfikacyjny, sposób oznakowania, wiek, masa ciała):</strong><br>${opis || '---'}</p>
+            <p><strong>4. Liczba leczonych zwierząt:</strong> ${liczba || '---'}</p>
+            <p><strong>5. Rozpoznanie albo wstępne rozpoznanie choroby:</strong><br>${rozpoznanie || '---'}</p>
+            <p><strong>6. Zastosowane produkty:</strong></p>
+            <p style="font-size: 9pt; padding-left: 10px;">(Nazwa** / Seria*** / Ilość(Dawka)**** / Karencja*****)</p>
+            <p style="padding-left: 10px;">
+                ${produkt || 'B/N'} / ${seria || 'B/N'} / ${iloscDawka || 'B/N'} / ${karencja || 'B/N'}
+            </p>
+        </div>
+        `;
+    };
+    
+    // Funkcja dla wierszy "Pozostawionych" (pkt 7.1 - 7.4)
+    const renderReceiptRowPozostawione = (row, lp) => {
+        if (!row || isRowEmpty(row)) return '';
+
+        const opis = row.cells[1]?.textContent || '';
+        const liczba = row.cells[2]?.querySelector('input')?.value || '';
+        const rozpoznanie = row.cells[3]?.querySelector('input')?.value || '';
+        const produkt = row.cells[4]?.querySelector('input')?.value || '';
+        const seria = row.cells[5]?.textContent || '';
+        const iloscInput = row.cells[6]?.querySelector('input[type="number"]');
+        const ilosc = iloscInput?.value || '';
+        let dawkaText = '';
+        if (iloscInput && iloscInput.nextSibling && iloscInput.nextSibling.nodeType === Node.TEXT_NODE) {
+            dawkaText = iloscInput.nextSibling.textContent.trim();
+        }
+        const iloscDawka = [ilosc, dawkaText].filter(Boolean).join(' ');
+        const karencja = row.cells[7]?.textContent || '';
+
+        return `
+        <div class="receipt-row-item">
+            <p><strong>(Lp. ${lp}) 7.1 Nazwa siedziby stada i opis leczonego zwierzęcia (gatunek, płeć numer identyfikacyjny, sposób oznakowania, wiek, masa ciała):</strong><br>${opis || '---'}</p>
+            <p><strong>7.2 Liczba leczonych zwierząt:</strong> ${liczba || '---'}</p>
+            <p><strong>7.3 Rozpoznanie albo wstępne rozpoznanie choroby:</strong><br>${rozpoznanie || '---'}</p>
+            <p><strong>7.4 Zastosowane u poszczególnych zwierząt produkty lecznicze...:</strong></p>
+            <p style="font-size: 9pt; padding-left: 10px;">(Nazwa** / Seria*** / Ilość(Dawka)**** / Karencja*****)</p>
+            <p style="padding-left: 10px;">
+                ${produkt || 'B/N'} / ${seria || 'B/N'} / ${iloscDawka || 'B/N'} / ${karencja || 'B/N'}
+            </p>
+        </div>
+        `;
+    };
+
+    // --- 5. BUDOWANIE FINALNEGO HTML (WERSJA Z PEŁNYMI TYTUŁAMI) ---
+    let html = '';
+
+    // Nagłówek paragonu
+    html += `
+        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+            <h2 style="text-align: left; max-width: 70%; font-size: 10pt !important; line-height: 1.2;">KARTA LECZENIA ZWIERZĄT GOSPODARSKICH ORAZ ZWIERZĄT, Z KTÓRYCH POZYSKANE TKANKI LUB PRODUKTY SĄ PRZEZNACZONE DO SPOŻYCIA PRZEZ LUDZI / EWIDENCJA LECZENIA ZWIERZĄT</h2>
+            <strong style="font-size: 11pt; text-align: right; white-space: nowrap; padding-left: 5px;">KARTA NR:<br>${nrKL}</strong>
+        </div>
+    `;
+
+    // Blok 1: Dane Lecznic
+    html += `
+        <div class="data-block">
+            <h3>1. Nazwa i adres zakładu leczniczego dla zwierząt:</h3>
+            <p>${lecznica.replace('<br>', '\n')}</p>
+        </div>
+    `;
+
+    // Blok 2: Dane Posiadacza
+    html += `
+        <div class="data-block">
+            <h3>2. Imię, nazwisko i adres albo nazwa siedziby i adres posiadacza zwierzęcia:</h3>
+            <p><strong>Klient:</strong> ${klient}</p>
+            <p><strong>Adres:</strong> ${adres}</p>
+            <p><strong>Nr stada:</strong> ${nrStada}</p>
+        </div>
+    `;
+    
+    // Blok 3: Data
+    html += `
+        <div class="data-block">
+            <h3>3. Wykonanie czynności lekarsko-weterynaryjnych data</h3>
+            <p>${dataWizyty}</p>
+        </div>
+    `;
+
+    // Blok Leczenia na Miejscu (Wiersze 1-9)
+    // Tytuł dla całej sekcji 3-6 (zgodnie z A4)
+    html += `<h3>Leczenie na miejscu (Pola 3-6)</h3>`;
+    
+    let rowCounterLNM = 1;
+    for (const row of leczenieNaMiejscu) {
+        html += renderReceiptRow(row, `${rowCounterLNM}.`);
+        rowCounterLNM++;
+    }
+
+    // Blok Leczenia Pozostawionego (Wiersze 10-12)
+    html += `<h3>7. Potwierdzenie nabycia produktu leczniczego weterynaryjnego / paszy leczniczej</h3>`;
+    html += `<p style="font-size: 9pt; border-bottom: 1px dashed #000; padding-bottom: 3px;"><strong>SCHEMAT:</strong> nazwa zastosowanego produktu** / nr serii*** / zastosowana ilość(dawkowanie)**** / karencja, zalecenia *****</p>`;
+    
+    let rowCounterLP = 1;
+    for (const row of leczeniePozostawione) {
+        html += renderReceiptRowPozostawione(row, `${rowCounterLP}.`);
+        rowCounterLP++;
+    }
+
+    // Blok Podpisów
+    html += `
+        <div class="signatures-110mm">
+            <div class="sig-box-110mm">
+                <strong>Podpis lekarza weterynarii:</strong>
+                <img src="${podpisLekarzaImg}" alt="Podpis lekarza">
+                <p>${podpisLekarzaLinia}</p>
+            </div>
+            <div class="sig-box-110mm">
+                <strong>Podpis posiadacza zwierzęcia:</strong>
+                <img src="${podpisKlientaImg}" alt="Podpis klienta">
+            </div>
+        </div>
+    `;
+
+    // Stopka (Legenda)
+    html += `
+        <div class="footer-legend">
+            <p>*Nazwa produktu leczniczego/ produktu leczniczego weterynaryjnego/ paszy leczniczej<br>
+            **Numer serii produktu leczniczego lub produktu leczniczego weterynaryjnego<br>
+            ***Ilość, dawkowanie zastosowanego produktu leczniczego lub ilość, dawkowanie i okres stosowanie nabytego produktu leczniczego, weterynaryjnego/paszy leczniczej<br>
+            ****Okres karencji oraz zabieg leczniczy lub profilaktyczne zalecenia lekarskie oraz uwagi</p>
+        </div>
+    `;
+
+    console.log("Generowanie HTML 110mm (v2) zakończone.");
+    return html;
+}
 
 /* ⬆️ ⬆️ ⬆️ KONIEC ZASTĘPOWANIA ⬆️ ⬆️ ⬆️ */
 
