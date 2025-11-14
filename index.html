@@ -4525,23 +4525,45 @@ if (printFormat110 && receiptPrintContainer) {
 /**
  * POMOCNICZA FUNKCJA (dla Pkt 6): Renderuje pojedynczą linię produktu w nowym widoku.
  */
-function renderReceiptProductLine(item) {
+// ⬇️ ⬇️ ⬇️ WKLEJ TEN NOWY BLOK W MIEJSCE STARYCH FUNKCJI ⬇️ ⬇️ ⬇️
+
+/**
+ * POMOCNICZA FUNKCJA (Wersja v2 - Styl PDF): Renderuje pojedynczą linię produktu.
+ */
+function renderReceiptProductLine_Styled(item, lp) {
+    // Formatowanie jak w PDF: "1. Nazwa Seria Ilość Karencja"
     const iloscDawka = [item.ilosc, item.dawkaText].filter(Boolean).join(' ');
+    
+    // Dzielimy karencję na linie, jeśli zawiera '\n' lub jest długa
+    let karencjaHtml = (item.karencja || '0').replace(/\n/g, '<br>');
+    // Jeśli nie ma ręcznych enterów, ale jest długa, spróbujmy złamać
+    if (!karencjaHtml.includes('<br>') && karencjaHtml.length > 20) {
+        // To jest trudne bez pełnego renderowania, ale spróbujmy
+        // Nie, zostawmy to przeglądarce, `word-wrap` powinien zadziałać.
+    }
+
+    // Formatowanie z PDF: "1. Glukoza 20% 500ml 15THC320 3 szt \n 0"
+    // Formatowanie z PDF: "2. Metriguard 240136 1 szt domacicznie[...]\n T-7 d, M-12h"
+    
+    // Wersja uproszczona, ale czysta:
+    let produktLinia = `${lp}. ${item.produkt} ${item.seria || ''} ${iloscDawka || ''}`;
+    
     return `
         <div class="product-item">
-            <div class="prefix">${item.prefix}</div>
-            <strong>${item.produkt}</strong> / ${item.seria || 'B/N'} / ${iloscDawka || 'B/N'} / ${item.karencja || 'B/N'}
+            ${produktLinia}
+            <br>
+            ${karencjaHtml || ''}
         </div>
     `;
 }
 
 /**
- * NOWA FUNKCJA (v3 - ZGRUPOWANA): Zbiera dane i generuje HTML dla 110mm 
- * zgodnie z Twoimi wytycznymi (Pkt 2-6).
+ * NOWA FUNKCJA (v4 - STYL PDF): Zbiera dane i generuje HTML 
+ * zgodnie ze stylem PDF (grupowanie + czcionka Times).
  * @returns {string} - Surowy HTML do wstrzyknięcia do okna podglądu.
  */
-function generate110mmReceiptHTML_Grouped() {
-    console.log("Rozpoczynam generowanie HTML dla 110mm (v3 - Zgrupowane)...");
+function generate110mmReceiptHTML_Grouped_Styled() {
+    console.log("Rozpoczynam generowanie HTML dla 110mm (v4 - Styl PDF)...");
 
     // --- 1. POBIERZ DANE NAGŁÓWKA ---
     const nrKL = document.getElementById('nrDokumentu')?.value || 'B/N';
@@ -4556,8 +4578,8 @@ function generate110mmReceiptHTML_Grouped() {
     const podpisLekarzaLinia = document.getElementById('doctor-signature-name')?.textContent || '';
     const podpisKlientaImg = document.getElementById('canvasPosiadacz')?.toDataURL() || '';
 
-    // --- 3. AGREGACJA DANYCH (Pkt 6) ---
-    const logicalRows = rowsEditable(); // Używamy istniejącej funkcji
+    // --- 3. AGREGACJA DANYCH (Jak w v3) ---
+    const logicalRows = rowsEditable();
     
     const allOpisy = new Set();
     const allRozpoznania = new Set();
@@ -4565,13 +4587,11 @@ function generate110mmReceiptHTML_Grouped() {
     const aggregatedProduktyNaMiejscu = [];
     const aggregatedProduktyPozostawione = [];
 
-    // Pętla po WSZYSTKICH wierszach
     logicalRows.forEach((row, index) => {
         if (isRowEmpty(row)) {
-            return; // Pomiń puste wiersze
+            return;
         }
 
-        // Odczytaj dane z wiersza
         const opis = row.cells[1]?.textContent || '';
         const liczbaVal = row.cells[2]?.querySelector('input')?.value || '0';
         const liczba = parseInt(liczbaVal, 10) || 0;
@@ -4587,15 +4607,13 @@ function generate110mmReceiptHTML_Grouped() {
         }
         const karencja = row.cells[7]?.textContent || '';
 
-        // Dodaj do Setów (jeśli istnieją)
         if (opis) allOpisy.add(opis);
         if (rozpoznanie) allRozpoznania.add(rozpoznanie);
 
-        // Zbuduj obiekt produktu (jeśli istnieje)
         let produktItem = null;
         if (produkt) {
             produktItem = {
-                prefix: `(Opis: ${opis || 'b.d.'}, Rozp: ${rozpoznanie || 'b.d.'})`,
+                // Usuwamy prefix, bo PDF go nie używa w ten sposób
                 produkt: produkt,
                 seria: seria,
                 ilosc: ilosc,
@@ -4604,43 +4622,42 @@ function generate110mmReceiptHTML_Grouped() {
             };
         }
 
-        // Rozdziel dane na podstawie indeksu wiersza
-        if (index < 9) {
-            // Leczenie na miejscu (Wiersze 1-9, indeksy 0-8)
-            totalLiczba += liczba; // Sumuj tylko te
+        if (index < 9) { // Leczenie na miejscu
+            totalLiczba += liczba; 
             if (produktItem) {
                 aggregatedProduktyNaMiejscu.push(produktItem);
             }
-        } else {
-            // Produkty pozostawione (Wiersze 10-12, indeksy 9-11)
+        } else { // Produkty pozostawione
             if (produktItem) {
                 aggregatedProduktyPozostawione.push(produktItem);
             }
         }
     });
 
-    // --- 4. BUDOWANIE FINALNEGO HTML ---
+    // --- 4. BUDOWANIE FINALNEGO HTML (Styl PDF) ---
     let html = '';
 
     // (Pkt 2 i 3) Nagłówek paragonu i Nr Karty
     html += `
-        <h2 style="font-size: 12pt !important; text-align: center; margin-bottom: 0;">KARTA LECZENIA ZWIERZĄT GOSPODARSKICH ORAZ ZWIERZĄT, Z KTÓRYCH POZYSKANE TKANKI LUB PRODUKTY SĄ PRZEZNACZONE DO SPOŻYCIA PRZEZ LUDZI / EWIDENCJA LECZENIA ZWIERZĄT</h2>
-        <p style="text-align: center; font-weight: bold; font-size: 11pt; margin-top: 2px; margin-bottom: 15px;">
-            KARTA NR: ${nrKL}
+        <h2>KARTA LECZENIA ZWIERZĄT GOSPODARSKICH ORAZ ZWIERZĄT
+            <br>Z KTÓRYCH POZYSKANE TKANKI LUB PRODUKTY SĄ
+            <br>PRZEZNACZONE DO SPOŻYCIA PRZEZ LUDZI/EWIDENCJA
+            <br>LECZENIA ZWIERZĄT
+        </h2>
+        <p class="card-number">
+            KARTA NR ${nrKL}
         </p>
     `;
 
-    // Bloki danych (z podkreśleniem h3 - Pkt 4)
+    // Bloki danych (z numeracją i wcięciem jak w PDF)
     html += `
         <div class="data-block">
-            <h3>1. Nazwa i adres zakładu leczniczego dla zwierząt:</h3>
-            <p>${lecznica.replace('<br>', '\n')}</p>
+            <h3>1. Nazwa i adres zakładu leczniczego dla zwierząt</h3>
+            <p>${lecznica.replace('<br>', '<br>')}</p>
         </div>
         <div class="data-block">
-            <h3>2. Imię, nazwisko i adres albo nazwa siedziby i adres posiadacza zwierzęcia:</h3>
-            <p><strong>Klient:</strong> ${klient}</p>
-            <p><strong>Adres:</strong> ${adres}</p>
-            <p><strong>Nr stada:</strong> ${nrStada}</p>
+            <h3>2. Imię, nazwisko i adres albo nazwa siedziby i adres<br>posiadacza zwierzęcia:</h3>
+            <p>${klient}<br>${adres}<br>${nrStada}</p>
         </div>
         <div class="data-block">
             <h3>3. Wykonanie czynności lekarsko-weterynaryjnych data</h3>
@@ -4648,52 +4665,64 @@ function generate110mmReceiptHTML_Grouped() {
         </div>
     `;
 
-    // --- Sekcje zgrupowane (Pkt 6) ---
+    // --- Sekcje zgrupowane (jak w PDF) ---
     html += `
         <div class="data-block">
-            <h3>Nazwa siedziby stada i opis leczonego zwierzęcia (gatunek, płeć numer identyfikacyjny, sposób oznakowania, wiek, masa ciała):</h3>
+            <h3>3. Nazwa siedziby stada i opis leczonego zwierzęcia<br>(gatunek, płeć numer identyfikacyjny, sposób<br>oznakowania, wiek, masa ciała)</h3>
             <p>${Array.from(allOpisy).join(', ') || '---'}</p>
         </div>
         <div class="data-block">
-            <h3>Liczba leczonych zwierząt:</h3>
+            <h3>4. Liczba leczonych zwierząt</h3>
             <p>${totalLiczba > 0 ? totalLiczba : '0'}</p>
         </div>
         <div class="data-block">
-            <h3>Rozpoznanie albo wstępne rozpoznanie choroby:</h3>
+            <h3>5. Rozpoznanie albo wstępne rozpoznanie choroby</h3>
             <p>${Array.from(allRozpoznania).join(', ') || '---'}</p>
         </div>
     `;
 
-    // Blok "Leczenie na Miejscu" (Pkt 5 i 6)
-    html += `<h3>Zastosowane u poszczególnych zwierząt produkty lecznicze... (Leczenie na miejscu)</h3>`;
+    // Blok "Leczenie na Miejscu"
+    html += `
+        <div class="data-block">
+            <h3>6. Zastosowane u poszczególnych zwierząt produkty lecznicze lub<br>nabyte przez posiadacza zwierzęcia produkty lecznicze<br>weterynaryjne lub pasze lecznicze</h3>
+            <p class="schema-header">SCHEMAT: nazwa zastosowanego produktu** / nr serii*** /<br>zastosowana ilość(dawkowanie)****/ karencja, zalecenia *****</p>
+        </div>
+    `;
     if (aggregatedProduktyNaMiejscu.length > 0) {
-        aggregatedProduktyNaMiejscu.forEach(item => {
-            html += renderReceiptProductLine(item);
+        aggregatedProduktyNaMiejscu.forEach((item, index) => {
+            html += renderReceiptProductLine_Styled(item, index + 1);
         });
     } else {
-        html += '<p style="font-size: 9pt;">--- Brak ---</p>';
+        html += '<p style="padding-left: 10mm; font-size: 9pt;">--- Brak ---</p>';
     }
 
     // Blok "Leczenie Pozostawione"
-    html += `<h3>7. Potwierdzenie nabycia produktu leczniczego weterynaryjnego / paszy leczniczej</h3>`;
+    html += `
+        <div class="data-block">
+            <h3>7.Potwierdzenie nabycia produktu leczniczego<br>weterynaryjnego / paszy leczniczej</h3>
+            <!-- Tutaj PDF powtarza dane (7.1, 7.2, 7.3), ale my grupujemy, więc pomijamy -->
+            <h3>7.4 Zastosowane u poszczególnych zwierząt produkty lecznicze...</h3>
+            <p class="schema-header">SCHEMAT: nazwa zastosowanego produktu** / nr serii*** / zastosowana ilość(dawkowanie)****/ karencja, zalecenia *****</p>
+        </div>
+    `;
     if (aggregatedProduktyPozostawione.length > 0) {
-        aggregatedProduktyPozostawione.forEach(item => {
-            html += renderReceiptProductLine(item);
+        aggregatedProduktyPozostawione.forEach((item, index) => {
+            html += renderReceiptProductLine_Styled(item, index + 1);
         });
     } else {
-        html += '<p style="font-size: 9pt;">--- Brak ---</p>';
+        html += '<p style="padding-left: 10mm; font-size: 9pt;">--- Brak ---</p>';
     }
 
     // Blok Podpisów
     html += `
         <div class="signatures-110mm">
             <div class="sig-box-110mm">
-                <strong>Podpis lekarza weterynarii:</strong>
+                <strong>podpis lekarza weterynarii</strong>
                 <img src="${podpisLekarzaImg}" alt="Podpis lekarza">
-                <p>${podpisLekarzaLinia}</p>
+                <p style="padding-left: 0;">${podpisLekarzaLinia}</p>
             </div>
             <div class="sig-box-110mm">
-                <strong>Podpis posiadacza zwierzęcia:</strong>
+                <strong>podpis posiadacza zwierzęcia</strong>
                 <img src="${podpisKlientaImg}" alt="Podpis klienta">
             </div>
         </div>
@@ -4702,24 +4731,34 @@ function generate110mmReceiptHTML_Grouped() {
     // Stopka (Legenda)
     html += `
         <div class="footer-legend">
-            <p>*Nazwa produktu leczniczego/ produktu leczniczego weterynaryjnego/ paszy leczniczej<br>
-            **Numer serii produktu leczniczego lub produktu leczniczego weterynaryjnego<br>
-            ***Ilość, dawkowanie zastosowanego produktu leczniczego lub ilość, dawkowanie i okres stosowanie nabytego produktu leczniczego, weterynaryjnego/paszy leczniczej<br>
-            ****Okres karencji oraz zabieg leczniczy lub profilaktyczne zalecenia lekarskie oraz uwagi</p>
+            <p style="padding-left: 0;">*Nazwa produktu leczniczego/ produktu leczniczego<br>
+            weterynaryjnego/ paszy leczniczej<br>
+            **Numer serii produktu leczniczego lub produktu leczniczego<br>
+            weterynaryjnego<br>
+            ***Ilość, dawkowanie zastosowanego produktu leczniczego lub<br>
+            ilość, dawkowanie i okres stosowanie nabytego produktu<br>
+            leczniczego, weterynaryjnego/paszy leczniczej<br>
+            ****Okres karencji oraz zabieg leczniczy lub profilaktyczne<br>
+            zalecenia lekarskie oraz uwagi</p>
         </div>
     `;
 
-    console.log("Generowanie HTML 110mm (v3) zakończone.");
+    console.log("Generowanie HTML 110mm (v4) zakończone.");
     return html;
 }
 
-// Zmieniamy nazwę starej funkcji, aby uniknąć konfliktu, jeśli nowa się nie załaduje
-// Możesz też po prostu usunąć starą funkcję generate110mmReceiptHTML()
+// Zmieniamy nazwę starej funkcji, aby uniknąć konfliktu
 function generate110mmReceiptHTML() {
-    console.warn("WYWOŁANO STARĄ FUNKCJĘ generate110mmReceiptHTML(). Powinna być wywołana generate110mmReceiptHTML_Grouped().");
-    // Na wszelki wypadek przekierowujemy na nową
-    return generate110mmReceiptHTML_Grouped();
+    console.warn("WYWOŁANO STARĄ FUNKCJĘ generate110mmReceiptHTML(). Przekierowuję na generate110mmReceiptHTML_Grouped_Styled().");
+    return generate110mmReceiptHTML_Grouped_Styled();
 }
+// Zmieniamy również nazwę v3, aby uniknąć wywołania
+function generate110mmReceiptHTML_Grouped() {
+     console.warn("WYWOŁANO STARĄ FUNKCJĘ generate110mmReceiptHTML_Grouped(). Przekierowuję na generate110mmReceiptHTML_Grouped_Styled().");
+    return generate110mmReceiptHTML_Grouped_Styled();
+}
+
+// ⬆️ ⬆️ ⬆️ KONIEC NOWEGO BLOKU 2 ⬆️ ⬆️ ⬆️
 
 // ⬆️ ⬆️ ⬆️ KONIEC NOWEGO BLOKU 2 ⬆️ ⬆️ ⬆️
 
