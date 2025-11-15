@@ -4804,11 +4804,6 @@ const loginBtn = document.getElementById('loginBtn');
 const loginError = document.getElementById('loginError');
 const logoutBtn = document.getElementById('logoutBtn'); // Przycisk wyloguj
 const menuLogoutBtn = document.getElementById('menuLogoutBtn'); // ✅ DODAJ TĘ LINIĘ
-// ⬇️ POCZĄTEK WKLEJANIA ⬇️
-const raportySection = document.getElementById('raportySection');
-const kalendarzWizytSection = document.getElementById('kalendarzWizytSection');
-const bazaSchematowSection = document.getElementById('bazaSchematowSection');
-// ⬆️ KONIEC WKLEJANIA ⬆️
 const loginSuccess = document.getElementById('loginSuccess');
 const forgotPasswordLink = document.getElementById('forgotPasswordLink');
 
@@ -8463,108 +8458,40 @@ if (document.readyState === 'loading') {
 /* ⬇️ ======================================================= ⬇️ */
 /* ✅ POCZĄTEK: NOWY, POPRAWIONY BLOK (Moduł 5 i 6) */
 
-/* ⬇️ ======================================================= ⬇️ */
-/* ✅ ZASTĄP CAŁĄ FUNKCJĘ "confirmOnTabChange" TYM KODEM: */
-
 /**
  * Pkt 4: Sprawdza, czy karta jest zapisana przy próbie zmiany zakładki.
- * (WERSJA ASYNCHRONICZNA z nowym modalem)
- * Zwraca 'true', jeśli można kontynuować nawigację, lub 'false', jeśli trzeba ją zablokować.
  */
-async function confirmOnTabChange() {
-    
-    // 1. Sprawdź KARTĘ LECZENIA
-    if (kartaSection.style.display === 'block' && !isCurrentCardSaved) {
-        
-        // Użyj nowej funkcji showCustomConfirm
-        const result = await showCustomConfirm(
-            "Karta nie została zapisana w archiwum.<br><br>Czy na pewno chcesz opuścić tę zakładkę? Niezapisane zmiany zostaną utracone.",
-            "Kontynuuj edycję", // Użytkownik chce ZOSTAĆ (zwróci true)
-            "Opuść i rozpocznij nową" // Użytkownik chce WYJŚĆ (zwróci false)
-        );
-        
-        if (result === true) {
-            // Użytkownik wybrał "Kontynuuj edycję" (chce zostać)
-            return false; // ZWRÓĆ FALSE = BLOKUJ zmianę zakładki
-        } else {
-            // Użytkownik wybrał "Opuść i rozpocznij nową" (chce wyjść)
-            clearKartaLeczenia(); // Wyczyść kartę
-            return true; // ZWRÓĆ TRUE = POZWÓL na zmianę zakładki
-        }
-    }
-    
-    // 2. Sprawdź KALKULATOR
-    if (kalkulatorSection.style.display === 'block' && isKalkulatorDirty()) {
-        
-        const result = await showCustomConfirm(
-            "Wykryto uzupełniony kalkulator.<br><br>Czy na pewno chcesz opuścić tę zakładkę? Niezapisane zmiany zostaną utracone.",
-            "Kontynuuj edycję", // Chce zostać (zwróci true)
-            "Opuść i rozpocznij nowy paragon" // Chce wyjść (zwróci false)
-        );
-        
-        if (result === true) {
-            // Użytkownik wybrał "Kontynuuj edycję"
-            return false; // BLOKUJ zmianę zakładki
-        } else {
-            // Użytkownik wybrał "Opuść i rozpocznij nowy"
-            clearKalkulator(); // Wyczyść kalkulator
-            return true; // POZWÓL na zmianę zakładki
-        }
-    }
-    
-    // 3. Jeśli żadna sekcja nie jest "brudna", po prostu pozwól na nawigację
-    return true;
+function confirmOnTabChange() {
+    // Sprawdzamy, czy karta jest widoczna i czy NIE jest zapisana
+    if (kartaSection.style.display === 'block' && !isCurrentCardSaved) {
+        if (!confirm("Karta nie została zapisana w archiwum.\n\nCzy na pewno chcesz opuścić tę zakładkę? Niezapisane zmiany zostaną utracone.")) {
+            return false; // Anuluj zmianę zakładki
+        }
+    }
+    return true; // Kontynuuj zmianę zakładki
 }
-/* ⬆️ ======================================================= ⬆️ */
 
-/* ⬇️ ======================================================= ⬇️ */
-/* ✅ ZASTĄP CAŁY BLOK "navButtonsToCheck" (WERSJA ASYNCHRONICZNA) */
+// Musimy "przechwycić" kliknięcia na WSZYSTKIE przyciski nawigacyjne
+/* Plik: index.html (ok. linii 1920) */
 
-// Tablica wszystkich przycisków, które powodują opuszczenie "brudnej" sekcji
-/* ⬇️ ======================================================= ⬇️ */
-/* ✅ ZASTĄP CAŁY BLOK "navButtonsToCheck" (WERSJA ASYNCHRONICZNA) */
-
-// Tablica wszystkich przycisków, które powodują opuszczenie "brudnej" sekcji
 const navButtonsToCheck = [
-    tabKalkulatorBtn, tabBazaKlientowBtn, tabBazaProduktowBtn, // Zakładki
-    backToMenuBtn, logoutBtn, menuLogoutBtn, // Przyciski paska i menu
-    menuKalkulatorBtn, menuBazaKlientowBtn, menuBazaProduktowBtn, // Przyciski podmenu
-    menuRaportyBtn, menuArchiwumKartyBtn, menuArchiwumParagonyBtn, menuKonfiguracjaBtn, // Przyciski menu
-    openCalcBtn, // Przycisk na karcie
-    tabKalendarzBtn, // Zakładka Kalendarz
-    tabSchematyLeczeniaBtn, // Zakładka Schematy
-    menuKalendarzBtn, // Przycisk Menu Kalendarz
-    menuSchematyLeczeniaBtn // Przycisk Menu Schematy
-];
+    tabKalkulatorBtn, tabBazaKlientowBtn, tabBazaProduktowBtn, // Zakładki
+    backToMenuBtn, logoutBtn, menuLogoutBtn, // Przyciski paska i menu
+    menuKalkulatorBtn, menuBazaKlientowBtn, menuBazaProduktowBtn, // Przyciski podmenu
+    menuRaportyBtn, menuArchiwumKartyBtn, menuArchiwumParagonyBtn, menuKonfiguracjaBtn, // Przyciski menu
+    openCalculatorBtn // Przycisk na karcie
+]; // <-- Koniec tablicy. Usunęliśmy przyciski z modala.
 
 navButtonsToCheck.forEach(btn => {
-    if (btn) { // Sprawdź, czy przycisk istnieje
-        // Zmieniamy listener na ASYNCHRONICZNY (async)
-        btn.addEventListener('click', async (e) => { 
-            
-            // Czekamy (await) na decyzję użytkownika z niestandardowego modala
-            // funkcja zwróci 'true' (można iść) lub 'false' (zostać)
-            const canProceed = await confirmOnTabChange(); 
-            
-            if (!canProceed) {
-                // Jeśli funkcja zwróci 'false' (bo użytkownik wybrał "Kontynuuj edycję")
-                // musimy zatrzymać nawigację
-                e.stopImmediatePropagation(); // Zatrzymaj inne listenery (np. showSection)
-                e.preventDefault(); // Zatrzymaj domyślną akcję
-            }
-            // Jeśli funkcja zwróci 'true' (bo użytkownik wybrał "Opuść"), 
-            // kod idzie dalej i listener (np. showSection) się wykona.
-            
-        }, true); // <-- WAŻNE: 'true' uruchamia ten kod w pierwszej kolejności
-    }
+    if (btn) { // Sprawdź, czy przycisk istnieje
+        btn.addEventListener('click', (e) => {
+            if (!confirmOnTabChange()) {
+                e.stopImmediatePropagation(); // Zatrzymaj inne listenery (np. showSection)
+                e.preventDefault(); // Zatrzymaj domyślną akcję
+            }
+        }, true); // <-- WAŻNE: 'true' uruchamia ten kod w pierwszej kolejności
+    }
 });
-/* ⬆️ ======================================================= ⬆️ */
-/* ⬆️ ======================================================= ⬆️ */
-
-
-/**
- * Pkt 7: Generuje i wstawia nowy numer dokumentu do pola w Karcie Leczenia.
- */
 
 /**
  * Pkt 7: Generuje i wstawia nowy numer dokumentu do pola w Karcie Leczenia.
@@ -8726,32 +8653,24 @@ async function generateAndSetReceiptDocumentNumber() {
  * ✅ NOWA FUNKCJA (Pkt 4): Wywoływana przy każdym wejściu do sekcji 'karta'.
  * Resetuje stan zapisu i przycisk 'Zapisz w Archiwum'.
  */
-/* ⬇️ ======================================================= ⬇️ */
-/* ✅ ZASTĄP CAŁĄ FUNKCJĘ "onShowKarta" TYM KODEM: */
-        
-/**
- * Pkt 4: Wywoływana przy każdym wejściu do sekcji 'karta'.
- * (WERSJA ASYNCHRONICZNA z nowym modalem)
- */
-async function onShowKarta() {
-    // 1. Sprawdź, czy karta jest "brudna"
+function onShowKarta() {
+    // 1. Sprawdź, czy karta jest "brudna" (wypełniona)
     if (isKartaDirty()) {
         
-        // 2. Użyj nowej funkcji showCustomConfirm
-        const result = await showCustomConfirm(
-            "Wykryto uzupełnioną kartę leczenia.",
-            "Kontynuuj edycję", // Zwróci true
-            "Rozpocznij nową kartę leczenia" // Zwróci false
-        );
-
-        if (result === true) {
+        // 2. Jeśli jest brudna, zapytaj użytkownika co robić
+        // [OK] = Dokonaj edycji (Kontynuuj)
+        // [Anuluj] = Rozpocznij nową (Wyczyść)
+        if (confirm("Wykryto uzupełnioną kartę leczenia.\n\n[OK] = Kontynuuj edycję\n[Anuluj] = Rozpocznij nową (wyczyść dane)")) {
+            
             // Użytkownik chce KONTYNUOWAĆ EDYCJĘ (kliknął OK)
             // Nie robimy nic, zostawiamy dane.
+            // Ustawiamy tylko flagę zapisu (tak jak wcześniej)
             isCurrentCardSaved = false; 
             if (saveCardToArchiveBtn) {
                 saveCardToArchiveBtn.disabled = false;
                 saveCardToArchiveBtn.textContent = '💾 Zapisz w Archiwum';
             }
+            
         } else {
             // Użytkownik chce ROZPOCZĄĆ NOWĄ (kliknął Anuluj)
             clearKartaLeczenia();
@@ -8759,12 +8678,14 @@ async function onShowKarta() {
         
     } else {
         // 3. Karta jest CZYSTA, więc rozpocznij nową automatycznie
+        // (Wyczyść pole nr dok. i wygeneruj nowy)
         isCurrentCardSaved = false;
         if (saveCardToArchiveBtn) {
             saveCardToArchiveBtn.disabled = false;
             saveCardToArchiveBtn.textContent = '💾 Zapisz w Archiwum';
         }
         
+        // Wymuś wyczyszczenie pola numeru, aby generator zadziałał poprawnie
         document.getElementById('nrDokumentu').value = ''; 
         generateAndSetDocumentNumber();
     }
@@ -8775,29 +8696,17 @@ async function onShowKarta() {
         refreshSchemaDatalist();
     }
 }
-/* ⬆️ ======================================================= ⬆️ */
 
-/* ⬇️ ======================================================= ⬇️ */
-/* ✅ ZASTĄP CAŁĄ FUNKCJĘ "onShowKalkulator" TYM KODEM: */
-
-/**
- * Wywoływana przy każdym wejściu do sekcji 'kalkulator'.
- * (WERSJA ASYNCHRONICZNA z nowym modalem)
- */
-async function onShowKalkulator() {
+function onShowKalkulator() {
     // 1. Sprawdź, czy kalkulator jest "brudny"
     if (isKalkulatorDirty()) {
         
-        // 2. Użyj nowej funkcji showCustomConfirm
-        const result = await showCustomConfirm(
-            "Wykryto uzupełniony kalkulator.",
-            "Kontynuuj edycję", // Zwróci true
-            "Rozpocznij nowy paragon" // Zwróci false
-        );
-
-        if (result === true) {
+        // 2. Jeśli jest brudny, zapytaj użytkownika
+        // [OK] = Dokonaj edycji (Kontynuuj)
+        // [Anuluj] = Rozpocznij nową (Wyczyść)
+        if (confirm("Wykryto uzupełniony kalkulator.\n\n[OK] = Kontynuuj edycję\n[Anuluj] = Rozpocznij nowy paragon (wyczyść dane)")) {
             // Użytkownik chce KONTYNUOWAĆ EDYCJĘ (kliknął OK)
-            // Nie robimy nic.
+            // Nie robimy nic, zostawiamy dane.
         } else {
             // Użytkownik chce ROZPOCZĄĆ NOWY (kliknął Anuluj)
             clearKalkulator();
@@ -8805,11 +8714,19 @@ async function onShowKalkulator() {
         
     } else {
         // 3. Kalkulator jest CZYSTY, więc rozpocznij nowy automatycznie
+        // (Wyczyść pole nr dok. i wygeneruj nowy)
         document.getElementById('calcNrDokInput').value = '';
         generateAndSetReceiptDocumentNumber();
     }
 }
-/* ⬆️ ======================================================= ⬆️ */
+// Zmodyfikuj też listener dla menuKartaBtn
+if (menuKartaBtn) {
+    menuKartaBtn.addEventListener('click', () => {
+        // ... (stara logika pokazywania modala) ...
+        showSection('karta'); // Pokaż sekcję karty
+        if (metodaModal) metodaModal.style.display = 'flex'; // Pokaż modal
+    });
+}
 
 /* ✅ KONIEC: NOWY BLOK KODU */
 /* ⬆️ ======================================================= ⬆️ */
@@ -9743,7 +9660,7 @@ if (document.readyState === 'loading') {
 /* ✅ POCZĄTEK: Logika dla sekcji Raportów                   */
 
 // --- Zmienne globalne dla Raportów ---
-
+const raportySection = document.getElementById('raportySection');
 // const menuRaportyBtn = document.getElementById('menuRaportyBtn'); // Już zdefiniowane
 
 // Kontrolki
@@ -9776,7 +9693,7 @@ const reportZuzyciaTableBody = document.getElementById('reportZuzyciaTableBody')
 // Zmienna cache na wczytane paragony (dla wydajności)
 let cachedReportData = [];
 // --- 1. Zmienne globalne Kalendarza ---
-
+const kalendarzWizytSection = document.getElementById('kalendarzWizytSection');
 const menuKalendarzBtn = document.getElementById('menuKalendarzBtn');
 const tabKalendarzBtn = document.getElementById('tabKalendarzBtn');
 
@@ -9820,7 +9737,7 @@ let currentMonthView = new Date(); // Data do śledzenia widoku miesiąca
 let allFetchedVisits = []; // Cache na wizyty
 let currentVisitClientData = null; // Przechowuje dane klienta dla formularza
 // --- 1. Zmienne globalne Bazy Schematów ---
-
+const bazaSchematowSection = document.getElementById('bazaSchematowSection');
 const menuSchematyLeczeniaBtn = document.getElementById('menuSchematyLeczeniaBtn');
 const tabSchematyLeczeniaBtn = document.getElementById('tabSchematyLeczeniaBtn');
 const loadSchemasBtn = document.getElementById('loadSchemasBtn');
@@ -10348,54 +10265,6 @@ function showToast(message, type = 'info', duration = 3000) {
 
 /* ✅ KONIEC: Krok 5 - Logika Powiadomień "Toast" */
 /* ⬆️ ======================================================= ⬆️ */
-/* ======================================================== */
-/* ✅ POCZĄTEK: MODUŁ 4 - Logika Custom Confirm Modal */
-/* ======================================================== */
-const customConfirmModal = document.getElementById('customConfirmModal');
-const customConfirmText = document.getElementById('customConfirmText');
-const customConfirmBtnOK = document.getElementById('customConfirmBtnOK');
-const customConfirmBtnCancel = document.getElementById('customConfirmBtnCancel');
-
-/**
- * Pokazuje niestandardowy dialog potwierdzenia.
- * @param {string} message - Tekst do wyświetlenia (może zawierać <br>).
- * @param {string} okText - Tekst na przycisku "OK".
- * @param {string} cancelText - Tekst na przycisku "Anuluj".
- * @returns {Promise<boolean>} - Rozstrzyga na 'true' (OK) lub 'false' (Anuluj).
- */
-function showCustomConfirm(message, okText, cancelText) {
-    // Używamy Promise, aby zatrzymać wykonywanie kodu (podobnie jak stary confirm)
-    return new Promise((resolve) => {
-        if (!customConfirmModal || !customConfirmText || !customConfirmBtnOK || !customConfirmBtnCancel) {
-            console.error("Brak modala #customConfirmModal. Używam standardowego 'confirm'.");
-            resolve(confirm(message.replace(/<br>/g, '\n'))); // Fallback
-            return;
-        }
-
-        // Ustaw teksty
-        customConfirmText.innerHTML = message;
-        customConfirmBtnOK.textContent = okText;
-        customConfirmBtnCancel.textContent = cancelText;
-
-        // Pokaż modal
-        customConfirmModal.style.display = 'flex';
-
-        // Listener dla "OK" (Kontynuuj)
-        customConfirmBtnOK.addEventListener('click', () => {
-            customConfirmModal.style.display = 'none';
-            resolve(true); // Zwróć 'true'
-        }, { once: true }); // {once: true} automatycznie usuwa listener po kliknięciu
-
-        // Listener dla "Anuluj" (Nowy)
-        customConfirmBtnCancel.addEventListener('click', () => {
-            customConfirmModal.style.display = 'none';
-            resolve(false); // Zwróć 'false'
-        }, { once: true });
-    });
-}
-/* ======================================================== */
-/* ✅ KONIEC: MODUŁ 4 - Logika Custom Confirm Modal */
-/* ======================================================== */
 /* ⬇️ KOMPLETNA LOGIKA DLA NAWIGATORA I MODALA PRODUKTÓW ⬇️ */
 
 // --- Logika Nawigatora Komórek ORAZ Modala Produktów ---
@@ -13125,20 +12994,6 @@ function printReceiptSummary(receiptData) { // receiptData nie jest już aktywni
 
 <div id="toastContainer" style="position: fixed; top: 20px; right: 20px; z-index: 20000; display: flex; flex-direction: column; gap: 10px;">
     </div>
-<div id="customConfirmModal" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.5); display: none; z-index: 10005; justify-content: center; align-items: center; padding: 15px; box-sizing: border-box;">
-    <div class="form-card" style="width: 100%; max-width: 450px; height: auto;">
-        
-        <p id="customConfirmText" style="font-size: 18px; text-align: center; line-height: 1.5; margin-top: 0; margin-bottom: 25px;">
-            Wykryto niezapisane zmiany. Co chcesz zrobić?
-        </p>
-        
-        <div style="display: flex; flex-direction: column; gap: 10px;">
-            <button id="customConfirmBtnOK" class="btn primary" style="font-size: 17px; padding: 12px;">Kontynuuj edycję</button>
-            
-            <button id="customConfirmBtnCancel" class="btn ghost" style="font-size: 17px; padding: 12px;">Rozpocznij nowy</button>
-        </div>
-        
-    </div>
-</div>
+
 </body>
 </html>
