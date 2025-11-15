@@ -4405,6 +4405,10 @@ if (printFormat110 && receiptPrintContainer) {
                         .receipt-page .receipt-row-item strong { font-size: 9pt; }
                         .receipt-page .signatures-110mm {
                             margin-top: 25px; page-break-inside: avoid; page-break-before: auto;
+                            /* NOWE LINIE - wymuszają wyrównanie do lewej */
+                            display: flex; 
+                            flex-direction: column; 
+                            align-items: flex-start;
                         }
                         .receipt-page .sig-box-110mm { margin-top: 10px; text-align: left !important; }
                         .receipt-page .sig-box-110mm strong { display: block; font-size: 10pt; }
@@ -12857,20 +12861,38 @@ function clearKalkulator() {
 /* ✅ KONIEC: Logika czyszczenia "brudnych" formularzy      */
 /* ======================================================== */
 /* ======================================================== */
-/* ✅ POCZĄTEK: MODUŁ 3.2/3.3 - Funkcja drukowania paragonu */
+/* ✅ POCZĄTEK: MODUŁ 3.2/3.3 - POPRAWIONA Funkcja drukowania paragonu */
 /* ======================================================== */
 
 /**
- * Drukuje podsumowanie paragonu z kalkulatora (jako kopia niefiskalna).
+ * Drukuje DOKŁADNĄ ZAWARTOŚĆ podsumowania paragonu (zamiast generować ją na nowo).
  */
-function printReceiptSummary(receiptData) {
-    if (!receiptData) {
-        alert("Błąd: Brak danych paragonu do wydrukowania.");
+function printReceiptSummary(receiptData) { // receiptData nie jest już aktywnie używane
+    
+    // 1. Znajdź kontener podsumowania
+    const summaryContainer = document.getElementById('savedReceiptSummary');
+    if (!summaryContainer || !summaryContainer.innerHTML) {
+        alert("Błąd: Nie znaleziono zapisanego paragonu do wydrukowania.");
         return;
     }
 
-    // --- 1. Generuj HTML do druku ---
-    // Używamy prostego formatowania, aby pasowało do większości drukarek
+    // 2. Pobierz zawartość HTML z podsumowania
+    let summaryHtml = summaryContainer.innerHTML;
+    
+    // 3. Usuń przycisk "Drukuj" z przechwyconego HTML-a (aby nie drukował sam siebie)
+    // Używamy prostego triku: tworzymy tymczasowy element, aby na nim operować
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = summaryHtml;
+    const buttonToRemove = tempDiv.querySelector('button.btn'); // Znajdź pierwszy przycisk
+    if (buttonToRemove) {
+        buttonToRemove.remove();
+    }
+    summaryHtml = tempDiv.innerHTML; // Zapisz HTML bez przycisku
+
+    // 4. Zdefiniuj nową stopkę (zgodnie z Twoją prośbą)
+    const footerText = "Paragon/notatka nie jest dokumentem fiskalnym, druk wystawiony na potrzeby wewnętrzne lecznicy weterynaryjnej.";
+
+    // 5. Generuj HTML do druku (prostszy, bo 90% mamy)
     let printHtml = `
         <!DOCTYPE html>
         <html lang="pl">
@@ -12884,64 +12906,61 @@ function printReceiptSummary(receiptData) {
                     margin: 5mm; 
                     width: 70mm; /* Standard dla drukarek paragonowych */
                 }
-                h2 { font-size: 12pt; text-align: center; margin-bottom: 10px; }
-                p { margin: 2px 0; }
-                ul { 
-                    list-style: none; 
-                    padding: 0; 
-                    margin: 10px 0; 
-                    border-top: 1px dashed #000; 
-                    border-bottom: 1px dashed #000; 
-                    padding: 10px 0;
+                /* Style do resetowania tego, co jest w divie */
+                #savedReceiptSummary { margin: 0; border: none; padding: 0; }
+                #savedReceiptSummary h4 { 
+                    font-size: 11pt; 
+                    margin: 0 0 10px 0; 
+                    border-bottom: 1px dashed #000;
+                    padding-bottom: 5px;
                 }
-                li { margin-bottom: 3px; }
-                .total { font-weight: bold; font-size: 11pt; text-align: right; margin-top: 10px; }
-                .status { font-weight: bold; font-size: 11pt; margin-top: 5px; }
+                #savedReceiptSummary p { 
+                    margin: 2px 0; 
+                    font-size: 10pt; 
+                    line-height: 1.3;
+                }
+                #savedReceiptSummary ul { 
+                    list-style: none; 
+                    padding-left: 10px; 
+                    margin: 10px 0;
+                    border-top: 1px solid #ccc;
+                    border-bottom: 1px solid #ccc;
+                    padding-top: 5px;
+                    padding-bottom: 5px;
+                }
+                #savedReceiptSummary li { font-size: 10pt; }
+                #savedReceiptSummary p[style*="font-weight: bold"] { 
+                    font-size: 11pt !important; 
+                    text-align: right;
+                } /* Dla Sumy */
+                 #savedReceiptSummary p[style*="font-size: 1.1em"] {
+                    font-size: 11pt !important;
+                 } /* Dla Statusu */
+
+
                 .footer { 
                     margin-top: 20px; 
                     font-size: 8pt; 
                     text-align: center; 
-                    border-top: 1px solid #ccc; 
+                    border-top: 1px dashed #000; 
                     padding-top: 5px; 
+                    font-family: Arial, sans-serif; /* Stopka może być czytelniejsza */
                 }
                 @media print {
-                    body { margin: 0; } /* Drukarka sama ustawi marginesy */
+                    body { margin: 0; }
                 }
             </style>
         </head>
         <body>
-            <h2>Paragon (Kopia)</h2>
-            <p><strong>Klient:</strong> ${receiptData.klient || 'Brak'}</p>
-            <p><strong>Data:</strong> ${receiptData.data || 'Brak'}</p>
-            <p><strong>Nr dokumentu:</strong> ${receiptData.nrDokumentu || 'Brak'}</p>
-            <p><strong>Czynności:</strong> ${receiptData.czynnosci || 'Brak'}</p>
+            <div id="savedReceiptSummary">
+                ${summaryHtml}
+            </div>
+            <div class="footer">${footerText}</div>
+        </body>
+        </html>
     `;
 
-    // Lista produktów
-    printHtml += `<ul>`;
-    (receiptData.pozycje || []).forEach(item => {
-        const quantity = Number(item.quantity) || 0;
-        const price = Number(item.price) || 0;
-        const itemTotal = quantity * price;
-        // Używamy formatPrice, która jest już zdefiniowana w Twoim skrypcie
-        printHtml += `<li>${item.name} (x ${quantity}) .... ${formatPrice(itemTotal)}</li>`;
-    });
-    printHtml += `</ul>`;
-
-    // Suma i Status
-    printHtml += `<div class="total">SUMA: ${formatPrice(receiptData.suma)}</div>`;
-    printHtml += `<div class="status">Status: ${receiptData.status}</div>`;
-    
-    // Notatka (jeśli jest)
-    if (receiptData.notatka) {
-        printHtml += `<p style="margin-top: 10px;"><strong>Notatka:</strong><br>${receiptData.notatka.replace(/\n/g, '<br>')}</p>`;
-    }
-
-   // --- 2. Dodanie stopki (Moduł 3.3 - Aktualizacja) ---
-    printHtml += `<div class="footer">Paragon/notatka nie jest dokumentem fiskalnym, druk wystawiony na potrzeby wewnętrzne lecznicy weterynaryjnej.</div>`;
-    printHtml += `</body></html>`;
-
-    // --- 3. Logika drukowania w iframe ---
+    // 6. Logika drukowania w iframe (bez zmian)
     try {
         const printFrame = document.createElement('iframe');
         printFrame.style.position = 'fixed';
@@ -12956,14 +12975,12 @@ function printReceiptSummary(receiptData) {
 
         printFrame.contentWindow.focus();
         
-        // Zaczekaj chwilę na załadowanie styli przed drukiem
         setTimeout(() => {
             printFrame.contentWindow.print();
-            // Sprzątanie
             setTimeout(() => {
                 document.body.removeChild(printFrame);
             }, 500);
-        }, 150); // 150ms opóźnienia
+        }, 150);
 
     } catch (e) {
         console.error("Błąd drukowania paragonu:", e);
@@ -12971,7 +12988,7 @@ function printReceiptSummary(receiptData) {
     }
 }
 /* ======================================================== */
-/* ✅ KONIEC: MODUŁ 3.2/3.3 - Funkcja drukowania paragonu */
+/* ✅ KONIEC: MODUŁ 3.2/3.3 - POPRAWIONA Funkcja */
 /* ======================================================== */
 </script> 
 
