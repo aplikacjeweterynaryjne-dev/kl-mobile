@@ -1829,6 +1829,10 @@ table {
 }
 
 /* ⬆️ ⬆️ ⬆️ KONIEC BLOKU KODU (KROK 2) ⬆️ ⬆️ ⬆️ */
+/* Ukryj stary przycisk #copyBtn w .actions, bo mamy nowy w tabeli */
+#kartaLeczeniaSection .actions #copyBtn {
+    display: none !important;
+}
 </style>
     <div id="calcProductSearchModal" class="product-search-modal" style="display: none; z-index: 10003;">
     <div class="product-search-card">
@@ -3319,30 +3323,7 @@ generateRows();
 
 // podłącz zachowanie autouzupełniania klienta w nagłówku i w formularzu
 setupClientAutoFill();
-// --- Przenoszenie przycisków ---
 
-// Przenieś przycisk #formBtn nad tabelę (jeśli masz ten kod, jest OK)
-const formBtnContainer = document.getElementById('formBtnContainer');
-const formBtn = document.getElementById('formBtn');
-if (formBtnContainer && formBtn) {
-formBtnContainer.appendChild(formBtn);
-} else {
-if (!formBtn) console.warn("#formBtn not found, skipping move.");
-if (!formBtnContainer) console.warn("#formBtnContainer not found, skipping move.");
-}
-
-// Przenieś przycisk #copyBtn do specjalnego wiersza tabeli
-const copyBtn = document.getElementById('copyBtn');
-const buttonPlaceholder = document.getElementById('copyBtnPlaceholder'); // Znajdź placeholder
-
-if (copyBtn && buttonPlaceholder) {
-buttonPlaceholder.appendChild(copyBtn); // Przenieś przycisk do placeholdera
-} else {
-if (!copyBtn) console.warn("#copyBtn not found, skipping move.");
-if (!buttonPlaceholder) console.warn("#copyBtnPlaceholder not found, skipping move.");
-}
-// ✅ KONIEC WKLEJANEGO KODU
-}
 
 /* ---- generowanie wierszy (dokładnie tak jak wcześniej) ---- */
 function generateRows(){
@@ -3369,10 +3350,23 @@ textDiv.style.fontWeight = 'bold';
 mainContainer.appendChild(textDiv); // Dodaj tekst do głównego kontenera
 
 // ✅ Fix 1: Tworzymy placeholder, do którego JS przeniesie przycisk
-const buttonPlaceholder = document.createElement('div');
-buttonPlaceholder.style.marginLeft = '10px';
-buttonPlaceholder.id = 'copyBtnPlaceholder'; // Upewnij się, że ID jest
-mainContainer.appendChild(buttonPlaceholder);
+// ✅ MODUŁ 2.1: Tworzymy przycisk bezpośrednio tutaj
+const newCopyBtn = document.createElement('button');
+newCopyBtn.id = 'copyBtnTable'; // Nowe ID, aby uniknąć konfliktu
+newCopyBtn.className = 'btn small';
+newCopyBtn.textContent = 'Przepisz dane z leczenia na miejscu';
+newCopyBtn.style.marginLeft = '10px';
+newCopyBtn.style.fontSize = '12px'; // Mniejsza czcionka, aby się zmieścił
+newCopyBtn.title = 'Kopiuje dane z wierszy 1-3 do wierszy 10-12';
+newCopyBtn.addEventListener('click', (e) => {
+    e.stopPropagation(); // Zapobiegaj innym kliknięciom
+    if (typeof copyRows123To101112 === 'function') {
+        copyRows123To101112();
+    } else {
+        alert('Błąd: Funkcja kopiowania nie jest gotowa.');
+    }
+});
+mainContainer.appendChild(newCopyBtn);
 
 row.appendChild(cell);
 tbody.appendChild(row);
@@ -3975,26 +3969,7 @@ setTimeout(()=>row.classList.remove('highlight-row'), 1600);
 showToast('Wiersz zapisany.', 'success');
 });
 
-/* ---- przycisk przepisz w formularzu: (NOWA FUNKCJA 1-3 -> 10-12) ---- */
-document.getElementById('formCopyBtn').addEventListener('click', ()=>{
-copyRows123To101112();
 
-// ustaw w formularzu na wiersz 10 (indeks logiczny 9)
-const sel = formRowSelect;
-sel.value = 9; // 0-based index
-sel.dispatchEvent(new Event('change'));
-
-// przewiń do wiersza 10 w tabeli
-const tbodyTrs = [...document.querySelectorAll('#karta tbody tr')];
-const special = tbodyTrs.find(tr => tr.children.length === 1 && tr.children[0].colSpan==8);
-if (special) { 
-special.scrollIntoView({behavior:'smooth', block:'center'}); 
-special.classList.add('highlight-row'); 
-setTimeout(()=>special.classList.remove('highlight-row'),2000); 
-}
-
-// formularz pozostaje otwarty
-});
 
 
 /* ---- przycisk górny: przepisz dane z leczenia na miejscu (NOWA FUNKCJA 1-3 -> 10-12) ---- */
@@ -4431,7 +4406,7 @@ if (printFormat110 && receiptPrintContainer) {
                         .receipt-page .signatures-110mm {
                             margin-top: 25px; page-break-inside: avoid; page-break-before: auto;
                         }
-                        .receipt-page .sig-box-110mm { margin-top: 10px; }
+                        .receipt-page .sig-box-110mm { margin-top: 10px; text-align: left !important; }
                         .receipt-page .sig-box-110mm strong { display: block; font-size: 10pt; }
                         .receipt-page .sig-box-110mm img {
                             max-width: 180px; height: 60px; object-fit: contain;
@@ -4445,11 +4420,15 @@ if (printFormat110 && receiptPrintContainer) {
                             page-break-inside: avoid;
                         }
                         
-                        /* --- Style dla drukowania tego nowego okna --- */
-                               @media print {
-                                    .print-controls {
-                                     display: none !important;
-                            }
+                       @media print {
+                                    .print-controls {
+                                     display: none !important;
+                                     visibility: hidden !important;
+                                    }
+                                    /* Dodatkowa reguła na wszelki wypadek */
+                                    .print-controls button {
+                                        visibility: hidden !important;
+                                    }
                             /* Zresetuj tło i cienie kartki */
                             body {
                                 background-color: #ffffff !important;
@@ -10946,9 +10925,9 @@ try {
             formCopyBtn.addEventListener('click', () => {
                 
                 // 1. Wywołaj główną funkcję kopiującą (aktualizuje tabelę)
-                if (typeof copyToRow10FromRow0 === 'function') {
-                    // Ta funkcja kopiuje dane z WIERSZA TABELI 1 do WIERSZA TABELI 10
-                    copyToRow10FromRow0(); 
+               if (typeof copyRows123To101112 === 'function') {
+                    // Kopiuje 1-3 do 10-12
+                    copyRows123To101112();
                 } else {
                     console.error("Błąd: Funkcja copyToRow10FromRow0() nie została znaleziona.");
                     return; // Przerwij, jeśli funkcja nie istnieje
@@ -12958,8 +12937,8 @@ function printReceiptSummary(receiptData) {
         printHtml += `<p style="margin-top: 10px;"><strong>Notatka:</strong><br>${receiptData.notatka.replace(/\n/g, '<br>')}</p>`;
     }
 
-    // --- 2. Dodanie stopki (Moduł 3.3) ---
-    printHtml += `<div class="footer">Druk nie jest drukiem fiskalnym, stworzony do potrzeb lecznicy.</div>`;
+   // --- 2. Dodanie stopki (Moduł 3.3 - Aktualizacja) ---
+    printHtml += `<div class="footer">Paragon/notatka nie jest dokumentem fiskalnym, druk wystawiony na potrzeby wewnętrzne lecznicy weterynaryjnej.</div>`;
     printHtml += `</body></html>`;
 
     // --- 3. Logika drukowania w iframe ---
