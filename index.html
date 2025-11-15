@@ -3548,46 +3548,60 @@ document.getElementById('formNrStada').value = opt.dataset.nrstada || '';
 }
 
 /* ---- kopiowanie do wiersza 10 i przewinięcie + podświetlenie ---- */
-function copyToRow10FromRow0(){
-const rows = document.querySelectorAll('#karta tbody tr');
-if (!rows[0]) return;
-// only copy if rows[0] is a normal row (we built so first is row 1)
-// find source cells: first non-10 row (rows array includes the special row as one element)
-// Safer way: build arr of editable rows (like rowsEditable())
-const ed = rowsEditable();
-if (ed.length === 0) return;
-const src = ed[0]; // first editable row
-// find the DOM row index of physical row10 in tbody (it is the 10th created tr)
-const tbodyTrs = [...document.querySelectorAll('#karta tbody tr')];
-// find index of the row which has colSpan === 8 (our special row)
-const specialIndex = tbodyTrs.findIndex(tr => tr.children.length === 1 && tr.children[0].colSpan==8);
-if (specialIndex === -1) return;
-const row10 = tbodyTrs[specialIndex];
-// copy cells 1..3 from src into the "special" row cells (special row has single TD colspan 8)
-// Original behaviour: rows[10].cells[1] etc. In our DOM the "special" row is single cell colspan 8,
-// but original code earlier assumed rows[10].cells[1] exists. To match original behaviour we will insert
-// a new row AFTER the special row and fill it (but user wanted structure unchanged). So keep original approach:
-// In earlier code, rows[10] referenced the 11th element of NodeList of rows (including special as its own row),
-// and they set rows[10].cells[1] etc. That worked because special row still had 8 cells in earlier code.
-// To be compatible, we will locate the editable rows array and find the 10th logical row (index 9) and copy into it.
-const logicalRows = rowsEditable(); // array of trs for logical rows (skips special)
-if (logicalRows.length >= 10) {
-const target = logicalRows[9]; // 0-based -> 9 = 10th editable row (this corresponds to original design)
-// copy columns: cells[1], cells[2], cells[3]
-target.cells[1].textContent = src.cells[1].textContent;
-// cell[2] may contain input
-const srcInput = src.cells[2].querySelector('input');
-const tgtInput = target.cells[2].querySelector('input');
-if (srcInput && tgtInput) tgtInput.value = srcInput.value;
-target.cells[3].textContent = src.cells[3].textContent;
-// highlight and scroll
-target.classList.add('highlight-row');
-setTimeout(()=>target.classList.remove('highlight-row'),2000);
-// scroll into view
-target.scrollIntoView({behavior:'smooth', block:'center'});
-} else {
-alert('Brak wystarczającej liczby wierszy aby przenieść dane do wiersza 10.');
-}
+/* ---- Kopiowanie wierszy 1-3 do 10-12 (NOWA WERSJA) ---- */
+function copyRows123To101112() {
+    const logicalRows = rowsEditable();
+    if (logicalRows.length < 12) {
+        alert('Błąd: Tabela nie ma wystarczającej liczby wierszy (wymagane 12).');
+        return;
+    }
+
+    // Wiersze 1-3 (indeksy 0, 1, 2)
+    const sources = [logicalRows[0], logicalRows[1], logicalRows[2]];
+    // Wiersze 10-12 (indeksy 9, 10, 11)
+    const targets = [logicalRows[9], logicalRows[10], logicalRows[11]];
+
+    let copied = false;
+    for (let i = 0; i < 3; i++) {
+        const src = sources[i];
+        const target = targets[i];
+
+        // Sprawdzamy, czy wiersz źródłowy ma jakiekolwiek dane (używamy istniejącej funkcji)
+        if (typeof isRowEmpty === 'function' && !isRowEmpty(src)) {
+            
+            // Kopiuj Kolumnę 2 (cells[1] - Opis)
+            target.cells[1].textContent = src.cells[1].textContent;
+            
+            // Kopiuj Kolumnę 3 (cells[2] - Liczba)
+            const srcLiczbaInput = src.cells[2].querySelector('input');
+            const tgtLiczbaInput = target.cells[2].querySelector('input');
+            if (srcLiczbaInput && tgtLiczbaInput) {
+                tgtLiczbaInput.value = srcLiczbaInput.value;
+            }
+            
+            // Kopiuj Kolumnę 4 (cells[3] - Rozpoznanie)
+            const srcRozpInput = src.cells[3].querySelector('input');
+            const tgtRozpInput = target.cells[3].querySelector('input');
+            if (srcRozpInput && tgtRozpInput) {
+                tgtRozpInput.value = srcRozpInput.value;
+            }
+
+            copied = true;
+        }
+    }
+
+    if (copied) {
+        // Podświetl i przewiń do pierwszego docelowego wiersza (Wiersz 10)
+        const firstTarget = targets[0];
+        firstTarget.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        targets.forEach(t => {
+            t.classList.add('highlight-row');
+            setTimeout(() => t.classList.remove('highlight-row'), 2000);
+        });
+        showToast('Skopiowano dane z wierszy 1-3 do 10-12.', 'success');
+    } else {
+        showToast('Wiersze 1-3 są puste. Nic nie skopiowano.', 'info');
+    }
 }
 
 /* helper: zwraca tabelę logicznych (edytowalnych) wierszy jako tablica */
@@ -3961,9 +3975,9 @@ setTimeout(()=>row.classList.remove('highlight-row'), 1600);
 showToast('Wiersz zapisany.', 'success');
 });
 
-/* ---- przycisk przepisz w formularzu: przenieś dane z pierwszego wiersza do wiersza 10 i przenieś użytkownika tam ---- */
+/* ---- przycisk przepisz w formularzu: (NOWA FUNKCJA 1-3 -> 10-12) ---- */
 document.getElementById('formCopyBtn').addEventListener('click', ()=>{
-copyToRow10FromRow0();
+copyRows123To101112();
 
 // ustaw w formularzu na wiersz 10 (indeks logiczny 9)
 const sel = formRowSelect;
@@ -3983,10 +3997,10 @@ setTimeout(()=>special.classList.remove('highlight-row'),2000);
 });
 
 
-/* ---- przycisk górny: przepisz dane z leczenia na miejscu (tak jak oryginalnie) ---- */
+/* ---- przycisk górny: przepisz dane z leczenia na miejscu (NOWA FUNKCJA 1-3 -> 10-12) ---- */
 document.getElementById('copyBtn').addEventListener('click', ()=> {
-// wykonaj kopię i przewiń do wiersza 10
-copyToRow10FromRow0();
+// wykonaj kopię i przewiń
+copyRows123To101112();
 });
 
 /* ---- mikrofon (dyktowanie nazwy leku) ---- */
@@ -4378,7 +4392,7 @@ if (printFormat110 && receiptPrintContainer) {
                             width: 105mm; /* Szerokość kartki (zostawia 5mm marginesu drukarki) */
                             min-height: 150mm;
                             margin: 20px auto; /* Centrowanie kartki */
-                            padding: 5mm; /* Wewnętrzny margines (jak w @page) */
+                            padding: 5mm 35mm 5mm 5mm; /* Prawy margines 35mm (ok 1/3), reszta 5mm */
                             box-sizing: border-box;
                             background-color: #ffffff;
                             box-shadow: 0 0 10px rgba(0,0,0,0.15);
@@ -4422,6 +4436,8 @@ if (printFormat110 && receiptPrintContainer) {
                         .receipt-page .sig-box-110mm img {
                             max-width: 180px; height: 60px; object-fit: contain;
                             border: 1px solid #eee; margin-top: 5px;
+                            display: block; /* Wymusza bycie blokiem */
+                            margin-left: 0; /* Wyrównuje do lewej */
                         }
                         .receipt-page .footer-legend {
                             margin-top: 20px; font-size: 8pt !important;
@@ -4439,7 +4455,7 @@ if (printFormat110 && receiptPrintContainer) {
                                 background-color: #ffffff !important;
                             }
                             .receipt-page {
-                                width: 105mm !important; /* Użyj pełnej szerokości */
+                                width: 66mm !important; /* Użyj 2/3 szerokości (100mm * 2/3) */
                                 margin: 0 !important;
                                 padding: 0 !important; /* Marginesy będą z @page */
                                 box-shadow: none !important;
@@ -5815,7 +5831,19 @@ if (saveReceiptBtn) {
     // --- 2. Logika podsumowania (zgodnie z Twoją prośbą) ---
     if (savedReceiptSummary) {
         savedReceiptSummary.innerHTML = '<h4>Zapisany Paragon:</h4>';
-
+// ✅ POCZĄTEK MODUŁU 3.2: Dodanie przycisku Drukuj
+            const printSummaryBtn = document.createElement('button');
+            printSummaryBtn.textContent = '🖨️ Drukuj ten paragon';
+            printSummaryBtn.className = 'btn small';
+            printSummaryBtn.style.float = 'right'; // Umieść z prawej
+            printSummaryBtn.style.marginTop = '-30px'; // Podnieś obok tytułu
+            
+            printSummaryBtn.onclick = (e) => {
+                e.preventDefault(); // Zapobiegaj dziwnemu zachowaniu formularza
+                printReceiptSummary(receiptData); // Przekaż pełne dane paragonu
+            };
+            savedReceiptSummary.appendChild(printSummaryBtn);
+            // ✅ KONIEC MODUŁU 3.2
         // ✅ NOWOŚĆ: Dodanie danych klienta do podsumowania
         const infoP = document.createElement('p');
         infoP.style.fontSize = '0.9em';
@@ -5979,19 +6007,38 @@ if (pluBtn) {
 // ⬆️ ⬆️ ⬆️ KONIEC MODUŁU 2 (Logika PLU) ⬆️ ⬆️ ⬆️
 
     // ✅ Moduł 2: Logika przełączania statusu płatności
-if (paymentStatusPaidBtn && paymentStatusDebtBtn) {
-    paymentStatusPaidBtn.addEventListener('click', () => {
-    paymentStatusPaidBtn.classList.add('active');
-    paymentStatusDebtBtn.classList.remove('active');
-    hidePaymentError(); // ⬇️ DODANA LINIA
-  });
+// Funkcja do ukrywania błędu (przeniesiona lub zdefiniowana tutaj, jeśli jej brakuje)
+    function hidePaymentError() {
+        let errorMsgEl = document.getElementById('paymentStatusError');
+        if (errorMsgEl) errorMsgEl.style.display = 'none';
+    }
 
-  paymentStatusDebtBtn.addEventListener('click', () => {
-    paymentStatusDebtBtn.classList.add('active');
-    paymentStatusPaidBtn.classList.remove('active');
-    hidePaymentError(); // ⬇️ DODANA LINIA
-  });
-}
+    // ✅ Moduł 3.1: Logika przełączania statusu (logika "checkboxa" / toggle)
+    if (paymentStatusPaidBtn && paymentStatusDebtBtn) {
+        paymentStatusPaidBtn.addEventListener('click', () => {
+            if (paymentStatusPaidBtn.classList.contains('active')) {
+                // Kliknięto aktywny - dezaktywuj
+                paymentStatusPaidBtn.classList.remove('active');
+            } else {
+                // Kliknięto nieaktywny - aktywuj ten, dezaktywuj drugi
+                paymentStatusPaidBtn.classList.add('active');
+                paymentStatusDebtBtn.classList.remove('active');
+            }
+            hidePaymentError();
+        });
+
+        paymentStatusDebtBtn.addEventListener('click', () => {
+            if (paymentStatusDebtBtn.classList.contains('active')) {
+                // Kliknięto aktywny - dezaktywuj
+                paymentStatusDebtBtn.classList.remove('active');
+            } else {
+                // Kliknięto nieaktywny - aktywuj ten, dezaktywuj drugi
+                paymentStatusDebtBtn.classList.add('active');
+                paymentStatusPaidBtn.classList.remove('active');
+            }
+            hidePaymentError();
+        });
+    }
 /* Plik: index.html (ok. linii 2639) */
 
 // ⬇️ ⬇️ ⬇️ POCZĄTEK MODUŁU 2 (Logika Produkt -> PLU) ⬇️ ⬇️ ⬇️
@@ -12829,6 +12876,123 @@ function clearKalkulator() {
 
 /* ======================================================== */
 /* ✅ KONIEC: Logika czyszczenia "brudnych" formularzy      */
+/* ======================================================== */
+/* ======================================================== */
+/* ✅ POCZĄTEK: MODUŁ 3.2/3.3 - Funkcja drukowania paragonu */
+/* ======================================================== */
+
+/**
+ * Drukuje podsumowanie paragonu z kalkulatora (jako kopia niefiskalna).
+ */
+function printReceiptSummary(receiptData) {
+    if (!receiptData) {
+        alert("Błąd: Brak danych paragonu do wydrukowania.");
+        return;
+    }
+
+    // --- 1. Generuj HTML do druku ---
+    // Używamy prostego formatowania, aby pasowało do większości drukarek
+    let printHtml = `
+        <!DOCTYPE html>
+        <html lang="pl">
+        <head>
+            <meta charset="utf-8">
+            <title>Paragon</title>
+            <style>
+                body { 
+                    font-family: 'Courier New', Courier, monospace; 
+                    font-size: 10pt; 
+                    margin: 5mm; 
+                    width: 70mm; /* Standard dla drukarek paragonowych */
+                }
+                h2 { font-size: 12pt; text-align: center; margin-bottom: 10px; }
+                p { margin: 2px 0; }
+                ul { 
+                    list-style: none; 
+                    padding: 0; 
+                    margin: 10px 0; 
+                    border-top: 1px dashed #000; 
+                    border-bottom: 1px dashed #000; 
+                    padding: 10px 0;
+                }
+                li { margin-bottom: 3px; }
+                .total { font-weight: bold; font-size: 11pt; text-align: right; margin-top: 10px; }
+                .status { font-weight: bold; font-size: 11pt; margin-top: 5px; }
+                .footer { 
+                    margin-top: 20px; 
+                    font-size: 8pt; 
+                    text-align: center; 
+                    border-top: 1px solid #ccc; 
+                    padding-top: 5px; 
+                }
+                @media print {
+                    body { margin: 0; } /* Drukarka sama ustawi marginesy */
+                }
+            </style>
+        </head>
+        <body>
+            <h2>Paragon (Kopia)</h2>
+            <p><strong>Klient:</strong> ${receiptData.klient || 'Brak'}</p>
+            <p><strong>Data:</strong> ${receiptData.data || 'Brak'}</p>
+            <p><strong>Nr dokumentu:</strong> ${receiptData.nrDokumentu || 'Brak'}</p>
+            <p><strong>Czynności:</strong> ${receiptData.czynnosci || 'Brak'}</p>
+    `;
+
+    // Lista produktów
+    printHtml += `<ul>`;
+    (receiptData.pozycje || []).forEach(item => {
+        const quantity = Number(item.quantity) || 0;
+        const price = Number(item.price) || 0;
+        const itemTotal = quantity * price;
+        // Używamy formatPrice, która jest już zdefiniowana w Twoim skrypcie
+        printHtml += `<li>${item.name} (x ${quantity}) .... ${formatPrice(itemTotal)}</li>`;
+    });
+    printHtml += `</ul>`;
+
+    // Suma i Status
+    printHtml += `<div class="total">SUMA: ${formatPrice(receiptData.suma)}</div>`;
+    printHtml += `<div class="status">Status: ${receiptData.status}</div>`;
+    
+    // Notatka (jeśli jest)
+    if (receiptData.notatka) {
+        printHtml += `<p style="margin-top: 10px;"><strong>Notatka:</strong><br>${receiptData.notatka.replace(/\n/g, '<br>')}</p>`;
+    }
+
+    // --- 2. Dodanie stopki (Moduł 3.3) ---
+    printHtml += `<div class="footer">Druk nie jest drukiem fiskalnym, stworzony do potrzeb lecznicy.</div>`;
+    printHtml += `</body></html>`;
+
+    // --- 3. Logika drukowania w iframe ---
+    try {
+        const printFrame = document.createElement('iframe');
+        printFrame.style.position = 'fixed';
+        printFrame.style.top = '-1000px';
+        printFrame.style.left = '-1000px';
+        document.body.appendChild(printFrame);
+
+        const frameDoc = printFrame.contentWindow.document;
+        frameDoc.open();
+        frameDoc.write(printHtml);
+        frameDoc.close();
+
+        printFrame.contentWindow.focus();
+        
+        // Zaczekaj chwilę na załadowanie styli przed drukiem
+        setTimeout(() => {
+            printFrame.contentWindow.print();
+            // Sprzątanie
+            setTimeout(() => {
+                document.body.removeChild(printFrame);
+            }, 500);
+        }, 150); // 150ms opóźnienia
+
+    } catch (e) {
+        console.error("Błąd drukowania paragonu:", e);
+        alert("Wystąpił błąd podczas próby drukowania.");
+    }
+}
+/* ======================================================== */
+/* ✅ KONIEC: MODUŁ 3.2/3.3 - Funkcja drukowania paragonu */
 /* ======================================================== */
 </script> 
 
