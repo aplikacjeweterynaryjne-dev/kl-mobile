@@ -2163,6 +2163,7 @@ background-color: #eef;
 <button id="tabBazaProduktowBtn" class="btn">📦 Produkty</button>
 <button id="tabSchematyLeczeniaBtn" class="btn">⚕️ Schematy</button>
 <button id="tabMojMagazynBtn" class="btn" style="background-color: #f0f8ff;">📦 Mój Magazyn</button>
+<button id="tabZarzadzanieMagazynamiBtn" class="btn" style="background-color: #fff8e1;">📦 Zarządzaj Magazynami</button>
 <button id="logoutBtn" class="btn warn small" style="font-size: 16px; margin-left: auto;">Wyloguj ➡️</button>
 </div> <div id="kartaLeczeniaSection" style="display: none;">
 <h2>KARTA LECZENIA ZWIERZĄT GOSPODARSKICH ORAZ ZWIERZĄT, Z KTÓRYCH POZYSKANE TKANKI LUB PRODUKTY SĄ PRZEZNACZONE DO SPOŻYCIA PRZEZ LUDZI / EWIDENCJA LECZENIA ZWIERZĄT</h2>
@@ -2611,6 +2612,9 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
 <button id="loadKonfiguracjaBtn" class="btn primary">📥 Wczytaj konfigurację</button> </div>
 <button id="addNewKonfiguracjaBtn" class="btn primary" style="margin-bottom: 15px;">
 ＋ Dodaj nowego pracownika 
+<button id="menuZarzadzajMagazynamiBtn" class="btn small" style="margin-bottom: 15px; margin-left: 10px; background-color: #fff8e1;">
+📦 Zarządzaj Magazynami Pracowników
+</button>
 </button>
 <div class="table-container">
 <table id="konfiguracjaTable">
@@ -3286,7 +3290,76 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
         </table>
     </div>
 </div>
-<div id="archiveCardViewerModal" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.5); display: none; z-index: 10001; justify-content: center; align-items: center;">
+<div id="zarzadzanieMagazynamiSection" style="display: none; padding: 0 15px 80px 15px;">
+    <h2>📦 Zarządzanie Magazynami Pracowników</h2>
+
+    <div class="form-row" style="margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 15px;">
+        <label for="zarzadzanieUserSelect">Wybierz użytkownika, którego magazyn chcesz zobaczyć:</label>
+        <select id="zarzadzanieUserSelect" style="width:100%; padding:8px; font-size:16px;">
+            <option value="">Najpierw wczytaj użytkowników...</option>
+        </select>
+        <button id="zarzadzanieLoadUsersBtn" class="btn primary small" style="margin-top: 10px;">📥 Wczytaj Użytkowników</button>
+    </div>
+
+    <div id="zarzadzanieUserMagazynContainer" style="display: none;">
+
+        <h3 id="zarzadzanieMagazynTitle" style="color: #6A994E;">Magazyn dla: ...</h3>
+
+        <div id="zarzadzanieMagazynControls" style="margin-bottom: 15px; display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: flex-end;">
+            <div class="form-row" style="margin: 0;">
+                <label for="zarzadzanieSearchInput">Filtruj produkty:</label>
+                <input type="search" id="zarzadzanieSearchInput" placeholder="Wpisz nazwę produktu...">
+            </div>
+            <div id="zarzadzanieActionButtons" style="display: flex; gap: 8px;">
+                <button id="zarzadzanieBtnSzybkieDoladowanie" class="btn primary small">⚡ Tryb Szybkiego Doładowania</button>
+                <button id="zarzadzanieBtnZapiszDoladowanie" class="btn primary small" style="display: none; background-color: #27ae60; border-color: #229954;">💾 Zapisz Doładowanie</button>
+                <button id="zarzadzanieBtnAnulujDoladowanie" class="btn ghost small" style="display: none;">❌ Anuluj</button>
+            </div>
+        </div>
+
+        <div class="table-container">
+            <table id="zarzadzanieMagazynTable" class="sortable-table">
+                <thead>
+                    <tr>
+                        <th data-sort-key="nazwa">Nazwa Produktu</th>
+                        <th data-sort-key="stan" data-sort-type="number">Aktualny Stan</th>
+                        <th class="col-topup" style="display: none; width: 25%;">Ilość do Doładowania</th>
+                        <th class="col-log" data-sort-key="data">Ostatnia Operacja (Data)</th>
+                        <th class="col-log" data-sort-key="kto">Ostatnia Operacja (Kto)</th>
+                        <th class="col-log" data-sort-key="ilosc" data-sort-type="number">Operacja (Ilość)</th>
+                        <th class="col-log" data-sort-key="typ">Operacja (Typ)</th>
+                    </tr>
+                </thead>
+                <tbody id="zarzadzanieMagazynTableBody">
+                    </tbody>
+            </table>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 30px;">
+            <h3>Pełna Historia Operacji (Log)</h3>
+            <div>
+                <button id="zarzadzanieBtnCofnijDoladowanie" class="btn warn small" title="Wycofuje ostatnią operację typu 'doładowanie'">↩️ Wycofaj ostatnie doładowanie</button>
+                <button id="zarzadzanieBtnWyczyscLogi" class="btn warn small" style="margin-left: 5px;">🗑️ Wyczyść Logi</button>
+            </div>
+        </div>
+        <div class="table-container" style="max-height: 400px; overflow-y: auto;">
+            <table id="zarzadzanieMagazynLogTable" class="sortable-table">
+                <thead>
+                    <tr>
+                        <th data-sort-key="data" style="width: 25%;">Data</th>
+                        <th data-sort-key="kto" style="width: 20%;">Kto</th>
+                        <th data-sort-key="typ" style="width: 15%;">Typ Operacji</th>
+                        <th style="width: 40%;">Szczegóły (Produkty)</th>
+                    </tr>
+                </thead>
+                <tbody id="zarzadzanieMagazynLogTableBody">
+                    </tbody>
+            </table>
+        </div>
+
+    </div>
+</div>
+    <div id="archiveCardViewerModal" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.5); display: none; z-index: 10001; justify-content: center; align-items: center;">
  <div style="width: 100%; height: 100%; background: white; border-radius: 0; box-shadow: none; display: flex; flex-direction: column;">
 
   <div style="padding: 10px 15px; border-bottom: 1px solid #ccc; display: flex; justify-content: space-between; align-items: center;">
