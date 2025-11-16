@@ -7410,20 +7410,28 @@ if (saveKonfiguracjaBtn) {
     const docId = konfiguracjaFormDocId.value;
     
     // Pobierz dane z formularza
-   const konfiguracjaData = {
+ // Pobierz dane z formularza
+   const konfiguracjaData = {
       Imie: konfiguracjaFormImie.value.trim(),
       Nazwisko: konfiguracjaFormNazwisko.value.trim(),
       'Adres email': konfiguracjaFormEmail.value.trim(),
       'Nr telefonu': konfiguracjaFormTelefon.value.trim(),
       // ✅ Moduł 6: Zapisywanie danych podpisu
       // Zapisujemy dane Base64 z ukrytego pola (nie .trim()!)
-      Podpis: konfiguracjaFormPodpis.value, 
+      Podpis: konfiguracjaFormPodpis.value, 
       PodpisLinia: konfigFormPodpisLinia.value.trim(), // Zapisujemy linię tekstu
       // ✅ Koniec Moduł 6
       Inicjaly: konfiguracjaFormInicjaly.value.trim(),
       'ID lecznicy': konfiguracjaFormIdLecznicy.value.trim(),
       'Nazwa lecznicy': konfiguracjaFormNazwaLecznicy.value.trim(),
-      'Rola': konfiguracjaFormRola.value
+      'Rola': konfiguracjaFormRola.value,
+      // ✅ POCZĄTEK MODUŁU 1
+      // Odczytamy wartości z checkboxów, które dodamy w Module 2.
+      // (Jeśli checkbox nie istnieje, 'getElementById' zwróci null, a '?.checked' da 'undefined', co Firestore zignoruje przy aktualizacji,
+      // a przy tworzeniu (add) musimy zapewnić domyślne 'false')
+      uzywaStanowMagazynowych: document.getElementById('konfigFormUzywaMagazynu')?.checked || false,
+      mozeDoladowacWlasnyMagazyn: document.getElementById('konfigFormMozeDoladowac')?.checked || false
+      // ✅ KONIEC MODUŁU 1
     };
 
     if (!konfiguracjaData.Imie || !konfiguracjaData.Nazwisko) {
@@ -8181,16 +8189,20 @@ if (registerBtn) {
         createdUserUid = userCredential.user.uid;
 
         // 2. Stwórz profil WŁAŚCICIELA (ta sama logika co wcześniej)
-        const userProfileData = {
-          uid: createdUserUid,
-          Imie: imie,
-          Nazwisko: nazwisko,
-          'Adres email': email,
-          Rola: 'właściciel',
-          'Nazwa lecznicy': nazwaLecznicy,
-          'ID lecznicy': '', // Puste na razie
-          Podpis: '', Inicjaly: '', 'Nr telefonu': ''
-        };
+     const userProfileData = {
+          uid: createdUserUid,
+          Imie: imie,
+          Nazwisko: nazwisko,
+          'Adres email': email,
+          Rola: 'właściciel',
+          'Nazwa lecznicy': nazwaLecznicy,
+          'ID lecznicy': '', // Puste na razie
+          Podpis: '', Inicjaly: '', 'Nr telefonu': '',
+          // ✅ POCZĄTEK MODUŁU 1
+          uzywaStanowMagazynowych: false,
+          mozeDoladowacWlasnyMagazyn: false
+          // ✅ KONIEC MODUŁU 1
+        };
 
         const docRef = await db.collection("konfiguracja").add(userProfileData);
 
