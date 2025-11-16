@@ -3265,7 +3265,7 @@ console.log("Firebase gotowy do działania.");
 let mapaSerii = {}, mapaIlosci = {}, mapaKarencji = {}, nazwyLekow = [];
 let mapaCen = {};
 let receiptTotal = 0;
-
+let magazynCache = new Map(); // ✅ MODUŁ 3: Cache dla stanów magazynowych
 // 🌐 Pobieramy dane dynamicznie z Firestore
 async function fetchDataFromFirebase() {
 try {
@@ -6340,7 +6340,20 @@ async function fetchUserProfile(uid) {
     
     console.log("Pomyślnie pobrano profil użytkownika:", currentUserProfile);
       fetchDataFromFirebase(); // <-- Ta linia ładuje leki i klientów
-
+// ✅ POCZĄTEK MODUŁU 3: Wczytywanie magazynu do cache
+      if (currentUserProfile.uzywaStanowMagazynowych === true) {
+          console.log("Moduł 3: Użytkownik używa stanów magazynowych. Ładowanie magazynu do cache...");
+          try {
+              await loadMagazynCache(user.uid);
+          } catch (magazynError) {
+              console.error("Krytyczny błąd ładowania magazynu osobistego:", magazynError);
+              showToast("Nie udało się załadować Twojego magazynu. Stany nie będą sprawdzane.", "error", 5000);
+          }
+      } else {
+          console.log("Moduł 3: Użytkownik nie używa stanów magazynowych.");
+          magazynCache.clear(); // Wyczyść cache na wszelki wypadek
+      }
+      // ✅ KONIEC MODUŁU 3
       
  /* Plik: index.html (ok. linii 1910) */
 
@@ -6406,6 +6419,45 @@ async function fetchUserProfile(uid) {
     alert("Wystąpił błąd podczas ładowania danych użytkownika. Logowanie przerwane.");
     auth.signOut();
   }
+}
+    /**
+ * ✅ MODUŁ 3: Wczytuje podkolekcję 'magazynOsobisty' danego użytkownika do globalnego 'magazynCache'.
+ * Kluczem Mapy jest ID Produktu (z kolekcji 'leki'), Wartością jest obiekt {stan, ...}.
+ */
+async function loadMagazynCache(uid) {
+    if (!uid) {
+        console.error("loadMagazynCache: Brak UID użytkownika.");
+        return;
+    }
+
+    // Wyczyść stary cache przed załadowaniem nowego
+    magazynCache.clear();
+
+    // Odwołujemy się do podkolekcji 'magazynOsobisty' w dokumencie użytkownika
+    // WAŻNE: Musimy znać ID dokumentu w 'konfiguracja', a nie UID z autentykacji.
+    // Na szczęście mamy je w 'currentUserProfile.id'
+
+    if (!currentUserProfile || !currentUserProfile.id) {
+         console.error("loadMagazynCache: Brak currentUserProfile.id. Nie można znaleźć dokumentu konfiguracji.");
+        return;
+    }
+
+    const magazynRef = db.collection("konfiguracja").doc(currentUserProfile.id).collection("magazynOsobisty");
+
+    const snapshot = await magazynRef.get();
+
+    if (snapshot.empty) {
+        console.log("Moduł 3: Magazyn osobisty jest pusty.");
+        return;
+    }
+
+    snapshot.docs.forEach(doc => {
+        // Kluczem Mapy staje się ID dokumentu (które powinno być ID produktu)
+        // Wartością jest cały dokument {stan, produkt_nazwa, ...}
+        magazynCache.set(doc.id, doc.data());
+    });
+
+    console.log(`Moduł 3: Pomyślnie załadowano ${magazynCache.size} pozycji do magazynCache.`);
 }
 async function loadAndCacheClients() {
 if (!klientTableBody) return;
@@ -8108,6 +8160,7 @@ if (loginBtn) {
 function handleLogout() {
   if (confirm("Czy na pewno chcesz się wylogować?")) {
     console.log("Wylogowywanie...");
+    magazynCache.clear(); // ✅ MODUŁ 3: Wyczyść cache magazynu
     auth.signOut().catch(error => {
       console.error("Błąd wylogowania:", error);
       alert("Nie udało się wylogować. Spróbuj ponownie.");
