@@ -2163,6 +2163,7 @@ background-color: #eef;
 <button id="tabBazaProduktowBtn" class="btn">📦 Produkty</button>
 <button id="tabSchematyLeczeniaBtn" class="btn">⚕️ Schematy</button>
 <button id="tabMojMagazynBtn" class="btn" style="background-color: #f0f8ff;">📦 Mój Magazyn</button>
+<button id="tabZarzadzanieMagazynamiBtn" class="btn" style="background-color: #fff8e1;">📦 Zarządzaj Magazynami</button>
 <button id="logoutBtn" class="btn warn small" style="font-size: 16px; margin-left: auto;">Wyloguj ➡️</button>
 </div> <div id="kartaLeczeniaSection" style="display: none;">
 <h2>KARTA LECZENIA ZWIERZĄT GOSPODARSKICH ORAZ ZWIERZĄT, Z KTÓRYCH POZYSKANE TKANKI LUB PRODUKTY SĄ PRZEZNACZONE DO SPOŻYCIA PRZEZ LUDZI / EWIDENCJA LECZENIA ZWIERZĄT</h2>
@@ -2611,6 +2612,9 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
 <button id="loadKonfiguracjaBtn" class="btn primary">📥 Wczytaj konfigurację</button> </div>
 <button id="addNewKonfiguracjaBtn" class="btn primary" style="margin-bottom: 15px;">
 ＋ Dodaj nowego pracownika 
+</button>
+<button id="menuZarzadzajMagazynamiBtn" class="btn small" style="margin-bottom: 15px; margin-left: 10px; background-color: #fff8e1;">
+📦 Zarządzaj Magazynami Pracowników
 </button>
 <div class="table-container">
 <table id="konfiguracjaTable">
@@ -3286,7 +3290,76 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
         </table>
     </div>
 </div>
-<div id="archiveCardViewerModal" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.5); display: none; z-index: 10001; justify-content: center; align-items: center;">
+<div id="zarzadzanieMagazynamiSection" style="display: none; padding: 0 15px 80px 15px;">
+    <h2>📦 Zarządzanie Magazynami Pracowników</h2>
+
+    <div class="form-row" style="margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 15px;">
+        <label for="zarzadzanieUserSelect">Wybierz użytkownika, którego magazyn chcesz zobaczyć:</label>
+        <select id="zarzadzanieUserSelect" style="width:100%; padding:8px; font-size:16px;">
+            <option value="">Najpierw wczytaj użytkowników...</option>
+        </select>
+        <button id="zarzadzanieLoadUsersBtn" class="btn primary small" style="margin-top: 10px;">📥 Wczytaj Użytkowników</button>
+    </div>
+
+    <div id="zarzadzanieUserMagazynContainer" style="display: none;">
+
+        <h3 id="zarzadzanieMagazynTitle" style="color: #6A994E;">Magazyn dla: ...</h3>
+
+        <div id="zarzadzanieMagazynControls" style="margin-bottom: 15px; display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: flex-end;">
+            <div class="form-row" style="margin: 0;">
+                <label for="zarzadzanieSearchInput">Filtruj produkty:</label>
+                <input type="search" id="zarzadzanieSearchInput" placeholder="Wpisz nazwę produktu...">
+            </div>
+            <div id="zarzadzanieActionButtons" style="display: flex; gap: 8px;">
+                <button id="zarzadzanieBtnSzybkieDoladowanie" class="btn primary small">⚡ Tryb Szybkiego Doładowania</button>
+                <button id="zarzadzanieBtnZapiszDoladowanie" class="btn primary small" style="display: none; background-color: #27ae60; border-color: #229954;">💾 Zapisz Doładowanie</button>
+                <button id="zarzadzanieBtnAnulujDoladowanie" class="btn ghost small" style="display: none;">❌ Anuluj</button>
+            </div>
+        </div>
+
+        <div class="table-container">
+            <table id="zarzadzanieMagazynTable" class="sortable-table">
+                <thead>
+                    <tr>
+                        <th data-sort-key="nazwa">Nazwa Produktu</th>
+                        <th data-sort-key="stan" data-sort-type="number">Aktualny Stan</th>
+                        <th class="col-topup" style="display: none; width: 25%;">Ilość do Doładowania</th>
+                        <th class="col-log" data-sort-key="data">Ostatnia Operacja (Data)</th>
+                        <th class="col-log" data-sort-key="kto">Ostatnia Operacja (Kto)</th>
+                        <th class="col-log" data-sort-key="ilosc" data-sort-type="number">Operacja (Ilość)</th>
+                        <th class="col-log" data-sort-key="typ">Operacja (Typ)</th>
+                    </tr>
+                </thead>
+                <tbody id="zarzadzanieMagazynTableBody">
+                    </tbody>
+            </table>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 30px;">
+            <h3>Pełna Historia Operacji (Log)</h3>
+            <div>
+                <button id="zarzadzanieBtnCofnijDoladowanie" class="btn warn small" title="Wycofuje ostatnią operację typu 'doładowanie'">↩️ Wycofaj ostatnie doładowanie</button>
+                <button id="zarzadzanieBtnWyczyscLogi" class="btn warn small" style="margin-left: 5px;">🗑️ Wyczyść Logi</button>
+            </div>
+        </div>
+        <div class="table-container" style="max-height: 400px; overflow-y: auto;">
+            <table id="zarzadzanieMagazynLogTable" class="sortable-table">
+                <thead>
+                    <tr>
+                        <th data-sort-key="data" style="width: 25%;">Data</th>
+                        <th data-sort-key="kto" style="width: 20%;">Kto</th>
+                        <th data-sort-key="typ" style="width: 15%;">Typ Operacji</th>
+                        <th style="width: 40%;">Szczegóły (Produkty)</th>
+                    </tr>
+                </thead>
+                <tbody id="zarzadzanieMagazynLogTableBody">
+                    </tbody>
+            </table>
+        </div>
+
+    </div>
+</div>
+    <div id="archiveCardViewerModal" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.5); display: none; z-index: 10001; justify-content: center; align-items: center;">
  <div style="width: 100%; height: 100%; background: white; border-radius: 0; box-shadow: none; display: flex; flex-direction: column;">
 
   <div style="padding: 10px 15px; border-bottom: 1px solid #ccc; display: flex; justify-content: space-between; align-items: center;">
@@ -5359,6 +5432,7 @@ if (raportySection) raportySection.style.display = 'none';
 if (kalendarzWizytSection) kalendarzWizytSection.style.display = 'none'; // ✅ DODANA LINIA
 if (bazaSchematowSection) bazaSchematowSection.style.display = 'none'; // <-- ✅ DODAJ TĘ LINIĘ
 if (mojMagazynSection) mojMagazynSection.style.display = 'none'; // ✅ MODUŁ 4: Dodaj tę linię
+if (zarzadzanieMagazynamiSection) zarzadzanieMagazynamiSection.style.display = 'none'; // ✅ MODUŁ 6: Dodaj tę linię
 // Odznacz wszystkie przyciski
   if (tabKartaBtn) tabKartaBtn.classList.remove('primary');
   if (tabKalkulatorBtn) tabKalkulatorBtn.classList.remove('primary');
@@ -5367,6 +5441,7 @@ if (mojMagazynSection) mojMagazynSection.style.display = 'none'; // ✅ MODUŁ 4
   if (tabKalendarzBtn) tabKalendarzBtn.classList.remove('primary'); // ✅ DODANA LINIA
   if (tabSchematyLeczeniaBtn) tabSchematyLeczeniaBtn.classList.remove('primary'); // <-- ✅ DODAJ TĘ LINIĘ
   if (tabMojMagazynBtn) tabMojMagazynBtn.classList.remove('primary'); // ✅ MODUŁ 4: Dodaj tę linię
+  if (tabZarzadzanieMagazynamiBtn) tabZarzadzanieMagazynamiBtn.classList.remove('primary'); // ✅ MODUŁ 6: Dodaj tę linię
 // (Nie musimy odznaczać tabKonfiguracjaBtn ani tabArchiwumBtn, bo je usunęliśmy)
 
  if (sectionToShow === 'karta' && kartaSection) {
@@ -5492,6 +5567,14 @@ loadArchiveReceiptUsers();
       if (tabSchematyLeczeniaBtn) tabSchematyLeczeniaBtn.classList.add('primary');
       onShowBazaLeczenia(); // Wywołaj funkcję startową
   }
+            // ✅ POCZĄTEK MODUŁU 6: Dodaj ten blok
+  else if (sectionToShow === 'zarzadzanieMagazynami' && zarzadzanieMagazynamiSection) {
+      zarzadzanieMagazynamiSection.style.display = 'block';
+      if (tabZarzadzanieMagazynamiBtn) tabZarzadzanieMagazynamiBtn.classList.add('primary');
+      onShowZarzadzanieMagazynami(); // Wywołaj funkcję startową
+  }
+  // ✅ KONIEC MODUŁU 6
+}
   // ⬆️ ⬆️ ⬆️ KONIEC NOWEGO BLOKU ⬆️ ⬆️ ⬆️
 // ✅ POCZĄTEK MODUŁU 4: Dodaj ten blok
   else if (sectionToShow === 'mojMagazyn' && mojMagazynSection) {
@@ -8706,6 +8789,8 @@ const navButtonsToCheck = [
     backToMenuBtn, logoutBtn, menuLogoutBtn, // Przyciski paska i menu
     menuKalkulatorBtn, menuBazaKlientowBtn, menuBazaProduktowBtn, // Przyciski podmenu
     menuRaportyBtn, menuArchiwumKartyBtn, menuArchiwumParagonyBtn, menuKonfiguracjaBtn, // Przyciski menu
+    enuZarzadzajMagazynamiBtn, // ✅ MODUŁ 6
+    tabZarzadzanieMagazynamiBtn // ✅ MODUŁ 6
     openCalculatorBtn // Przycisk na karcie
 ]; // <-- Koniec tablicy. Usunęliśmy przyciski z modala.
 
@@ -9980,6 +10065,33 @@ const magazynBtnAnulujDoladowanie = document.getElementById('magazynBtnAnulujDol
 const magazynBtnCofnijDoladowanie = document.getElementById('magazynBtnCofnijDoladowanie');
 const magazynTable = document.getElementById('magazynTable');
 let isQuickTopUpMode = false; // Flaga trybu edycji
+    // ✅ POCZĄTEK MODUŁU 6: Zmienne Zarządzania Magazynami
+const zarzadzanieMagazynamiSection = document.getElementById('zarzadzanieMagazynamiSection');
+const menuZarzadzajMagazynamiBtn = document.getElementById('menuZarzadzajMagazynamiBtn');
+const tabZarzadzanieMagazynamiBtn = document.getElementById('tabZarzadzanieMagazynamiBtn');
+
+const zarzadzanieUserSelect = document.getElementById('zarzadzanieUserSelect');
+const zarzadzanieLoadUsersBtn = document.getElementById('zarzadzanieLoadUsersBtn');
+const zarzadzanieUserMagazynContainer = document.getElementById('zarzadzanieUserMagazynContainer');
+const zarzadzanieMagazynTitle = document.getElementById('zarzadzanieMagazynTitle');
+
+const zarzadzanieSearchInput = document.getElementById('zarzadzanieSearchInput');
+const zarzadzanieMagazynTable = document.getElementById('zarzadzanieMagazynTable');
+const zarzadzanieMagazynTableBody = document.getElementById('zarzadzanieMagazynTableBody');
+const zarzadzanieMagazynLogTableBody = document.getElementById('zarzadzanieMagazynLogTableBody');
+
+const zarzadzanieBtnSzybkieDoladowanie = document.getElementById('zarzadzanieBtnSzybkieDoladowanie');
+const zarzadzanieBtnZapiszDoladowanie = document.getElementById('zarzadzanieBtnZapiszDoladowanie');
+const zarzadzanieBtnAnulujDoladowanie = document.getElementById('zarzadzanieBtnAnulujDoladowanie');
+const zarzadzanieBtnCofnijDoladowanie = document.getElementById('zarzadzanieBtnCofnijDoladowanie');
+const zarzadzanieBtnWyczyscLogi = document.getElementById('zarzadzanieBtnWyczyscLogi');
+
+let zarzadzanieWybranyUser = null; // Przechowuje { uid, docId, nazwa } wybranego usera
+let zarzadzanieMagazynCache = new Map();
+let zarzadzanieMagazynLogCache = [];
+let zarzadzanieIsQuickTopUpMode = false;
+let zarzadzanieUzytkownicyCache = []; // Cache dla listy użytkowników
+// ✅ KONIEC MODUŁU 6
 // ✅ KONIEC MODUŁU 5
 // ✅ KONIEC MODUŁU 4
 const menuSchematyLeczeniaBtn = document.getElementById('menuSchematyLeczeniaBtn');
@@ -11921,6 +12033,23 @@ if (tabMojMagazynBtn) {
     });
 }
 // ✅ KONIEC MODUŁU 4
+    // ✅ POCZĄTEK MODUŁU 6: Listenery nawigacji
+if (menuZarzadzajMagazynamiBtn) {
+    menuZarzadzajMagazynamiBtn.addEventListener('click', () => {
+         // Sprawdź, czy karta jest "brudna"
+        if (typeof confirmOnTabChange === 'function' && !confirmOnTabChange()) {
+            return; // Przerwij, jeśli użytkownik anuluje
+        }
+        showSection('zarzadzanieMagazynami');
+    });
+}
+if (tabZarzadzanieMagazynamiBtn) {
+    tabZarzadzanieMagazynamiBtn.addEventListener('click', () => {
+        if (typeof confirmOnTabChange === 'function' && !confirmOnTabChange()) return;
+        showSection('zarzadzanieMagazynami');
+    });
+}
+// ✅ KONIEC MODUŁU 6
     // --- 2. Funkcja Startowa ---
     function onShowBazaLeczenia() {
         // Uruchom ładowanie tylko jeśli cache jest pusty
@@ -13785,6 +13914,575 @@ if (magazynTableBody) {
 
 /* ======================================================== */
 /* ✅ KONIEC: MODUŁ 5 - Logika Akcji Magazynu */
+/* ======================================================== */
+/* ======================================================== */
+/* ✅ POCZĄTEK: MODUŁ 6 - Logika Zarządzania Magazynami */
+/* ======================================================== */
+
+/**
+ * Funkcja startowa dla sekcji "Zarządzanie Magazynami".
+ * Sprawdza uprawnienia i ładuje listę użytkowników.
+ */
+function onShowZarzadzanieMagazynami() {
+    console.log("Wejście do sekcji Zarządzanie Magazynami.");
+    
+    // Zresetuj widok
+    zarzadzanieUserMagazynContainer.style.display = 'none';
+    zarzadzanieUserSelect.value = "";
+    
+    // Sprawdź uprawnienia (zgodnie z sugestią Właściciel = Admin)
+    if (!currentUserProfile || (currentUserProfile.Rola !== 'administrator' && currentUserProfile.Rola !== 'właściciel')) {
+        zarzadzanieMagazynamiSection.innerHTML = `<h2>📦 Zarządzanie Magazynami</h2><p style="text-align: center; font-size: 16px; color: red; padding: 20px;">Brak uprawnień.<br><br>Ta sekcja jest dostępna tylko dla Administratorów i Właścicieli.</p>`;
+        return; // Przerwij
+    }
+    
+    // Jeśli uprawnienia się zgadzają, pokaż przycisk ładowania userów
+    zarzadzanieLoadUsersBtn.style.display = 'inline-block';
+    
+    // Jeśli już raz wczytaliśmy użytkowników, nie każ klikać ponownie
+    if (zarzadzanieUzytkownicyCache.length > 0) {
+        populateZarzadzanieUsers();
+        zarzadzanieLoadUsersBtn.style.display = 'none';
+    }
+}
+
+/**
+ * Wczytuje listę użytkowników (z lecznicy Admina) do listy rozwijanej.
+ */
+async function loadZarzadzanieUsers() {
+    console.log("Moduł 6: Ładowanie listy użytkowników do zarządzania...");
+    zarzadzanieLoadUsersBtn.disabled = true;
+    zarzadzanieLoadUsersBtn.textContent = 'Ładowanie... ⏳';
+    
+    let query;
+    if (currentUserProfile.Rola === 'administrator') {
+        // Admin widzi wszystkich
+        query = db.collection("konfiguracja").orderBy("Nazwisko");
+    } else {
+        // Właściciel widzi tylko swoją lecznicę
+        const userClinicId = currentUserProfile['ID lecznicy'];
+        query = db.collection("konfiguracja").where("ID lecznicy", "==", userClinicId).orderBy("Nazwisko");
+    }
+    
+    try {
+        const snapshot = await query.get();
+        zarzadzanieUzytkownicyCache = snapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+                docId: doc.id, // ID dokumentu w konfiguracja (KLUCZOWE!)
+                uid: data.uid, // ID z autentykacji (jeśli połączone)
+                nazwa: `${data.Imie} ${data.Nazwisko}`,
+                uzywaMagazynu: data.uzywaStanowMagazynowych || false
+            };
+        });
+        
+        populateZarzadzanieUsers();
+        zarzadzanieLoadUsersBtn.style.display = 'none'; // Ukryj przycisk po sukcesie
+        
+    } catch (error) {
+        console.error("Błąd ładowania użytkowników do zarządzania:", error);
+        showToast("Błąd ładowania listy użytkowników.", "error");
+        zarzadzanieLoadUsersBtn.disabled = false;
+        zarzadzanieLoadUsersBtn.textContent = '📥 Wczytaj Użytkowników';
+    }
+}
+
+/**
+ * Wypełnia listę rozwijaną <select> na podstawie 'zarzadzanieUzytkownicyCache'.
+ */
+function populateZarzadzanieUsers() {
+    zarzadzanieUserSelect.innerHTML = '<option value="">--- Wybierz pracownika ---</option>';
+    zarzadzanieUzytkownicyCache.forEach(user => {
+        // Dodajemy informację, czy magazyn jest aktywny
+        const suffix = user.uzywaMagazynu ? " (Magazyn Aktywny)" : " (Magazyn Nieaktywny)";
+        const option = new Option(user.nazwa + suffix, user.docId);
+        option.dataset.userName = user.nazwa; // Zapisujemy nazwę do późniejszego użytku
+        zarzadzanieUserSelect.add(option);
+    });
+}
+
+/**
+ * Funkcja wywoływana po wybraniu użytkownika z listy.
+ * Rozpoczyna ładowanie jego magazynu.
+ */
+async function handleWyborUzytkownika() {
+    const selectedDocId = zarzadzanieUserSelect.value;
+    if (!selectedDocId) {
+        zarzadzanieUserMagazynContainer.style.display = 'none';
+        zarzadzanieWybranyUser = null;
+        return;
+    }
+    
+    const selectedOption = zarzadzanieUserSelect.options[zarzadzanieUserSelect.selectedIndex];
+    const selectedUserName = selectedOption.dataset.userName;
+    
+    // Zapisz globalnie, kogo edytujemy
+    zarzadzanieWybranyUser = zarzadzanieUzytkownicyCache.find(u => u.docId === selectedDocId);
+    
+    if (!zarzadzanieWybranyUser) {
+         showToast("Błąd: Nie znaleziono danych tego użytkownika.", "error");
+         return;
+    }
+    
+    zarzadzanieMagazynTitle.textContent = `Magazyn dla: ${selectedUserName}`;
+    zarzadzanieUserMagazynContainer.style.display = 'block';
+    
+    // Zresetuj widok
+    zarzadzanieMagazynTableBody.innerHTML = '<tr><td colspan="6" style="text-align: center;">Wczytywanie stanu... ⏳</td></tr>';
+    zarzadzanieMagazynLogTableBody.innerHTML = '<tr><td colspan="4" style="text-align: center;">Wczytywanie logów... ⏳</td></tr>';
+    
+    // Pokaż/ukryj przyciski akcji
+    const uzywaMagazynu = zarzadzanieWybranyUser.uzywaMagazynu;
+    zarzadzanieMagazynControls.style.display = uzywaMagazynu ? 'grid' : 'none';
+    
+    if (!uzywaMagazynu) {
+        zarzadzanieMagazynTableBody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #f39c12;">Ten użytkownik ma wyłączony moduł magazynu w swojej konfiguracji.</td></tr>';
+        zarzadzanieMagazynLogTableBody.innerHTML = '<tr><td colspan="4" style="text-align: center;">---</td></tr>';
+        return;
+    }
+
+    // Użytkownik ma włączony magazyn, załaduj jego dane
+    await loadAndRenderWybranyMagazyn();
+}
+
+/**
+ * Pobiera i renderuje dane magazynowe dla admina.
+ * Ta funkcja jest kopią loadAndRenderMagazyn, ale używa globalnych zmiennych 'zarzadzanie...'.
+ */
+async function loadAndRenderWybranyMagazyn() {
+    if (!zarzadzanieWybranyUser) return;
+    
+    try {
+        // --- Krok 1: Pobierz główną listę produktów (mamy ją w cache) ---
+        if (produktyGlowneCache.size === 0) {
+            // Na wszelki wypadek, gdyby admin wszedł tu przed "Mój Magazyn"
+            await loadAndCacheProducts();
+            cachedProducts.forEach(p => {
+                produktyGlowneCache.set(p.nazwa, p.id);
+            });
+        }
+        
+        // --- Krok 2: Pobierz stany wybranego użytkownika ---
+        zarzadzanieMagazynCache.clear();
+        const stanRef = db.collection("konfiguracja").doc(zarzadzanieWybranyUser.docId).collection("magazynOsobisty");
+        const stanSnapshot = await stanRef.get();
+        stanSnapshot.docs.forEach(doc => {
+            zarzadzanieMagazynCache.set(doc.id, doc.data());
+        });
+        console.log(`Moduł 6: Załadowano ${zarzadzanieMagazynCache.size} pozycji stanu dla ${zarzadzanieWybranyUser.nazwa}.`);
+
+        // --- Krok 3: Pobierz logi wybranego użytkownika ---
+        zarzadzanieMagazynLogCache = [];
+        const logRef = db.collection("konfiguracja").doc(zarzadzanieWybranyUser.docId).collection("magazynOsobistyLog");
+        const logSnapshot = await logRef.orderBy("data", "desc").get();
+        zarzadzanieMagazynLogCache = logSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        console.log(`Moduł 6: Załadowano ${zarzadzanieMagazynLogCache.length} logów dla ${zarzadzanieWybranyUser.nazwa}.`);
+        
+        // --- Krok 4: Renderuj tabele (używając nowych funkcji) ---
+        renderZarzadzanieMagazynTable();
+        renderZarzadzanieMagazynLogTable();
+        
+        // Uruchom auto-czyszczenie logów (sugestia użytkownika)
+        runAutoCleanupLogs(zarzadzanieWybranyUser.docId);
+
+    } catch (error) {
+        console.error(`Błąd podczas ładowania magazynu dla ${zarzadzanieWybranyUser.nazwa}:`, error);
+        zarzadzanieMagazynTableBody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: red;">Wystąpił błąd ładowania magazynu.</td></tr>';
+    }
+}
+
+/**
+ * Renderuje tabelę stanów magazynowych dla panelu Admina.
+ * (Kopia renderMagazynTable, ale używa zmiennych 'zarzadzanie...')
+ */
+function renderZarzadzanieMagazynTable() {
+    zarzadzanieMagazynTableBody.innerHTML = '';
+    const filterText = zarzadzanieSearchInput.value.toLowerCase().trim();
+    const threeDaysAgo = new Date().getTime() - (3 * 24 * 60 * 60 * 1000);
+    
+    let productsToRender = [...cachedProducts];
+    productsToRender.sort((a, b) => (a.nazwa || '').localeCompare(b.nazwa || '', 'pl'));
+
+    productsToRender.forEach(product => {
+        const nazwa = product.nazwa || 'Brak Nazwy';
+        const productId = product.id;
+        
+        if (filterText && !nazwa.toLowerCase().includes(filterText)) return;
+        
+        const stanData = zarzadzanieMagazynCache.get(productId);
+        const aktualnyStan = stanData ? stanData.stan : 0;
+        let dataOperacji = '', ktoOperacji = '', iloscOperacji = '', typOperacji = '', highlightClass = '';
+
+        const ostatniLogProduktu = zarzadzanieMagazynLogCache.find(log => 
+            log.zmiany && log.zmiany.some(z => z.id_produktu === productId)
+        );
+        
+        if (ostatniLogProduktu) {
+            const zmiana = ostatniLogProduktu.zmiany.find(z => z.id_produktu === productId);
+            dataOperacji = ostatniLogProduktu.data.toDate().toLocaleString('pl-PL');
+            ktoOperacji = ostatniLogProduktu.kto_nazwa;
+            iloscOperacji = zmiana.ilosc > 0 ? `+${zmiana.ilosc}` : zmiana.ilosc;
+            typOperacji = ostatniLogProduktu.typ;
+            if (ostatniLogProduktu.typ === 'doładowanie' && ostatniLogProduktu.data.toDate().getTime() > threeDaysAgo) {
+                highlightClass = 'highlight-recent';
+            }
+        }
+        
+        const tr = document.createElement('tr');
+        tr.className = highlightClass;
+        tr.dataset.productId = productId;
+        tr.dataset.nazwa = nazwa;
+        tr.dataset.stan = aktualnyStan;
+        // ... (inne datasety do sortowania) ...
+        
+        tr.innerHTML = `
+            <td>${nazwa}</td>
+            <td style="text-align: center; font-weight: bold;">${aktualnyStan}</td>
+            <td class="col-topup" style="text-align: center;">
+                <input type="number" class="topup-input" data-product-id="${productId}" placeholder="0" min="0" step="1">
+            </td>
+            <td class="col-log">${dataOperacji}</td>
+            <td class="col-log">${ktoOperacji}</td>
+            <td class="col-log" style="text-align: center; font-weight: 600;">${iloscOperacji}</td>
+            <td class="col-log">${typOperacji}</td>
+        `;
+        zarzadzanieMagazynTableBody.appendChild(tr);
+    });
+}
+
+/**
+ * Renderuje tabelę logów dla panelu Admina.
+ * (Kopia renderMagazynLogTable, ale używa zmiennych 'zarzadzanie...')
+ */
+function renderZarzadzanieMagazynLogTable() {
+    zarzadzanieMagazynLogTableBody.innerHTML = '';
+    if (zarzadzanieMagazynLogCache.length === 0) {
+        zarzadzanieMagazynLogTableBody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 20px; color: #555;">Brak historii operacji.</td></tr>';
+        return;
+    }
+    
+    zarzadzanieMagazynLogCache.forEach(log => {
+        const tr = document.createElement('tr');
+        tr.dataset.data = log.data.toMillis();
+        tr.dataset.kto = log.kto_nazwa;
+        tr.dataset.typ = log.typ;
+        
+        let typKlasa = `log-type-${log.typ}`;
+        
+        let zmianyHtml = '<ul class="log-details-list">';
+        (log.zmiany || []).forEach(z => {
+            const zmianaVal = z.ilosc > 0 ? `+${z.ilosc}` : z.ilosc;
+            zmianyHtml += `<li><strong>${z.nazwa_produktu}</strong>: ${zmianaVal} (z ${z.stan_przed} na ${z.stan_po})</li>`;
+        });
+        zmianyHtml += '</ul>';
+        
+        tr.innerHTML = `
+            <td>${log.data.toDate().toLocaleString('pl-PL')}</td>
+            <td>${log.kto_nazwa}</td>
+            <td class="${typKlasa}">${log.typ}</td>
+            <td>${zmianyHtml}</td>
+        `;
+        zarzadzanieMagazynLogTableBody.appendChild(tr);
+    });
+}
+
+/**
+ * Przełącza tryb edycji dla tabeli Admina.
+ */
+function toggleZarzadzanieTopUpMode(enable) {
+    zarzadzanieIsQuickTopUpMode = enable;
+    if (enable) {
+        zarzadzanieMagazynTable.classList.add('import-mode');
+        zarzadzanieBtnSzybkieDoladowanie.style.display = 'none';
+        zarzadzanieBtnZapiszDoladowanie.style.display = 'inline-block';
+        zarzadzanieBtnAnulujDoladowanie.style.display = 'inline-block';
+        document.getElementById('zarzadzanieMagazynLogTable').closest('.table-container').style.display = 'none';
+        zarzadzanieBtnCofnijDoladowanie.style.display = 'none';
+        zarzadzanieBtnWyczyscLogi.style.display = 'none';
+    } else {
+        zarzadzanieMagazynTable.classList.remove('import-mode');
+        zarzadzanieBtnSzybkieDoladowanie.style.display = 'inline-block';
+        zarzadzanieBtnZapiszDoladowanie.style.display = 'none';
+        zarzadzanieBtnAnulujDoladowanie.style.display = 'none';
+        document.getElementById('zarzadzanieMagazynLogTable').closest('.table-container').style.display = 'block';
+        zarzadzanieBtnCofnijDoladowanie.style.display = 'inline-block';
+        zarzadzanieBtnWyczyscLogi.style.display = 'inline-block';
+    }
+    renderZarzadzanieMagazynTable();
+}
+
+/**
+ * Zapisuje doładowanie wykonane przez Admina dla wybranego użytkownika.
+ */
+async function handleAdminSaveTopUp() {
+    if (!zarzadzanieWybranyUser) return;
+    
+    console.log(`Moduł 6: Admin [${currentUserProfile.Imie}] zapisuje doładowanie dla [${zarzadzanieWybranyUser.nazwa}]`);
+    
+    zarzadzanieBtnZapiszDoladowanie.disabled = true;
+    zarzadzanieBtnZapiszDoladowanie.textContent = 'Zapisywanie... ⏳';
+
+    const zmianyBatch = [];
+    const firestoreBatch = db.batch();
+    const inputyDoDoladowania = zarzadzanieMagazynTableBody.querySelectorAll('input.topup-input');
+    
+    inputyDoDoladowania.forEach(input => {
+        const iloscDoDodania = parseFloat(input.value) || 0;
+        if (iloscDoDodania > 0) {
+            const row = input.closest('tr');
+            const productId = row.dataset.productId;
+            const productName = row.dataset.nazwa;
+            const stanPrzed = parseFloat(row.dataset.stan) || 0;
+            const stanPo = stanPrzed + iloscDoDodania;
+            
+            zmianyBatch.push({
+                id_produktu: productId,
+                nazwa_produktu: productName,
+                ilosc: iloscDoDodania,
+                stan_przed: stanPrzed,
+                stan_po: stanPo
+            });
+            
+            // --- WAŻNE: Zapisujemy do magazynu WYBRANEGO użytkownika ---
+            const stanRef = db.collection("konfiguracja").doc(zarzadzanieWybranyUser.docId)
+                              .collection("magazynOsobisty").doc(productId);
+            firestoreBatch.set(stanRef, { stan: stanPo, produkt_nazwa: productName }, { merge: true });
+        }
+    });
+
+    if (zmianyBatch.length === 0) {
+        showToast("Nie wprowadzono żadnych ilości.", "info");
+        // (reszta cleanup w 'finally')
+    } else {
+        // Zapisz log w magazynie WYBRANEGO użytkownika
+        const logData = {
+            typ: "doładowanie",
+            data: firebase.firestore.FieldValue.serverTimestamp(),
+            kto_uid: currentUserProfile.uid, // UID Admina!
+            kto_nazwa: `${currentUserProfile.Imie} ${currentUserProfile.Nazwisko} (Admin)`, // Z dopiskiem
+            batch_id: "batch_" + new Date().getTime(),
+            wycofany: false,
+            zmiany: zmianyBatch
+        };
+        const logRef = db.collection("konfiguracja").doc(zarzadzanieWybranyUser.docId)
+                         .collection("magazynOsobistyLog").doc();
+        firestoreBatch.set(logRef, logData);
+        
+        try {
+            await firestoreBatch.commit();
+            showToast(`Pomyślnie doładowano ${zmianyBatch.length} pozycji dla ${zarzadzanieWybranyUser.nazwa}.`, "success");
+        } catch (error) {
+            console.error("Błąd zapisu doładowania przez Admina:", error);
+            showToast("Wystąpił błąd podczas zapisu doładowania.", "error");
+        }
+    }
+    
+    // Zawsze wyłącz tryb edycji i odśwież
+    zarzadzanieBtnZapiszDoladowanie.disabled = false;
+    zarzadzanieBtnZapiszDoladowanie.textContent = '💾 Zapisz Doładowanie';
+    toggleZarzadzanieTopUpMode(false);
+    await loadAndRenderWybranyMagazyn(); // Odśwież widok
+}
+
+/**
+ * Cofa ostatnie doładowanie dla wybranego użytkownika (logika Admina).
+ */
+async function handleAdminUndoTopUp() {
+    if (!zarzadzanieWybranyUser) return;
+    
+    const ostatnieDoladowanie = zarzadzanieMagazynLogCache.find(log => log.typ === "doładowanie" && log.wycofany === false);
+    
+    if (!ostatnieDoladowanie) {
+        showToast("Nie znaleziono operacji doładowania do wycofania.", "info");
+        return;
+    }
+    
+    if (!confirm(`Czy na pewno chcesz wycofać operację (ID: ${ostatnieDoladowanie.batch_id}) dla ${zarzadzanieWybranyUser.nazwa}?`)) {
+        return;
+    }
+    
+    zarzadzanieBtnCofnijDoladowanie.disabled = true;
+    
+    const firestoreBatch = db.batch();
+    const zmianyBatchLog = [];
+    
+    for (const zmiana of ostatnieDoladowanie.zmiany) {
+        const productId = zmiana.id_produktu;
+        const stanPrzed = zmiana.stan_przed;
+        const stanAktualny = zarzadzanieMagazynCache.get(productId)?.stan || zmiana.stan_po;
+        
+        zmianyBatchLog.push({
+            id_produktu: productId,
+            nazwa_produktu: zmiana.nazwa_produktu,
+            ilosc: -zmiana.ilosc,
+            stan_przed: stanAktualny,
+            stan_po: stanPrzed
+        });
+        
+        const stanRef = db.collection("konfiguracja").doc(zarzadzanieWybranyUser.docId)
+                          .collection("magazynOsobisty").doc(productId);
+        firestoreBatch.update(stanRef, { stan: stanPrzed });
+    }
+
+    const staryLogRef = db.collection("konfiguracja").doc(zarzadzanieWybranyUser.docId)
+                         .collection("magazynOsobistyLog").doc(ostatnieDoladowanie.id);
+    firestoreBatch.update(staryLogRef, { wycofany: true });
+    
+    const nowyLogData = {
+        typ: "wycofanie",
+        data: firebase.firestore.FieldValue.serverTimestamp(),
+        kto_uid: currentUserProfile.uid, // Admin
+        kto_nazwa: `${currentUserProfile.Imie} ${currentUserProfile.Nazwisko} (Admin)`,
+        batch_id_powiazany: ostatnieDoladowanie.batch_id,
+        wycofany: false,
+        zmiany: zmianyBatchLog
+    };
+    const nowyLogRef = db.collection("konfiguracja").doc(zarzadzanieWybranyUser.docId)
+                         .collection("magazynOsobistyLog").doc();
+    firestoreBatch.set(nowyLogRef, nowyLogData);
+
+    try {
+        await firestoreBatch.commit();
+        showToast("Pomyślnie wycofano doładowanie.", "success");
+    } catch (error) {
+        console.error("Błąd wycofywania (Admin):", error);
+        showToast("Wystąpił błąd podczas wycofywania.", "error");
+    } finally {
+        zarzadzanieBtnCofnijDoladowanie.disabled = false;
+        await loadAndRenderWybranyMagazyn(); // Odśwież
+    }
+}
+
+/**
+ * Automatycznie czyści logi starsze niż 14 dni dla danego użytkownika.
+ */
+async function runAutoCleanupLogs(userDocId) {
+    if (!userDocId) return;
+    
+    const cutoffDate = new Date().getTime() - (14 * 24 * 60 * 60 * 1000); // 14 dni temu
+    const cutoffTimestamp = firebase.firestore.Timestamp.fromMillis(cutoffDate);
+
+    try {
+        const logRef = db.collection("konfiguracja").doc(userDocId).collection("magazynOsobistyLog");
+        const q = logRef.where("data", "<", cutoffTimestamp);
+        const snapshot = await q.get();
+        
+        if (snapshot.empty) {
+            console.log(`Moduł 6 (Auto-Czyszczenie): Brak logów starszych niż 14 dni dla ${userDocId}.`);
+            return;
+        }
+        
+        console.log(`Moduł 6 (Auto-Czyszczenie): Znaleziono ${snapshot.size} starych logów do usunięcia.`);
+        
+        const batch = db.batch();
+        snapshot.docs.forEach(doc => {
+            batch.delete(doc.ref);
+        });
+        await batch.commit();
+        
+        showToast(`Wyczyszczono ${snapshot.size} starych logów (starszych niż 14 dni).`, "info");
+
+    } catch (error) {
+        console.error("Błąd automatycznego czyszczenia logów:", error);
+        if (error.code === 'failed-precondition') {
+             // To się może zdarzyć, jeśli admin nigdy nie otworzy magazynu
+             console.warn("Moduł 6: Wymagany indeks do auto-czyszczenia logów: [data(ASC)] dla `magazynOsobistyLog`");
+        }
+    }
+}
+
+/**
+ * Ręcznie czyści WSZYSTKIE logi dla wybranego użytkownika.
+ */
+async function handleAdminClearLogs() {
+    if (!zarzadzanieWybranyUser) return;
+    
+    const userName = zarzadzanieWybranyUser.nazwa;
+    
+    // Potrójne potwierdzenie - bardzo niebezpieczna operacja
+    if (!confirm(`Czy NA PEWNO chcesz usunąć CAŁĄ HISTORIĘ (wszystkie logi) dla użytkownika ${userName}?\n\nTEJ OPERACJI NIE MOŻNA COFNĄĆ.`)) {
+        return;
+    }
+    const verificationText = "WYCZYŚĆ LOGI";
+    const userInput = prompt(`Aby potwierdzić, wpisz dokładnie: "${verificationText}"`);
+    
+    if (userInput !== verificationText) {
+        showToast("Anulowano. Tekst potwierdzający był niepoprawny.", "info");
+        return;
+    }
+
+    zarzadzanieBtnWyczyscLogi.disabled = true;
+    zarzadzanieBtnWyczyscLogi.textContent = 'Czyszczenie... ⏳';
+
+    try {
+        const logRef = db.collection("konfiguracja").doc(zarzadzanieWybranyUser.docId).collection("magazynOsobistyLog");
+        const snapshot = await logRef.get();
+        
+        if (snapshot.empty) {
+            showToast("Logi są już puste.", "info");
+            return;
+        }
+        
+        const batch = db.batch();
+        snapshot.docs.forEach(doc => {
+            batch.delete(doc.ref);
+        });
+        await batch.commit();
+        
+        showToast(`Pomyślnie usunięto ${snapshot.size} logów dla ${userName}.`, "success");
+        
+        // Odśwież widok
+        zarzadzanieMagazynLogCache = [];
+        renderZarzadzanieMagazynLogTable();
+
+    } catch (error) {
+        console.error("Błąd ręcznego czyszczenia logów:", error);
+        showToast("Wystąpił błąd podczas czyszczenia logów.", "error");
+    } finally {
+        zarzadzanieBtnWyczyscLogi.disabled = false;
+        zarzadzanieBtnWyczyscLogi.textContent = '🗑️ Wyczyść Logi';
+    }
+}
+
+
+// --- Listenery dla Panelu Zarządzania ---
+if (zarzadzanieLoadUsersBtn) {
+    zarzadzanieLoadUsersBtn.addEventListener('click', loadZarzadzanieUsers);
+}
+if (zarzadzanieUserSelect) {
+    zarzadzanieUserSelect.addEventListener('change', handleWyborUzytkownika);
+}
+if (zarzadzanieSearchInput) {
+    zarzadzanieSearchInput.addEventListener('input', renderZarzadzanieMagazynTable);
+}
+if (zarzadzanieBtnSzybkieDoladowanie) {
+    zarzadzanieBtnSzybkieDoladowanie.addEventListener('click', () => toggleZarzadzanieTopUpMode(true));
+}
+if (zarzadzanieBtnAnulujDoladowanie) {
+    zarzadzanieBtnAnulujDoladowanie.addEventListener('click', () => toggleZarzadzanieTopUpMode(false));
+}
+if (zarzadzanieBtnZapiszDoladowanie) {
+    zarzadzanieBtnZapiszDoladowanie.addEventListener('click', handleAdminSaveTopUp);
+}
+if (zarzadzanieBtnCofnijDoladowanie) {
+    zarzadzanieBtnCofnijDoladowanie.addEventListener('click', handleAdminUndoTopUp);
+}
+if (zarzadzanieBtnWyczyscLogi) {
+    zarzadzanieBtnWyczyscLogi.addEventListener('click', handleAdminClearLogs);
+}
+if (zarzadzanieMagazynTableBody) {
+    // Używamy tej samej funkcji do wklejania co w Module 5, ale musimy zaktualizować flagę
+    zarzadzanieMagazynTableBody.addEventListener('paste', (e) => {
+        // "Oszukujemy" funkcję 'handleMagazynPaste' mówiąc jej, że jest w trybie edycji
+        const oldFlag = isQuickTopUpMode; // Zapisz stary stan
+        isQuickTopUpMode = zarzadzanieIsQuickTopUpMode; // Ustaw stan admina
+        handleMagazynPaste(e); // Wywołaj logikę wklejania
+        isQuickTopUpMode = oldFlag; // Przywróć stary stan
+    });
+}
+
+/* ======================================================== */
+/* ✅ KONIEC: MODUŁ 6 - Logika Zarządzania Magazynami */
 /* ======================================================== */
 </script> 
 
