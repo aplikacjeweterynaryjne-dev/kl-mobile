@@ -2751,7 +2751,19 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
 <option value="administrator">Administrator</option>
 </select>
 </div>
+<div class="form-row" style="background: #f7f7f7; padding: 10px; border-radius: 6px; margin-top: 10px;">
+    <label style="font-size: 16px; font-weight: 700; display: flex; align-items: center; gap: 8px; margin: 0;">
+        <input type="checkbox" id="konfigFormUzywaMagazynu" style="width: auto; height: 20px; flex-shrink: 0;">
+        Włącz stany magazynowe dla tego użytkownika
+    </label>
+</div>
 
+<div class="form-row" style="background: #f7f7f7; padding: 10px; border-radius: 6px; margin-top: 5px;">
+    <label style="font-size: 16px; font-weight: 700; display: flex; align-items: center; gap: 8px; margin: 0;">
+        <input type="checkbox" id="konfigFormMozeDoladowac" style="width: auto; height: 20px; flex-shrink: 0;">
+        Pozwól użytkownikowi na doładowywanie własnego magazynu
+    </label>
+</div>
 <div class="form-actions">
 <div class="left">
 <button id="cancelKonfiguracjaForm" type="button" class="btn ghost small" style="font-size: 19px;">Anuluj</button>
@@ -7131,7 +7143,10 @@ if (addNewKonfiguracjaBtn) {
  // ✅ MODYFIKACJA: Dynamicznie wypełnij role i ustaw domyślną
     populateRolaSelect(); // Wywołaj nową funkcję
     konfiguracjaFormRola.value = 'pracownik'; // Ustaw domyślną na 'pracownik'
-
+    // ✅ POCZĄTEK MODUŁU 2: Resetowanie checkboxów
+        document.getElementById('konfigFormUzywaMagazynu').checked = false;
+        document.getElementById('konfigFormMozeDoladowac').checked = false;
+        // ✅ KONIEC MODUŁU 2
     // ✅ NOWA LOGIKA: Automatycznie wypełnij ID i Nazwę lecznicy właściciela
     if (currentUserProfile && currentUserProfile['ID lecznicy'] && currentUserProfile['Nazwa lecznicy']) {
       konfiguracjaFormIdLecznicy.value = currentUserProfile['ID lecznicy'];
@@ -7328,7 +7343,10 @@ if (zapisanyPodpisBase64) {
         // ✅ MODYFIKACJA: Dynamicznie wypełnij role PRZED ustawieniem wartości
         populateRolaSelect();
         konfiguracjaFormRola.value = data.Rola || 'pracownik';
-        
+        // ✅ POCZĄTEK MODUŁU 2: Wczytywanie stanu checkboxów
+        document.getElementById('konfigFormUzywaMagazynu').checked = data.uzywaStanowMagazynowych || false;
+        document.getElementById('konfigFormMozeDoladowac').checked = data.mozeDoladowacWlasnyMagazyn || false;
+        // ✅ KONIEC MODUŁU 2
         // ✅ POCZĄTEK NOWEJ LOGIKI BLOKOWANIA PÓL
         // Pole ID Lecznicy jest ZAWSZE zablokowane
         konfiguracjaFormIdLecznicy.readOnly = true;
