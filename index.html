@@ -6482,7 +6482,61 @@ if(importActionsContainer) importActionsContainer.style.display = 'flex'; // Uż
 if(loadClientsBtn) loadClientsBtn.style.display = 'none';
 if(refreshClientsBtn) refreshClientsBtn.style.display = 'inline-block';
 }
- async function loadAndRenderSchemas() {
+    function renderSchemaList(schemas) {
+        schemaListContainer.innerHTML = ''; // Wyczyść
+        schemas.forEach(schema => {
+            const div = document.createElement('div');
+            div.className = 'schema-item';
+
+            let productsHtml = `
+                <table class="schema-products-table">
+                    <thead>
+                        <tr>
+                            <th>Wiersz</th>
+                            <th>Produkt</th>
+                            <th>Ilość/Dawka</th>
+                            <th>Karencja</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            (schema.produkty || []).sort((a,b) => a.wierszDocelowy - b.wierszDocelowy).forEach(p => {
+                // Konwertuj indeks wiersza na czytelną nazwę
+                let wierszNazwa = `Lecz. ${p.wierszDocelowy + 1}`;
+                if (p.wierszDocelowy >= 9) {
+                    wierszNazwa = `Zost. ${p.wierszDocelowy - 8}`;
+                }
+
+//...
+                // ✅ FIX 2: Połącz 'ilosc' i 'dawkowanie'
+                const iloscDawkaDisplay = [p.ilosc, p.dawkowanie].filter(Boolean).join(' ');
+
+                productsHtml += `
+                    <tr>
+                        <td>${wierszNazwa}</td>
+                        <td>${p.produkt}</td>
+                        <td>${iloscDawkaDisplay}</td>
+                        <td>${p.karencja}</td>
+                    </tr>
+                `;
+            });
+            productsHtml += '</tbody></table>';
+
+            div.innerHTML = `
+                <div class="schema-header">
+                    <h4>${schema.rozpoznanie}</h4>
+                    <div>
+                        <button class="btn small btn-edit-schema" data-id="${schema.id}">Edytuj</button>
+                        <button class="btn warn small btn-delete-schema" data-id="${schema.id}" style="margin-left: 5px;">Usuń</button>
+                    </div>
+                </div>
+                <div class="schema-products">${productsHtml}</div>
+            `;
+            schemaListContainer.appendChild(div);
+        });
+    }
+    async function loadAndRenderSchemas() {
         if (!currentUserProfile) return;
         schemaListContainer.innerHTML = '<p style="text-align:center; color:#888;">Wczytywanie schematów... ⏳</p>';
 
@@ -12066,60 +12120,7 @@ if (tabZarzadzajMagazynamiBtn) {
     // --- 3. Wczytywanie i Renderowanie Schematów ---
    
     // Funkcja do renderowania listy schematów
-    function renderSchemaList(schemas) {
-        schemaListContainer.innerHTML = ''; // Wyczyść
-        schemas.forEach(schema => {
-            const div = document.createElement('div');
-            div.className = 'schema-item';
 
-            let productsHtml = `
-                <table class="schema-products-table">
-                    <thead>
-                        <tr>
-                            <th>Wiersz</th>
-                            <th>Produkt</th>
-                            <th>Ilość/Dawka</th>
-                            <th>Karencja</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-            `;
-
-            (schema.produkty || []).sort((a,b) => a.wierszDocelowy - b.wierszDocelowy).forEach(p => {
-                // Konwertuj indeks wiersza na czytelną nazwę
-                let wierszNazwa = `Lecz. ${p.wierszDocelowy + 1}`;
-                if (p.wierszDocelowy >= 9) {
-                    wierszNazwa = `Zost. ${p.wierszDocelowy - 8}`;
-                }
-
-//...
-                // ✅ FIX 2: Połącz 'ilosc' i 'dawkowanie'
-                const iloscDawkaDisplay = [p.ilosc, p.dawkowanie].filter(Boolean).join(' ');
-
-                productsHtml += `
-                    <tr>
-                        <td>${wierszNazwa}</td>
-                        <td>${p.produkt}</td>
-                        <td>${iloscDawkaDisplay}</td>
-                        <td>${p.karencja}</td>
-                    </tr>
-                `;
-            });
-            productsHtml += '</tbody></table>';
-
-            div.innerHTML = `
-                <div class="schema-header">
-                    <h4>${schema.rozpoznanie}</h4>
-                    <div>
-                        <button class="btn small btn-edit-schema" data-id="${schema.id}">Edytuj</button>
-                        <button class="btn warn small btn-delete-schema" data-id="${schema.id}" style="margin-left: 5px;">Usuń</button>
-                    </div>
-                </div>
-                <div class="schema-products">${productsHtml}</div>
-            `;
-            schemaListContainer.appendChild(div);
-        });
-    }
 
     // --- 4. Logika Modala Schematu (CRUD) ---
 
