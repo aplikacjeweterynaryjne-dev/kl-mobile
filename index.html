@@ -3324,7 +3324,7 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
                     <tr>
                         <th data-sort-key="nazwa">Nazwa Produktu</th>
                         <th data-sort-key="stan" data-sort-type="number">Aktualny Stan</th>
-                        <th class="col-topup" style="display: none; width: 25%;">Ilość do Doładowania</th>
+                        <th class="col-topup" style="display: none; width: 25%; background-color: #fef9e7; color: #b8860b;">DOŁADOWANIE (Wpisz ilość)</th>
                         <th class="col-log" data-sort-key="data">Ostatnia Operacja (Data)</th>
                         <th class="col-log" data-sort-key="kto">Ostatnia Operacja (Kto)</th>
                         <th class="col-log" data-sort-key="ilosc" data-sort-type="number">Operacja (Ilość)</th>
@@ -5578,9 +5578,11 @@ loadArchiveReceiptUsers();
     // ✅ KONIEC MODUŁU 4
 
   // ✅ POCZĄTEK MODUŁU 6: Dodaj ten blok
+ // ✅ POCZĄTEK MODUŁU 6 (Poprawka): Logika dla 'zarzadzanieMagazynami'
   else if (sectionToShow === 'zarzadzanieMagazynami' && zarzadzanieMagazynamiSection) {
       zarzadzanieMagazynamiSection.style.display = 'block';
-      if (tabZarzadzanieMagazynamiBtn) tabZarzadzanieMagazynamiBtn.classList.add('primary');
+      // Podświetl zakładkę 'Mój Magazyn', bo 'Zarządzanie' jest jej częścią
+      if (tabMojMagazynBtn) tabMojMagazynBtn.classList.add('primary'); 
       onShowZarzadzanieMagazynami(); // Wywołaj funkcję startową
   }
   // ✅ KONIEC MODUŁU 6
@@ -13412,6 +13414,15 @@ toggleQuickTopUpMode(false); // Wyłącz tryb edycji przy starcie
 
     // Jeśli magazyn jest włączony, wczytaj dane
     await loadAndRenderMagazyn();
+    // ✅ POCZĄTEK MODUŁU 6 (Poprawka): Pokaż przycisk zarządzania dla Admina/Właściciela
+        const adminToggle = document.getElementById('adminMagazynToggle');
+        if (adminToggle && (currentUserProfile.Rola === 'administrator' || currentUserProfile.Rola === 'właściciel')) {
+            adminToggle.style.display = 'block';
+        } else if (adminToggle) {
+            adminToggle.style.display = 'none';
+        }
+    
+        // ✅ KONIEC MODUŁU 6 (Poprawka)
 }
 
 /**
