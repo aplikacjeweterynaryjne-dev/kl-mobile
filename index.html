@@ -1833,6 +1833,41 @@ table {
 #kartaLeczeniaSection .actions #copyBtn {
     display: none !important;
 }
+    /* ======================================================== */
+/* ✅ POCZĄTEK: MODUŁ 4 - Style dla Magazynu */
+/* ======================================================== */
+
+/* Podświetlenie wiersza dla niedawno doładowanych */
+#magazynTable tbody tr.highlight-recent {
+    background-color: #e6f3e6 !important; /* Jasnozielone tło */
+}
+#magazynTable tbody tr.highlight-recent td {
+    font-weight: 600;
+}
+
+/* Style dla logów (szczegóły operacji) */
+#magazynLogTable .log-details-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    font-size: 12px;
+}
+#magazynLogTable .log-details-list li {
+    margin-bottom: 2px;
+    padding-bottom: 2px;
+    border-bottom: 1px solid #f0f0f0;
+}
+#magazynLogTable .log-details-list li:last-child {
+    border-bottom: none;
+}
+/* Kolorowanie typów operacji */
+#magazynLogTable .log-type-doladowanie { color: #27ae60; font-weight: 600; }
+#magazynLogTable .log-type-wydanie { color: #c0392b; font-weight: 600; }
+#magazynLogTable .log-type-wycofanie { color: #f39c12; font-weight: 600; }
+
+/* ======================================================== */
+/* ✅ KONIEC: MODUŁ 4 - Style dla Magazynu */
+/* ======================================================== */
 </style>
     <div id="calcProductSearchModal" class="product-search-modal" style="display: none; z-index: 10003;">
     <div class="product-search-card">
@@ -2061,6 +2096,7 @@ background-color: #eef;
     <button id="menuBazaKlientowBtn" class="submenu-btn">👥 Baza klientów</button>
     <button id="menuBazaProduktowBtn" class="submenu-btn">📦 Baza produktów</button>
     <button id="menuSchematyLeczeniaBtn" class="submenu-btn">⚕️ Baza leczenia (Schematy)</button>
+    <button id="menuMojMagazynBtn" class="submenu-btn" style="background-color: #e6f3e6; font-weight: bold;">📦 Mój Magazyn</button>
   </div>
   <button id="menuRaportyBtn" class="menu-btn">📊 Raporty</button>
   <button id="menuArchiwumBtn" class="menu-btn">🗄️ Archiwum</button>
@@ -2083,6 +2119,7 @@ background-color: #eef;
 <button id="tabBazaKlientowBtn" class="btn">👥 Klienci</button>
 <button id="tabBazaProduktowBtn" class="btn">📦 Produkty</button>
 <button id="tabSchematyLeczeniaBtn" class="btn">⚕️ Schematy</button>
+<button id="tabMojMagazynBtn" class="btn" style="background-color: #f0f8ff;">📦 Mój Magazyn</button>
 <button id="logoutBtn" class="btn warn small" style="font-size: 16px; margin-left: auto;">Wyloguj ➡️</button>
 </div> <div id="kartaLeczeniaSection" style="display: none;">
 <h2>KARTA LECZENIA ZWIERZĄT GOSPODARSKICH ORAZ ZWIERZĄT, Z KTÓRYCH POZYSKANE TKANKI LUB PRODUKTY SĄ PRZEZNACZONE DO SPOŻYCIA PRZEZ LUDZI / EWIDENCJA LECZENIA ZWIERZĄT</h2>
@@ -3148,6 +3185,54 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
         <div class="form-actions" style="justify-content: flex-end;">
             <button id="schemaSearchCloseBtn" class="btn ghost">Anuluj</button>
         </div>
+    </div>
+</div>
+<div id="mojMagazynSection" style="display: none; padding: 0 15px 80px 15px;">
+    <h2>📦 Mój Magazyn Osobisty</h2>
+
+    <div id="magazynControls" style="margin-bottom: 15px; display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: flex-end;">
+        <div class="form-row" style="margin: 0;">
+            <label for="magazynSearchInput">Filtruj produkty:</label>
+            <input type="search" id="magazynSearchInput" placeholder="Wpisz nazwę produktu...">
+        </div>
+        <div id="magazynActionButtons">
+            <button id="magazynBtnSzybkieDoladowanie" class="btn small" style="display: none;">⚡ Tryb Szybkiego Doładowania</button>
+        </div>
+    </div>
+
+    <div class="table-container">
+        <table id="magazynTable" class="sortable-table">
+            <thead>
+                <tr>
+                    <th data-sort-key="nazwa" style="width: 30%;">Nazwa Produktu</th>
+                    <th data-sort-key="stan" data-sort-type="number" style="width: 10%;">Aktualny Stan</th>
+                    <th data-sort-key="data" style="width: 25%;">Ostatnia Operacja (Data)</th>
+                    <th data-sort-key="kto" style="width: 15%;">Ostatnia Operacja (Kto)</th>
+                    <th data-sort-key="ilosc" data-sort-type="number" style="width: 10%;">Operacja (Ilość)</th>
+                    <th data-sort-key="typ" style="width: 10%;">Operacja (Typ)</th>
+                </tr>
+            </thead>
+            <tbody id="magazynTableBody">
+                <tr><td colspan="6" style="text-align: center; padding: 20px; color: #555;">Wczytywanie...</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <h3 style="margin-top: 30px;">Pełna Historia Operacji (Log)</h3>
+    <div class="table-container" style="max-height: 400px; overflow-y: auto;">
+        <table id="magazynLogTable" class="sortable-table">
+            <thead>
+                <tr>
+                    <th data-sort-key="data" style="width: 25%;">Data</th>
+                    <th data-sort-key="kto" style="width: 20%;">Kto</th>
+                    <th data-sort-key="typ" style="width: 15%;">Typ Operacji</th>
+                    <th style="width: 40%;">Szczegóły (Produkty)</th>
+                    </tr>
+            </thead>
+            <tbody id="magazynLogTableBody">
+                <tr><td colspan="4" style="text-align: center; padding: 20px; color: #555;">Wczytywanie historii...</td></tr>
+            </tbody>
+        </table>
     </div>
 </div>
 <div id="archiveCardViewerModal" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.5); display: none; z-index: 10001; justify-content: center; align-items: center;">
@@ -5222,6 +5307,7 @@ if (archiwumParagonySection) archiwumParagonySection.style.display = 'none'; // 
 if (raportySection) raportySection.style.display = 'none';
 if (kalendarzWizytSection) kalendarzWizytSection.style.display = 'none'; // ✅ DODANA LINIA
 if (bazaSchematowSection) bazaSchematowSection.style.display = 'none'; // <-- ✅ DODAJ TĘ LINIĘ
+if (mojMagazynSection) mojMagazynSection.style.display = 'none'; // ✅ MODUŁ 4: Dodaj tę linię
 // Odznacz wszystkie przyciski
   if (tabKartaBtn) tabKartaBtn.classList.remove('primary');
   if (tabKalkulatorBtn) tabKalkulatorBtn.classList.remove('primary');
@@ -5229,6 +5315,7 @@ if (bazaSchematowSection) bazaSchematowSection.style.display = 'none'; // <-- �
   if (tabBazaProduktowBtn) tabBazaProduktowBtn.classList.remove('primary'); 
   if (tabKalendarzBtn) tabKalendarzBtn.classList.remove('primary'); // ✅ DODANA LINIA
   if (tabSchematyLeczeniaBtn) tabSchematyLeczeniaBtn.classList.remove('primary'); // <-- ✅ DODAJ TĘ LINIĘ
+  if (tabMojMagazynBtn) tabMojMagazynBtn.classList.remove('primary'); // ✅ MODUŁ 4: Dodaj tę linię
 // (Nie musimy odznaczać tabKonfiguracjaBtn ani tabArchiwumBtn, bo je usunęliśmy)
 
  if (sectionToShow === 'karta' && kartaSection) {
@@ -5355,7 +5442,13 @@ loadArchiveReceiptUsers();
       onShowBazaLeczenia(); // Wywołaj funkcję startową
   }
   // ⬆️ ⬆️ ⬆️ KONIEC NOWEGO BLOKU ⬆️ ⬆️ ⬆️
-  }
+// ✅ POCZĄTEK MODUŁU 4: Dodaj ten blok
+  else if (sectionToShow === 'mojMagazyn' && mojMagazynSection) {
+      mojMagazynSection.style.display = 'block';
+      if (tabMojMagazynBtn) tabMojMagazynBtn.classList.add('primary');
+      onShowMojMagazyn(); // Wywołaj funkcję startową
+  }  
+}
 
 if (tabKartaBtn && tabKalkulatorBtn) {
 // ✅ POPRAWIONA LINIA - najpierw pokazuje sekcję, potem modal
@@ -9821,8 +9914,18 @@ let allFetchedVisits = []; // Cache na wizyty
 let currentVisitClientData = null; // Przechowuje dane klienta dla formularza
 // --- 1. Zmienne globalne Bazy Schematów ---
 const bazaSchematowSection = document.getElementById('bazaSchematowSection');
+// ✅ POCZĄTEK MODUŁU 4: Zmienne Magazynu
+const mojMagazynSection = document.getElementById('mojMagazynSection');
+const menuMojMagazynBtn = document.getElementById('menuMojMagazynBtn');
+const magazynSearchInput = document.getElementById('magazynSearchInput');
+const magazynTableBody = document.getElementById('magazynTableBody');
+const magazynLogTableBody = document.getElementById('magazynLogTableBody');
+let magazynLogCache = []; // Cache dla pełnej historii (logów)
+let produktyGlowneCache = new Map(); // Cache dla głównej listy produktów (Nazwa -> ID)
+// ✅ KONIEC MODUŁU 4
 const menuSchematyLeczeniaBtn = document.getElementById('menuSchematyLeczeniaBtn');
 const tabSchematyLeczeniaBtn = document.getElementById('tabSchematyLeczeniaBtn');
+const tabMojMagazynBtn = document.getElementById('tabMojMagazynBtn'); // ✅ MODUŁ 4
 const loadSchemasBtn = document.getElementById('loadSchemasBtn');
 const addNewSchemaBtn = document.getElementById('addNewSchemaBtn');
 const schemaListContainer = document.getElementById('schemaListContainer');
@@ -11747,7 +11850,18 @@ try {
             showSection('bazaSchematow');
         });
     }
-
+// ✅ POCZĄTEK MODUŁU 4: Dodaj te bloki
+if (menuMojMagazynBtn) {
+    menuMojMagazynBtn.addEventListener('click', () => showSection('mojMagazyn'));
+}
+if (tabMojMagazynBtn) {
+    tabMojMagazynBtn.addEventListener('click', () => {
+        // Używamy tej samej logiki sprawdzania "brudnej" karty co w innych zakładkach
+        if (typeof confirmOnTabChange === 'function' && !confirmOnTabChange()) return;
+        showSection('mojMagazyn');
+    });
+}
+// ✅ KONIEC MODUŁU 4
     // --- 2. Funkcja Startowa ---
     function onShowBazaLeczenia() {
         // Uruchom ładowanie tylko jeśli cache jest pusty
@@ -13072,6 +13186,229 @@ function printReceiptSummary(receiptData) { // receiptData nie jest już aktywni
 }
 /* ======================================================== */
 /* ✅ KONIEC: MODUŁ 3.2/3.3 - POPRAWIONA Funkcja */
+/* ======================================================== */
+/* ======================================================== */
+/* ✅ POCZĄTEK: MODUŁ 4 - Logika "Mój Magazyn" */
+/* ======================================================== */
+
+/**
+ * Funkcja startowa dla sekcji "Mój Magazyn".
+ * Sprawdza, czy magazyn jest włączony i uruchamia ładowanie danych.
+ */
+async function onShowMojMagazyn() {
+    console.log("Wejście do sekcji Mój Magazyn.");
+    
+    // Zresetuj tabele do stanu ładowania
+    magazynTableBody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 20px; color: #555;">Wczytywanie...</td></tr>';
+    magazynLogTableBody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 20px; color: #555;">Wczytywanie...</td></tr>';
+    
+    // Ukryj przyciski akcji (pokażemy je w Module 5)
+    document.getElementById('magazynActionButtons').style.display = 'none';
+
+    if (!currentUserProfile) {
+        magazynTableBody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: red;">Błąd: Brak profilu użytkownika.</td></tr>';
+        return;
+    }
+
+    // Sprawdź, czy użytkownik ma włączony magazyn
+    if (currentUserProfile.uzywaStanowMagazynowych !== true) {
+        mojMagazynSection.innerHTML = `<h2>📦 Mój Magazyn Osobisty</h2><p style="text-align: center; font-size: 16px; color: #555; padding: 20px;">Moduł magazynu osobistego jest wyłączony dla Twojego konta.<br><br>Skontaktuj się z administratorem, aby go włączyć.</p>`;
+        return; // Przerwij
+    }
+
+    // Jeśli magazyn jest włączony, wczytaj dane
+    await loadAndRenderMagazyn();
+}
+
+/**
+ * Główna funkcja pobierająca dane:
+ * 1. Pobiera listę WSZYSTKICH produktów z 'leki' (jeśli jeszcze nie ma).
+ * 2. Pobiera AKTUALNE STANY z 'magazynOsobisty' (z cache, jeśli jest).
+ * 3. Pobiera LOGI operacji z 'magazynOsobistyLog'.
+ * 4. Renderuje obie tabele.
+ */
+async function loadAndRenderMagazyn() {
+    try {
+        // --- Krok 1: Pobierz główną listę produktów (jeśli trzeba) ---
+        if (produktyGlowneCache.size === 0) {
+            console.log("Moduł 4: Pobieranie głównej listy produktów (leki)...");
+            // Używamy cache 'cachedProducts' ładowanego przez Bazy Produktów
+            if (!cachedProducts) {
+                // Jeśli ktoś wszedł tu przed bazą produktów, wymuś załadowanie
+                await loadAndCacheProducts(); 
+            }
+            // Zbuduj mapę Nazwa -> ID (potrzebne do aktualizacji)
+            cachedProducts.forEach(p => {
+                produktyGlowneCache.set(p.nazwa, p.id);
+            });
+            console.log(`Moduł 4: Zbudowano cache produktów głównych (${produktyGlowneCache.size} pozycji).`);
+        }
+        
+        // --- Krok 2: Pobierz stany (z 'magazynCache', który załadował Moduł 3) ---
+        // Mamy je w 'magazynCache' (Map<ID_Produktu, {stan, ...}>)
+
+        // --- Krok 3: Pobierz logi (Dziennik Zdarzeń) ---
+        // (ID dokumentu konfiguracji, a NIE uid)
+        const logRef = db.collection("konfiguracja").doc(currentUserProfile.id).collection("magazynOsobistyLog");
+        const logSnapshot = await logRef.orderBy("data", "desc").get();
+        
+        magazynLogCache = logSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        console.log(`Moduł 4: Załadowano ${magazynLogCache.length} wpisów z dziennika.`);
+
+        // --- Krok 4: Renderuj tabele ---
+        renderMagazynTable();
+        renderMagazynLogTable();
+        
+        // Pokaż przyciski akcji (dla Modułu 5)
+        document.getElementById('magazynActionButtons').style.display = 'block';
+
+    } catch (error) {
+        console.error("Błąd podczas ładowania danych magazynu:", error);
+        if (error.code === 'failed-precondition') {
+             magazynLogTableBody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: red;">Błąd bazy danych. Wymagany jest indeks dla `magazynOsobistyLog` (po polu `data` malejąco).</td></tr>';
+        } else {
+             magazynTableBody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: red;">Wystąpił krytyczny błąd ładowania magazynu.</td></tr>';
+        }
+    }
+}
+
+/**
+ * Renderuje główną tabelę stanów magazynowych.
+ * Łączy dane z 'cachedProducts' (wszystkie produkty) i 'magazynCache' (stany).
+ */
+function renderMagazynTable() {
+    magazynTableBody.innerHTML = ''; // Wyczyść
+    
+    if (!cachedProducts) {
+        magazynTableBody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: red;">Błąd: Nie udało się wczytać głównej listy produktów.</td></tr>';
+        return;
+    }
+    
+    const filterText = magazynSearchInput.value.toLowerCase().trim();
+    const threeDaysAgo = new Date().getTime() - (3 * 24 * 60 * 60 * 1000);
+    
+    let productsToRender = [...cachedProducts]; // Pracuj na kopii
+    
+    // Sortowanie (A-Z domyślnie)
+    productsToRender.sort((a, b) => (a.nazwa || '').localeCompare(b.nazwa || '', 'pl'));
+
+    productsToRender.forEach(product => {
+        const nazwa = product.nazwa || 'Brak Nazwy';
+        const productId = product.id; // ID produktu z kolekcji 'leki'
+        
+        // Filtrowanie
+        if (filterText && !nazwa.toLowerCase().includes(filterText)) {
+            return; // Pomiń ten wiersz
+        }
+        
+        // Pobierz stan z cache (Moduł 3)
+        const stanData = magazynCache.get(productId);
+        
+        const aktualnyStan = stanData ? stanData.stan : 0;
+        let dataOperacji = '';
+        let ktoOperacji = '';
+        let iloscOperacji = '';
+        let typOperacji = '';
+        let highlightClass = '';
+
+        // Znajdź ostatnią operację DLA TEGO PRODUKTU w logach
+        const ostatniLogProduktu = magazynLogCache.find(log => 
+            log.zmiany && log.zmiany.some(z => z.id_produktu === productId)
+        );
+        
+        if (ostatniLogProduktu) {
+            const zmiana = ostatniLogProduktu.zmiany.find(z => z.id_produktu === productId);
+            dataOperacji = ostatniLogProduktu.data.toDate().toLocaleString('pl-PL');
+            ktoOperacji = ostatniLogProduktu.kto_nazwa;
+            iloscOperacji = zmiana.ilosc > 0 ? `+${zmiana.ilosc}` : zmiana.ilosc;
+            typOperacji = ostatniLogProduktu.typ;
+            
+            // Kolorowanie wiersza
+            if (ostatniLogProduktu.typ === 'doładowanie' && ostatniLogProduktu.data.toDate().getTime() > threeDaysAgo) {
+                highlightClass = 'highlight-recent';
+            }
+        }
+        
+        const tr = document.createElement('tr');
+        tr.className = highlightClass;
+        // Zapisujemy dane do sortowania
+        tr.dataset.nazwa = nazwa;
+        tr.dataset.stan = aktualnyStan;
+        tr.dataset.data = ostatniLogProduktu ? ostatniLogProduktu.data.toMillis() : 0;
+        tr.dataset.kto = ktoOperacji;
+        tr.dataset.ilosc = iloscOperacji;
+        tr.dataset.typ = typOperacji;
+        
+        tr.innerHTML = `
+            <td>${nazwa}</td>
+            <td style="text-align: center; font-weight: bold;">${aktualnyStan}</td>
+            <td>${dataOperacji}</td>
+            <td>${ktoOperacji}</td>
+            <td style="text-align: center; font-weight: 600;">${iloscOperacji}</td>
+            <td>${typOperacji}</td>
+        `;
+        magazynTableBody.appendChild(tr);
+    });
+}
+
+/**
+ * Renderuje tabelę z pełnym dziennikiem zdarzeń (logów).
+ */
+function renderMagazynLogTable() {
+    magazynLogTableBody.innerHTML = ''; // Wyczyść
+    
+    if (magazynLogCache.length === 0) {
+        magazynLogTableBody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 20px; color: #555;">Brak historii operacji magazynowych.</td></tr>';
+        return;
+    }
+    
+    magazynLogCache.forEach(log => {
+        const tr = document.createElement('tr');
+        tr.dataset.data = log.data.toMillis();
+        tr.dataset.kto = log.kto_nazwa;
+        tr.dataset.typ = log.typ;
+        
+        let typKlasa = `log-type-${log.typ}`; // np. log-type-doladowanie
+        
+        // Budowanie listy zmian
+        let zmianyHtml = '<ul class="log-details-list">';
+        (log.zmiany || []).forEach(z => {
+            const zmianaVal = z.ilosc > 0 ? `+${z.ilosc}` : z.ilosc;
+            zmianyHtml += `<li><strong>${z.nazwa_produktu}</strong>: ${zmianaVal} (z ${z.stan_przed} na ${z.stan_po})</li>`;
+        });
+        zmianyHtml += '</ul>';
+        
+        tr.innerHTML = `
+            <td>${log.data.toDate().toLocaleString('pl-PL')}</td>
+            <td>${log.kto_nazwa}</td>
+            <td class="${typKlasa}">${log.typ}</td>
+            <td>${zmianyHtml}</td>
+        `;
+        magazynLogTableBody.appendChild(tr);
+    });
+}
+
+// --- Listenery dla Filtrowania i Sortowania ---
+
+// Filtr
+if (magazynSearchInput) {
+    magazynSearchInput.addEventListener('input', renderMagazynTable);
+}
+
+// Sortowanie (podpinamy się pod obie tabele naraz)
+document.querySelectorAll('#mojMagazynSection .sortable-table th[data-sort-key]').forEach(th => {
+    th.addEventListener('click', () => {
+        const table = th.closest('.sortable-table');
+        // Używamy funkcji 'sortTable', którą już masz (dla Archiwum)
+        if (typeof sortTable === 'function') {
+            sortTable(table, th);
+        } else {
+            console.error("Błąd: Funkcja sortTable() nie znaleziona.");
+        }
+    });
+});
+/* ======================================================== */
+/* ✅ KONIEC: MODUŁ 4 - Logika "Mój Magazyn" */
 /* ======================================================== */
 </script> 
 
