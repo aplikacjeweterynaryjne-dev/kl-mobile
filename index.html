@@ -5070,9 +5070,16 @@ if (saveCardToArchiveBtn) {
         const klient = document.getElementById('klientSelect').value;
         const nrDok = document.getElementById('nrDokumentu').value;
         if (!klient || !nrDok) {
-            showToast("Wypełnij pola 'Klient' i 'Nr Dokumentu'", 'error');
-            return;
-        }
+            showToast("Wypełnij pola 'Klient' i 'Nr Dokumentu'", 'error');
+            return;
+        }
+
+        // ✅ POCZĄTEK MODUŁU 7: Blokada zapisu przy błędzie stanu
+        if (!isCardStockValid) {
+            showToast("Nie można zapisać karty. Wykryto błędy w stanach magazynowych (czerwone pola).", "error", 4000);
+            return;
+        }
+        // ✅ KONIEC MODUŁU 7
 
         console.log("Rozpoczynanie zapisu karty do archiwum...");
         saveCardToArchiveBtn.disabled = true;
