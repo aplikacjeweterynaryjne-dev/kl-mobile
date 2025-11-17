@@ -2632,7 +2632,19 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
             </div>
             <button id="pluBtn" class="btn small">PLU</button>
        </div>
-        
+        <div style="margin-top: 15px; display: flex; gap: 10px; align-items: flex-end; border-top: 1px dashed #ccc; padding-top: 15px;">
+    <div style="flex-grow: 1;">
+        <label for="correctionNameInput" style="font-size: 19px !important;"><strong>Opis korekty (np. Rabat):</strong></label><br>
+        <input type="text" id="correctionNameInput" style="font-size: 18px; padding: 10px 8px; width: 100%; box-sizing: border-box;" placeholder="Opis...">
+    </div>
+    <div style="flex-shrink: 0;">
+        <label for="correctionAmountInput" style="font-size: 19px !important;"><strong>Kwota (+/-):</strong></label><br>
+        <input type="number" id="correctionAmountInput" step="0.01" style="font-size: 18px; padding: 10px 5px; width: 100px;" placeholder="0.00">
+    </div>
+    <div style="flex-shrink: 0;">
+        <button id="addCorrectionBtn" class="btn small">Dodaj korektę</button>
+    </div>
+</div>
     </div> </div>
         
     <div id="paymentStatusSection" style="margin-top: 20px; border-top: 1px solid #eee; padding-top: 15px;">
@@ -5996,6 +6008,11 @@ const savedReceiptSummary = document.getElementById('savedReceiptSummary');
 const pluCodeInput = document.getElementById('pluCodeInput');
 const pluBtn = document.getElementById('pluBtn');
 const productUnitDisplay = document.getElementById('productUnitDisplay');
+    // ✅ POCZĄTEK MODUŁU KOREKTY
+const correctionAmountInput = document.getElementById('correctionAmountInput');
+const correctionNameInput = document.getElementById('correctionNameInput');
+const addCorrectionBtn = document.getElementById('addCorrectionBtn');
+// ✅ KONIEC MODUŁU KOREKTY
     const calcNotatkaInput = document.getElementById('calcNotatkaInput'); // ✅ ZADANIE 2
 // Tablica przechowuje teraz { name: '...', quantity: 1, price: 10.50 }
     // ✅ Moduł 2: Zmienne statusu płatności
@@ -6158,7 +6175,35 @@ if (quantityInput) quantityInput.value = '';
 } else { alert('Wybierz produkt i podaj poprawną ilość.'); }
 });
 }
+// ✅ POCZĄTEK MODUŁU KOREKTY: Listener przycisku
+if (addCorrectionBtn) {
+    addCorrectionBtn.addEventListener('click', () => {
+        const amount = parseFloat(correctionAmountInput.value) || 0;
+        let name = correctionNameInput.value.trim();
 
+        if (amount === 0) {
+            showToast("Wpisz kwotę korekty (np. -50 lub 20).", "error");
+            correctionAmountInput.focus();
+            return;
+        }
+
+        // Jeśli użytkownik nie podał nazwy, nadaj domyślną
+        if (!name) {
+            name = (amount > 0) ? "Dodatkowa opłata" : "Rabat";
+        }
+
+        // Używamy istniejącej funkcji 'addItemToReceipt'
+        // Dodajemy korektę jako produkt z ilością 1 i ceną równą kwocie korekty
+        addItemToReceipt(name, 1, amount);
+
+        // Wyczyść pola
+        correctionAmountInput.value = '';
+        correctionNameInput.value = '';
+
+        showToast(`Dodano korektę: ${name} (${formatPrice(amount)})`, 'success');
+    });
+}
+// ✅ KONIEC MODUŁU KOREKTY
 // Kopiowanie z karty leczenia (używa addItemToReceipt)
 /* Plik: index.html (zastąp cały blok copyCheckbox, ok. linii 1397) */
 
