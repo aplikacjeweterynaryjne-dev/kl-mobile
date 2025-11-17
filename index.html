@@ -6487,14 +6487,16 @@ if(refreshClientsBtn) refreshClientsBtn.style.display = 'inline-block';
         if (!currentUserProfile) return;
         schemaListContainer.innerHTML = '<p style="text-align:center; color:#888;">Wczytywanie schematów... ⏳</p>';
 
-      try {
+    try {
+            // 1. ZMIANA: Usunięto .orderBy("rozpoznanie") z zapytania
             const q = db.collection("schematyLeczenia")
-                .where("lekarz_uid", "==", currentUserProfile.uid)
-                .orderBy("rozpoznanie");
+                .where("lekarz_uid", "==", currentUserProfile.uid);
 
             const snapshot = await q.get();
             cachedSchemas = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-
+            
+            // 2. DODANO: Sortowanie po stronie klienta (JavaScript)
+            cachedSchemas.sort((a, b) => (a.rozpoznanie || '').localeCompare(b.rozpoznanie || '', 'pl'));
             // Zbuduj mapę dla szybkiego dostępu (Klucz: nazwa rozpoznania)
             cachedSchemaMap.clear();
             cachedSchemas.forEach(schema => {
