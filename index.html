@@ -4525,21 +4525,39 @@ if (printFormatCancel) {
 
 // 3. Listener dla przycisku "A4" (uruchamia starą logikę)
 if (printFormatA4) {
-    printFormatA4.addEventListener('click', () => {
-        printFormatModal.style.display = 'none'; // Ukryj modal
+    // 3. Listener dla przycisku "A4" (uruchamia starą logikę)
+if (printFormatA4) {
+    printFormatA4.addEventListener('click', () => {
         
-        console.log("Drukowanie w formacie A4...");
-        // Uruchom starą logikę drukowania A4
-        document.body.classList.add('print-mode-karta');
-        setTimeout(() => { window.print(); }, 100);
-        setTimeout(() => { document.body.classList.remove('print-mode-karta'); }, 1000);
-    });
+        // ✅ POCZĄTEK MODUŁU 7: Blokada druku
+        if (!isCardStockValid) {
+            showToast("Nie można drukować karty. Wykryto błędy w stanach magazynowych (czerwone pola).", "error", 4000);
+            printFormatModal.style.display = 'none'; // Ukryj modal wyboru
+            return;
+        }
+        // ✅ KONIEC MODUŁU 7
+        
+        printFormatModal.style.display = 'none'; // Ukryj modal
+        
+        console.log("Drukowanie w formacie A4...");
+        // Uruchom starą logikę drukowania A4
+        document.body.classList.add('print-mode-karta');
+        setTimeout(() => { window.print(); }, 100);
+        setTimeout(() => { document.body.classList.remove('print-mode-karta'); }, 1000);
+    });
 }
 
 // ⬇️ ⬇️ ⬇️ WKLEJ TEN NOWY BLOK W MIEJSCE STAREGO ⬇️ ⬇️ ⬇️
 
 if (printFormat110 && receiptPrintContainer) {
     printFormat110.addEventListener('click', () => {
+        // ✅ POCZĄTEK MODUŁU 7: Blokada druku
+        if (!isCardStockValid) {
+            showToast("Nie można drukować karty. Wykryto błędy w stanach magazynowych (czerwone pola).", "error", 4000);
+            printFormatModal.style.display = 'none'; // Ukryj modal wyboru
+            return;
+        }
+        // ✅ KONIEC MODUŁU 7
         printFormatModal.style.display = 'none'; // 1. Ukryj modal wyboru
         showToast('Otwieranie podglądu 110mm...', 'info', 1500);
 
@@ -5070,9 +5088,16 @@ if (saveCardToArchiveBtn) {
         const klient = document.getElementById('klientSelect').value;
         const nrDok = document.getElementById('nrDokumentu').value;
         if (!klient || !nrDok) {
-            showToast("Wypełnij pola 'Klient' i 'Nr Dokumentu'", 'error');
-            return;
-        }
+            showToast("Wypełnij pola 'Klient' i 'Nr Dokumentu'", 'error');
+            return;
+        }
+
+        // ✅ POCZĄTEK MODUŁU 7: Blokada zapisu przy błędzie stanu
+        if (!isCardStockValid) {
+            showToast("Nie można zapisać karty. Wykryto błędy w stanach magazynowych (czerwone pola).", "error", 4000);
+            return;
+        }
+        // ✅ KONIEC MODUŁU 7
 
         console.log("Rozpoczynanie zapisu karty do archiwum...");
         saveCardToArchiveBtn.disabled = true;
