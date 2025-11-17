@@ -1911,6 +1911,20 @@ table {
 /* ======================================================== */
 /* ✅ KONIEC: MODUŁ 5 - Style */
 /* ======================================================== */
+/* ======================================================== */
+/* ✅ POCZĄTEK: MODUŁ 7 - Style Walidacji Stanu */
+/* ======================================================== */
+
+/* Czerwona ramka dla inputów z błędem stanu */
+#karta td input.stock-error {
+    border: 2px solid #c0392b !important;
+    background-color: #fdf2f2 !important;
+    box-shadow: 0 0 5px rgba(192, 57, 43, 0.5);
+}
+
+/* ======================================================== */
+/* ✅ KONIEC: MODUŁ 7 - Style */
+/* ======================================================== */
 </style>
     <div id="calcProductSearchModal" class="product-search-modal" style="display: none; z-index: 10003;">
     <div class="product-search-card">
@@ -6866,6 +6880,21 @@ console.log("Dane produktów zapisane w cache.");
 renderProductTable(cachedProducts);
 }
 // Po udanym załadowaniu i renderowaniu, odśwież globalne listy
+// ✅ POCZĄTEK MODUŁU 7: Budowanie map ID <-> Nazwa
+        produktyGlowneCache.clear();
+        productIDtoNameMap.clear();
+        if (cachedProducts) {
+            cachedProducts.forEach(p => {
+                if (p.id && p.nazwa) {
+                    produktyGlowneCache.set(p.nazwa, p.id); // Mapa Nazwa -> ID
+                    productIDtoNameMap.set(p.id, p.nazwa); // Mapa ID -> Nazwa
+                }
+            });
+        }
+        console.log(`Moduł 7: Zbudowano mapy produktów (ID <-> Nazwa): ${produktyGlowneCache.size} pozycji.`);
+        // ✅ KONIEC MODUŁU 7
+
+// Po udanym załadowaniu i renderowaniu, odśwież globalne listy
 refreshProductDataLists();
 
 } catch (error) {
@@ -10096,6 +10125,10 @@ let zarzadzanieMagazynLogCache = [];
 let zarzadzanieIsQuickTopUpMode = false;
 let zarzadzanieUzytkownicyCache = []; // Cache dla listy użytkowników
 // ✅ KONIEC MODUŁU 6
+// ✅ POCZĄTEK MODUŁU 7: Zmienne Walidacji
+let isCardStockValid = true; // Domyślnie zakładamy, że karta jest OK
+let productIDtoNameMap = new Map(); // Mapa ID -> Nazwa (potrzebna do komunikatów)
+// ✅ KONIEC MODUŁU 7
 // ✅ KONIEC MODUŁU 4
 const menuSchematyLeczeniaBtn = document.getElementById('menuSchematyLeczeniaBtn');
 const tabSchematyLeczeniaBtn = document.getElementById('tabSchematyLeczeniaBtn');
