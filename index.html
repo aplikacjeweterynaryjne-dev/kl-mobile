@@ -3703,6 +3703,7 @@ for (let j=1;j<=8;j++){
             nrCell.textContent = nr;
             iloscCell.innerHTML = `<input class="small-input" type="number" inputmode="numeric" pattern="[0-9]*" placeholder="ilość"> ${dawka||''}`;
             karCell.textContent = kar;
+            if (typeof validateCardStock === 'function') validateCardStock();
         });
         cell.textContent = '';
         cell.appendChild(input);
@@ -13281,6 +13282,141 @@ function clearKalkulator() {
 
 /* ======================================================== */
 /* ✅ KONIEC: Logika czyszczenia "brudnych" formularzy      */
+/* ======================================================== */
+/* ======================================================== */
+/* ✅ POCZĄTEK: MODUŁ 7 - Logika Walidacji Stanu i Podglądu */
+/* ======================================================== */
+
+/**
+ * Główna funkcja walidująca stany magazynowe w Karcie Leczenia.
+ * Uruchamiana przy każdej zmianie produktu lub ilości.
+ */
+async function validateCardStock() {
+    // Krok 1: Sprawdź, czy magazyn jest w ogóle włączony dla tego usera
+    if (!currentUserProfile || !currentUserProfile.uzywaStanowMagazynowych) {
+        isCardStockValid = true; // Jeśli magazyn jest wyłączony, karta jest zawsze "poprawna"
+        return; 
+    }
+
+    console.log("Moduł 7: Uruchomiono walidację stanów magazynowych...");
+
+    // Krok 2: Zresetuj stan (zakładamy, że jest OK, dopóki nie znajdziemy błędu)
+    isCardStockValid = true;
+    let errorsFound = 0;
+    const requiredStock = new Map(); // Mapa: ProductID -> Wymagana Ilość
+    const allInputs = new Map(); // Mapa: ProductID -> Lista pol input[] do pokolorowania
+
+    const logicalRows = rowsEditable();
+
+    // Krok 3: Przejdź przez tabelę i zlicz zapotrzebowanie
+    logicalRows.forEach(row => {
+        const lekInput = row.cells[4].querySelector('input');
+        const iloscInput = row.cells[6].querySelector('input[type="number"]');
+
+        if (lekInput && iloscInput) {
+            const productName = lekInput.value.trim();
+            const quantity = parseFloat(iloscInput.value) || 0;
+
+            // Wyczyść stare błędy przy każdej walidacji
+            lekInput.classList.remove('stock-error');
+            iloscInput.classList.remove('stock-error');
+
+            if (productName && quantity > 0) {
+                const productId = produktyGlowneCache.get(productName);
+                if (productId) {
+                    // Zlicz zapotrzebowanie
+                    const currentRequired = requiredStock.get(productId) || 0;
+                    requiredStock.set(productId, currentRequired + quantity);
+
+                    // Zapisz pola input do pokolorowania
+                    if (!allInputs.has(productId)) {
+                        allInputs.set(productId, []);
+                    }
+                    allInputs.get(productId).push(lekInput, iloscInput);
+                }
+                // Jeśli nie ma productId (np. produkt spoza bazy), to ignorujemy - nie da się walidować
+            }
+        }
+    });
+
+    if (requiredStock.size === 0) {
+        console.log("Moduł 7: Karta jest pusta lub nie używa produktów. Walidacja OK.");
+        return; // Karta pusta, nic do roboty
+    }
+
+    // Krok 4: Porównaj zapotrzebowanie z cache magazynu
+    for (const [productId, neededQty] of requiredStock.entries()) {
+        const stockData = magazynCache.get(productId);
+        const availableQty = stockData ? (stockData.stan || 0) : 0;
+
+        const productName = productIDtoNameMap.get(productId) || "Nieznany Produkt";
+
+        if (neededQty > availableQty) {
+            // Mamy błąd!
+            isCardStockValid = false; // Ustaw flagę globalną
+            errorsFound++;
+            console.warn(`Moduł 7: BŁĄD STANU! Produkt: [${productName}], Potrzeba: ${neededQty}, Dostępne: ${availableQty}`);
+
+            // Pokoloruj wszystkie pola związane z tym produktem
+            const inputsToFlag = allInputs.get(productId);
+            if (inputsToFlag) {
+                inputsToFlag.forEach(input => input.classList.add('stock-error'));
+            }
+        }
+    }
+
+    if (errorsFound > 0) {
+         showToast(`Wykryto ${errorsFound} poz. z niewystarczającym stanem magazynowym!`, "error");
+    } else {
+        console.log("Moduł 7: Walidacja zakończona pomyślnie. Stany się zgadzają.");
+    }
+}
+
+/**
+ * Pokazuje stan magazynowy produktu po dwukliku.
+ */
+async function showStockOnDoubleClick(event) {
+    // Sprawdź, czy magazyn jest włączony
+    if (!currentUserProfile || !currentUserProfile.uzywaStanowMagazynowych) {
+        return; 
+    }
+
+    const targetCell = event.target.closest('td');
+
+    // Sprawdź, czy to komórka produktu (indeks 4) lub ilości (indeks 6)
+    if (!targetCell || (targetCell.cellIndex !== 4 && targetCell.cellIndex !== 6)) {
+        return;
+    }
+
+    try {
+        const row = targetCell.closest('tr');
+        const lekInput = row.cells[4].querySelector('input');
+        const productName = lekInput ? lekInput.value.trim() : null;
+
+        if (!productName) {
+            showToast("Najpierw wybierz produkt, aby sprawdzić jego stan.", "info");
+            return;
+        }
+
+        const productId = produktyGlowneCache.get(productName);
+        if (!productId) {
+             // Produktu nie ma na liście = nie ma go w magazynie
+             showToast(`Stan magazynowy dla [${productName}]: 0 szt. (Produkt spoza bazy)`, "info", 2000);
+             return;
+        }
+
+        const stockData = magazynCache.get(productId);
+        const availableQty = stockData ? (stockData.stan || 0) : 0;
+
+        showToast(`Stan magazynowy dla [${productName}]: ${availableQty} szt.`, "info", 2000);
+
+    } catch (e) {
+        console.error("Błąd podglądu stanu magazynowego:", e);
+    }
+}
+
+/* ======================================================== */
+/* ✅ KONIEC: MODUŁ 7 - Logika Walidacji Stanu i Podglądu */
 /* ======================================================== */
 /* ======================================================== */
 /* ✅ POCZĄTEK: MODUŁ 3.2/3.3 - POPRAWIONA Funkcja drukowania paragonu */
