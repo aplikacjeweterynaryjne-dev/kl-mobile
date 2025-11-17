@@ -1,15 +1,14 @@
-// 🔒 Nazwa pamięci podręcznej (zmieniona na v87, aby wymusić aktualizację)
-const CACHE_NAME = 'karta-leczenia-cache-v87';
+// 🔒 Nazwa pamięci podręcznej (zmieniona na v88, aby wymusić aktualizację)
+const CACHE_NAME = 'karta-leczenia-cache-v88';
 
 // 📦 Lista plików do zapamiętania offline (tzw. App Shell)
 const urlsToCache = [
   '/',
   '/index.html',
   '/manifest.json',
-  '/logo.jpg', // ❗️ DODANY BRAKUJĄCY PLIK
+  '/logo.jpg', 
 
   // --- Zasoby zewnętrzne (CDN) ---
-  // Muszą być na liście, aby aplikacja działała offline
   'https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&display=swap',
   'https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css'
 ];
@@ -17,13 +16,11 @@ const urlsToCache = [
 
 // ⚙️ Instalacja Service Workera
 self.addEventListener('install', event => {
-  console.log('[Service Worker] Instalacja (v87)...');
+  console.log('[Service Worker] Instalacja (v88)...');
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => {
         console.log('[Service Worker] Otworzono cache i dodano pliki');
-        // Używamy .addAll(), aby pobrać wszystkie kluczowe zasoby
-        // Jeśli którykolwiek zawiedzie, instalacja się nie powiedzie, co jest dobre
         return cache.addAll(urlsToCache);
       })
       .then(() => self.skipWaiting()) // Wymuś aktywację nowej wersji
@@ -32,7 +29,7 @@ self.addEventListener('install', event => {
 
 // ♻️ Aktywacja — czyszczenie starych cache
 self.addEventListener('activate', event => {
-  console.log('[Service Worker] Aktywacja (v87)...');
+  console.log('[Service Worker] Aktywacja (v88)...');
   event.waitUntil(
     caches.keys().then(cacheNames => {
       return Promise.all(
@@ -64,7 +61,8 @@ self.addEventListener('fetch', event => {
           if (networkResponse && networkResponse.status === 200) {
             // Musimy sklonować odpowiedź, bo można ją odczytać tylko raz
             const responseToCache = networkResponse.clone();
-  T           caches.open(CACHE_NAME).then(cache => {
+            // ❗️ POPRAWIONA LINIA (usunięta litera 'T') ❗️
+            caches.open(CACHE_NAME).then(cache => {
               cache.put(event.request, responseToCache);
             });
           }
@@ -75,7 +73,6 @@ self.addEventListener('fetch', event => {
         // W przypadku błędu sieci (np. offline) można zwrócić stronę zastępczą
         // Na razie po prostu logujemy błąd
         console.error('[Service Worker] Błąd pobierania:', error);
-        // Możesz tu zwrócić np. stronę offline.html, jeśli ją masz
       })
   );
 });
