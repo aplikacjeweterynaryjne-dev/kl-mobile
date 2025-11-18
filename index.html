@@ -2007,37 +2007,6 @@ table {
 /* ======================================================== */
 /* ✅ KONIEC: KOREKTA 2 */
 /* ======================================================== */
-/* ======================================================== */
-/* ✅ KOREKTA: Usunięcie "wielkiego odstępu" w Raporcie */
-/* ======================================================== */
-
-/* 1. Zmniejsz margines dolny całego nagłówka podsumowania */
-.report-summary-header {
-    margin-bottom: 0 !important;
-    padding-bottom: 0 !important;
-}
-
-/* 2. Zmniejsz margines dolny szarego pudełka z sumami */
-.report-summary-header > div {
-    margin-bottom: 5px !important; 
-}
-
-/* 3. Usuń margines górny kontenera tabeli (to on często robi odstęp) */
-#reportWizytyTableContainer, 
-#reportZuzyciaTableContainer {
-    margin-top: 5px !important; /* Tylko 5px odstępu */
-}
-
-/* 4. Upewnij się, że pole paliwa nie rozpycha kontenera w pionie */
-#reportFuelSection {
-    margin: 0 !important;
-    padding: 0 !important;
-}
-#reportFuelCost {
-    margin: 0 5px !important; /* Mały margines tylko po bokach */
-}
-
-/* ======================================================== */
 </style>
     <div id="calcProductSearchModal" class="product-search-modal" style="display: none; z-index: 10003;">
     <div class="product-search-card">
@@ -10465,24 +10434,22 @@ let reportClientsLoaded = false;
  * Wywoływana przy każdym wejściu do sekcji Raporty.
  * Ładuje listy lekarzy i klientów do filtrów.
  */
-/**
- * Wywoływana przy każdym wejściu do sekcji Raporty.
- * Ładuje listy lekarzy i klientów do filtrów.
- */
 function onShowRaporty() {
-    console.log("Wejście do sekcji Raporty. Ładowanie filtrów...");
-    if (!reportUsersLoaded) {
-        loadReportUsers();
-    }
-    if (!reportClientsLoaded) {
-        loadReportClients();
-    }
-    
-    // ✅ ZMIANA: Ustaw domyślne daty na DZISIAJ
-    const today = new Date().toISOString().split('T')[0];
-    
-    if (!reportDateStart.value) reportDateStart.value = today;
-    if (!reportDateEnd.value) reportDateEnd.value = today;
+    console.log("Wejście do sekcji Raporty. Ładowanie filtrów...");
+    if (!reportUsersLoaded) {
+        loadReportUsers();
+    }
+    if (!reportClientsLoaded) {
+        loadReportClients();
+    }
+    
+    // Ustaw domyślne daty (np. bieżący miesiąc)
+    const today = new Date();
+    const firstDay = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
+    const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0).toISOString().split('T')[0];
+    
+    if (!reportDateStart.value) reportDateStart.value = firstDay;
+    if (!reportDateEnd.value) reportDateEnd.value = lastDay;
 }
 
 /**
@@ -10677,111 +10644,100 @@ async function fetchReceiptsForReport(dateStart, dateEnd, userId) {
 /**
  * Generuje Raporty Wizyt (Typ 1, 2, 3)
  */
-/**
- * Generuje Raporty Wizyt (Typ 1, 2, 3)
- * ZMIANA: Raport gotówki pokazuje WSZYSTKO, ale sumuje tylko ZAPŁACONE.
- */
 function generateWizytyReport(allReceipts, filters) {
-    console.log("Generowanie raportu wizyt...");
-    
-    // --- 1. Filtrowanie w JavaScript ---
-    let filteredReceipts = [...allReceipts];
+    console.log("Generowanie raportu wizyt...");
+    
+    // --- 1. Filtrowanie w JavaScript ---
+    let filteredReceipts = [...allReceipts];
 
-    // Filtr Klienta
-    if (filters.klient) {
-        filteredReceipts = filteredReceipts.filter(r => r.klient === filters.klient);
-    }
+    // Filtr Klienta
+    // Filtr Klienta
+    if (filters.klient) { // ✅ ZMIANA: Filtruj tylko jeśli pole 'klient' nie jest puste
+        filteredReceipts = filteredReceipts.filter(r => r.klient === filters.klient);
+    }
 
-    // Konfiguracja tytułów
-    let reportTitle = "Raport Ogólny";
-    let sumTitle = "Suma wszystkich wizyt";
-    
-    if (filters.type === "gotowka") {
-        // ✅ ZMIANA: NIE filtrujemy listy (chcemy widzieć wszystko)
-        reportTitle = "Raport Przyjętej Gotówki";
-        sumTitle = "Suma przyjętej gotówki";
-    } else if (filters.type === "dluznicy") {
-        // Dla dłużników nadal filtrujemy listę (pokazujemy tylko długi)
-        filteredReceipts = filteredReceipts.filter(r => r.status === "Dług");
-        reportTitle = "Raport Dłużników";
-        sumTitle = "Suma zadłużenia";
-    }
-    // Dla "ogolny" nie filtrujemy statusu
+    // Filtr Statusu (w zależności od typu raportu)
+    let reportTitle = "Raport Ogólny";
+    let sumTitle = "Suma wszystkich wizyt";
+    
+    if (filters.type === "gotowka") {
+        filteredReceipts = filteredReceipts.filter(r => r.status === "Zapłacone");
+        reportTitle = "Raport Przyjętej Gotówki";
+        sumTitle = "Suma przyjętej gotówki";
+    } else if (filters.type === "dluznicy") {
+        filteredReceipts = filteredReceipts.filter(r => r.status === "Dług");
+        reportTitle = "Raport Dłużników";
+        sumTitle = "Suma zadłużenia";
+    }
+    // Dla "ogolny" nie filtrujemy statusu
 
-    // --- 2. Obliczanie sumy i budowanie tabeli ---
-    let totalSum = 0;
-    let tableHtml = '';
+    // --- 2. Obliczanie sumy i budowanie tabeli ---
+    let totalSum = 0;
+    let tableHtml = '';
 
-    filteredReceipts.sort((a, b) => a.data.localeCompare(b.data)); // Sortuj po dacie
+    filteredReceipts.sort((a, b) => a.data.localeCompare(b.data)); // Sortuj po dacie
 
-    for (const receipt of filteredReceipts) {
-        const suma = parseFloat(receipt.suma) || 0;
-        
-        // ✅ ZMIANA LOGIKI SUMOWANIA
-        if (filters.type === "gotowka") {
-            // W raporcie gotówkowym dodajemy do sumy TYLKO jeśli zapłacone
-            if (receipt.status === "Zapłacone") {
-                totalSum += suma;
-            }
-        } else {
-            // W innych raportach (ogólny, dłużnicy) sumujemy wszystko co jest na liście
-            totalSum += suma;
-        }
+    for (const receipt of filteredReceipts) {
+        const suma = parseFloat(receipt.suma) || 0;
+        totalSum += suma;
 
-        // Formatowanie kolumny "Zużycia"
-        let zuzyciaHtml = '';
-        if (receipt.pozycje && receipt.pozycje.length > 0) {
-            const produkty = receipt.pozycje.filter(p => p.name.toLowerCase() !== 'wyrównanie');
-            
-            if (produkty.length > 0) {
-                 zuzyciaHtml = '<ul style="margin: 0; padding-left: 18px; font-size: 12px; color: #333;">';
-                for (const item of produkty) {
-                    zuzyciaHtml += `<li>${item.name} - ${item.quantity}</li>`;
-                }
-                zuzyciaHtml += '</ul>';
-            }
-        }
-        
-        // Status płatności (kolorowanie)
-        const statusColor = receipt.status === "Zapłacone" ? "green" : (receipt.status === "Dług" ? "red" : "#555");
-        const notatka = receipt.notatka || '';
+        // Formatowanie kolumny "Zużycia"
+        let zuzyciaHtml = '';
+        if (receipt.pozycje && receipt.pozycje.length > 0) {
+            // Filtrujemy, aby pokazać tylko produkty (bez "Wyrównanie")
+            const produkty = receipt.pozycje.filter(p => p.name.toLowerCase() !== 'wyrównanie');
+            
+            if (produkty.length > 0) {
+                 zuzyciaHtml = '<ul style="margin: 0; padding-left: 18px; font-size: 12px; color: #333;">';
+                for (const item of produkty) {
+                    zuzyciaHtml += `<li>${item.name} - ${item.quantity}</li>`;
+                }
+                zuzyciaHtml += '</ul>';
+            }
+        }
+        
+        // Status płatności (kolorowanie)
+        const statusColor = receipt.status === "Zapłacone" ? "green" : (receipt.status === "Dług" ? "red" : "#555");
+        const notatka = receipt.notatka || '';
 
-        // Budowanie wiersza
-        tableHtml += `
-            <tr data-klient="${receipt.klient}" data-data="${receipt.data}" data-czynnosci="${receipt.czynnosci || ''}" data-suma="${suma}" data-status="${receipt.status || ''}" data-notatka="${notatka}">
-                <td>${receipt.klient}</td>
-                <td>${receipt.data}</td>
-                <td>${receipt.czynnosci || ''}</td>
-                <td class="col-zuzycia">${zuzyciaHtml}</td>
-                <td style="text-align: right;">${formatPrice(suma)}</td>
-                <td style="color: ${statusColor}; font-weight: bold;">${receipt.status || 'Brak'}</td>
-                <td title="${notatka}">${notatka.substring(0, 30)}${notatka.length > 30 ? '...' : ''}</td>
-            </tr>
-        `;
-    }
+        // Budowanie wiersza
+        tableHtml += `
+            <tr data-klient="${receipt.klient}" data-data="${receipt.data}" data-czynnosci="${receipt.czynnosci || ''}" data-suma="${suma}" data-status="${receipt.status || ''}" data-notatka="${notatka}">
+                <td>${receipt.klient}</td>
+                <td>${receipt.data}</td>
+                <td>${receipt.czynnosci || ''}</td>
+                <td class="col-zuzycia">${zuzyciaHtml}</td>
+                <td style="text-align: right;">${formatPrice(suma)}</td>
+                <td style="color: ${statusColor}; font-weight: bold;">${receipt.status || 'Brak'}</td>
+                <td title="${notatka}">${notatka.substring(0, 30)}${notatka.length > 30 ? '...' : ''}</td>
+            </tr>
+        `;
+    }
 
-    // --- 3. Aktualizacja widoku (DOM) ---
-    reportWizytyTableBody.innerHTML = tableHtml || '<tr><td colspan="7" style="text-align: center; padding: 20px;">Brak danych dla wybranych filtrów.</td></tr>';
-    
-    // Pokaż/Ukryj tabele
-    reportWizytyTableContainer.style.display = 'block';
-    reportZuzyciaTableContainer.style.display = 'none';
-    
-    // Pokaż/Ukryj pole paliwa i sumę netto
-    const isCashReport = (filters.type === "gotowka");
-    reportFuelSection.style.display = isCashReport ? 'flex' : 'none';
-    reportNetSumContainer.style.display = isCashReport ? 'inline' : 'none';
+    // --- 3. Aktualizacja widoku (DOM) ---
+    reportWizytyTableBody.innerHTML = tableHtml || '<tr><td colspan="7" style="text-align: center; padding: 20px;">Brak danych dla wybranych filtrów.</td></tr>';
+    
+    // Pokaż/Ukryj tabele
+    reportWizytyTableContainer.style.display = 'block';
+    reportZuzyciaTableContainer.style.display = 'none';
+    
+    // Pokaż/Ukryj pole paliwa i sumę netto
+    const isCashReport = (filters.type === "gotowka");
+    reportFuelSection.style.display = isCashReport ? 'flex' : 'none';
+    reportNetSumContainer.style.display = isCashReport ? 'inline' : 'none'; // 'inline' lub 'block'
 
-    // Aktualizuj podsumowanie
-    reportMainTitle.textContent = reportTitle;
-    reportDateDisplay.textContent = `Raport zawiera wizyty od: ${filters.dateStart} do: ${filters.dateEnd}`;
-    reportUserDisplay.textContent = `Pracownik: ${filters.userName}`;
-    reportSumTitle.textContent = `${sumTitle}:`;
-    reportCalculatedSum.textContent = formatPrice(totalSum);
-    
-    // Zaktualizuj sumę netto
-    reportFuelCost.value = 0; // Zresetuj koszty
-    updateNetSum(totalSum);
+    // Aktualizuj podsumowanie
+
+    // Aktualizuj podsumowanie
+    reportMainTitle.textContent = reportTitle;
+    reportDateDisplay.textContent = `Raport zawiera wizyty od: ${filters.dateStart} do: ${filters.dateEnd}`;
+    reportUserDisplay.textContent = `Pracownik: ${filters.userName}`;
+    reportSumTitle.textContent = `${sumTitle}:`; // Usunięto tekst o tankowaniu
+    reportCalculatedSum.textContent = formatPrice(totalSum);
+    
+    // Zaktualizuj sumę netto
+    reportFuelCost.value = 0; // Zresetuj koszty
+    updateNetSum(totalSum);
 }
 
 /**
@@ -15002,25 +14958,28 @@ if (adminZarzadzajBtn) {
     });
 }
     /* ======================================================== */
-/* ======================================================== */
 /* ✅ KOREKTA: Funkcja otwierająca podgląd wydruku Raportu */
 /* ======================================================== */
 function openReportPrintWindow() {
     console.log("Otwieranie okna podglądu raportu...");
-    
+
+    // 1. Pobierz zawartość HTML wygenerowanego raportu
     const reportContentEl = document.getElementById('reportResultArea');
     if (!reportContentEl) {
-        showToast("Błąd: Nie znaleziono treści raportu.", "error");
+        showToast("Błąd: Nie znaleziono treści raportu (reportResultArea).", "error");
         return;
     }
+    // Pobieramy "wewnętrzny" HTML, aby uniknąć zagnieżdżenia
     const reportHTML = reportContentEl.innerHTML;
-    
+
+    // 2. Otwórz nowe okno
     const printWindow = window.open('', '_blank', 'width=800,height=700,scrollbars=yes,resizable=yes');
     if (!printWindow) {
-        showToast('Nie udało się otworzyć nowego okna.', 'error');
+        showToast('Nie udało się otworzyć nowego okna. Wyłącz blokowanie wyskakujących okienek.', 'error');
         return;
     }
 
+    // 3. Wygeneruj pełny HTML dla nowego okna
     printWindow.document.write(`
         <!DOCTYPE html>
         <html lang="pl">
@@ -15031,12 +14990,16 @@ function openReportPrintWindow() {
             <style>
                 body { 
                     font-family: 'Nunito', sans-serif; 
-                    margin: 0; padding: 0; background-color: #f0f0f0; 
+                    margin: 0; 
+                    padding: 0; 
+                    background-color: #f0f0f0; 
                 }
-                
-                /* Kontrolki */
+
+                /* Kontrolki (Drukuj/Zamknij) - nie do druku */
                 .print-controls {
-                    padding: 10px; text-align: center; background-color: #333;
+                    padding: 10px; 
+                    text-align: center; 
+                    background-color: #333;
                     position: sticky; top: 0; z-index: 100;
                 }
                 .print-controls button {
@@ -15044,80 +15007,58 @@ function openReportPrintWindow() {
                     cursor: pointer; border-radius: 6px; border: 1px solid #777;
                     font-family: 'Nunito', sans-serif; font-weight: 600;
                 }
-                .print-controls .print-btn { background-color: #4CAF50; color: white; }
-                .print-controls .close-btn { background-color: #f44336; color: white; }
-                
-                /* Kartka A4 */
+                .print-controls .print-btn { background-color: #4CAF50; color: white; border-color: #388E3C;}
+                .print-controls .close-btn { background-color: #f44336; color: white; border-color: #D32F2F;}
+
+                /* "Kartka" A4 do podglądu */
                 .page-preview {
-                    width: 210mm; min-height: 297mm; 
-                    padding: 1cm; margin: 20px auto; 
+                    width: 210mm; /* Szerokość A4 */
+                    min-height: 297mm; /* Wysokość A4 (orientacyjna) */
+                    padding: 1cm; /* Marginesy jak na wydruku */
+                    margin: 20px auto; 
                     background-color: #ffffff; 
-                    box-sizing: border-box;
                     box-shadow: 0 0 10px rgba(0,0,0,0.15);
+                    box-sizing: border-box;
                 }
 
-                /* --- ⬇️ AGRESYWNA KOREKTA ODSTĘPÓW ⬇️ --- */
-
-                /* 1. Zresetuj główny kontener nagłówka */
-                .report-summary-header {
-                    display: block !important; /* Wyłącz flexa kontenera głównego */
-                    margin-bottom: 0 !important;
-                    padding-bottom: 0 !important;
-                    height: auto !important;
+                /* Style dla treści raportu (skopiowane z Twoich styli @media print) */
+                /* Upewniamy się, że wszystko w raporcie jest widoczne */
+                .report-summary-header div {
+                    background: none !important; padding: 0 !important; border: none !important;
+                    box-shadow: none !important;
                 }
+                /* Ukrywamy elementy, których nie chcesz na wydruku */
+               
 
-                /* 2. Zresetuj wewnętrzne divy (szare tło) */
-                .report-summary-header > div {
-                    margin: 0 !important;
-                    padding: 5px !important;
-                    display: block !important; /* Zmień na blok, aby elementy się nie rozjeżdżały */
-                    line-height: 1.1 !important;
+                table { 
+                    border-collapse: collapse; width: 100%; font-size: 10pt; 
+                    -webkit-print-color-adjust: exact; print-color-adjust: exact;
                 }
-
-                /* 3. Zresetuj wszystkie teksty w nagłówku */
-                .report-summary-header h3, 
-                .report-summary-header h4, 
-                .report-summary-header p {
-                    margin: 2px 0 !important; /* Minimalny odstęp między liniami tekstu */
-                    padding: 0 !important;
-                }
-
-                /* 4. Podciągnij tabelę maksymalnie do góry */
-                .table-container {
-                    margin-top: 5px !important; /* Tylko 5px odstępu od nagłówka */
-                    padding-top: 0 !important;
-                }
-                table { margin-top: 0 !important; }
-
-                /* 5. Ukryj puste elementy, które mogą robić odstęp */
-                .report-summary-header:empty,
-                #reportFuelSection[style*="none"],
-                #reportNetSumContainer[style*="none"] {
-                    display: none !important;
-                    margin: 0 !important;
-                    padding: 0 !important;
-                    height: 0 !important;
-                }
-
-                /* --- Koniec korekty --- */
-
-                /* Style tabeli */
-                table { border-collapse: collapse; width: 100%; font-size: 10pt; }
                 th, td { 
                     border: 1px solid #ddd; padding: 4px; text-align: left; 
-                    white-space: nowrap; 
+                    white-space: nowrap; word-break: keep-all; /* Zachowaj style tabeli raportów */
                 }
-                th { background: #f2f2f2 !important; }
-                #reportWizytyTable .col-zuzycia ul { margin: 0; padding-left: 18px; font-size: 10pt; }
+                th { background: #f2f2f2 !important; } /* Wymuś tło nagłówków */
+                #reportWizytyTable .col-zuzycia ul { 
+                    margin: 0; padding-left: 18px; font-size: 10pt; 
+                }
 
+                /* Style dla samego wydruku (z nowego okna) */
                 @media print {
                     body { background-color: #ffffff !important; }
                     .print-controls { display: none !important; }
                     .page-preview {
-                        width: 100% !important; margin: 0 !important; padding: 0 !important;
+                        width: 100% !important;
+                        min-height: unset !important;
+                        margin: 0 !important;
+                        padding: 0 !important;
                         box-shadow: none !important;
                     }
-                    @page { size: A4 portrait; margin: 1cm; }
+                    /* Ustawienia strony (rozwiązuje problem marginesów na mobilkach) */
+                    @page {
+                        size: A4 portrait; /* Wymuś portret */
+                        margin: 1cm; /* Ustaw marginesy strony */
+                    }
                 }
             </style>
         </head>
@@ -15132,10 +15073,13 @@ function openReportPrintWindow() {
         </body>
         </html>
     `);
-    
+
     printWindow.document.close();
     printWindow.focus();
 }
+/* ======================================================== */
+/* ✅ KONIEC: KOREKTA - Funkcja drukowania Raportu */
+/* ======================================================== */
 </script> 
 
 <div id="toastContainer" style="position: fixed; top: 20px; right: 20px; z-index: 20000; display: flex; flex-direction: column; gap: 10px;">
