@@ -6497,7 +6497,20 @@ async function saveReceiptToArchive(receiptData) {
  * Główna funkcja wykonująca zapis do archiwum i wywołująca akcje.
  * @param {boolean} shouldPrint - Czy po zapisie należy otworzyć okno druku.
  */
+/* ======================================================== */
+/* ✅ MODUŁ 4: Logika Transakcji Zapisu i Druku */
+/* ======================================================== */
+
+/**
+ * Główna funkcja wykonująca zapis do archiwum i wywołująca akcje.
+ * @param {boolean} shouldPrint - Czy po zapisie należy otworzyć okno druku.
+ */
 async function executeSaveReceiptTransaction(shouldPrint) {
+    // Ustawienie stanów przycisków
+    if (modalSaveAndCloseBtn) modalSaveAndCloseBtn.disabled = true;
+    if (modalSaveAndPrintBtn) modalSaveAndPrintBtn.disabled = true;
+    if (modalSaveAndCloseBtn) modalSaveAndCloseBtn.textContent = 'Zapisywanie...';
+
     // 1. Walidacja statusu płatności (przeniesiona z głównego przycisku)
     if (paymentStatusPaidBtn && paymentStatusDebtBtn &&
         !paymentStatusPaidBtn.classList.contains('active') &&
@@ -6508,22 +6521,17 @@ async function executeSaveReceiptTransaction(shouldPrint) {
         if (errorMsgEl) errorMsgEl.style.display = 'block';
         setTimeout(() => { if (errorMsgEl) errorMsgEl.style.display = 'none'; }, 3000);
         
-        saveReceiptOptionsModal.style.display = 'none'; // Zamknij modal opcji
+        if (saveReceiptOptionsModal) saveReceiptOptionsModal.style.display = 'none';
         return;
     }
 
     if (receiptItems.length === 0) {
         showToast('Paragon jest pusty, nie ma czego zapisywać.', 'error');
-        saveReceiptOptionsModal.style.display = 'none';
+        if (saveReceiptOptionsModal) saveReceiptOptionsModal.style.display = 'none';
         return;
     }
     
-    // Ustawienie stanów przycisków
-    modalSaveAndCloseBtn.disabled = true;
-    modalSaveAndPrintBtn.disabled = true;
-    modalSaveAndCloseBtn.textContent = 'Zapisywanie...';
-    
-    // --- 2. Pobranie danych do zapisu ---
+    // --- 2. Pobranie i sfinalizowanie danych do zapisu ---
     let statusText = "Nie wybrano statusu";
     if (paymentStatusPaidBtn && paymentStatusPaidBtn.classList.contains('active')) {
       statusText = paymentStatusPaidBtn.dataset.status; 
@@ -6535,10 +6543,8 @@ async function executeSaveReceiptTransaction(shouldPrint) {
         klient: calcKlientInput.value || 'Brak klienta',
         data: calcDataInput.value || new Date().toISOString().split('T')[0],
         nrDokumentu: calcNrDokInput.value || '',
-        // ✅ MODUŁ 5: Tryb korekty
-        isCorrection: document.getElementById('correctionModeCheckbox').checked || false,
+        isCorrection: document.getElementById('correctionModeCheckbox')?.checked || false,
         originalReceiptId: document.getElementById('correctionReceiptSelect')?.value || null, 
-        // ✅ KONIEC MODUŁU 5
         status: statusText,
         suma: receiptTotal,
         pozycje: receiptItems,
@@ -6546,9 +6552,9 @@ async function executeSaveReceiptTransaction(shouldPrint) {
         lekarz_nazwisko: currentUserProfile ? `${currentUserProfile.Imie} ${currentUserProfile.Nazwisko}` : 'Nieznany',
         id_lecznicy: currentUserProfile ? currentUserProfile['ID lecznicy'] : null,
         czynnosci: document.getElementById('calcCzynnosciInput').value || '',
-        notatka: calcNotatkaInput.value || '',
-        // ✅ DODANIE: Log korekty do Notatki (dla nadpisywania)
-        correctionLog: (document.getElementById('correctionModeCheckbox').checked) 
+        notatka: document.getElementById('calcNotatkaInput').value || '',
+        // Log korekty jest dodawany w Moduł 5
+        correctionLog: (document.getElementById('correctionModeCheckbox')?.checked) 
                        ? `Korekta paragonu z dnia: ${new Date().toLocaleDateString('pl-PL')}` 
                        : ''
     };
@@ -6560,55 +6566,29 @@ async function executeSaveReceiptTransaction(shouldPrint) {
 
         // --- 3. Akcje po zapisie ---
         if (shouldPrint) {
-            // Wyczyść modal, ale nie zamykaj okna druku od razu
-            saveReceiptOptionsModal.style.display = 'none';
-            
-            // Logika wydruku (używamy iframe, jak ustaliliśmy wcześniej)
-            await printReceiptSummary(receiptData);
-            
-            // Po wydruku: Wyczyść paragon i powróć do Kroku 1
-            clearKalkulator(); 
-            
-        } else {
-            // Zapisz i Zamknij
-            saveReceiptOptionsModal.style.display = 'none';
-            clearKalkulator(); 
+            // Logika wydruku (wywołana przed czyszczeniem)
+            // Używamy świeżo utworzonych danych 'receiptData' (BUG 3 FIX)
+            if (receiptData.pozycje && receiptData.pozycje.length > 0) {
+                 await printReceiptSummary(receiptData);
+            } else {
+                 showToast("Błąd: Brak pozycji do wydruku.", "error");
+            }
         }
+        
+        // Zapisz i Zamknij (w obu przypadkach: wydruk/bez druku)
+        clearKalkulator(); 
 
     } catch (error) {
         console.error("Błąd transakcji zapisu paragonu:", error);
         alert("Wystąpił błąd podczas zapisu. Sprawdź konsolę.");
-        saveReceiptOptionsModal.style.display = 'none';
     } finally {
-        modalSaveAndCloseBtn.disabled = false;
-        modalSaveAndPrintBtn.disabled = false;
-        modalSaveAndCloseBtn.textContent = '💾 Zapisz i Zamknij Paragon';
+        if (modalSaveAndCloseBtn) modalSaveAndCloseBtn.disabled = false;
+        if (modalSaveAndPrintBtn) modalSaveAndPrintBtn.disabled = false;
+        if (modalSaveAndCloseBtn) modalSaveAndCloseBtn.textContent = '💾 Zapisz i Zamknij Paragon';
+        if (saveReceiptOptionsModal) saveReceiptOptionsModal.style.display = 'none'; // Zawsze zamknij modal opcji
     }
 }
-
-// --- Podpięcie listenerów Modala ---
-if (modalCancelSaveBtn) {
-    modalCancelSaveBtn.addEventListener('click', () => {
-        saveReceiptOptionsModal.style.display = 'none';
-        showToast('Zapis anulowany.', 'info');
-    });
-}
-
-if (modalSaveAndCloseBtn) {
-    modalSaveAndCloseBtn.addEventListener('click', () => {
-        // Zapisz i Zamknij (bez drukowania)
-        executeSaveReceiptTransaction(false);
-    });
-}
-
-if (modalSaveAndPrintBtn) {
-    modalSaveAndPrintBtn.addEventListener('click', () => {
-        // Zapisz i Wydrukuj (z flagą drukowania)
-        executeSaveReceiptTransaction(true);
-    });
-}
 /* Plik: index.html (ok. linii 2623) */
-
 // ⬇️ ⬇️ ⬇️ POCZĄTEK MODUŁU 2 (Logika PLU) ⬇️ ⬇️ ⬇️
 // Obsługa PLU (Moduł 2 - Poprawiona logika)
 if (pluBtn) {
@@ -13736,54 +13716,53 @@ function clearKartaLeczenia() {
     showToast('Rozpoczęto nową kartę leczenia.', 'info');
 }
 
-/**
- * Czyści kompletnie formularz Kalkulatora Wizyty.
- */
+
 /**
  * Czyści kompletnie formularz Kalkulatora Wizyty (RESETUJĄC STAN UI).
  */
 function clearKalkulator() {
     console.log("Czyszczenie Kalkulatora Wizyty na żądanie użytkownika...");
 
-    // 1. Reset danych
+    // 1. Reset danych i pól formularza
     receiptItems = [];
-    receiptTotal = 0; // Upewnij się, że globalna suma jest zerowana
-    if (typeof renderReceipt === 'function') {
-        renderReceipt(); // Opróżnij paragon
-    }
-
-    // 2. Wyczyść pola nagłówka (Krok 1)
+    // Resetuj pola (Krok 1)
     if (calcKlientInput) calcKlientInput.value = '';
     if (calcCzynnosciInput) calcCzynnosciInput.value = '';
+    if (calcNrDokInput) calcNrDokInput.value = '';
+    // Resetuj pola (Krok 3)
     if (calcNotatkaInput) calcNotatkaInput.value = '';
     if (correctionNameInput) correctionNameInput.value = '';
     if (correctionAmountInput) correctionAmountInput.value = '';
-
-    // 3. Reset statusu i podsumowania
-    const paidRadio = document.getElementById('paymentStatusPaid');
-    const debtRadio = document.getElementById('paymentStatusDebt');
-    if (paidRadio) paidRadio.checked = false;
-    if (debtRadio) debtRadio.checked = false;
+    
+    // 2. Reset statusu (kluczowe!)
+    if (document.getElementById('paymentStatusPaid')) document.getElementById('paymentStatusPaid').classList.remove('active');
+    if (document.getElementById('paymentStatusDebt')) document.getElementById('paymentStatusDebt').classList.remove('active');
     if (savedReceiptSummary) savedReceiptSummary.innerHTML = '';
     
-    // 4. Reset trybu korekty (Moduł 5)
+    // 3. Reset trybu korekty
     if(document.getElementById('correctionModeCheckbox')) document.getElementById('correctionModeCheckbox').checked = false;
+    if(document.getElementById('correctionReceiptSelect')) document.getElementById('correctionReceiptSelect').innerHTML = '<option value="">-- Wybierz klienta, aby pobrać paragony --</option>';
     if(document.getElementById('correctionSelectContainer')) document.getElementById('correctionSelectContainer').style.display = 'none';
 
-    // 5. Wyczyść pole Nr Dokumentu i GENERUJ NOWY (Bug 4)
-    if (calcNrDokInput) calcNrDokInput.value = '';
+
+    // 4. Aktualizacja sumy i UI
+    receiptTotal = 0; // Wymuś globalne zerowanie sumy (BUG 1 FIX)
+    if (typeof renderReceipt === 'function') {
+        renderReceipt(); // Opróżnij paragon i zaktualizuj wyświetlacze sumy
+    }
+
+    // 5. Generuj Nowy Numer Paragonu (BUG 4 FIX)
     if (typeof generateAndSetReceiptDocumentNumber === 'function') {
         generateAndSetReceiptDocumentNumber();
     }
     
-    // 6. Reset UI do Kroku 1 (Bug 2)
+    // 6. Reset UI do Kroku 1 (BUG 2 FIX)
     if (typeof goToCalcStep === 'function') {
-        goToCalcStep(1); // PRZEJDŹ DO KROKU 1
+        goToCalcStep(1); 
     }
 
     showToast('Rozpoczęto nowy paragon.', 'info');
 }
-
 /* ======================================================== */
 /* ✅ KONIEC: Logika czyszczenia "brudnych" formularzy      */
 /* ======================================================== */
