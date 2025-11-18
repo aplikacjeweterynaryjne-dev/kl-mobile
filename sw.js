@@ -1,4 +1,4 @@
-// 🔒 Nazwa pamięci podręcznej (zmieniona na v90, aby wymusić aktualizację)
+// 🔒 Nazwa pamięci podręcznej (zmieniona na v91, aby wymusić aktualizację)
 const CACHE_NAME = 'karta-leczenia-cache-v91';
 
 // 📦 Lista plików do zapamiętania offline (tzw. App Shell)
@@ -16,7 +16,7 @@ const urlsToCache = [
 
 // ⚙️ Instalacja Service Workera
 self.addEventListener('install', event => {
-  console.log('[Service Worker] Instalacja (v90)...');
+  console.log('[Service Worker] Instalacja (v91)...');
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => {
@@ -29,7 +29,7 @@ self.addEventListener('install', event => {
 
 // ♻️ Aktywacja — czyszczenie starych cache
 self.addEventListener('activate', event => {
-  console.log('[Service Worker] Aktywacja (v90)...');
+  console.log('[Service Worker] Aktywacja (v91)...');
   event.waitUntil(
     caches.keys().then(cacheNames => {
       return Promise.all(
@@ -44,35 +44,53 @@ self.addEventListener('activate', event => {
   );
 });
 
-// 🌐 Przechwytywanie zapytań (strategia: Cache First)
+// 🌐 Przechwytywanie zapytań (NOWA LOGIKA)
 self.addEventListener('fetch', event => {
-  // Stosujemy strategię "Cache first, falling back to Network"
-  event.respondWith(
-    caches.match(event.request)
-      .then(cachedResponse => {
-        // Zwróć z cache, jeśli jest
-        if (cachedResponse) {
-          return cachedResponse;
-        }
-
-        // Jeśli nie ma w cache, spróbuj pobrać z sieci
-        return fetch(event.request).then(networkResponse => {
-          // Jeśli pobrano poprawnie, dodaj do cache i zwróć
-          // ❗️ POPRAWKA: Dodano warunek "event.request.method === 'GET'" ❗️
-          if (networkResponse && networkResponse.status === 200 && event.request.method === 'GET') {
-            // Musimy sklonować odpowiedź, bo można ją odczytać tylko raz
-            const responseToCache = networkResponse.clone();
-            caches.open(CACHE_NAME).then(cache => {
-              cache.put(event.request, responseToCache);
-            });
-          }
+  // Sprawdź, czy zapytanie dotyczy strony (nawigacji), np. index.html
+  if (event.request.mode === 'navigate') {
+    // --- STRATEGIA 1: Network First (dla index.html) ---
+    event.respondWith(
+      fetch(event.request)
+        .then(networkResponse => {
+          // 1. Sukces (online) - zapisz nową wersję do cache i ją zwróć
+          const responseToCache = networkResponse.clone();
+          caches.open(CACHE_NAME).then(cache => {
+            // Zapisujemy nową wersję index.html
+            cache.put(event.request, responseToCache);
+          });
           return networkResponse;
-        });
-      })
-      .catch(error => {
-        // W przypadku błędu sieci (np. offline) można zwrócić stronę zastępczą
-        // Na razie po prostu logujemy błąd
-        console.error('[Service Worker] Błąd pobierania:', error);
-      })
-  );
+        })
+        .catch(error => {
+          // 2. Błąd (offline) - zwróć starą wersję z cache
+          console.log('[Service Worker] Błąd sieci (Network First), zwracam z cache');
+          return caches.match(event.request);
+        })
+    );
+  } else {
+    // --- STRATEGIA 2: Cache First (dla wszystkiego innego: CSS, JS, obrazy, fonty) ---
+    // To jest Twój stary, działający kod dla zasobów
+    event.respondWith(
+      caches.match(event.request)
+        .then(cachedResponse => {
+          // Zwróć z cache, jeśli jest
+          if (cachedResponse) {
+            return cachedResponse;
+          }
+
+          // Jeśli nie ma w cache, spróbuj pobrać z sieci
+          return fetch(event.request).then(networkResponse => {
+            if (networkResponse && networkResponse.status === 200 && event.request.method === 'GET') {
+              const responseToCache = networkResponse.clone();
+              caches.open(CACHE_NAME).then(cache => {
+                cache.put(event.request, responseToCache);
+              });
+            }
+            return networkResponse;
+          });
+        })
+        .catch(error => {
+          console.error('[Service Worker] Błąd pobierania (Cache First):', error);
+        })
+    );
+  }
 });
