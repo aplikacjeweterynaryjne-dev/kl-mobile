@@ -2007,6 +2007,68 @@ table {
 /* ======================================================== */
 /* ✅ KONIEC: KOREKTA 2 */
 /* ======================================================== */
+/* ======================================================== */
+/* ✅ MODUŁ 1 (Kalkulator): Style Zakładek (Wizard) */
+/* ======================================================== */
+
+/* Pasek nawigacji kroków */
+.calc-steps-nav {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    background: #eee;
+    border-radius: 8px;
+    padding: 4px;
+}
+
+.step-indicator {
+    flex: 1;
+    text-align: center;
+    padding: 8px 2px;
+    font-size: 14px;
+    color: #777;
+    border-radius: 6px;
+    font-weight: 600;
+}
+
+.step-indicator.active {
+    background: #fff;
+    color: #6A994E; /* Zielony */
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* Ukrywanie kroków */
+.calc-step {
+    display: none;
+    animation: fadeIn 0.3s ease;
+}
+.calc-step.active {
+    display: block;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(5px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Style dla check-icon w przyciskach płatności */
+.payment-status-btn .check-icon {
+    display: none; /* Domyślnie ukryty */
+    margin-right: 5px;
+}
+.payment-status-btn.active .check-icon {
+    display: inline; /* Pokaż gdy aktywny */
+}
+
+/* Powiększenie textarea czynności */
+#calcCzynnosciInput {
+    font-size: 16px;
+    padding: 8px;
+    width: 100%;
+    box-sizing: border-box;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+}
 </style>
     <div id="calcProductSearchModal" class="product-search-modal" style="display: none; z-index: 10003;">
     <div class="product-search-card">
@@ -2561,119 +2623,149 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
 <datalist id="listaLekow"></datalist>
 <datalist id="listaRozpoznan"></datalist>
 
-</div> <div id="kalkulatorWizytySection" style="display: none;">
-<h2>Kalkulator Wizyty</h2>
-<div id="calculatorUI">
-    
-    <details id="calcDanePodstawowe" open>
-        <summary style="font-size: 18px; font-weight: 600; cursor: pointer; margin-bottom: 10px;">
-            Dane podstawowe (Kliknij, aby zwinąć/rozwinąć)
-        </summary>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px; padding: 10px; background: #f7f7f7; border-radius: 8px;">
+<div id="kalkulatorWizytySection" style="display: none;">
+    <h2>🧮 Kalkulator Wizyty</h2>
+
+    <div class="calc-steps-nav">
+        <div class="step-indicator active" id="indStep1">1. Dane</div>
+        <div class="step-indicator" id="indStep2">2. Paragon</div>
+        <div class="step-indicator" id="indStep3">3. Podsumowanie</div>
+    </div>
+
+    <div id="calcStep1" class="calc-step active">
+        <h3>1. Dane Podstawowe</h3>
         
-            <div class="form-row" style="margin-bottom: 0;">
-                <label for="calcKlientInput">Klient:</label>
-                <input type="text" id="calcKlientInput" list="klientList" placeholder="Kliknij, aby wyszukać klienta..." readonly style="cursor: pointer; background: #fff;">
+        <div class="form-row" style="margin-bottom: 10px;">
+            <label style="display: flex; align-items: center; gap: 10px; font-size: 17px; color: #c0392b;">
+                <input type="checkbox" id="correctionModeCheckbox" style="width: 20px; height: 20px;">
+                <strong>Tryb Korekty Paragonu</strong>
+            </label>
+            <div id="correctionSelectContainer" style="display: none; margin-top: 10px;">
+                <select id="correctionReceiptSelect" style="width: 100%; padding: 8px; font-size: 16px;">
+                    <option value="">-- Wybierz klienta, aby pobrać paragony --</option>
+                </select>
+            </div>
+        </div>
+
+        <div style="background: #f7f7f7; padding: 15px; border-radius: 8px; border: 1px solid #eee;">
+            <div class="form-row">
+                <label for="calcKlientInput">Klient (Możesz wpisać nowego):</label>
+                <input type="text" id="calcKlientInput" list="klientList" placeholder="Wpisz lub wybierz z listy..." style="width: 100%;">
             </div>
             
-            <div class="form-row" style="margin-bottom: 0;">
+            <div class="form-row">
                 <label for="calcDataInput">Data:</label>
                 <input type="date" id="calcDataInput">
             </div>
 
-            <div class="form-row" style="margin-bottom: 0; grid-column: 1 / -1;">
+            <div class="form-row">
                 <label for="calcNrDokInput">Nr dokumentu:</label>
-                <input type="text" id="calcNrDokInput" placeholder="Nr dokumentu...">
+                <input type="text" id="calcNrDokInput" placeholder="Auto-generowany...">
             </div>
-            <div class="form-row" style="margin-bottom: 0; grid-column: 1 / -1;">
-                <label for="calcCzynnosciInput">Czynności:</label>
-                <input type="text" id="calcCzynnosciInput" placeholder="Np. Wizyta, badanie...">
+            
+            <div class="form-row">
+                <label for="calcCzynnosciInput">Czynności (Usługi):</label>
+                <textarea id="calcCzynnosciInput" rows="2" placeholder="Np. Wizyta, badanie kliniczne..."></textarea>
+            </div>
+
+            <div style="margin-top: 15px; padding-top: 10px; border-top: 1px dashed #ccc;">
+                <input type="checkbox" id="copyFromCardCheckbox" style="width: 20px; height: 20px; vertical-align: middle;">
+                <label for="copyFromCardCheckbox" style="vertical-align: middle; margin-left: 5px;">Przepisz produkty i dane z karty leczenia</label>
             </div>
         </div>
-    </details>
 
-    <div id="calcSekcjaParagonu">
-        <h3 style="font-size: 18px; font-weight: 600; margin-top: 20px; border-top: 1px solid #eee; padding-top: 15px;">Paragon</h3>
+        <div class="step-actions" style="text-align: right; margin-top: 20px;">
+            <button id="btnToStep2" class="btn primary" style="font-size: 18px; padding: 10px 25px;">Dalej ➜</button>
+        </div>
+    </div>
+
+    <div id="calcStep2" class="calc-step">
+        <h3>2. Paragon (Produkty)</h3>
         
-        <div id="receiptDisplay" style="border: 1px solid #ccc; min-height: 100px; margin-bottom: 15px; padding: 5px; background: #f9f9f9;">
+        <div id="receiptDisplay" style="border: 1px solid #ccc; min-height: 150px; margin-bottom: 15px; padding: 10px; background: #fff; border-radius: 6px; max-height: 300px; overflow-y: auto;">
             <p style="text-align: center; color: #999;">Paragon jest pusty</p>
         </div>
 
-        <div>
-            <input type="checkbox" id="copyFromCardCheckbox">
-            <label for="copyFromCardCheckbox">Przepisz produkty i dane z karty leczenia</label>
+        <div style="background: #f0f8ff; padding: 15px; border-radius: 8px; border: 1px solid #bcd;">
+            <div style="display: flex; gap: 10px; align-items: flex-end; margin-bottom: 10px;">
+                <div style="flex-grow: 1;">
+                    <label for="productSelect">Wybierz produkt:</label>
+                    <input list="listaLekow" id="productSelect" placeholder="Szukaj produktu..." style="width: 100%;">
+                </div>
+                <div style="width: 80px;">
+                    <label for="productQuantityInput">Ilość:</label>
+                    <input type="number" id="productQuantityInput" placeholder="" min="0.01" step="any" style="width: 100%;">
+                </div>
+            </div>
+            
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <span id="productUnitDisplay" style="font-weight: bold; color: #555;"></span>
+                </div>
+                <button id="addProductBtn" class="btn primary" style="font-size: 18px; padding: 10px 20px;">+ Dodaj</button>
+            </div>
+
+            <div style="margin-top: 15px; display: flex; gap: 10px; align-items: center; border-top: 1px dashed #ccc; padding-top: 10px;">
+                <label for="pluCodeInput">PLU:</label>
+                <input type="tel" id="pluCodeInput" style="width: 80px;">
+                <button id="pluBtn" class="btn small">OK</button>
+            </div>
         </div>
 
-        <div style="margin-top: 15px; display: flex; gap: 10px; align-items: flex-end;">
-
-            <div style="flex-grow: 1;">
-                <label for="productSelect"><strong>Wybierz produkt:</strong></label><br>
-                <input list="listaLekow" id="productSelect" style="width: 100%; padding: 5px; box-sizing: border-box; cursor: pointer; background: #fff;" readonly placeholder="Kliknij, aby wyszukać produkt...">
-            </div>
-
-            <div>
-                <label for="productQuantityInput"><strong>Ilość:</strong></label><br>
-                <input type="number" id="productQuantityInput" placeholder="" min="0.01" step="any" style="font-size: 18px; padding: 10px 5px; width: 60px;">
-            </div>
-
-            <div style="padding-bottom: 5px;"> 
-                <span id="productUnitDisplay" style="font-size: 0.9em; color: #555;"></span>
-            </div>
-
-            <div>
-                <button id="addProductBtn" class="btn primary">Dodaj</button>
-            </div>
-
+        <div class="step-actions" style="display: flex; justify-content: space-between; margin-top: 20px;">
+            <button id="btnBackToStep1" class="btn ghost" style="font-size: 18px;">⬅ Wróć</button>
+            <button id="btnToStep3" class="btn primary" style="font-size: 18px; padding: 10px 25px;">Podsumowanie ➜</button>
         </div>
-        <div style="margin-top: 10px; display: flex; gap: 10px; align-items: flex-end;">
-            <div>
-                <label for="pluCodeInput"><strong>Kod PLU:</strong></label><br>
-                <input type="tel" id="pluCodeInput" inputmode="numeric" pattern="[0-9]*" style="width: 80px; padding: 5px;" placeholder="PLU...">
+    </div>
+
+    <div id="calcStep3" class="calc-step">
+        <h3>3. Podsumowanie i Płatność</h3>
+
+        <div style="background: #fff5f5; padding: 10px; border-radius: 8px; border: 1px solid #ffcccc; margin-bottom: 15px;">
+            <label>Dodaj korektę / Rabat:</label>
+            <div style="display: flex; gap: 10px; margin-top: 5px;">
+                <input type="text" id="correctionNameInput" placeholder="Opis (np. Rabat)" style="flex: 2;">
+                <input type="number" id="correctionAmountInput" placeholder="Kwota (np. -10)" style="flex: 1;">
+                <button id="addCorrectionBtn" class="btn small">Dodaj</button>
             </div>
-            <button id="pluBtn" class="btn small">PLU</button>
-       </div>
-        <div style="margin-top: 15px; display: flex; gap: 10px; align-items: flex-end; border-top: 1px dashed #ccc; padding-top: 15px;">
-    <div style="flex-grow: 1;">
-        <label for="correctionNameInput" style="font-size: 19px !important;"><strong>Opis korekty (np. Rabat):</strong></label><br>
-        <input type="text" id="correctionNameInput" style="font-size: 18px; padding: 10px 8px; width: 100%; box-sizing: border-box;" placeholder="Opis...">
-    </div>
-    <div style="flex-shrink: 0;">
-        <label for="correctionAmountInput" style="font-size: 19px !important;"><strong>Kwota (+/-):</strong></label><br>
-        <input type="number" id="correctionAmountInput" step="0.01" style="font-size: 18px; padding: 10px 5px; width: 100px;" placeholder="0.00">
-    </div>
-    <div style="flex-shrink: 0;">
-        <button id="addCorrectionBtn" class="btn small">Dodaj korektę</button>
-    </div>
-</div>
-    </div> </div>
-        
-    <div id="paymentStatusSection" style="margin-top: 20px; border-top: 1px solid #eee; padding-top: 15px;">
+        </div>
 
-<div id="paymentStatusSection" style="margin-top: 20px; border-top: 1px solid #eee; padding-top: 15px;">
-  <h4 style="margin: 0 0 10px 0; font-size: 16px;">Status płatności:</h4>
-  <div style="display: flex; gap: 10px;">
-    <button type="button" id="paymentStatusPaid" class="btn payment-status-btn" data-status="Zapłacone">
-      <span style="font-size: 20px; color: #27ae60; font-weight: bold;">+</span> Zapłacone
-    </button>
-    <button type="button" id="paymentStatusDebt" class="btn payment-status-btn" data-status="Dług">
-      <span style="font-size: 20px; color: #c0392b; font-weight: bold;">-</span> Dług
-    </button>
-  </div>
-</div>
-<div class="form-row" style="margin-top: 15px;">
-    <label for="calcNotatkaInput" style="font-size: 16px; font-weight: 600;">Notatka:</label>
-    <textarea id="calcNotatkaInput" placeholder="Dodatkowe uwagi do paragonu..." style="width: 100%; min-height: 60px; box-sizing: border-box; font-size: 16px; padding: 8px; border: 1px solid #ccc; border-radius: 6px; margin-top: 4px;"></textarea>
-</div>
-<div style="text-align: right; margin-top: 20px; display: flex; justify-content: flex-end; gap: 8px;">
-    <button id="roundTotalBtn" class="btn small" style="background-color: #f0f0f0;">Zaokrąglij sumę (do 10)</button>
-    <button id="saveReceiptBtn" class="btn primary">Zapisz Paragon</button>
-</div>
-</div>
+        <div class="form-row">
+            <label for="calcNotatkaInput">Notatka do paragonu:</label>
+            <textarea id="calcNotatkaInput" style="width: 100%; height: 60px;" placeholder="Uwagi..."></textarea>
+        </div>
 
-<div id="savedReceiptSummary" style="margin-top: 20px; border-top: 1px dashed #ccc; padding-top: 10px;">
-</div>
+        <div id="paymentStatusSection" style="margin-bottom: 20px;">
+            <h4 style="margin-bottom: 10px;">Status płatności:</h4>
+            <div style="display: flex; gap: 10px;">
+                <button type="button" id="paymentStatusPaid" class="btn payment-status-btn" data-status="Zapłacone" style="flex: 1;">
+                    <span class="check-icon">✔️</span> Zapłacone
+                </button>
+                <button type="button" id="paymentStatusDebt" class="btn payment-status-btn" data-status="Dług" style="flex: 1;">
+                    <span class="check-icon">✔️</span> Dług
+                </button>
+            </div>
+            <p id="paymentStatusError" style="color: red; display: none; text-align: center; margin-top: 5px;">Wybierz status!</p>
+        </div>
 
-</div> 
+        <div style="text-align: center; margin: 20px 0; padding: 15px; background: #e8f5e9; border: 2px solid #6A994E; border-radius: 10px;">
+            <div style="font-size: 16px; color: #555;">SUMA DO ZAPŁATY:</div>
+            <div id="calcFinalSumDisplay" style="font-size: 32px; font-weight: 800; color: #2d3436;">0,00 zł</div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+            <button id="roundTotalBtn" class="btn" style="width: 100%; background: #f0f0f0;">Zaokrąglij sumę (do 10zł)</button>
+            <button id="saveReceiptBtn" class="btn primary" style="width: 100%; font-size: 22px; padding: 15px;">💾 ZAPISZ PARAGON</button>
+        </div>
+
+        <div id="savedReceiptSummary" style="margin-top: 20px; border-top: 2px dashed #ccc; padding-top: 15px; display: none;"></div>
+
+        <div class="step-actions" style="text-align: left; margin-top: 20px;">
+            <button id="btnBackToStep2" class="btn ghost" style="font-size: 18px;">⬅ Wróć do edycji</button>
+        </div>
+    </div>
+
+</div>
 <div id="bazaKlientowSection" style="display: none;">
 
 <h2>Baza Klientów</h2>
