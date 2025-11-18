@@ -11459,32 +11459,33 @@ try {
         }
     }
     
- // 4. Funkcja filtrowania (Główna - z obsługą polskich znaków)
+    // 4. Funkcja do wypełniania i filtrowania listy w modalu klienta (CZYTA Z DATALIST)
     function populateAndFilterClientList() {
         if (!clientSearchListModal) return;
 
+        // Czytamy z 'klientList', która jest ładowana na starcie przez initData()
         const dataList = document.getElementById('klientList');
         if (!dataList || dataList.options.length === 0) {
             clientSearchListModal.innerHTML = '<div class="client-search-item" style="color: #999; cursor: default;">Proszę czekać, ładowanie listy klientów...</div>';
-            return; 
+            return; // To nie błąd, dane się jeszcze ładują
         }
 
-        // ✅ ZMIANA
-        const filterText = normalizePL(clientSearchInputModal.value.trim());
-        
-        clientSearchListModal.innerHTML = ''; 
+        const filterText = clientSearchInputModal.value.toLowerCase().trim();
+        clientSearchListModal.innerHTML = ''; // Wyczyść listę
         let foundItems = 0;
         
         const options = Array.from(dataList.options);
+        
+        // Sortuj alfabetycznie
         options.sort((a, b) => (a.value || '').localeCompare(b.value || '', 'pl'));
         
+        // Iterujemy po opcjach z <datalist>
         options.forEach(opt => {
             const nazwa = opt.value || '';
             const adres = opt.dataset.adres || '';
             const nrStada = opt.dataset.nrstada || ''; 
             
-            // ✅ ZMIANA
-            const searchableText = normalizePL(`${nazwa} ${adres} ${nrStada}`);
+            const searchableText = `${nazwa} ${adres} ${nrStada}`.toLowerCase();
             
             if (filterText === '' || searchableText.includes(filterText)) {
                 const itemDiv = document.createElement('div');
@@ -11619,7 +11620,7 @@ try {
             });
         }
         // ⬆️ ⬆️ ⬆️ KONIEC WKLEJANIA ⬆️ ⬆️ ⬆️
- // Wypełnianie listy (Formularz - z obsługą polskich znaków)
+    // Wypełnianie listy (czyta z głównej <datalist>)
     function populateAndFilterFormClientList() {
         const dataList = document.getElementById('klientList');
         if (!dataList || dataList.options.length === 0) {
@@ -11627,9 +11628,7 @@ try {
             return;
         }
 
-        // ✅ ZMIANA
-        const filterText = normalizePL(input.value.trim());
-        
+        const filterText = input.value.toLowerCase().trim();
         list.innerHTML = '';
         let foundItems = 0;
         
@@ -11640,9 +11639,7 @@ try {
             const nazwa = opt.value || '';
             const adres = opt.dataset.adres || '';
             const nrStada = opt.dataset.nrstada || ''; 
-            
-            // ✅ ZMIANA
-            const searchableText = normalizePL(`${nazwa} ${adres} ${nrStada}`);
+            const searchableText = `${nazwa} ${adres} ${nrStada}`.toLowerCase();
             
             if (filterText === '' || searchableText.includes(filterText)) {
                 const itemDiv = document.createElement('div');
@@ -13490,51 +13487,48 @@ try {
         if (calcClientSearchModal) calcClientSearchModal.style.display = 'none';
     }
 
-  // 3. Wypełnianie i filtrowanie listy (Kalkulator - z obsługą polskich znaków)
-    function populateAndFilterCalcClientList() {
-        const dataList = document.getElementById('klientList');
-        if (!dataList || dataList.options.length === 0) {
-            calcClientSearchList.innerHTML = '<div class="client-search-item">Błąd: Brak bazy klientów.</div>';
-            return;
-        }
+    // 3. Wypełnianie i filtrowanie listy (czyta z globalnej <datalist id="klientList">)
+    function populateAndFilterCalcClientList() {
+        const dataList = document.getElementById('klientList');
+        if (!dataList || dataList.options.length === 0) {
+            calcClientSearchList.innerHTML = '<div class="client-search-item">Błąd: Brak bazy klientów.</div>';
+            return;
+        }
 
-        // ✅ ZMIANA: Używamy normalizePL
-        const filterText = normalizePL(calcClientSearchInput.value.trim());
-        
-        calcClientSearchList.innerHTML = '';
-        let foundItems = 0;
+        const filterText = calcClientSearchInput.value.toLowerCase().trim();
+        calcClientSearchList.innerHTML = '';
+        let foundItems = 0;
 
-        const options = Array.from(dataList.options);
-        options.sort((a, b) => (a.value || '').localeCompare(b.value || '', 'pl'));
+        const options = Array.from(dataList.options);
+        options.sort((a, b) => (a.value || '').localeCompare(b.value || '', 'pl'));
 
-        options.forEach(opt => {
-            const nazwa = opt.value || '';
-            const adres = opt.dataset.adres || '';
-            const nrStada = opt.dataset.nrstada || ''; 
-            
-            // ✅ ZMIANA: Normalizujemy tekst do przeszukania
-            const searchableText = normalizePL(`${nazwa} ${adres} ${nrStada}`);
-            
-            if (filterText === '' || searchableText.includes(filterText)) {
-                const itemDiv = document.createElement('div');
-                itemDiv.className = 'client-search-item'; 
-                itemDiv.innerHTML = `
-                    <strong>${nazwa}</strong>
-                    <span class="details">
-                        ${adres ? `Adres: ${adres}` : ''}
-                        ${(adres && nrStada) ? '<br>' : ''}
-                        ${nrStada ? `Nr stada: ${nrStada}` : ''}
-                    </span>
-                `;
-                itemDiv.addEventListener('click', () => {
-                    selectCalcClient(nazwa);
-                });
-                calcClientSearchList.appendChild(itemDiv);
-                foundItems++;
-            }
-        });
-        if (foundItems === 0) calcClientSearchList.innerHTML = '<div class="client-search-item" style="color: #999;">Brak pasujących klientów.</div>';
-    }
+        options.forEach(opt => {
+            const nazwa = opt.value || '';
+            const adres = opt.dataset.adres || '';
+            const nrStada = opt.dataset.nrstada || ''; 
+            const searchableText = `${nazwa} ${adres} ${nrStada}`.toLowerCase();
+            
+            if (filterText === '' || searchableText.includes(filterText)) {
+                const itemDiv = document.createElement('div');
+                itemDiv.className = 'client-search-item'; // Użyjemy tych samych styli
+                itemDiv.innerHTML = `
+                    <strong>${nazwa}</strong>
+                    <span class="details">
+                        ${adres ? `Adres: ${adres}` : ''}
+                        ${(adres && nrStada) ? '<br>' : ''}
+                        ${nrStada ? `Nr stada: ${nrStada}` : ''}
+                    </span>
+                `;
+                // Przekazujemy tylko nazwę, bo kalkulator nie potrzebuje adresu/nr stada
+                itemDiv.addEventListener('click', () => {
+                    selectCalcClient(nazwa);
+                });
+                calcClientSearchList.appendChild(itemDiv);
+                foundItems++;
+            }
+        });
+        if (foundItems === 0) calcClientSearchList.innerHTML = '<div class="client-search-item" style="color: #999;">Brak pasujących klientów.</div>';
+    }
 
     // 4. Funkcja wyboru klienta z modala
     function selectCalcClient(klientName) {
@@ -15453,18 +15447,6 @@ if (btnUseNewActivity) {
     });
 }
 /* ======================================================== */
-/* ======================================================== */
-/* ✅ MODUŁ KOREKTY C: Funkcja usuwająca polskie znaki */
-/* ======================================================== */
-function normalizePL(text) {
-    if (!text) return "";
-    return text.toLowerCase()
-        .replace(/ą/g, 'a').replace(/ć/g, 'c')
-        .replace(/ę/g, 'e').replace(/ł/g, 'l')
-        .replace(/ń/g, 'n').replace(/ó/g, 'o')
-        .replace(/ś/g, 's').replace(/ź/g, 'z')
-        .replace(/ż/g, 'z');
-}
 </script> 
 
 <div id="toastContainer" style="position: fixed; top: 20px; right: 20px; z-index: 20000; display: flex; flex-direction: column; gap: 10px;">
