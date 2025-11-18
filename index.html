@@ -2686,7 +2686,13 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
             
             <div class="form-row">
                 <label for="calcCzynnosciInput">Czynności (Usługi):</label>
-                <textarea id="calcCzynnosciInput" rows="2" placeholder="Np. Wizyta, badanie kliniczne..."></textarea>
+                <div class="form-row">
+                <label for="calcCzynnosciInput">Czynności (Usługi):</label>
+                <textarea id="calcCzynnosciInput" rows="2" 
+                          placeholder="Kliknij, aby wybrać z historii lub wpisać..." 
+                          readonly 
+                          style="cursor: pointer; background-color: #fff;"></textarea>
+            </div>
             </div>
 
             <div style="margin-top: 15px; padding-top: 10px; border-top: 1px dashed #ccc;">
@@ -3679,7 +3685,26 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
 
 <div id="receiptPrintContainer" style="display: none; font-family: 'Courier New', Courier, monospace; color: #000;">
     </div>
-<script>
+<div id="activitiesSearchModal" class="product-search-modal" style="display: none; z-index: 10004;">
+    <div class="product-search-card">
+        <h3>Wybierz czynność</h3>
+        <p style="font-size: 12px; color: #666; margin-bottom: 10px; text-align: center;">
+            Poniżej lista czynności użytych w ciągu ostatnich 30 dni.
+        </p>
+        
+        <input type="search" id="activitiesSearchInput" placeholder="Szukaj lub wpisz nową..." style="margin-bottom: 10px;">
+        
+        <div id="activitiesSearchList" class="product-search-list">
+            <div style="padding: 20px; text-align: center; color: #999;">Ładowanie historii...</div>
+        </div>
+        
+        <div class="form-actions" style="justify-content: space-between; margin-top: 15px;">
+            <button id="btnUseNewActivity" class="btn primary small">➕ Użyj wpisanej</button>
+            <button id="activitiesSearchCloseBtn" class="btn ghost">Anuluj</button>
+        </div>
+    </div>
+</div>
+    <script>
 /* ----- Inicjalizacja Firebase (Uruchamia się na starcie) ----- */
 // ... reszta kodu pierwszego bloku script ...
 const firebaseConfig = {
@@ -15266,6 +15291,139 @@ function openReportPrintWindow() {
 }
 /* ======================================================== */
 /* ✅ KONIEC: KOREKTA - Funkcja drukowania Raportu */
+/* ======================================================== */
+/* ======================================================== */
+/* ✅ MODUŁ KOREKTY B: Logika Historii Czynności */
+/* ======================================================== */
+
+const activitiesModal = document.getElementById('activitiesSearchModal');
+const activitiesInput = document.getElementById('activitiesSearchInput');
+const activitiesList = document.getElementById('activitiesSearchList');
+const activitiesCloseBtn = document.getElementById('activitiesSearchCloseBtn');
+const btnUseNewActivity = document.getElementById('btnUseNewActivity');
+const calcCzynnosciTrigger = document.getElementById('calcCzynnosciInput');
+
+let activitiesCache = []; // Przechowuje unikalne czynności
+
+// 1. Otwieranie modala
+if (calcCzynnosciTrigger) {
+    calcCzynnosciTrigger.addEventListener('click', async () => {
+        if (!activitiesModal) return;
+        
+        // Pokaż modal
+        activitiesModal.style.display = 'flex';
+        
+        // Wpisz obecną wartość do szukajki (do edycji)
+        activitiesInput.value = calcCzynnosciTrigger.value;
+        
+        // Pobierz historię (jeśli cache pusty lub wymuszamy odświeżenie)
+        await fetchActivitiesHistory();
+        
+        // Renderuj listę
+        renderActivitiesList();
+        
+        // Focus na polu wpisywania (dla wygody)
+        setTimeout(() => activitiesInput.focus(), 100);
+    });
+}
+
+// 2. Pobieranie historii z Firestore (ostatnie 30 dni)
+async function fetchActivitiesHistory() {
+    if (!currentUserProfile) return;
+    
+    // Oblicz datę 30 dni temu
+    const date30DaysAgo = new Date();
+    date30DaysAgo.setDate(date30DaysAgo.getDate() - 30);
+    const dateString = date30DaysAgo.toISOString().split('T')[0]; // YYYY-MM-DD
+
+    try {
+        // Zapytanie do archiwum paragonów
+        const q = db.collection("archiwumParagony")
+            .where("lekarz_uid", "==", currentUserProfile.uid)
+            .where("data", ">=", dateString)
+            .orderBy("data", "desc")
+            .limit(50); // Ograniczamy do 50 ostatnich paragonów dla wydajności
+
+        const snapshot = await q.get();
+        
+        const uniqueSet = new Set();
+        
+        snapshot.docs.forEach(doc => {
+            const data = doc.data();
+            if (data.czynnosci && data.czynnosci.trim() !== "") {
+                // Dodaj do zbioru unikalnych (normalizacja wielkości liter opcjonalna)
+                uniqueSet.add(data.czynnosci.trim());
+            }
+        });
+        
+        // Zamień Set na tablicę
+        activitiesCache = Array.from(uniqueSet);
+        console.log(`Pobrano ${activitiesCache.length} unikalnych czynności z ostatnich 30 dni.`);
+
+    } catch (error) {
+        console.error("Błąd pobierania historii czynności:", error);
+        activitiesList.innerHTML = '<div style="padding:10px; text-align:center; color:red;">Błąd pobierania historii.</div>';
+    }
+}
+
+// 3. Renderowanie listy
+function renderActivitiesList() {
+    const filterText = activitiesInput.value.toLowerCase().trim();
+    activitiesList.innerHTML = '';
+    
+    let found = 0;
+    
+    activitiesCache.forEach(act => {
+        if (act.toLowerCase().includes(filterText)) {
+            const item = document.createElement('div');
+            item.className = 'client-search-item'; // Używamy stylu listy klientów (pasuje idealnie)
+            item.style.padding = "12px";
+            item.textContent = act;
+            
+            // Kliknięcie wybiera czynność
+            item.addEventListener('click', () => {
+                selectActivity(act);
+            });
+            
+            activitiesList.appendChild(item);
+            found++;
+        }
+    });
+    
+    if (found === 0) {
+        activitiesList.innerHTML = '<div style="padding:15px; text-align:center; color:#999;">Brak w historii.<br>Kliknij "➕ Użyj wpisanej", aby dodać nową.</div>';
+    }
+}
+
+// 4. Wybór czynności
+function selectActivity(text) {
+    if (calcCzynnosciTrigger) {
+        calcCzynnosciTrigger.value = text;
+    }
+    activitiesModal.style.display = 'none';
+}
+
+// 5. Obsługa przycisków
+if (activitiesCloseBtn) {
+    activitiesCloseBtn.addEventListener('click', () => {
+        activitiesModal.style.display = 'none';
+    });
+}
+
+if (activitiesInput) {
+    activitiesInput.addEventListener('input', renderActivitiesList);
+}
+
+if (btnUseNewActivity) {
+    btnUseNewActivity.addEventListener('click', () => {
+        const text = activitiesInput.value.trim();
+        if (text) {
+            selectActivity(text);
+        } else {
+            showToast("Wpisz treść czynności.", "info");
+        }
+    });
+}
 /* ======================================================== */
 </script> 
 
