@@ -15008,23 +15008,19 @@ if (adminZarzadzajBtn) {
 function openReportPrintWindow() {
     console.log("Otwieranie okna podglądu raportu...");
     
-    // 1. Pobierz zawartość HTML wygenerowanego raportu
     const reportContentEl = document.getElementById('reportResultArea');
     if (!reportContentEl) {
-        showToast("Błąd: Nie znaleziono treści raportu (reportResultArea).", "error");
+        showToast("Błąd: Nie znaleziono treści raportu.", "error");
         return;
     }
-    // Pobieramy "wewnętrzny" HTML
     const reportHTML = reportContentEl.innerHTML;
     
-    // 2. Otwórz nowe okno
     const printWindow = window.open('', '_blank', 'width=800,height=700,scrollbars=yes,resizable=yes');
     if (!printWindow) {
-        showToast('Nie udało się otworzyć nowego okna. Wyłącz blokowanie wyskakujących okienek.', 'error');
+        showToast('Nie udało się otworzyć nowego okna.', 'error');
         return;
     }
 
-    // 3. Wygeneruj pełny HTML dla nowego okna
     printWindow.document.write(`
         <!DOCTYPE html>
         <html lang="pl">
@@ -15035,16 +15031,12 @@ function openReportPrintWindow() {
             <style>
                 body { 
                     font-family: 'Nunito', sans-serif; 
-                    margin: 0; 
-                    padding: 0; 
-                    background-color: #f0f0f0; 
+                    margin: 0; padding: 0; background-color: #f0f0f0; 
                 }
                 
-                /* Kontrolki (Drukuj/Zamknij) - nie do druku */
+                /* Kontrolki */
                 .print-controls {
-                    padding: 10px; 
-                    text-align: center; 
-                    background-color: #333;
+                    padding: 10px; text-align: center; background-color: #333;
                     position: sticky; top: 0; z-index: 100;
                 }
                 .print-controls button {
@@ -15052,78 +15044,80 @@ function openReportPrintWindow() {
                     cursor: pointer; border-radius: 6px; border: 1px solid #777;
                     font-family: 'Nunito', sans-serif; font-weight: 600;
                 }
-                .print-controls .print-btn { background-color: #4CAF50; color: white; border-color: #388E3C;}
-                .print-controls .close-btn { background-color: #f44336; color: white; border-color: #D32F2F;}
+                .print-controls .print-btn { background-color: #4CAF50; color: white; }
+                .print-controls .close-btn { background-color: #f44336; color: white; }
                 
-                /* "Kartka" A4 do podglądu */
+                /* Kartka A4 */
                 .page-preview {
-                    width: 210mm; 
-                    min-height: 297mm; 
-                    padding: 1cm; 
-                    margin: 20px auto; 
+                    width: 210mm; min-height: 297mm; 
+                    padding: 1cm; margin: 20px auto; 
                     background-color: #ffffff; 
-                    box-shadow: 0 0 10px rgba(0,0,0,0.15);
                     box-sizing: border-box;
-                }
-                
-                /* --- ✅ KOREKTA ODSTĘPÓW DLA OKNA DRUKU --- */
-                
-                /* 1. Zresetuj marginesy nagłówków */
-                h3, h4, p {
-                    margin-top: 5px !important;
-                    margin-bottom: 5px !important;
-                }
-                
-                /* 2. Ściśnij sekcję podsumowania (szary box) */
-                .report-summary-header > div {
-                    margin-bottom: 5px !important;
-                    padding-bottom: 5px !important;
-                    background: none !important; 
-                    border: none !important;
-                    box-shadow: none !important;
+                    box-shadow: 0 0 10px rgba(0,0,0,0.15);
                 }
 
-                /* 3. Usuń odstęp nad tabelą */
-                .table-container, 
-                #reportWizytyTableContainer, 
-                #reportZuzyciaTableContainer {
-                    margin-top: 0 !important;
+                /* --- ⬇️ AGRESYWNA KOREKTA ODSTĘPÓW ⬇️ --- */
+
+                /* 1. Zresetuj główny kontener nagłówka */
+                .report-summary-header {
+                    display: block !important; /* Wyłącz flexa kontenera głównego */
+                    margin-bottom: 0 !important;
+                    padding-bottom: 0 !important;
+                    height: auto !important;
+                }
+
+                /* 2. Zresetuj wewnętrzne divy (szare tło) */
+                .report-summary-header > div {
+                    margin: 0 !important;
+                    padding: 5px !important;
+                    display: block !important; /* Zmień na blok, aby elementy się nie rozjeżdżały */
+                    line-height: 1.1 !important;
+                }
+
+                /* 3. Zresetuj wszystkie teksty w nagłówku */
+                .report-summary-header h3, 
+                .report-summary-header h4, 
+                .report-summary-header p {
+                    margin: 2px 0 !important; /* Minimalny odstęp między liniami tekstu */
+                    padding: 0 !important;
+                }
+
+                /* 4. Podciągnij tabelę maksymalnie do góry */
+                .table-container {
+                    margin-top: 5px !important; /* Tylko 5px odstępu od nagłówka */
                     padding-top: 0 !important;
                 }
-                
-                /* 4. Usuń odstęp samej tabeli */
-                table { 
-                    margin-top: 5px !important;
-                    border-collapse: collapse; width: 100%; font-size: 10pt; 
-                    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+                table { margin-top: 0 !important; }
+
+                /* 5. Ukryj puste elementy, które mogą robić odstęp */
+                .report-summary-header:empty,
+                #reportFuelSection[style*="none"],
+                #reportNetSumContainer[style*="none"] {
+                    display: none !important;
+                    margin: 0 !important;
+                    padding: 0 !important;
+                    height: 0 !important;
                 }
-                
+
                 /* --- Koniec korekty --- */
 
+                /* Style tabeli */
+                table { border-collapse: collapse; width: 100%; font-size: 10pt; }
                 th, td { 
                     border: 1px solid #ddd; padding: 4px; text-align: left; 
-                    white-space: nowrap; word-break: keep-all; 
+                    white-space: nowrap; 
                 }
-                th { background: #f2f2f2 !important; } 
-                #reportWizytyTable .col-zuzycia ul { 
-                    margin: 0; padding-left: 18px; font-size: 10pt; 
-                }
+                th { background: #f2f2f2 !important; }
+                #reportWizytyTable .col-zuzycia ul { margin: 0; padding-left: 18px; font-size: 10pt; }
 
-                /* Style dla samego wydruku */
                 @media print {
                     body { background-color: #ffffff !important; }
                     .print-controls { display: none !important; }
                     .page-preview {
-                        width: 100% !important;
-                        min-height: unset !important;
-                        margin: 0 !important;
-                        padding: 0 !important;
+                        width: 100% !important; margin: 0 !important; padding: 0 !important;
                         box-shadow: none !important;
                     }
-                    @page {
-                        size: A4 portrait;
-                        margin: 1cm;
-                    }
+                    @page { size: A4 portrait; margin: 1cm; }
                 }
             </style>
         </head>
@@ -15142,9 +15136,6 @@ function openReportPrintWindow() {
     printWindow.document.close();
     printWindow.focus();
 }
-/* ======================================================== */
-/* ✅ KONIEC: KOREKTA - Funkcja drukowania Raportu */
-/* ======================================================== */
 </script> 
 
 <div id="toastContainer" style="position: fixed; top: 20px; right: 20px; z-index: 20000; display: flex; flex-direction: column; gap: 10px;">
