@@ -2090,6 +2090,19 @@ table {
     margin-bottom: 5px;
 }
 /* ======================================================== */
+/* ======================================================== */
+/* ✅ KOREKTA 2: Wymuszenie centrowania Modala Zapisu */
+/* ======================================================== */
+#saveReceiptOptionsModal {
+    /* Nadpisujemy, aby zapewnić centrowanie na każdej wysokości */
+    position: fixed !important;
+    top: 50% !important;
+    left: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    padding: 0 !important;
+}
 </style>
     <div id="calcProductSearchModal" class="product-search-modal" style="display: none; z-index: 10003;">
     <div class="product-search-card">
@@ -13726,39 +13739,48 @@ function clearKartaLeczenia() {
 /**
  * Czyści kompletnie formularz Kalkulatora Wizyty.
  */
+/**
+ * Czyści kompletnie formularz Kalkulatora Wizyty (RESETUJĄC STAN UI).
+ */
 function clearKalkulator() {
     console.log("Czyszczenie Kalkulatora Wizyty na żądanie użytkownika...");
 
-    // 1. Wyczyść pola nagłówka
-    document.getElementById('calcKlientInput').value = '';
-    document.getElementById('calcCzynnosciInput').value = '';
-    
-    // 2. Wyczyść pole Nr Dokumentu (WAŻNE: to wymusi wygenerowanie nowego)
-    document.getElementById('calcNrDokInput').value = '';
-
-    // 3. Wyczyść paragon (listę produktów i sumę)
+    // 1. Reset danych
     receiptItems = [];
+    receiptTotal = 0; // Upewnij się, że globalna suma jest zerowana
     if (typeof renderReceipt === 'function') {
-        renderReceipt();
+        renderReceipt(); // Opróżnij paragon
     }
 
-    // 4. Wyczyść notatkę
-    document.getElementById('calcNotatkaInput').value = '';
+    // 2. Wyczyść pola nagłówka (Krok 1)
+    if (calcKlientInput) calcKlientInput.value = '';
+    if (calcCzynnosciInput) calcCzynnosciInput.value = '';
+    if (calcNotatkaInput) calcNotatkaInput.value = '';
+    if (correctionNameInput) correctionNameInput.value = '';
+    if (correctionAmountInput) correctionAmountInput.value = '';
 
-    // 5. Wyczyść status płatności
-    const activeStatusBtn = document.querySelector('.payment-status-btn.active');
-    if (activeStatusBtn) {
-        activeStatusBtn.classList.remove('active');
-    }
+    // 3. Reset statusu i podsumowania
+    const paidRadio = document.getElementById('paymentStatusPaid');
+    const debtRadio = document.getElementById('paymentStatusDebt');
+    if (paidRadio) paidRadio.checked = false;
+    if (debtRadio) debtRadio.checked = false;
+    if (savedReceiptSummary) savedReceiptSummary.innerHTML = '';
     
-    // 6. Wyczyść podsumowanie zapisanego paragonu
-    if(savedReceiptSummary) savedReceiptSummary.innerHTML = '';
+    // 4. Reset trybu korekty (Moduł 5)
+    if(document.getElementById('correctionModeCheckbox')) document.getElementById('correctionModeCheckbox').checked = false;
+    if(document.getElementById('correctionSelectContainer')) document.getElementById('correctionSelectContainer').style.display = 'none';
 
-    // 7. Wygeneruj nowy numer paragonu
+    // 5. Wyczyść pole Nr Dokumentu i GENERUJ NOWY (Bug 4)
+    if (calcNrDokInput) calcNrDokInput.value = '';
     if (typeof generateAndSetReceiptDocumentNumber === 'function') {
         generateAndSetReceiptDocumentNumber();
     }
     
+    // 6. Reset UI do Kroku 1 (Bug 2)
+    if (typeof goToCalcStep === 'function') {
+        goToCalcStep(1); // PRZEJDŹ DO KROKU 1
+    }
+
     showToast('Rozpoczęto nowy paragon.', 'info');
 }
 
