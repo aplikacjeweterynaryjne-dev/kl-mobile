@@ -15302,17 +15302,17 @@ function openReportPrintWindow() {
 /* ✅ KONIEC: KOREKTA - Funkcja drukowania Raportu */
 /* ======================================================== */
 /* ======================================================== */
-/* ✅ MODUŁ KOREKTY B: Logika Historii Czynności */
+/* ✅ MODUŁ KOREKTY B (Poprawiony): Logika Historii Czynności */
 /* ======================================================== */
 
 const activitiesModal = document.getElementById('activitiesSearchModal');
-const activitiesInput = document.getElementById('activitiesSearchInput');
+const activitiesInput = document.getElementById('activitiesSearchInput'); // Pole wyszukiwania/wpisywania
 const activitiesList = document.getElementById('activitiesSearchList');
 const activitiesCloseBtn = document.getElementById('activitiesSearchCloseBtn');
 const btnUseNewActivity = document.getElementById('btnUseNewActivity');
 const calcCzynnosciTrigger = document.getElementById('calcCzynnosciInput');
 
-let activitiesCache = []; // Przechowuje unikalne czynności
+let activitiesCache = []; // Tu przechowujemy unikalną listę
 
 // 1. Otwieranie modala
 if (calcCzynnosciTrigger) {
@@ -15322,74 +15322,82 @@ if (calcCzynnosciTrigger) {
         // Pokaż modal
         activitiesModal.style.display = 'flex';
         
-        // Wpisz obecną wartość do szukajki (do edycji)
+        // Wpisz obecną wartość do pola wyszukiwania (żeby można było ją edytować)
         activitiesInput.value = calcCzynnosciTrigger.value;
         
-        // Pobierz historię (jeśli cache pusty lub wymuszamy odświeżenie)
+        // Pobierz historię (zawsze odświeżamy, aby mieć najnowsze)
         await fetchActivitiesHistory();
         
-        // Renderuj listę
+        // Renderuj listę (z uwzględnieniem tego, co jest wpisane w inpucie)
         renderActivitiesList();
         
-        // Focus na polu wpisywania (dla wygody)
-        setTimeout(() => activitiesInput.focus(), 100);
+        // Ustaw focus na polu, aby można było od razu pisać
+        setTimeout(() => {
+            activitiesInput.focus();
+            // Opcjonalnie: zaznacz tekst, aby łatwo go nadpisać
+            activitiesInput.select(); 
+        }, 100);
     });
 }
 
-// 2. Pobieranie historii z Firestore (ostatnie 30 dni)
+// 2. Pobieranie historii z Firestore + USUWANIE DUPLIKATÓW
 async function fetchActivitiesHistory() {
     if (!currentUserProfile) return;
     
-    // Oblicz datę 30 dni temu
-    const date30DaysAgo = new Date();
-    date30DaysAgo.setDate(date30DaysAgo.getDate() - 30);
-    const dateString = date30DaysAgo.toISOString().split('T')[0]; // YYYY-MM-DD
+    activitiesList.innerHTML = '<div style="padding:20px; text-align:center; color:#999;">Ładowanie historii...</div>';
 
     try {
-        // Zapytanie do archiwum paragonów
+        // Pobieramy ostatnie 100 paragonów tego lekarza
         const q = db.collection("archiwumParagony")
             .where("lekarz_uid", "==", currentUserProfile.uid)
-            .where("data", ">=", dateString)
-            .orderBy("data", "desc")
-            .limit(50); // Ograniczamy do 50 ostatnich paragonów dla wydajności
+            .orderBy("createdAt", "desc") // Najnowsze najpierw (wymaga indeksu, o którym rozmawialiśmy)
+            .limit(100);
 
         const snapshot = await q.get();
         
+        // Używamy obiektu Set, który automatycznie usuwa duplikaty
         const uniqueSet = new Set();
         
         snapshot.docs.forEach(doc => {
             const data = doc.data();
             if (data.czynnosci && data.czynnosci.trim() !== "") {
-                // Dodaj do zbioru unikalnych (normalizacja wielkości liter opcjonalna)
+                // Dodajemy do zbioru (Set ignoruje powtórzenia)
                 uniqueSet.add(data.czynnosci.trim());
             }
         });
         
-        // Zamień Set na tablicę
+        // Konwertujemy Set z powrotem na tablicę
         activitiesCache = Array.from(uniqueSet);
-        console.log(`Pobrano ${activitiesCache.length} unikalnych czynności z ostatnich 30 dni.`);
+        console.log(`Pobrano i oczyszczono historię: ${activitiesCache.length} unikalnych pozycji.`);
 
     } catch (error) {
         console.error("Błąd pobierania historii czynności:", error);
-        activitiesList.innerHTML = '<div style="padding:10px; text-align:center; color:red;">Błąd pobierania historii.</div>';
+        // Jeśli błąd indeksu, to na razie pusta lista (żeby nie blokować użytkownika)
+        activitiesCache = [];
     }
 }
 
-// 3. Renderowanie listy
+// 3. Renderowanie listy z FILTROWANIEM NA ŻYWO
 function renderActivitiesList() {
+    // Pobierz to, co użytkownik wpisuje, małymi literami
     const filterText = activitiesInput.value.toLowerCase().trim();
-    activitiesList.innerHTML = '';
     
+    activitiesList.innerHTML = '';
     let found = 0;
     
     activitiesCache.forEach(act => {
+        // Sprawdź, czy wpis z historii zawiera wpisywany tekst
         if (act.toLowerCase().includes(filterText)) {
             const item = document.createElement('div');
-            item.className = 'client-search-item'; // Używamy stylu listy klientów (pasuje idealnie)
+            item.className = 'client-search-item'; // Styl listy (ten sam co przy klientach)
             item.style.padding = "12px";
-            item.textContent = act;
+            item.style.cursor = "pointer";
+            item.style.borderBottom = "1px solid #eee";
             
-            // Kliknięcie wybiera czynność
+            // Podświetlenie pasującego fragmentu (opcjonalne, ale ładne)
+            item.textContent = act; 
+            
+            // Kliknięcie wybiera czynność i zamyka modal
             item.addEventListener('click', () => {
                 selectActivity(act);
             });
@@ -15399,12 +15407,15 @@ function renderActivitiesList() {
         }
     });
     
-    if (found === 0) {
-        activitiesList.innerHTML = '<div style="padding:15px; text-align:center; color:#999;">Brak w historii.<br>Kliknij "➕ Użyj wpisanej", aby dodać nową.</div>';
+    // Komunikaty gdy lista jest pusta lub brak wyników wyszukiwania
+    if (activitiesCache.length === 0) {
+        activitiesList.innerHTML = '<div style="padding:15px; text-align:center; color:#999;">Brak historii czynności.</div>';
+    } else if (found === 0) {
+        activitiesList.innerHTML = '<div style="padding:15px; text-align:center; color:#999;">Brak takiej czynności w historii.<br>Kliknij "➕ Użyj wpisanej", aby dodać ją jako nową.</div>';
     }
 }
 
-// 4. Wybór czynności
+// 4. Wybór czynności (zamyka modal i wpisuje wartość)
 function selectActivity(text) {
     if (calcCzynnosciTrigger) {
         calcCzynnosciTrigger.value = text;
@@ -15412,14 +15423,16 @@ function selectActivity(text) {
     activitiesModal.style.display = 'none';
 }
 
-// 5. Obsługa przycisków
+// 5. Obsługa przycisków i inputa
 if (activitiesCloseBtn) {
     activitiesCloseBtn.addEventListener('click', () => {
         activitiesModal.style.display = 'none';
     });
 }
 
+// TO JEST KLUCZOWE DLA FILTROWANIA:
 if (activitiesInput) {
+    // Uruchom renderowanie przy każdym naciśnięciu klawisza
     activitiesInput.addEventListener('input', renderActivitiesList);
 }
 
@@ -15429,7 +15442,8 @@ if (btnUseNewActivity) {
         if (text) {
             selectActivity(text);
         } else {
-            showToast("Wpisz treść czynności.", "info");
+            // Jeśli pole puste, po prostu zamknij (lub pokaż błąd)
+            activitiesModal.style.display = 'none';
         }
     });
 }
