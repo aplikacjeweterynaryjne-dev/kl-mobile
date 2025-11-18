@@ -10434,22 +10434,24 @@ let reportClientsLoaded = false;
  * Wywoływana przy każdym wejściu do sekcji Raporty.
  * Ładuje listy lekarzy i klientów do filtrów.
  */
+/**
+ * Wywoływana przy każdym wejściu do sekcji Raporty.
+ * Ładuje listy lekarzy i klientów do filtrów.
+ */
 function onShowRaporty() {
-    console.log("Wejście do sekcji Raporty. Ładowanie filtrów...");
-    if (!reportUsersLoaded) {
-        loadReportUsers();
-    }
-    if (!reportClientsLoaded) {
-        loadReportClients();
-    }
-    
-    // Ustaw domyślne daty (np. bieżący miesiąc)
-    const today = new Date();
-    const firstDay = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
-    const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0).toISOString().split('T')[0];
-    
-    if (!reportDateStart.value) reportDateStart.value = firstDay;
-    if (!reportDateEnd.value) reportDateEnd.value = lastDay;
+    console.log("Wejście do sekcji Raporty. Ładowanie filtrów...");
+    if (!reportUsersLoaded) {
+        loadReportUsers();
+    }
+    if (!reportClientsLoaded) {
+        loadReportClients();
+    }
+    
+    // ✅ ZMIANA: Ustaw domyślne daty na DZISIAJ
+    const today = new Date().toISOString().split('T')[0];
+    
+    if (!reportDateStart.value) reportDateStart.value = today;
+    if (!reportDateEnd.value) reportDateEnd.value = today;
 }
 
 /**
@@ -10644,100 +10646,111 @@ async function fetchReceiptsForReport(dateStart, dateEnd, userId) {
 /**
  * Generuje Raporty Wizyt (Typ 1, 2, 3)
  */
+/**
+ * Generuje Raporty Wizyt (Typ 1, 2, 3)
+ * ZMIANA: Raport gotówki pokazuje WSZYSTKO, ale sumuje tylko ZAPŁACONE.
+ */
 function generateWizytyReport(allReceipts, filters) {
-    console.log("Generowanie raportu wizyt...");
-    
-    // --- 1. Filtrowanie w JavaScript ---
-    let filteredReceipts = [...allReceipts];
+    console.log("Generowanie raportu wizyt...");
+    
+    // --- 1. Filtrowanie w JavaScript ---
+    let filteredReceipts = [...allReceipts];
 
-    // Filtr Klienta
-    // Filtr Klienta
-    if (filters.klient) { // ✅ ZMIANA: Filtruj tylko jeśli pole 'klient' nie jest puste
-        filteredReceipts = filteredReceipts.filter(r => r.klient === filters.klient);
-    }
+    // Filtr Klienta
+    if (filters.klient) {
+        filteredReceipts = filteredReceipts.filter(r => r.klient === filters.klient);
+    }
 
-    // Filtr Statusu (w zależności od typu raportu)
-    let reportTitle = "Raport Ogólny";
-    let sumTitle = "Suma wszystkich wizyt";
-    
-    if (filters.type === "gotowka") {
-        filteredReceipts = filteredReceipts.filter(r => r.status === "Zapłacone");
-        reportTitle = "Raport Przyjętej Gotówki";
-        sumTitle = "Suma przyjętej gotówki";
-    } else if (filters.type === "dluznicy") {
-        filteredReceipts = filteredReceipts.filter(r => r.status === "Dług");
-        reportTitle = "Raport Dłużników";
-        sumTitle = "Suma zadłużenia";
-    }
-    // Dla "ogolny" nie filtrujemy statusu
+    // Konfiguracja tytułów
+    let reportTitle = "Raport Ogólny";
+    let sumTitle = "Suma wszystkich wizyt";
+    
+    if (filters.type === "gotowka") {
+        // ✅ ZMIANA: NIE filtrujemy listy (chcemy widzieć wszystko)
+        reportTitle = "Raport Przyjętej Gotówki";
+        sumTitle = "Suma przyjętej gotówki";
+    } else if (filters.type === "dluznicy") {
+        // Dla dłużników nadal filtrujemy listę (pokazujemy tylko długi)
+        filteredReceipts = filteredReceipts.filter(r => r.status === "Dług");
+        reportTitle = "Raport Dłużników";
+        sumTitle = "Suma zadłużenia";
+    }
+    // Dla "ogolny" nie filtrujemy statusu
 
-    // --- 2. Obliczanie sumy i budowanie tabeli ---
-    let totalSum = 0;
-    let tableHtml = '';
+    // --- 2. Obliczanie sumy i budowanie tabeli ---
+    let totalSum = 0;
+    let tableHtml = '';
 
-    filteredReceipts.sort((a, b) => a.data.localeCompare(b.data)); // Sortuj po dacie
+    filteredReceipts.sort((a, b) => a.data.localeCompare(b.data)); // Sortuj po dacie
 
-    for (const receipt of filteredReceipts) {
-        const suma = parseFloat(receipt.suma) || 0;
-        totalSum += suma;
+    for (const receipt of filteredReceipts) {
+        const suma = parseFloat(receipt.suma) || 0;
+        
+        // ✅ ZMIANA LOGIKI SUMOWANIA
+        if (filters.type === "gotowka") {
+            // W raporcie gotówkowym dodajemy do sumy TYLKO jeśli zapłacone
+            if (receipt.status === "Zapłacone") {
+                totalSum += suma;
+            }
+        } else {
+            // W innych raportach (ogólny, dłużnicy) sumujemy wszystko co jest na liście
+            totalSum += suma;
+        }
 
-        // Formatowanie kolumny "Zużycia"
-        let zuzyciaHtml = '';
-        if (receipt.pozycje && receipt.pozycje.length > 0) {
-            // Filtrujemy, aby pokazać tylko produkty (bez "Wyrównanie")
-            const produkty = receipt.pozycje.filter(p => p.name.toLowerCase() !== 'wyrównanie');
-            
-            if (produkty.length > 0) {
-                 zuzyciaHtml = '<ul style="margin: 0; padding-left: 18px; font-size: 12px; color: #333;">';
-                for (const item of produkty) {
-                    zuzyciaHtml += `<li>${item.name} - ${item.quantity}</li>`;
-                }
-                zuzyciaHtml += '</ul>';
-            }
-        }
-        
-        // Status płatności (kolorowanie)
-        const statusColor = receipt.status === "Zapłacone" ? "green" : (receipt.status === "Dług" ? "red" : "#555");
-        const notatka = receipt.notatka || '';
+        // Formatowanie kolumny "Zużycia"
+        let zuzyciaHtml = '';
+        if (receipt.pozycje && receipt.pozycje.length > 0) {
+            const produkty = receipt.pozycje.filter(p => p.name.toLowerCase() !== 'wyrównanie');
+            
+            if (produkty.length > 0) {
+                 zuzyciaHtml = '<ul style="margin: 0; padding-left: 18px; font-size: 12px; color: #333;">';
+                for (const item of produkty) {
+                    zuzyciaHtml += `<li>${item.name} - ${item.quantity}</li>`;
+                }
+                zuzyciaHtml += '</ul>';
+            }
+        }
+        
+        // Status płatności (kolorowanie)
+        const statusColor = receipt.status === "Zapłacone" ? "green" : (receipt.status === "Dług" ? "red" : "#555");
+        const notatka = receipt.notatka || '';
 
-        // Budowanie wiersza
-        tableHtml += `
-            <tr data-klient="${receipt.klient}" data-data="${receipt.data}" data-czynnosci="${receipt.czynnosci || ''}" data-suma="${suma}" data-status="${receipt.status || ''}" data-notatka="${notatka}">
-                <td>${receipt.klient}</td>
-                <td>${receipt.data}</td>
-                <td>${receipt.czynnosci || ''}</td>
-                <td class="col-zuzycia">${zuzyciaHtml}</td>
-                <td style="text-align: right;">${formatPrice(suma)}</td>
-                <td style="color: ${statusColor}; font-weight: bold;">${receipt.status || 'Brak'}</td>
-                <td title="${notatka}">${notatka.substring(0, 30)}${notatka.length > 30 ? '...' : ''}</td>
-            </tr>
-        `;
-    }
+        // Budowanie wiersza
+        tableHtml += `
+            <tr data-klient="${receipt.klient}" data-data="${receipt.data}" data-czynnosci="${receipt.czynnosci || ''}" data-suma="${suma}" data-status="${receipt.status || ''}" data-notatka="${notatka}">
+                <td>${receipt.klient}</td>
+                <td>${receipt.data}</td>
+                <td>${receipt.czynnosci || ''}</td>
+                <td class="col-zuzycia">${zuzyciaHtml}</td>
+                <td style="text-align: right;">${formatPrice(suma)}</td>
+                <td style="color: ${statusColor}; font-weight: bold;">${receipt.status || 'Brak'}</td>
+                <td title="${notatka}">${notatka.substring(0, 30)}${notatka.length > 30 ? '...' : ''}</td>
+            </tr>
+        `;
+    }
 
-    // --- 3. Aktualizacja widoku (DOM) ---
-    reportWizytyTableBody.innerHTML = tableHtml || '<tr><td colspan="7" style="text-align: center; padding: 20px;">Brak danych dla wybranych filtrów.</td></tr>';
-    
-    // Pokaż/Ukryj tabele
-    reportWizytyTableContainer.style.display = 'block';
-    reportZuzyciaTableContainer.style.display = 'none';
-    
-    // Pokaż/Ukryj pole paliwa i sumę netto
-    const isCashReport = (filters.type === "gotowka");
-    reportFuelSection.style.display = isCashReport ? 'flex' : 'none';
-    reportNetSumContainer.style.display = isCashReport ? 'inline' : 'none'; // 'inline' lub 'block'
+    // --- 3. Aktualizacja widoku (DOM) ---
+    reportWizytyTableBody.innerHTML = tableHtml || '<tr><td colspan="7" style="text-align: center; padding: 20px;">Brak danych dla wybranych filtrów.</td></tr>';
+    
+    // Pokaż/Ukryj tabele
+    reportWizytyTableContainer.style.display = 'block';
+    reportZuzyciaTableContainer.style.display = 'none';
+    
+    // Pokaż/Ukryj pole paliwa i sumę netto
+    const isCashReport = (filters.type === "gotowka");
+    reportFuelSection.style.display = isCashReport ? 'flex' : 'none';
+    reportNetSumContainer.style.display = isCashReport ? 'inline' : 'none';
 
-    // Aktualizuj podsumowanie
-
-    // Aktualizuj podsumowanie
-    reportMainTitle.textContent = reportTitle;
-    reportDateDisplay.textContent = `Raport zawiera wizyty od: ${filters.dateStart} do: ${filters.dateEnd}`;
-    reportUserDisplay.textContent = `Pracownik: ${filters.userName}`;
-    reportSumTitle.textContent = `${sumTitle}:`; // Usunięto tekst o tankowaniu
-    reportCalculatedSum.textContent = formatPrice(totalSum);
-    
-    // Zaktualizuj sumę netto
-    reportFuelCost.value = 0; // Zresetuj koszty
-    updateNetSum(totalSum);
+    // Aktualizuj podsumowanie
+    reportMainTitle.textContent = reportTitle;
+    reportDateDisplay.textContent = `Raport zawiera wizyty od: ${filters.dateStart} do: ${filters.dateEnd}`;
+    reportUserDisplay.textContent = `Pracownik: ${filters.userName}`;
+    reportSumTitle.textContent = `${sumTitle}:`;
+    reportCalculatedSum.textContent = formatPrice(totalSum);
+    
+    // Zaktualizuj sumę netto
+    reportFuelCost.value = 0; // Zresetuj koszty
+    updateNetSum(totalSum);
 }
 
 /**
