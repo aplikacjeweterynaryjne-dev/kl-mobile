@@ -15002,20 +15002,21 @@ if (adminZarzadzajBtn) {
     });
 }
     /* ======================================================== */
+/* ======================================================== */
 /* ✅ KOREKTA: Funkcja otwierająca podgląd wydruku Raportu */
 /* ======================================================== */
 function openReportPrintWindow() {
     console.log("Otwieranie okna podglądu raportu...");
-
+    
     // 1. Pobierz zawartość HTML wygenerowanego raportu
     const reportContentEl = document.getElementById('reportResultArea');
     if (!reportContentEl) {
         showToast("Błąd: Nie znaleziono treści raportu (reportResultArea).", "error");
         return;
     }
-    // Pobieramy "wewnętrzny" HTML, aby uniknąć zagnieżdżenia
+    // Pobieramy "wewnętrzny" HTML
     const reportHTML = reportContentEl.innerHTML;
-
+    
     // 2. Otwórz nowe okno
     const printWindow = window.open('', '_blank', 'width=800,height=700,scrollbars=yes,resizable=yes');
     if (!printWindow) {
@@ -15038,7 +15039,7 @@ function openReportPrintWindow() {
                     padding: 0; 
                     background-color: #f0f0f0; 
                 }
-
+                
                 /* Kontrolki (Drukuj/Zamknij) - nie do druku */
                 .print-controls {
                     padding: 10px; 
@@ -15053,41 +15054,62 @@ function openReportPrintWindow() {
                 }
                 .print-controls .print-btn { background-color: #4CAF50; color: white; border-color: #388E3C;}
                 .print-controls .close-btn { background-color: #f44336; color: white; border-color: #D32F2F;}
-
+                
                 /* "Kartka" A4 do podglądu */
                 .page-preview {
-                    width: 210mm; /* Szerokość A4 */
-                    min-height: 297mm; /* Wysokość A4 (orientacyjna) */
-                    padding: 1cm; /* Marginesy jak na wydruku */
+                    width: 210mm; 
+                    min-height: 297mm; 
+                    padding: 1cm; 
                     margin: 20px auto; 
                     background-color: #ffffff; 
                     box-shadow: 0 0 10px rgba(0,0,0,0.15);
                     box-sizing: border-box;
                 }
-
-                /* Style dla treści raportu (skopiowane z Twoich styli @media print) */
-                /* Upewniamy się, że wszystko w raporcie jest widoczne */
-                .report-summary-header div {
-                    background: none !important; padding: 0 !important; border: none !important;
+                
+                /* --- ✅ KOREKTA ODSTĘPÓW DLA OKNA DRUKU --- */
+                
+                /* 1. Zresetuj marginesy nagłówków */
+                h3, h4, p {
+                    margin-top: 5px !important;
+                    margin-bottom: 5px !important;
+                }
+                
+                /* 2. Ściśnij sekcję podsumowania (szary box) */
+                .report-summary-header > div {
+                    margin-bottom: 5px !important;
+                    padding-bottom: 5px !important;
+                    background: none !important; 
+                    border: none !important;
                     box-shadow: none !important;
                 }
-                /* Ukrywamy elementy, których nie chcesz na wydruku */
-               
 
+                /* 3. Usuń odstęp nad tabelą */
+                .table-container, 
+                #reportWizytyTableContainer, 
+                #reportZuzyciaTableContainer {
+                    margin-top: 0 !important;
+                    padding-top: 0 !important;
+                }
+                
+                /* 4. Usuń odstęp samej tabeli */
                 table { 
+                    margin-top: 5px !important;
                     border-collapse: collapse; width: 100%; font-size: 10pt; 
                     -webkit-print-color-adjust: exact; print-color-adjust: exact;
                 }
+                
+                /* --- Koniec korekty --- */
+
                 th, td { 
                     border: 1px solid #ddd; padding: 4px; text-align: left; 
-                    white-space: nowrap; word-break: keep-all; /* Zachowaj style tabeli raportów */
+                    white-space: nowrap; word-break: keep-all; 
                 }
-                th { background: #f2f2f2 !important; } /* Wymuś tło nagłówków */
+                th { background: #f2f2f2 !important; } 
                 #reportWizytyTable .col-zuzycia ul { 
                     margin: 0; padding-left: 18px; font-size: 10pt; 
                 }
 
-                /* Style dla samego wydruku (z nowego okna) */
+                /* Style dla samego wydruku */
                 @media print {
                     body { background-color: #ffffff !important; }
                     .print-controls { display: none !important; }
@@ -15098,10 +15120,9 @@ function openReportPrintWindow() {
                         padding: 0 !important;
                         box-shadow: none !important;
                     }
-                    /* Ustawienia strony (rozwiązuje problem marginesów na mobilkach) */
                     @page {
-                        size: A4 portrait; /* Wymuś portret */
-                        margin: 1cm; /* Ustaw marginesy strony */
+                        size: A4 portrait;
+                        margin: 1cm;
                     }
                 }
             </style>
@@ -15117,7 +15138,7 @@ function openReportPrintWindow() {
         </body>
         </html>
     `);
-
+    
     printWindow.document.close();
     printWindow.focus();
 }
