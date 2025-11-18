@@ -6079,6 +6079,22 @@ const correctionAmountInput = document.getElementById('correctionAmountInput');
 const correctionNameInput = document.getElementById('correctionNameInput');
 const addCorrectionBtn = document.getElementById('addCorrectionBtn');
 // ✅ KONIEC MODUŁU KOREKTY
+// ✅ POCZĄTEK MODUŁU 2 (Kalkulator): Zmienne Nawigacji
+    const calcStep1 = document.getElementById('calcStep1');
+    const calcStep2 = document.getElementById('calcStep2');
+    const calcStep3 = document.getElementById('calcStep3');
+    
+    const indStep1 = document.getElementById('indStep1');
+    const indStep2 = document.getElementById('indStep2');
+    const indStep3 = document.getElementById('indStep3');
+
+    const btnToStep2 = document.getElementById('btnToStep2');
+    const btnToStep3 = document.getElementById('btnToStep3');
+    const btnBackToStep1 = document.getElementById('btnBackToStep1');
+    const btnBackToStep2 = document.getElementById('btnBackToStep2');
+    
+    const calcFinalSumDisplay = document.getElementById('calcFinalSumDisplay');
+    // ✅ KONIEC MODUŁU 2
     const calcNotatkaInput = document.getElementById('calcNotatkaInput'); // ✅ ZADANIE 2
 // Tablica przechowuje teraz { name: '...', quantity: 1, price: 10.50 }
     // ✅ Moduł 2: Zmienne statusu płatności
@@ -9368,7 +9384,37 @@ function onShowKarta() {
         refreshSchemaDatalist();
     }
 }
+/* ======================================================== */
+/* ✅ MODUŁ 2 (Kalkulator): Logika Nawigacji (Wizard) */
+/* ======================================================== */
 
+function goToCalcStep(stepNumber) {
+    // 1. Ukryj wszystkie kroki
+    if(calcStep1) calcStep1.classList.remove('active');
+    if(calcStep2) calcStep2.classList.remove('active');
+    if(calcStep3) calcStep3.classList.remove('active');
+
+    // 2. Zresetuj wskaźniki
+    if(indStep1) indStep1.classList.remove('active');
+    if(indStep2) indStep2.classList.remove('active');
+    if(indStep3) indStep3.classList.remove('active');
+
+    // 3. Pokaż wybrany krok
+    if (stepNumber === 1) {
+        calcStep1.classList.add('active');
+        indStep1.classList.add('active');
+    } else if (stepNumber === 2) {
+        calcStep2.classList.add('active');
+        indStep2.classList.add('active');
+        // Opcjonalnie: Odśwież widok paragonu przy wejściu
+        renderReceipt(); 
+    } else if (stepNumber === 3) {
+        calcStep3.classList.add('active');
+        indStep3.classList.add('active');
+        // Ważne: Przy wejściu do podsumowania, upewnij się, że suma jest aktualna
+        renderReceipt();
+    }
+}
 function onShowKalkulator() {
     // 1. Sprawdź, czy kalkulator jest "brudny"
     if (isKalkulatorDirty()) {
@@ -9399,7 +9445,39 @@ if (menuKartaBtn) {
         if (metodaModal) metodaModal.style.display = 'flex'; // Pokaż modal
     });
 }
+// --- Listenery Nawigacji Kalkulatora ---
 
+if (btnToStep2) {
+    btnToStep2.addEventListener('click', () => {
+        // Walidacja Kroku 1 (Opcjonalna, ale zalecana)
+        const klient = document.getElementById('calcKlientInput').value.trim();
+        if (!klient) {
+            showToast("Wpisz nazwę klienta, aby przejść dalej.", "error");
+            return;
+        }
+        goToCalcStep(2);
+    });
+}
+
+if (btnToStep3) {
+    btnToStep3.addEventListener('click', () => {
+        // Walidacja Kroku 2: Czy paragon nie jest pusty?
+        if (receiptItems.length === 0) {
+            if(!confirm("Paragon jest pusty. Czy na pewno chcesz przejść do podsumowania?")) {
+                return;
+            }
+        }
+        goToCalcStep(3);
+    });
+}
+
+if (btnBackToStep1) {
+    btnBackToStep1.addEventListener('click', () => goToCalcStep(1));
+}
+
+if (btnBackToStep2) {
+    btnBackToStep2.addEventListener('click', () => goToCalcStep(2));
+}
 /* ✅ KONIEC: NOWY BLOK KODU */
 /* ⬆️ ======================================================= ⬆️ */
 /* ⬇️ ======================================================= ⬇️ */
