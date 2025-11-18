@@ -6565,23 +6565,34 @@ if (saveReceiptBtn) {
 const roundTotalBtn = document.getElementById('roundTotalBtn');
 if (roundTotalBtn) {
     roundTotalBtn.addEventListener('click', () => {
-        // 1. Usuń poprzednie zaokrąglenie, jeśli istnieje
+        // 1. Usuń poprzednie zaokrąglenie (jeśli już było)
         receiptItems = receiptItems.filter(item => item.name !== "Wyrównanie");
         
-        // 2. Przelicz sumę na nowo (po usunięciu)
-        renderReceipt();
+        // 2. Przelicz aktualną sumę rzeczywistą
+        let currentTotal = 0;
+        receiptItems.forEach(item => {
+            currentTotal += (Number(item.quantity) * Number(item.price));
+        });
+
+        // 3. Oblicz sumę zaokrągloną (matematycznie do 10: <5 w dół, >=5 w górę)
+        const roundedTotal = Math.round(currentTotal / 10) * 10;
         
-        // 3. Oblicz różnicę
-        const currentTotal = receiptTotal;
-        const roundedTotal = Math.ceil(currentTotal / 10) * 10;
+        // 4. Oblicz różnicę (może być ujemna lub dodatnia)
         const difference = roundedTotal - currentTotal;
 
-        // 4. Dodaj "Wyrównanie" tylko jeśli jest dodatnie
-        if (difference > 0) {
-            // Używamy zmodyfikowanej funkcji, aby dodać produkt z własną ceną
+        // 5. Dodaj pozycję wyrównania (jeśli różnica nie jest zerowa)
+        if (difference !== 0) {
+            // Dodajemy jako zwykły produkt, ale z ceną równą różnicy
             addItemToReceipt("Wyrównanie", 1, difference);
+            showToast(`Zaokrąglono sumę do ${formatPrice(roundedTotal)}`, 'success');
+        } else {
+            showToast("Suma jest już równa.", "info");
         }
+        
+        // 6. Odśwież widok (to zaktualizuje też Wielką Sumę w Kroku 3)
+        renderReceipt();
     });
+}
 }
 /* Plik: index.html (wklej ok. linii 1527) */
 
