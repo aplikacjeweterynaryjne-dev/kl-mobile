@@ -10584,8 +10584,13 @@ if (generateReportBtn) {
                 generateWizytyReport(cachedReportData, filters);
             }
 
-            reportResultArea.style.display = 'block';
-            printReportBtn.style.display = 'inline-block';
+           // KOREKTA: Pokaż raport na stronie (do podglądu)
+            reportResultArea.style.display = 'block';
+
+            // KOREKTA: Zamiast pokazywać stary przycisk, otwórz nowe okno
+            openReportPrintWindow();
+
+            // printReportBtn.style.display = 'inline-block'; // <-- Tę linię wyłączamy
 
         } catch (error) {
             console.error("Błąd podczas generowania raportu:", error);
@@ -14952,6 +14957,131 @@ if (adminZarzadzajBtn) {
         showSection('zarzadzanieMagazynami');
     });
 }
+    /* ======================================================== */
+/* ✅ KOREKTA: Funkcja otwierająca podgląd wydruku Raportu */
+/* ======================================================== */
+function openReportPrintWindow() {
+    console.log("Otwieranie okna podglądu raportu...");
+
+    // 1. Pobierz zawartość HTML wygenerowanego raportu
+    const reportContentEl = document.getElementById('reportResultArea');
+    if (!reportContentEl) {
+        showToast("Błąd: Nie znaleziono treści raportu (reportResultArea).", "error");
+        return;
+    }
+    // Pobieramy "wewnętrzny" HTML, aby uniknąć zagnieżdżenia
+    const reportHTML = reportContentEl.innerHTML;
+
+    // 2. Otwórz nowe okno
+    const printWindow = window.open('', '_blank', 'width=800,height=700,scrollbars=yes,resizable=yes');
+    if (!printWindow) {
+        showToast('Nie udało się otworzyć nowego okna. Wyłącz blokowanie wyskakujących okienek.', 'error');
+        return;
+    }
+
+    // 3. Wygeneruj pełny HTML dla nowego okna
+    printWindow.document.write(`
+        <!DOCTYPE html>
+        <html lang="pl">
+        <head>
+            <meta charset="utf-8">
+            <title>Podgląd Raportu</title>
+            <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
+            <style>
+                body { 
+                    font-family: 'Nunito', sans-serif; 
+                    margin: 0; 
+                    padding: 0; 
+                    background-color: #f0f0f0; 
+                }
+
+                /* Kontrolki (Drukuj/Zamknij) - nie do druku */
+                .print-controls {
+                    padding: 10px; 
+                    text-align: center; 
+                    background-color: #333;
+                    position: sticky; top: 0; z-index: 100;
+                }
+                .print-controls button {
+                    padding: 8px 15px; font-size: 16px; margin: 0 5px; 
+                    cursor: pointer; border-radius: 6px; border: 1px solid #777;
+                    font-family: 'Nunito', sans-serif; font-weight: 600;
+                }
+                .print-controls .print-btn { background-color: #4CAF50; color: white; border-color: #388E3C;}
+                .print-controls .close-btn { background-color: #f44336; color: white; border-color: #D32F2F;}
+
+                /* "Kartka" A4 do podglądu */
+                .page-preview {
+                    width: 210mm; /* Szerokość A4 */
+                    min-height: 297mm; /* Wysokość A4 (orientacyjna) */
+                    padding: 1cm; /* Marginesy jak na wydruku */
+                    margin: 20px auto; 
+                    background-color: #ffffff; 
+                    box-shadow: 0 0 10px rgba(0,0,0,0.15);
+                    box-sizing: border-box;
+                }
+
+                /* Style dla treści raportu (skopiowane z Twoich styli @media print) */
+                /* Upewniamy się, że wszystko w raporcie jest widoczne */
+                .report-summary-header div {
+                    background: none !important; padding: 0 !important; border: none !important;
+                    box-shadow: none !important;
+                }
+                /* Ukrywamy elementy, których nie chcesz na wydruku */
+                #reportNetSum, #reportNetSum::before, #reportFuelSection { 
+                    display: none !important; 
+                }
+
+                table { 
+                    border-collapse: collapse; width: 100%; font-size: 10pt; 
+                    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+                }
+                th, td { 
+                    border: 1px solid #ddd; padding: 4px; text-align: left; 
+                    white-space: nowrap; word-break: keep-all; /* Zachowaj style tabeli raportów */
+                }
+                th { background: #f2f2f2 !important; } /* Wymuś tło nagłówków */
+                #reportWizytyTable .col-zuzycia ul { 
+                    margin: 0; padding-left: 18px; font-size: 10pt; 
+                }
+
+                /* Style dla samego wydruku (z nowego okna) */
+                @media print {
+                    body { background-color: #ffffff !important; }
+                    .print-controls { display: none !important; }
+                    .page-preview {
+                        width: 100% !important;
+                        min-height: unset !important;
+                        margin: 0 !important;
+                        padding: 0 !important;
+                        box-shadow: none !important;
+                    }
+                    /* Ustawienia strony (rozwiązuje problem marginesów na mobilkach) */
+                    @page {
+                        size: A4 portrait; /* Wymuś portret */
+                        margin: 1cm; /* Ustaw marginesy strony */
+                    }
+                }
+            </style>
+        </head>
+        <body>
+            <div class="print-controls">
+                <button class="print-btn" onclick="window.print();">Drukuj</button>
+                <button class="close-btn" onclick="window.close();">Zamknij okno</button>
+            </div>
+            <div class="page-preview">
+                ${reportHTML}
+            </div>
+        </body>
+        </html>
+    `);
+
+    printWindow.document.close();
+    printWindow.focus();
+}
+/* ======================================================== */
+/* ✅ KONIEC: KOREKTA - Funkcja drukowania Raportu */
+/* ======================================================== */
 </script> 
 
 <div id="toastContainer" style="position: fixed; top: 20px; right: 20px; z-index: 20000; display: flex; flex-direction: column; gap: 10px;">
