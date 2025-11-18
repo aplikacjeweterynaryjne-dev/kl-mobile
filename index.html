@@ -10651,20 +10651,21 @@ function generateWizytyReport(allReceipts, filters) {
     let filteredReceipts = [...allReceipts];
 
     // Filtr Klienta
-    // Filtr Klienta
-    if (filters.klient) { // ✅ ZMIANA: Filtruj tylko jeśli pole 'klient' nie jest puste
+    if (filters.klient) {
         filteredReceipts = filteredReceipts.filter(r => r.klient === filters.klient);
     }
 
-    // Filtr Statusu (w zależności od typu raportu)
+    // Konfiguracja tytułów i filtrowanie listy
     let reportTitle = "Raport Ogólny";
     let sumTitle = "Suma wszystkich wizyt";
     
     if (filters.type === "gotowka") {
-        filteredReceipts = filteredReceipts.filter(r => r.status === "Zapłacone");
+        // ✅ ZMIANA: USUNĄŁEM FILTROWANIE LISTY DLA 'GOTOWKA'
+        // filteredReceipts = filteredReceipts.filter(r => r.status === "Zapłacone"); // <-- TO BYŁO TU
         reportTitle = "Raport Przyjętej Gotówki";
-        sumTitle = "Suma przyjętej gotówki";
+        sumTitle = "Suma przyjętej gotówki (tylko 'Zapłacone')";
     } else if (filters.type === "dluznicy") {
+        // Dla dłużników nadal filtrujemy listę
         filteredReceipts = filteredReceipts.filter(r => r.status === "Dług");
         reportTitle = "Raport Dłużników";
         sumTitle = "Suma zadłużenia";
@@ -10679,12 +10680,21 @@ function generateWizytyReport(allReceipts, filters) {
 
     for (const receipt of filteredReceipts) {
         const suma = parseFloat(receipt.suma) || 0;
-        totalSum += suma;
+        
+        // ✅ ZMIANA LOGIKI SUMOWANIA
+        // Dodajemy do sumy głównej tylko jeśli to raport ogólny/dłużników
+        // LUB jeśli to raport gotówkowy I status jest "Zapłacone"
+        if (filters.type === "gotowka") {
+            if (receipt.status === "Zapłacone") {
+                totalSum += suma;
+            }
+        } else {
+            totalSum += suma;
+        }
 
         // Formatowanie kolumny "Zużycia"
         let zuzyciaHtml = '';
         if (receipt.pozycje && receipt.pozycje.length > 0) {
-            // Filtrujemy, aby pokazać tylko produkty (bez "Wyrównanie")
             const produkty = receipt.pozycje.filter(p => p.name.toLowerCase() !== 'wyrównanie');
             
             if (produkty.length > 0) {
@@ -10724,15 +10734,13 @@ function generateWizytyReport(allReceipts, filters) {
     // Pokaż/Ukryj pole paliwa i sumę netto
     const isCashReport = (filters.type === "gotowka");
     reportFuelSection.style.display = isCashReport ? 'flex' : 'none';
-    reportNetSumContainer.style.display = isCashReport ? 'inline' : 'none'; // 'inline' lub 'block'
-
-    // Aktualizuj podsumowanie
+    reportNetSumContainer.style.display = isCashReport ? 'inline' : 'none';
 
     // Aktualizuj podsumowanie
     reportMainTitle.textContent = reportTitle;
     reportDateDisplay.textContent = `Raport zawiera wizyty od: ${filters.dateStart} do: ${filters.dateEnd}`;
     reportUserDisplay.textContent = `Pracownik: ${filters.userName}`;
-    reportSumTitle.textContent = `${sumTitle}:`; // Usunięto tekst o tankowaniu
+    reportSumTitle.textContent = `${sumTitle}:`;
     reportCalculatedSum.textContent = formatPrice(totalSum);
     
     // Zaktualizuj sumę netto
