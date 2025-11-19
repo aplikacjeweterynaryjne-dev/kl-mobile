@@ -6636,21 +6636,12 @@ document.getElementById('calcKlientInput').addEventListener('input', function() 
 // 2. Aktywacja trybu korekty
 document.getElementById('correctionModeCheckbox').addEventListener('change', function() {
     const container = document.getElementById('correctionSelectContainer');
-    const clientName = document.getElementById('calcKlientInput').value.trim(); // Pobierz imię klienta
-    
     if (this.checked) {
         container.style.display = 'block';
         showToast("Włączono Tryb Korekty. Wybierz paragon do nadpisania.", "info");
-        
-        // ✅ Jeśli klient jest już wpisany, od razu ładuj paragony
-        if (clientName) {
-            if (typeof loadArchivedReceiptsForCorrection === 'function') {
-                loadArchivedReceiptsForCorrection(clientName);
-            }
-        }
     } else {
         container.style.display = 'none';
-        // Reset pól korekty przy wyłączeniu
+        // Opcjonalnie: Zresetuj pola korekty przy wyłączeniu
         document.getElementById('correctionReceiptSelect').value = '';
     }
 });
@@ -13677,27 +13668,19 @@ try {
     }
 
 // 4. Funkcja wyboru klienta z modala (Zezwolenie na ręczny wpis)
-// 2. Aktywacja trybu korekty
-document.getElementById('correctionModeCheckbox').addEventListener('change', function() {
-    const container = document.getElementById('correctionSelectContainer');
-    const clientName = document.getElementById('calcKlientInput').value.trim(); // Pobierz imię klienta
-    
-    if (this.checked) {
-        container.style.display = 'block';
-        showToast("Włączono Tryb Korekty. Wybierz paragon do nadpisania.", "info");
+    function selectCalcClient(klientName) {
+        if (!klientName) return;
+
+        // Wpisz wartość do pola w kalkulatorze
+        calcClientTrigger.value = klientName;
         
-        // ✅ Jeśli klient jest już wpisany, od razu ładuj paragony
-        if (clientName) {
-            if (typeof loadArchivedReceiptsForCorrection === 'function') {
-                loadArchivedReceiptsForCorrection(clientName);
-            }
-        }
-    } else {
-        container.style.display = 'none';
-        // Reset pól korekty przy wyłączeniu
-        document.getElementById('correctionReceiptSelect').value = '';
+        // Nie wywołujemy input, bo nie chcemy, by datalist się otwierał ponownie
+        
+        closeCalcClientSearchModal();
+        
+        // Ustaw focus na następnym polu (Czynności)
+        document.getElementById('calcCzynnosciInput')?.focus();
     }
-});
 
     // 5. Podpięcie listenerów
     if (calcClientTrigger) calcClientTrigger.addEventListener('click', openCalcClientSearchModal);
