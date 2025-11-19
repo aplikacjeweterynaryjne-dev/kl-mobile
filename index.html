@@ -6625,6 +6625,126 @@ async function saveReceiptToArchive(receiptData) {
     await db.collection("archiwumParagony").add(dataDoZapisu);
 }
 
+    // ✅ MODUŁ 5: Listener dla zmian klienta i checkboxa korekty
+
+// 1. Zmiana klienta -> ładuj paragony do listy
+document.getElementById('calcKlientInput').addEventListener('input', function() {
+    const clientName = this.value.trim();
+    loadArchivedReceiptsForCorrection(clientName);
+});
+
+// 2. Aktywacja trybu korekty
+document.getElementById('correctionModeCheckbox').addEventListener('change', function() {
+    const container = document.getElementById('correctionSelectContainer');
+    if (this.checked) {
+        container.style.display = 'block';
+        showToast("Włączono Tryb Korekty. Wybierz paragon do nadpisania.", "info");
+    } else {
+        container.style.display = 'none';
+        // Opcjonalnie: Zresetuj pola korekty przy wyłączeniu
+        document.getElementById('correctionReceiptSelect').value = '';
+    }
+});
+    // ✅ MODUŁ 5: Listener na zmianę wybranego paragonu
+document.getElementById('correctionReceiptSelect').addEventListener('change', function() {
+    populateReceiptFromArchive(this.value);
+});
+/**
+ * ✅ MODUŁ 5: Ładuje ostatnie paragony wybranego klienta do listy Korekty.
+ */
+async function loadArchivedReceiptsForCorrection(clientName) {
+    const selectEl = document.getElementById('correctionReceiptSelect');
+    if (!selectEl || !currentUserProfile) return;
+
+    selectEl.innerHTML = '<option value="">-- Ładowanie paragonów... --</option>';
+
+    if (!clientName || clientName.trim() === '') {
+        selectEl.innerHTML = '<option value="">-- Najpierw wpisz/wybierz klienta --</option>';
+        return;
+    }
+    
+    // Używamy zapytania do archiwum paragonów
+    try {
+        const q = db.collection("archiwumParagony")
+            .where("id_lecznicy", "==", currentUserProfile['ID lecznicy'])
+            .where("klient", "==", clientName) // Filtrujemy po nazwie klienta
+            .orderBy("data", "desc")
+            .limit(20);
+
+        const snapshot = await q.get();
+
+        if (snapshot.empty) {
+            selectEl.innerHTML = '<option value="">-- Brak paragonów w archiwum --</option>';
+            return;
+        }
+
+        selectEl.innerHTML = '<option value="">-- Wybierz paragon do korekty --</option>';
+        snapshot.docs.forEach(doc => {
+            const data = doc.data();
+            const date = data.data || 'Brak daty';
+            const sum = typeof formatPrice === 'function' ? formatPrice(data.suma) : `${data.suma} zł`;
+            
+            // Format wpisu: [Data, NrDokumentu, Suma]
+            const optionText = `${date} | ${data.nrDokumentu || 'Brak Nr'} | Suma: ${sum}`;
+            const option = new Option(optionText, doc.id);
+            selectEl.add(option);
+        });
+
+    } catch (error) {
+        console.error("Błąd ładowania paragonów do korekty:", error);
+        selectEl.innerHTML = '<option value="">-- BŁĄD ŁADOWANIA --</option>';
+    }
+}    
+
+    /**
+ * ✅ MODUŁ 5: Wczytuje dane starego paragonu do formularza.
+ */
+async function populateReceiptFromArchive(receiptDocId) {
+    if (!receiptDocId) return;
+
+    try {
+        const doc = await db.collection("archiwumParagony").doc(receiptDocId).get();
+        if (!doc.exists) {
+            showToast("Błąd: Nie znaleziono paragonu do wczytania.", "error");
+            return;
+        }
+        const data = doc.data();
+
+        // 1. Populacja pól podstawowych (Krok 1)
+        if (calcDataInput) calcDataInput.value = data.data || '';
+        if (calcNrDokInput) calcNrDokInput.value = data.nrDokumentu || ''; // Zostawiamy stary numer
+        if (calcCzynnosciInput) calcCzynnosciInput.value = data.czynnosci || '';
+
+        // 2. Populacja Stanu Płatności (Krok 3)
+        if (data.status === 'Zapłacone') {
+            document.getElementById('paymentStatusPaid')?.classList.add('active');
+            document.getElementById('paymentStatusDebt')?.classList.remove('active');
+        } else if (data.status === 'Dług') {
+            document.getElementById('paymentStatusDebt')?.classList.add('active');
+            document.getElementById('paymentStatusPaid')?.classList.remove('active');
+        }
+
+        // 3. Populacja Notatki (Krok 3)
+        if (calcNotatkaInput) calcNotatkaInput.value = data.notatka || '';
+        
+        // 4. Populacja Listy Produktów (Krok 2)
+        // Resetujemy listę i wczytujemy stare pozycje
+        receiptItems = []; 
+        (data.pozycje || []).forEach(item => {
+            // Używamy logicznych pól: name, quantity, price
+            addItemToReceipt(item.name, Number(item.quantity) || 0, Number(item.price) || 0);
+        });
+
+        // Wymuś odświeżenie widoku (przejdź do kroku 2)
+        if (typeof goToCalcStep === 'function') goToCalcStep(2);
+        
+        showToast("Pobrano paragon do korekty. Dane są gotowe do edycji.", "info");
+
+    } catch (e) {
+        console.error("Błąd ładowania starego paragonu:", e);
+        showToast("Krytyczny błąd podczas wczytywania danych paragonu.", "error");
+    }
+}
 /* Plik: index.html (ok. linii 2623) */
 
 // ⬇️ ⬇️ ⬇️ POCZĄTEK MODUŁU 2 (Logika PLU) ⬇️ ⬇️ ⬇️
@@ -13547,21 +13667,20 @@ try {
         if (foundItems === 0) calcClientSearchList.innerHTML = '<div class="client-search-item" style="color: #999;">Brak pasujących klientów.</div>';
     }
 
-    // 4. Funkcja wyboru klienta z modala
-    function selectCalcClient(klientName) {
-        if (!klientName) return;
+// 4. Funkcja wyboru klienta z modala (Zezwolenie na ręczny wpis)
+    function selectCalcClient(klientName) {
+        if (!klientName) return;
 
-        // Wpisz wartość do pola w kalkulatorze
-        calcClientTrigger.value = klientName;
-        
-        // (Opcjonalnie) Wywołaj 'input', jeśli jest jakaś logika od tego zależna
-        // calcClientTrigger.dispatchEvent(new Event('input', { bubbles: true })); 
-        
-        closeCalcClientSearchModal();
-        
-        // Ustaw focus na następnym polu, np. "Czynności"
-        document.getElementById('calcCzynnosciInput')?.focus();
-    }
+        // Wpisz wartość do pola w kalkulatorze
+        calcClientTrigger.value = klientName;
+        
+        // Nie wywołujemy input, bo nie chcemy, by datalist się otwierał ponownie
+        
+        closeCalcClientSearchModal();
+        
+        // Ustaw focus na następnym polu (Czynności)
+        document.getElementById('calcCzynnosciInput')?.focus();
+    }
 
     // 5. Podpięcie listenerów
     if (calcClientTrigger) calcClientTrigger.addEventListener('click', openCalcClientSearchModal);
