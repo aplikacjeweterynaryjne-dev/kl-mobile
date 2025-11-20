@@ -2471,183 +2471,135 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
 </div>
 <!-- FORMULARZ (modal od dołu na mobilnych) -->
 <div id="formModal" aria-hidden="true">
-    <div class="form-card" role="dialog" aria-modal="true" style="max-height: 95vh; height: auto;">
+<div class="form-card" role="dialog" aria-modal="true">
+<!-- krok 1: nagłówek -->
+<div id="step1" class="form-step active">
+<h3>Dane posiadacza / nagłówek</h3>
+<div class="form-row">
+<label for="formKlient">Imię, nazwisko lub nazwa siedziby</label>
+<input list="klientList" id="formKlient" placeholder="Kliknij, aby wyszukać klienta..." readonly style="cursor: pointer; background: #fff;">
+</div>
+<div class="form-row">
+<label for="formAdres">Adres</label>
+<input type="text" id="formAdres" placeholder="Adres">
+</div>
+<div class="form-row">
+<label for="formNrStada">Nr stada</label>
+<input type="text" id="formNrStada" placeholder="Nr stada">
+</div>
+<div class="form-row">
+<label for="formDataZgloszenia">Data zgłoszenia</label>
+<input type="date" id="formDataZgloszenia">
+</div>
+<div class="form-row">
+<label for="formDataWykonania">Data wykonania</label>
+<input type="date" id="formDataWykonania">
+</div>
+<div class="form-row">
+<label for="formNrDokumentu">Nr dokumentu</label>
+<input type="text" id="formNrDokumentu" placeholder="Numer dokumentu">
+</div>
+<div class="form-actions">
+<div class="left">
+<button id="closeForm" class="btn ghost small">Zakończ</button>
+</div>
+<div class="right">
+<button id="nextToProducts" class="btn primary small">Dalej ➜</button>
+</div>
+</div>
+</div>
 
-        <div class="calc-steps-nav" id="kartaStepsNav">
-            <div class="step-indicator active" id="kartaIndStep1">1. Dane Podstawowe</div>
-            <div class="step-indicator" id="kartaIndStep2">2. Leczenie (Wiersze 1-9)</div>
-            <div class="step-indicator" id="kartaIndStep3">3. Pozostawione (Wiersze 10-12)</div>
+<div id="step2" class="form-step">
+    <h3 id="formRowTitle" style="color: red; font-size: 25px;">Edycja wierszy tabeli</h3>
+
+    <div id="formLivePreview" style="font-size: 14px; color: #333; background-color: #f4f4f4; border: 1px solid #ddd; border-radius: 6px; padding: 8px; margin-bottom: 12px; max-height: 70px; overflow-y: auto;">
+        <strong style="color: #000;">Dodane do karty:</strong>
+        <span id="previewProductList">ładowanie...</span>
+    </div>
+<div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
+        <label style="margin:0; font-weight:600;">Wybierz wiersz</label>
+        <select id="formRowSelect" style="flex:1; padding:8px; border-radius:6px; border:1px solid #ccc;"></select>
+    </div>
+    <div style="margin-bottom: 12px;" id="formCopyPrevRowBtnContainer">
+        <button type="button" id="formCopyPrevRowBtn" class="btn small" style="background-color: #f0f8ff; border-color: #b0c4de; width: 100%; font-weight: 600;">
+            Kopiuj dane zwierzęcia z poprzedniego wiersza
+        </button>
+    </div>
+<div id="formCopyBtnContainer" style="display: none; margin-bottom: 8px; text-align: center;">
         </div>
-
-        <div id="kartaStep1" class="calc-step active">
-            <h3>1. Dane Posiadacza / Nagłówek</h3>
-            <div class="form-row">
-                <label for="formKlient">Imię, nazwisko lub nazwa siedziby</label>
-                <input list="klientList" id="formKlient" placeholder="Kliknij, aby wyszukać klienta..." readonly style="cursor: pointer; background: #fff;">
-            </div>
-            <div class="form-row">
-                <label for="formAdres">Adres</label>
-                <input type="text" id="formAdres" placeholder="Adres">
-            </div>
-            <div class="form-row">
-                <label for="formNrStada">Nr stada</label>
-                <input type="text" id="formNrStada" placeholder="Nr stada">
-            </div>
-            <div class="form-row">
-                <label for="formDataZgloszenia">Data zgłoszenia</label>
-                <input type="date" id="formDataZgloszenia">
-            </div>
-            <div class="form-row">
-                <label for="formDataWykonania">Data wykonania</label>
-                <input type="date" id="formDataWykonania">
-            </div>
-            <div class="form-row">
-                <label for="formNrDokumentu">Nr dokumentu</label>
-                <input type="text" id="formNrDokumentu" placeholder="Numer dokumentu">
-            </div>
-            <div class="form-actions" style="justify-content: flex-end;">
-                <button id="kartaBtnToStep2" class="btn primary small">Dalej (Leczenie) ➜</button>
-            </div>
-            <div class="form-actions" style="justify-content: flex-start; border-top: none; margin-top: 10px; padding-top: 5px;">
-                <button id="closeForm" class="btn ghost small">Zakończ (Anuluj)</button>
-            </div>
-        </div>
-
-        <div id="kartaStep2" class="calc-step">
-            <h3 id="formRowTitleLeczenie">2. Leczenie - Wiersz 1/9</h3>
-            
-            <div id="formLivePreview" style="font-size: 14px; color: #333; background-color: #f4f4f4; border: 1px solid #ddd; border-radius: 6px; padding: 8px; margin-bottom: 12px; max-height: 70px; overflow-y: auto;">
-                <strong style="color: #000;">Wiersze wypełnione:</strong>
-                <span id="previewProductList">ładowanie...</span>
-            </div>
-            
-            <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
-                <label style="margin:0; font-weight:600;">Wybierz wiersz</label>
-                <select id="formRowSelectLeczenie" style="flex:1; padding:8px; border-radius:6px; border:1px solid #ccc;">
-                    <option value="0">Wiersz 1</option>
-                    <option value="1">Wiersz 2</option>
-                    <option value="2">Wiersz 3</option>
-                    <option value="3">Wiersz 4</option>
-                    <option value="4">Wiersz 5</option>
-                    <option value="5">Wiersz 6</option>
-                    <option value="6">Wiersz 7</option>
-                    <option value="7">Wiersz 8</option>
-                    <option value="8">Wiersz 9</option>
-                </select>
-            </div>
-            
-            <div style="margin-bottom: 12px;" id="formCopyPrevRowBtnContainerLeczenie">
-                <button type="button" id="formCopyPrevRowBtnLeczenie" class="btn small" style="background-color: #f0f8ff; border-color: #b0c4de; width: 100%; font-weight: 600;">
-                    Kopiuj dane zwierzęcia z poprzedniego wiersza
-                </button>
-            </div>
-            
-            <div id="formRowDetailsContainerLeczenie" style="display: block;">
-                <div class="form-row"><label for="formOpisLeczenie">Nazwa siedziby stada i opis zwierzęcia</label><input type="text" id="formOpisLeczenie" placeholder="Opis zwierzęcia"></div>
-                <div class="form-row"><label for="formLiczbaLeczenie">Liczba leczonych zwierząt</label><input type="number" id="formLiczbaLeczenie" min="0" placeholder="0"></div>
-                <div class="form-row"><label for="formRozpoznanieLeczenie">Rozpoznanie / wstępne rozpoznanie</label><input type="text" id="formRozpoznanieLeczenie" list="listaRozpoznan" placeholder="Wpisz lub wybierz schemat..."></div>
-            </div>
-            
-            <div style="display: flex; align-items: flex-end; gap: 8px; margin-bottom: 8px;">
-                <button id="prevRowLeczenie" class="btn small">◀</button>
-
-                <div class="form-row" style="flex: 1; margin-bottom: 0;">
-                    <label for="formLekLeczenie">Nazwa produktu leczniczego</label>
-                    <input list="listaLekow" id="formLekLeczenie" placeholder="Kliknij, aby wyszukać produkt..." readonly style="cursor: pointer; background: #fff;">
-                </div>
-
-                <button id="nextRowLeczenie" class="btn small">▶</button>
-            </div>
-            
-            <div class="form-row">
-                <label for="formSeriaLeczenie">Numer serii produktu</label>
-                <input type="text" id="formSeriaLeczenie" placeholder="Numer serii">
-            </div>
-            <div style="display: flex; gap: 8px;">
-                <div class="form-row" style="flex: 1;">
-                    <label>Ilość</label>
-                    <input type="number" inputmode="numeric" pattern="[0-9]*" id="formIloscLeczenie" placeholder="0">
-                </div>
-                <div class="form-row" style="flex: 1;">
-                    <label>Dawkowanie / jednostka</label>
-                    <input type="text" id="formDawkowanieLeczenie" placeholder="np. 2 ml/kg">
-                </div>
-            </div>
-            <div class="form-row">
-                <label for="formKarencjaLeczenie">Okres karencji / uwagi</label>
-                <input type="text" id="formKarencjaLeczenie" placeholder="Okres karencji / uwagi">
-            </div>
-
-            <div class="form-actions" style="justify-content: space-between; margin-top: 15px;">
-                <button id="kartaBtnBackToStep1" class="btn ghost small">⬅ Wróć (Dane)</button>
-                <button id="kartaBtnToStep3" class="btn primary small">Dalej (Pozostawione) ➜</button>
-            </div>
-        </div>
+    <div id="formNoweDaneContainer" style="display: none; margin-bottom: 8px;">
+        <button type="button" id="formBtnNoweDane" class="btn primary" style="width: 100%; font-size: 16px; padding: 10px;">+ Nowe Dane</button>
+    </div>
+    
+        <div id="formRowDetailsContainer" style="display: block;">
+<div class="form-row"><label for="formOpis">Nazwa siedziby stada i opis zwierzęcia</label><input type="text" id="formOpis" placeholder="Opis zwierzęcia"></div>
+<div class="form-row"><label for="formLiczba">Liczba leczonych zwierząt</label><input type="number" id="formLiczba" min="0" placeholder="0"></div>
+<div class="form-row"><label for="formRozpoznanie">Rozpoznanie / wstępne rozpoznanie</label><input type="text" id="formRozpoznanie" list="listaRozpoznan" placeholder="Wpisz lub wybierz schemat..."></div>
+    </div>      
+    <div style="display: flex; align-items: flex-end; gap: 8px; margin-bottom: 8px;">
         
-        <div id="kartaStep3" class="calc-step">
-            <h3 id="formRowTitlePozostawione">3. Pozostawione - Wiersz 1/3</h3>
+        <button id="prevRow" class="btn small">◀</button>
 
-            <div id="formCopyBtnContainerPozostawione" style="margin-bottom: 15px; text-align: center;">
-                 <button id="formCopyBtn" class="btn small primary">Przepisz dane z Leczenia na Miejscu (1-3) ➡️</button>
-            </div>
-            
-            <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
-                <label style="margin:0; font-weight:600;">Wybierz wiersz</label>
-                <select id="formRowSelectPozostawione" style="flex:1; padding:8px; border-radius:6px; border:1px solid #ccc;">
-                    <option value="9">Wiersz 1</option>
-                    <option value="10">Wiersz 2</option>
-                    <option value="11">Wiersz 3</option>
-                </select>
-            </div>
-            
-             <div style="margin-bottom: 12px;" id="formCopyPrevRowBtnContainerPozostawione">
-                <button type="button" id="formCopyPrevRowBtnPozostawione" class="btn small" style="background-color: #f0f8ff; border-color: #b0c4de; width: 100%; font-weight: 600;">
-                    Kopiuj dane zwierzęcia z poprzedniego wiersza
-                </button>
-            </div>
+        <div class="form-row" style="flex: 1; margin-bottom: 0;">
+        <label for="formLek">Nazwa produktu leczniczego</label>
+            <input list="listaLekow" id="formLek" placeholder="Kliknij, aby wyszukać produkt..." readonly style="cursor: pointer; background: #fff;">
+        </div>
 
-            <div id="formRowDetailsContainerPozostawione" style="display: block;">
-                <div class="form-row"><label for="formOpisPozostawione">Nazwa siedziby stada i opis zwierzęcia</label><input type="text" id="formOpisPozostawione" placeholder="Opis zwierzęcia"></div>
-                <div class="form-row"><label for="formLiczbaPozostawione">Liczba leczonych zwierząt</label><input type="number" id="formLiczbaPozostawione" min="0" placeholder="0"></div>
-                <div class="form-row"><label for="formRozpoznaniePozostawione">Rozpoznanie / wstępne rozpoznanie</label><input type="text" id="formRozpoznaniePozostawione" list="listaRozpoznan" placeholder="Wpisz lub wybierz schemat..."></div>
-            </div>
-            
-            <div style="display: flex; align-items: flex-end; gap: 8px; margin-bottom: 8px;">
-                <button id="prevRowPozostawione" class="btn small">◀</button>
+        <button id="nextRow" class="btn small">▶</button>
+    </div>
 
-                <div class="form-row" style="flex: 1; margin-bottom: 0;">
-                    <label for="formLekPozostawione">Nazwa produktu leczniczego</label>
-                    <input list="listaLekow" id="formLekPozostawione" placeholder="Kliknij, aby wyszukać produkt..." readonly style="cursor: pointer; background: #fff;">
-                </div>
 
-                <button id="nextRowPozostawione" class="btn small">▶</button>
-            </div>
-            
-            <div class="form-row">
-                <label for="formSeriaPozostawione">Numer serii produktu</label>
-                <input type="text" id="formSeriaPozostawione" placeholder="Numer serii">
-            </div>
-            <div style="display: flex; gap: 8px;">
-                <div class="form-row" style="flex: 1;">
-                    <label>Ilość</label>
-                    <input type="number" inputmode="numeric" pattern="[0-9]*" id="formIloscPozostawione" placeholder="0">
-                </div>
-                <div class="form-row" style="flex: 1;">
-                    <label>Dawkowanie / jednostka</label>
-                    <input type="text" id="formDawkowaniePozostawione" placeholder="np. 2 ml/kg">
-                </div>
-            </div>
-            <div class="form-row">
-                <label for="formKarencjaPozostawione">Okres karencji / uwagi</label>
-                <input type="text" id="formKarencjaPozostawione" placeholder="Okres karencji / uwagi">
-            </div>
+    <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
+        <button id="micBtn" class="" title="Dyktuj nazwę produktu">🎤</button>
+        <small style="color:#666">Naciśnij mikrofon aby dyktować</small>
+    </div>
 
-            <div class="form-actions" style="margin-top:20px; flex-direction: column; gap: 10px; border-top: 1px solid #eee; padding-top: 10px;">
-                 <button type="button" id="formSaveAndCloseBtn" class="btn primary" style="font-weight: bold; font-size: 18px; width: 100%;">💾 ZAPISZ I ZAMKNIJ</button>
-                 <button id="kartaBtnBackToStep2" class="btn ghost small" style="width: 100%;">⬅ Wróć (Leczenie)</button>
-            </div>
+    <div class="form-row">
+        <label for="formSeria">Numer serii produktu</label>
+        <input type="text" id="formSeria" placeholder="Numer serii">
+    </div>
+    <form id="myForm">
+
+        <div class="form-row">
+            <label>Ilość </label>
+            <input type="number" inputmode="numeric" pattern="[0-9]*" id="formIlosc" placeholder="0" style="width:60px;">
+        </div>
+
+        <div class="form-row">
+            <label>Dawkowanie / jednostka</label>
+            <input type="text" id="formDawkowanie" placeholder="np. 2 ml/kg">
+        </div>
+    </form>
+
+    <div class="form-row">
+        <label for="formKarencja">Okres karencji / uwagi</label>
+        <div class="mic-container" style="display: flex; gap: 8px; align-items: center;">
+            <input type="text" id="formKarencja" placeholder="Okres karencji / uwagi">
+            <button type="button" id="micKarencja" class="mic-btn" title="Dyktuj" style="flex-shrink: 0;">🎤</button>
         </div>
     </div>
+
+  <div class="form-actions" style="margin-top:12px; flex-direction: column; gap: 10px; border-top: 1px solid #eee; padding-top: 10px;">
+        
+        <div style="display: flex; gap: 8px; width: 100%;">
+            <button type="button" id="formPrevRowBtn" class="btn small" style="flex: 1;">Poprzedni wiersz</button>
+            
+            <button type="button" id="formSaveAndCloseBtn" class="btn warn small" style="flex: 2; font-weight: bold; font-size: 16px;">Zamknij i zapisz</button>
+            
+            <button type="button" id="formNextRowBtn" class="btn small" style="flex: 1;">Następny wiersz</button>
+        </div>
+
+        <div style="width: 100%; text-align: center; border-top: 1px solid #eee; padding-top: 10px; margin-top: 5px;">
+            <button id="backToHeader" class="btn ghost small">Dane posiadacza/Nagłówek</button>
+        </div>
+
+        <button id="saveRow" class="btn primary small" style="display: none;">Zapisz wiersz</button>
+        <button id="formCopyBtn" class="btn small" style="display: none;">Przepisz dane z leczenia na miejscu</button>
+    </div>
+</div>
+</div>
+
+</div>
 </div>
 <div id="metodaModal" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.48); display: none; z-index: 10001; justify-content: center; align-items: center; overflow: hidden;">
 <div class="form-card" style="width: 90vw; max-width: 400px; height: auto;">
@@ -11105,35 +11057,7 @@ function generateWizytyReport(allReceipts, filters) {
     let totalSum = 0;
     let tableHtml = '';
 
-    // Sortuj wg niestandardowej logiki (Status Płatności i Notatka)
-    filteredReceipts.sort((a, b) => {
-        // Funkcja pomocnicza do określenia "Wagi" statusu
-        const getStatusWeight = (receipt) => {
-            if (receipt.status === 'Zapłacone' && receipt.notatka && receipt.notatka.includes('SPŁATA DŁUGU')) {
-                return 3; // Niska waga: Spłata długu (idzie na sam koniec)
-            }
-            if (receipt.status === 'Dług') {
-                return 2; // Średnia waga: Dług
-            }
-            if (receipt.status === 'Zapłacone') {
-                return 1; // Najwyższa waga: Zapłacone (zwykłe)
-            }
-            return 4; // Najniższa waga: Inne / Nie wybrano
-        };
-
-        const weightA = getStatusWeight(a);
-        const weightB = getStatusWeight(b);
-
-        // 1. Sortuj wg wagi rosnąco (1, 2, 3)
-        if (weightA !== weightB) {
-            return weightA - weightB; 
-        }
-
-        // 2. Jeśli wagi są takie same (np. dwie "Zapłacone"), sortuj wg daty (najnowsze na górze)
-        // Zakładamy, że format 'YYYY-MM-DD' pozwala na proste porównanie stringów.
-        return b.data.localeCompare(a.data); // Malejąco po dacie (najnowsze pierwsze)
-    });
-
+    filteredReceipts.sort((a, b) => a.data.localeCompare(b.data)); // Sortuj po dacie
 
     for (const receipt of filteredReceipts) {
         const suma = parseFloat(receipt.suma) || 0;
