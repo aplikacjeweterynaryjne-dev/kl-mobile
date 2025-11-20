@@ -11057,7 +11057,35 @@ function generateWizytyReport(allReceipts, filters) {
     let totalSum = 0;
     let tableHtml = '';
 
-    filteredReceipts.sort((a, b) => a.data.localeCompare(b.data)); // Sortuj po dacie
+    // Sortuj wg niestandardowej logiki (Status Płatności i Notatka)
+    filteredReceipts.sort((a, b) => {
+        // Funkcja pomocnicza do określenia "Wagi" statusu
+        const getStatusWeight = (receipt) => {
+            if (receipt.status === 'Zapłacone' && receipt.notatka && receipt.notatka.includes('SPŁATA DŁUGU')) {
+                return 3; // Niska waga: Spłata długu (idzie na sam koniec)
+            }
+            if (receipt.status === 'Dług') {
+                return 2; // Średnia waga: Dług
+            }
+            if (receipt.status === 'Zapłacone') {
+                return 1; // Najwyższa waga: Zapłacone (zwykłe)
+            }
+            return 4; // Najniższa waga: Inne / Nie wybrano
+        };
+
+        const weightA = getStatusWeight(a);
+        const weightB = getStatusWeight(b);
+
+        // 1. Sortuj wg wagi rosnąco (1, 2, 3)
+        if (weightA !== weightB) {
+            return weightA - weightB; 
+        }
+
+        // 2. Jeśli wagi są takie same (np. dwie "Zapłacone"), sortuj wg daty (najnowsze na górze)
+        // Zakładamy, że format 'YYYY-MM-DD' pozwala na proste porównanie stringów.
+        return b.data.localeCompare(a.data); // Malejąco po dacie (najnowsze pierwsze)
+    });
+
 
     for (const receipt of filteredReceipts) {
         const suma = parseFloat(receipt.suma) || 0;
