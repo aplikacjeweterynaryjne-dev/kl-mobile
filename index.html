@@ -2662,10 +2662,16 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
                 <strong>Tryb Korekty Paragonu</strong>
             </label>
             <div id="correctionSelectContainer" style="display: none; margin-top: 10px;">
-                <select id="correctionReceiptSelect" style="width: 100%; padding: 8px; font-size: 16px;">
-                    <option value="">-- Wybierz klienta, aby pobrać paragony --</option>
-                </select>
-            </div>
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+        <input type="date" id="corrDateStart" placeholder="Data od" title="Data od" style="padding: 8px; font-size: 16px;">
+        <input type="date" id="corrDateEnd" placeholder="Data do" title="Data do" style="padding: 8px; font-size: 16px;">
+        <input type="number" id="corrSumStart" placeholder="Suma od (zł)" title="Suma od" style="padding: 8px; font-size: 16px;" step="0.01">
+        <input type="number" id="corrSumEnd" placeholder="Suma do (zł)" title="Suma do" style="padding: 8px; font-size: 16px;" step="0.01">
+    </div>
+    <select id="correctionReceiptSelect" style="width: 100%; padding: 8px; font-size: 16px;">
+        <option value="">-- Wybierz klienta, aby pobrać paragony --</option>
+    </select>
+</div>
         </div>
 
         <div style="background: #f7f7f7; padding: 15px; border-radius: 8px; border: 1px solid #eee;">
@@ -6627,14 +6633,25 @@ async function saveReceiptToArchive(receiptData) {
 
     // ✅ MODUŁ 5: Listener dla zmian klienta i checkboxa korekty
 
-// 1. Zmiana klienta -> ładuj paragony do listy
+// --- 1. Zmiana klienta w polu Kalkulatora uruchamia ładowanie paragonów ---
 document.getElementById('calcKlientInput').addEventListener('input', function() {
     const clientName = this.value.trim();
     
-    // Ta funkcja jest kluczowa dla pobierania danych
+    // Uruchom ładowanie (funkcja zaktualizowana w pkt. 2)
     if (typeof loadArchivedReceiptsForCorrection === 'function') {
         loadArchivedReceiptsForCorrection(clientName);
     }
+});
+
+// --- 2. Zmiana filtra uruchamia filtrowanie (po stronie klienta) ---
+const correctionFilterInputs = ['corrDateStart', 'corrDateEnd', 'corrSumStart', 'corrSumEnd'];
+
+correctionFilterInputs.forEach(id => {
+    document.getElementById(id)?.addEventListener('input', function() {
+        if (typeof filterCorrectionReceipts === 'function') {
+            filterCorrectionReceipts();
+        }
+    });
 });
 
 // 2. Aktywacja trybu korekty (checkbox)
@@ -15785,6 +15802,45 @@ function normalizePL(text) {
         .replace(/ń/g, 'n').replace(/ó/g, 'o')
         .replace(/ś/g, 's').replace(/ź/g, 'z')
         .replace(/ż/g, 'z');
+}
+    /**
+ * Nowa funkcja do filtrowania paragonów w trybie korekty (po stronie klienta).
+ */
+function filterCorrectionReceipts() {
+    const selectEl = document.getElementById('correctionReceiptSelect');
+    if (!selectEl) return;
+
+    // Pobierz wartości filtrów
+    const dateStart = document.getElementById('corrDateStart').value;
+    const dateEnd = document.getElementById('corrDateEnd').value;
+    const sumStart = parseFloat(document.getElementById('corrSumStart').value) || 0;
+    const sumEnd = parseFloat(document.getElementById('corrSumEnd').value) || Infinity;
+
+    // Przekształć daty na timestamp (dla łatwiejszego porównania)
+    const timeStart = dateStart ? new Date(dateStart).getTime() : 0;
+    const timeEnd = dateEnd ? new Date(dateEnd).setHours(23, 59, 59, 999) : Infinity;
+
+    // Iteruj przez opcje (zaczynając od 1, aby pominąć opcję "Wybierz...")
+    for (let i = 1; i < selectEl.options.length; i++) {
+        const option = selectEl.options[i];
+        const optionTime = option.dataset.time ? parseInt(option.dataset.time, 10) : 0;
+        const optionSum = option.dataset.sum ? parseFloat(option.dataset.sum) : 0;
+
+        let isVisible = true;
+
+        // Filtr Daty
+        if (optionTime < timeStart || optionTime > timeEnd) {
+            isVisible = false;
+        }
+
+        // Filtr Sumy
+        if (isVisible && (optionSum < sumStart || optionSum > sumEnd)) {
+            isVisible = false;
+        }
+
+        // Pokaż/ukryj opcję
+        option.style.display = isVisible ? 'block' : 'none';
+    }
 }
 </script> 
 
