@@ -2661,18 +2661,11 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
                 <input type="checkbox" id="correctionModeCheckbox" style="width: 20px; height: 20px;">
                 <strong>Tryb Korekty Paragonu</strong>
             </label>
-         <div id="correctionSelectContainer" style="display: none; margin-top: 10px;">
-  <div style="display: flex; gap: 10px; margin-bottom: 8px;">
-        <input type="date" id="correctionFilterDateStart" title="Data od" style="flex: 1; padding: 8px; font-size: 14px;">
-        <input type="date" id="correctionFilterDateEnd" title="Data do" style="flex: 1; padding: 8px; font-size: 14px;">
-        <input type="number" id="correctionFilterMinAmount" placeholder="Min. kwota" style="width: 80px; padding: 8px; font-size: 14px;">
-        <button id="correctionFilterBtn" class="btn small" style="flex-shrink: 0;">Filtruj</button>
-    </div>
-    
-    <select id="correctionReceiptSelect" style="width: 100%; padding: 8px; font-size: 16px;">
-        <option value="">-- Wybierz klienta, aby pobrać paragony --</option>
-    </select>
-</div>
+            <div id="correctionSelectContainer" style="display: none; margin-top: 10px;">
+                <select id="correctionReceiptSelect" style="width: 100%; padding: 8px; font-size: 16px;">
+                    <option value="">-- Wybierz klienta, aby pobrać paragony --</option>
+                </select>
+            </div>
         </div>
 
         <div style="background: #f7f7f7; padding: 15px; border-radius: 8px; border: 1px solid #eee;">
@@ -2725,22 +2718,18 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
                 </div>
             </div>
             
-            <div style="display: flex; flex-direction: column; gap: 10px;">
-    <div style="display: flex; justify-content: space-between; align-items: center;">
-        <div>
-            <span id="productUnitDisplay" style="font-weight: bold; color: #555;"></span>
-        </div>
-        <button id="addProductBtn" class="btn primary" style="font-size: 18px; padding: 10px 20px;">+ Dodaj</button>
-    </div>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <span id="productUnitDisplay" style="font-weight: bold; color: #555;"></span>
+                </div>
+                <button id="addProductBtn" class="btn primary" style="font-size: 18px; padding: 10px 20px;">+ Dodaj</button>
+            </div>
 
-           <div style="margin-top: 15px; border-top: 1px dashed #ccc; padding-top: 10px;">
-        <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 10px;">
-            <label for="pluCodeInput">PLU:</label>
-            <input type="tel" id="pluCodeInput" style="width: 80px; padding: 8px; box-sizing: border-box;">
-            <button id="pluBtn" class="btn small">OK</button>
-        </div>
-        <button id="addCustomProductBtn" class="btn secondary" style="width: 100%; font-size: 16px; padding: 8px 15px;">Własny produkt</button>
-    </div>
+            <div style="margin-top: 15px; display: flex; gap: 10px; align-items: center; border-top: 1px dashed #ccc; padding-top: 10px;">
+                <label for="pluCodeInput">PLU:</label>
+                <input type="tel" id="pluCodeInput" style="width: 80px; padding: 8px; box-sizing: border-box;">
+                <button id="pluBtn" class="btn small">OK</button>
+            </div>
         </div>
 
         <div id="receiptDisplay" style="border: 1px solid #ccc; min-height: 150px; margin-bottom: 15px; padding: 10px; background: #fff; border-radius: 6px; max-height: 300px; overflow-y: auto;">
@@ -6160,17 +6149,6 @@ const addCorrectionBtn = document.getElementById('addCorrectionBtn');
     const btnBackToStep2 = document.getElementById('btnBackToStep2');
     
     const calcFinalSumDisplay = document.getElementById('calcFinalSumDisplay');
-    const correctionFilterDate = document.getElementById('correctionFilterDate');
-const correctionFilterMinAmount = document.getElementById('correctionFilterMinAmount');
-const correctionFilterBtn = document.getElementById('correctionFilterBtn');
-// Upewnij się, że masz też:
-const correctionReceiptSelect = document.getElementById('correctionReceiptSelect');
-const customProductModal = document.getElementById('customProductModal');
-    const addCustomProductBtn = document.getElementById('addCustomProductBtn');
-    const confirmCustomProductBtn = document.getElementById('confirmCustomProductBtn');
-    const customProductName = document.getElementById('customProductName');
-    const customProductPrice = document.getElementById('customProductPrice');
-    const customProductQuantity = document.getElementById('customProductQuantity');
     // ✅ KONIEC MODUŁU 2
     const calcNotatkaInput = document.getElementById('calcNotatkaInput'); // ✅ ZADANIE 2
 // Tablica przechowuje teraz { name: '...', quantity: 1, price: 10.50 }
@@ -6684,19 +6662,8 @@ document.getElementById('correctionModeCheckbox').addEventListener('change', fun
 document.getElementById('correctionReceiptSelect').addEventListener('change', function() {
     populateReceiptFromArchive(this.value);
 });
-    if (correctionFilterBtn) {
-    correctionFilterBtn.addEventListener('click', applyCorrectionFilter);
-}
-// Opcjonalnie: Filtruj również przy zmianie daty/kwoty (użyj debounce, jeśli lista jest długa)
-if (correctionFilterDate) {
-    correctionFilterDate.addEventListener('change', applyCorrectionFilter);
-}
-if (correctionFilterMinAmount) {
-    correctionFilterMinAmount.addEventListener('change', applyCorrectionFilter);
-}
 /**
-/**
- * ✅ KOREKTA 1: Ładuje ostatnie paragony wybranego klienta do listy Korekty, uwzględniając uprawnienia.
+ * ✅ MODUŁ 5: Ładuje ostatnie paragony wybranego klienta do listy Korekty.
  */
 async function loadArchivedReceiptsForCorrection(clientName) {
     const selectEl = document.getElementById('correctionReceiptSelect');
@@ -6709,24 +6676,14 @@ async function loadArchivedReceiptsForCorrection(clientName) {
         return;
     }
     
-    // START ZAPYTANIA
-    let q = db.collection("archiwumParagony")
-        .where("id_lecznicy", "==", currentUserProfile['ID lecznicy'])
-        .where("klient", "==", clientName) // Filtrujemy po nazwie klienta
-        .orderBy("data", "desc")
-        .limit(30); // Zwiększamy limit, aby ułatwić wyszukiwanie
-
-    // ✅ FILTRACJA PO UŻYTKOWNIKU: Właściciel/Admin widzi wszystko, reszta tylko swoje
-    const userRole = currentUserProfile.rola || 'user';
-    if (userRole !== 'wlasciciel' && userRole !== 'admin') {
-        const currentUserId = firebase.auth().currentUser?.uid;
-        if (currentUserId) {
-             // Zakładam, że w archiwum zapisujesz ID_user
-            q = q.where("ID_user", "==", currentUserId); 
-        }
-    }
-
+    // Używamy zapytania do archiwum paragonów
     try {
+        const q = db.collection("archiwumParagony")
+            .where("id_lecznicy", "==", currentUserProfile['ID lecznicy'])
+            .where("klient", "==", clientName) // Filtrujemy po nazwie klienta
+            .orderBy("data", "desc")
+            .limit(20);
+
         const snapshot = await q.get();
 
         if (snapshot.empty) {
@@ -6739,16 +6696,10 @@ async function loadArchivedReceiptsForCorrection(clientName) {
             const data = doc.data();
             const date = data.data || 'Brak daty';
             const sum = typeof formatPrice === 'function' ? formatPrice(data.suma) : `${data.suma} zł`;
-            const statusText = data.status || '';
             
-            // ✅ KOREKTA 2 (Wizualna): Kolorowanie statusu "Dług"
-            const statusStyle = (statusText === 'Dług') ? 'color: #c0392b; font-weight: bold;' : '';
-            
-            // Format wpisu: [Data, NrDokumentu, Suma, Status]
-            const optionText = `${date} | ${data.nrDokumentu || 'Brak Nr'} | Suma: ${sum} | Status: ${statusText}`;
-            
+            // Format wpisu: [Data, NrDokumentu, Suma]
+            const optionText = `${date} | ${data.nrDokumentu || 'Brak Nr'} | Suma: ${sum}`;
             const option = new Option(optionText, doc.id);
-            option.style.cssText = statusStyle; // Zastosowanie stylu do elementu
             selectEl.add(option);
         });
 
@@ -6756,50 +6707,8 @@ async function loadArchivedReceiptsForCorrection(clientName) {
         console.error("Błąd ładowania paragonów do korekty:", error);
         selectEl.innerHTML = '<option value="">-- BŁĄD ŁADOWANIA --</option>';
     }
-}
-/**
- * ✅ MODUŁ 5: Filtracja opcji w select (po stronie klienta).
- */
-function applyCorrectionFilter() {
-    if (!correctionReceiptSelect) return;
+}    
 
-    const filterDateValue = correctionFilterDate.value;
-    const filterAmount = parseFloat(correctionFilterMinAmount.value) || 0;
-    
-    // Przechowujemy oryginalne dane, które będą filtrowane
-    const originalOptions = Array.from(correctionReceiptSelect.options).filter(opt => opt.value !== '');
-
-    // Resetuj i pokaż tylko te, które pasują do filtra
-    correctionReceiptSelect.innerHTML = '<option value="">-- Wybierz paragon do korekty --</option>';
-
-    originalOptions.forEach(opt => {
-        const text = opt.text;
-        
-        // Parsowanie danych z tekstu opcji (Wymaga ściśle ustalonego formatu)
-        const parts = text.split('|').map(p => p.trim());
-        if (parts.length < 3) return; // Jeśli format jest nieprawidłowy
-
-        const itemDate = parts[0];
-        const itemSumText = parts[2]; // np. "Suma: 120,00 zł"
-        
-        const itemSum = parseFloat(itemSumText.replace('Suma:', '').replace('zł', '').replace(',', '.').trim()) || 0;
-        
-        let passDate = true;
-        if (filterDateValue) {
-            passDate = itemDate >= filterDateValue; // Filtrowanie daty
-        }
-        
-        const passAmount = itemSum >= filterAmount; // Filtrowanie kwoty
-
-        if (passDate && passAmount) {
-            correctionReceiptSelect.add(opt); // Dodaj opcję z powrotem do select
-        }
-    });
-
-    if (correctionReceiptSelect.options.length === 1) { // Tylko opcja nagłówkowa
-        correctionReceiptSelect.innerHTML += '<option value="" disabled>-- Brak pasujących paragonów --</option>';
-    }
-}
     /**
  * ✅ MODUŁ 5: Wczytuje dane starego paragonu do formularza.
  */
@@ -9715,7 +9624,6 @@ function goToCalcStep(stepNumber) {
         renderReceipt();
     }
 }
-    
 function onShowKalkulator() {
     goToCalcStep(1); // Zawsze startuj od Kroku 1
     // 1. Sprawdź, czy kalkulator jest "brudny"
@@ -9779,62 +9687,6 @@ if (btnBackToStep1) {
 
 if (btnBackToStep2) {
     btnBackToStep2.addEventListener('click', () => goToCalcStep(2));
-}
-    function openCustomProductModal() {
-    if (customProductModal) customProductModal.style.display = 'block';
-    // Reset pól przy otwarciu
-    if (customProductName) customProductName.value = '';
-    if (customProductPrice) customProductPrice.value = '';
-    if (customProductQuantity) customProductQuantity.value = '1';
-    if (customProductName) customProductName.focus();
-}
-
-function closeCustomProductModal() {
-    if (customProductModal) customProductModal.style.display = 'none';
-}
-    /**
- * ✅ KOREKTA 3: Logika dodawania niestandardowego produktu.
- */
-function addCustomProductToReceipt() {
-    const name = customProductName.value.trim();
-    const price = parseFloat(customProductPrice.value);
-    const quantity = parseFloat(customProductQuantity.value);
-
-    if (!name || isNaN(price) || price <= 0 || isNaN(quantity) || quantity <= 0) {
-        showToast("Wypełnij poprawnie nazwę, cenę ( > 0) i ilość ( > 0)!", "error");
-        return;
-    }
-
-    // Wywołaj główną funkcję dodawania produktu (zakładam, że masz ją zdefiniowaną)
-    if (typeof addItemToReceipt === 'function') {
-        addItemToReceipt(name, quantity, price);
-        renderReceipt(); // Odśwież widok
-        showToast(`Dodano "${name}" (x${quantity}) do paragonu.`, "success");
-        closeCustomProductModal();
-    } else {
-         showToast("Błąd: Brak funkcji addItemToReceipt.", "error");
-    }
-}
-
-
-// --- LISTENERY ---
-
-if (addCustomProductBtn) {
-    addCustomProductBtn.addEventListener('click', openCustomProductModal);
-}
-
-if (confirmCustomProductBtn) {
-    confirmCustomProductBtn.addEventListener('click', addCustomProductToReceipt);
-}
-
-// Dodanie zdarzenia Enter w modal
-if (customProductQuantity) {
-    customProductQuantity.addEventListener('keydown', function(event) {
-        if (event.key === 'Enter') {
-            event.preventDefault();
-            addCustomProductToReceipt();
-        }
-    });
 }
 /* ✅ KONIEC: NOWY BLOK KODU */
 /* ⬆️ ======================================================= ⬆️ */
@@ -15938,31 +15790,6 @@ function normalizePL(text) {
 
 <div id="toastContainer" style="position: fixed; top: 20px; right: 20px; z-index: 20000; display: flex; flex-direction: column; gap: 10px;">
     </div>
-<div id="customProductModal" class="modal" style="display: none;">
-    <div class="modal-content" style="max-width: 400px;">
-        <span class="close-btn" onclick="closeCustomProductModal()">&times;</span>
-        <h3>Wprowadź Własny Produkt</h3>
-        
-        <div class="form-row">
-            <label for="customProductName">Nazwa produktu:</label>
-            <input type="text" id="customProductName" placeholder="np. Konsultacja nietypowa" style="width: 100%;">
-        </div>
-        <div style="display: flex; gap: 10px;">
-            <div class="form-row" style="flex: 2;">
-                <label for="customProductPrice">Cena jednostkowa (zł):</label>
-                <input type="number" id="customProductPrice" placeholder="0.00" min="0.01" step="0.01">
-            </div>
-            <div class="form-row" style="flex: 1;">
-                <label for="customProductQuantity">Ilość:</label>
-                <input type="number" id="customProductQuantity" value="1" min="0.01" step="any">
-            </div>
-        </div>
-        
-        <div class="form-actions" style="margin-top: 20px;">
-            <button id="confirmCustomProductBtn" class="btn primary">Dodaj do Paragonu</button>
-            <button onclick="closeCustomProductModal()" class="btn ghost">Anuluj</button>
-        </div>
-    </div>
-</div>
+
 </body>
 </html>
