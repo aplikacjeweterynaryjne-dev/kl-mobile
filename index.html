@@ -2724,12 +2724,16 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
                 </div>
             </div>
             
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <div>
-                    <span id="productUnitDisplay" style="font-weight: bold; color: #555;"></span>
-                </div>
-                <button id="addProductBtn" class="btn primary" style="font-size: 18px; padding: 10px 20px;">+ Dodaj</button>
-            </div>
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div>
+            <span id="productUnitDisplay" style="font-weight: bold; color: #555;"></span>
+        </div>
+        <button id="addProductBtn" class="btn primary" style="font-size: 18px; padding: 10px 20px;">+ Dodaj</button>
+    </div>
+    
+    <button id="addCustomProductBtn" class="btn secondary" style="font-size: 16px; padding: 8px 15px;">Własny produkt</button>
+</div>
 
             <div style="margin-top: 15px; display: flex; gap: 10px; align-items: center; border-top: 1px dashed #ccc; padding-top: 10px;">
                 <label for="pluCodeInput">PLU:</label>
@@ -6160,6 +6164,12 @@ const correctionFilterMinAmount = document.getElementById('correctionFilterMinAm
 const correctionFilterBtn = document.getElementById('correctionFilterBtn');
 // Upewnij się, że masz też:
 const correctionReceiptSelect = document.getElementById('correctionReceiptSelect');
+const customProductModal = document.getElementById('customProductModal');
+    const addCustomProductBtn = document.getElementById('addCustomProductBtn');
+    const confirmCustomProductBtn = document.getElementById('confirmCustomProductBtn');
+    const customProductName = document.getElementById('customProductName');
+    const customProductPrice = document.getElementById('customProductPrice');
+    const customProductQuantity = document.getElementById('customProductQuantity');
     // ✅ KONIEC MODUŁU 2
     const calcNotatkaInput = document.getElementById('calcNotatkaInput'); // ✅ ZADANIE 2
 // Tablica przechowuje teraz { name: '...', quantity: 1, price: 10.50 }
@@ -9704,6 +9714,7 @@ function goToCalcStep(stepNumber) {
         renderReceipt();
     }
 }
+    
 function onShowKalkulator() {
     goToCalcStep(1); // Zawsze startuj od Kroku 1
     // 1. Sprawdź, czy kalkulator jest "brudny"
@@ -9767,6 +9778,62 @@ if (btnBackToStep1) {
 
 if (btnBackToStep2) {
     btnBackToStep2.addEventListener('click', () => goToCalcStep(2));
+}
+    function openCustomProductModal() {
+    if (customProductModal) customProductModal.style.display = 'block';
+    // Reset pól przy otwarciu
+    if (customProductName) customProductName.value = '';
+    if (customProductPrice) customProductPrice.value = '';
+    if (customProductQuantity) customProductQuantity.value = '1';
+    if (customProductName) customProductName.focus();
+}
+
+function closeCustomProductModal() {
+    if (customProductModal) customProductModal.style.display = 'none';
+}
+    /**
+ * ✅ KOREKTA 3: Logika dodawania niestandardowego produktu.
+ */
+function addCustomProductToReceipt() {
+    const name = customProductName.value.trim();
+    const price = parseFloat(customProductPrice.value);
+    const quantity = parseFloat(customProductQuantity.value);
+
+    if (!name || isNaN(price) || price <= 0 || isNaN(quantity) || quantity <= 0) {
+        showToast("Wypełnij poprawnie nazwę, cenę ( > 0) i ilość ( > 0)!", "error");
+        return;
+    }
+
+    // Wywołaj główną funkcję dodawania produktu (zakładam, że masz ją zdefiniowaną)
+    if (typeof addItemToReceipt === 'function') {
+        addItemToReceipt(name, quantity, price);
+        renderReceipt(); // Odśwież widok
+        showToast(`Dodano "${name}" (x${quantity}) do paragonu.`, "success");
+        closeCustomProductModal();
+    } else {
+         showToast("Błąd: Brak funkcji addItemToReceipt.", "error");
+    }
+}
+
+
+// --- LISTENERY ---
+
+if (addCustomProductBtn) {
+    addCustomProductBtn.addEventListener('click', openCustomProductModal);
+}
+
+if (confirmCustomProductBtn) {
+    confirmCustomProductBtn.addEventListener('click', addCustomProductToReceipt);
+}
+
+// Dodanie zdarzenia Enter w modal
+if (customProductQuantity) {
+    customProductQuantity.addEventListener('keydown', function(event) {
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            addCustomProductToReceipt();
+        }
+    });
 }
 /* ✅ KONIEC: NOWY BLOK KODU */
 /* ⬆️ ======================================================= ⬆️ */
@@ -15870,6 +15937,31 @@ function normalizePL(text) {
 
 <div id="toastContainer" style="position: fixed; top: 20px; right: 20px; z-index: 20000; display: flex; flex-direction: column; gap: 10px;">
     </div>
-
+<div id="customProductModal" class="modal" style="display: none;">
+    <div class="modal-content" style="max-width: 400px;">
+        <span class="close-btn" onclick="closeCustomProductModal()">&times;</span>
+        <h3>Wprowadź Własny Produkt</h3>
+        
+        <div class="form-row">
+            <label for="customProductName">Nazwa produktu:</label>
+            <input type="text" id="customProductName" placeholder="np. Konsultacja nietypowa" style="width: 100%;">
+        </div>
+        <div style="display: flex; gap: 10px;">
+            <div class="form-row" style="flex: 2;">
+                <label for="customProductPrice">Cena jednostkowa (zł):</label>
+                <input type="number" id="customProductPrice" placeholder="0.00" min="0.01" step="0.01">
+            </div>
+            <div class="form-row" style="flex: 1;">
+                <label for="customProductQuantity">Ilość:</label>
+                <input type="number" id="customProductQuantity" value="1" min="0.01" step="any">
+            </div>
+        </div>
+        
+        <div class="form-actions" style="margin-top: 20px;">
+            <button id="confirmCustomProductBtn" class="btn primary">Dodaj do Paragonu</button>
+            <button onclick="closeCustomProductModal()" class="btn ghost">Anuluj</button>
+        </div>
+    </div>
+</div>
 </body>
 </html>
