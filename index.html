@@ -2661,11 +2661,17 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
                 <input type="checkbox" id="correctionModeCheckbox" style="width: 20px; height: 20px;">
                 <strong>Tryb Korekty Paragonu</strong>
             </label>
-            <div id="correctionSelectContainer" style="display: none; margin-top: 10px;">
-                <select id="correctionReceiptSelect" style="width: 100%; padding: 8px; font-size: 16px;">
-                    <option value="">-- Wybierz klienta, aby pobrać paragony --</option>
-                </select>
-            </div>
+         <div id="correctionSelectContainer" style="display: none; margin-top: 10px;">
+    <div style="display: flex; gap: 10px; margin-bottom: 8px;">
+        <input type="date" id="correctionFilterDate" placeholder="Data od" style="flex: 1; padding: 8px; font-size: 14px;">
+        <input type="number" id="correctionFilterMinAmount" placeholder="Min. kwota" style="width: 80px; padding: 8px; font-size: 14px;">
+        <button id="correctionFilterBtn" class="btn small" style="flex-shrink: 0;">Filtruj</button>
+    </div>
+    
+    <select id="correctionReceiptSelect" style="width: 100%; padding: 8px; font-size: 16px;">
+        <option value="">-- Wybierz klienta, aby pobrać paragony --</option>
+    </select>
+</div>
         </div>
 
         <div style="background: #f7f7f7; padding: 15px; border-radius: 8px; border: 1px solid #eee;">
@@ -6663,7 +6669,8 @@ document.getElementById('correctionReceiptSelect').addEventListener('change', fu
     populateReceiptFromArchive(this.value);
 });
 /**
- * ✅ MODUŁ 5: Ładuje ostatnie paragony wybranego klienta do listy Korekty.
+/**
+ * ✅ KOREKTA 1: Ładuje ostatnie paragony wybranego klienta do listy Korekty, uwzględniając uprawnienia.
  */
 async function loadArchivedReceiptsForCorrection(clientName) {
     const selectEl = document.getElementById('correctionReceiptSelect');
@@ -6676,14 +6683,24 @@ async function loadArchivedReceiptsForCorrection(clientName) {
         return;
     }
     
-    // Używamy zapytania do archiwum paragonów
-    try {
-        const q = db.collection("archiwumParagony")
-            .where("id_lecznicy", "==", currentUserProfile['ID lecznicy'])
-            .where("klient", "==", clientName) // Filtrujemy po nazwie klienta
-            .orderBy("data", "desc")
-            .limit(20);
+    // START ZAPYTANIA
+    let q = db.collection("archiwumParagony")
+        .where("id_lecznicy", "==", currentUserProfile['ID lecznicy'])
+        .where("klient", "==", clientName) // Filtrujemy po nazwie klienta
+        .orderBy("data", "desc")
+        .limit(30); // Zwiększamy limit, aby ułatwić wyszukiwanie
 
+    // ✅ FILTRACJA PO UŻYTKOWNIKU: Właściciel/Admin widzi wszystko, reszta tylko swoje
+    const userRole = currentUserProfile.rola || 'user';
+    if (userRole !== 'wlasciciel' && userRole !== 'admin') {
+        const currentUserId = firebase.auth().currentUser?.uid;
+        if (currentUserId) {
+             // Zakładam, że w archiwum zapisujesz ID_user
+            q = q.where("ID_user", "==", currentUserId); 
+        }
+    }
+
+    try {
         const snapshot = await q.get();
 
         if (snapshot.empty) {
@@ -6696,10 +6713,16 @@ async function loadArchivedReceiptsForCorrection(clientName) {
             const data = doc.data();
             const date = data.data || 'Brak daty';
             const sum = typeof formatPrice === 'function' ? formatPrice(data.suma) : `${data.suma} zł`;
+            const statusText = data.status || '';
             
-            // Format wpisu: [Data, NrDokumentu, Suma]
-            const optionText = `${date} | ${data.nrDokumentu || 'Brak Nr'} | Suma: ${sum}`;
+            // ✅ KOREKTA 2 (Wizualna): Kolorowanie statusu "Dług"
+            const statusStyle = (statusText === 'Dług') ? 'color: #c0392b; font-weight: bold;' : '';
+            
+            // Format wpisu: [Data, NrDokumentu, Suma, Status]
+            const optionText = `${date} | ${data.nrDokumentu || 'Brak Nr'} | Suma: ${sum} | Status: ${statusText}`;
+            
             const option = new Option(optionText, doc.id);
+            option.style.cssText = statusStyle; // Zastosowanie stylu do elementu
             selectEl.add(option);
         });
 
@@ -6707,7 +6730,7 @@ async function loadArchivedReceiptsForCorrection(clientName) {
         console.error("Błąd ładowania paragonów do korekty:", error);
         selectEl.innerHTML = '<option value="">-- BŁĄD ŁADOWANIA --</option>';
     }
-}    
+}
 
     /**
  * ✅ MODUŁ 5: Wczytuje dane starego paragonu do formularza.
