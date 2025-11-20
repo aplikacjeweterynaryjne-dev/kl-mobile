@@ -2113,6 +2113,32 @@ table {
         </div>
     </div>
 </div>
+    <div id="customProductModal" class="product-search-modal" style="display: none; z-index: 10005;">
+    <div class="product-search-card" style="max-width: 400px; height: auto;">
+        <h3>Dodaj własny produkt</h3>
+        <div class="form-row">
+            <label for="customProductName">Nazwa produktu:</label>
+            <input type="text" id="customProductName" placeholder="Wpisz nazwę" style="font-size: 18px;">
+        </div>
+        <div class="form-row" style="display: flex; gap: 10px;">
+            <div style="flex: 1;">
+                <label for="customProductQuantity">Ilość:</label>
+                <input type="number" id="customProductQuantity" placeholder="1" min="0.01" step="any" value="1" style="font-size: 18px;">
+            </div>
+            <div style="flex: 1;">
+                <label for="customProductPrice">Cena jednostkowa (zł):</label>
+                <input type="number" id="customProductPrice" placeholder="0.00" min="0" step="0.01" style="font-size: 18px;">
+            </div>
+        </div>
+        <p style="text-align: right; margin-top: 15px; font-size: 18px; font-weight: bold;">
+            Suma: <span id="customProductTotalDisplay" style="color: #6A994E;">0,00 zł</span>
+        </p>
+        <div class="form-actions" style="justify-content: space-between; margin-top: 20px;">
+            <button id="customProductCancelBtn" class="btn ghost">Anuluj</button>
+            <button id="customProductAddBtn" class="btn primary" style="font-size: 18px;">Dodaj</button>
+        </div>
+    </div>
+</div>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
@@ -2735,6 +2761,11 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
                 <label for="pluCodeInput">PLU:</label>
                 <input type="tel" id="pluCodeInput" style="width: 80px; padding: 8px; box-sizing: border-box;">
                 <button id="pluBtn" class="btn small">OK</button>
+            </div>
+            <div style="margin-top: 15px; border-top: 1px dashed #ccc; padding-top: 10px;">
+                <button id="openCustomProductModalBtn" class="btn small" style="width: 100%; background: #f0f8ff;">
+                    ➕ Dodaj własny produkt
+                </button>
             </div>
         </div>
 
@@ -15868,6 +15899,84 @@ function filterCorrectionReceipts() {
         option.style.display = isVisible ? 'block' : 'none';
     }
 }
+    /* ======================================================== */
+/* ✅ POCZĄTEK: Logika Własnego Produktu (ZADANIE 3)        */
+/* ======================================================== */
+try {
+    // Zmienne dla Własnego Produktu
+    const customProductModal = document.getElementById('customProductModal');
+    const openCustomProductModalBtn = document.getElementById('openCustomProductModalBtn');
+    const customProductNameInput = document.getElementById('customProductName');
+    const customProductQuantityInput = document.getElementById('customProductQuantity');
+    const customProductPriceInput = document.getElementById('customProductPrice');
+    const customProductTotalDisplay = document.getElementById('customProductTotalDisplay');
+    const customProductCancelBtn = document.getElementById('customProductCancelBtn');
+    const customProductAddBtn = document.getElementById('customProductAddBtn');
+
+    // Funkcja obliczająca sumę
+    function calculateCustomTotal() {
+        const quantity = parseFloat(customProductQuantityInput.value) || 0;
+        const price = parseFloat(customProductPriceInput.value) || 0;
+        const total = quantity * price;
+        customProductTotalDisplay.textContent = formatPrice(total);
+    }
+
+    // 1. Otwieranie Modala
+    if (openCustomProductModalBtn) {
+        openCustomProductModalBtn.addEventListener('click', () => {
+            customProductNameInput.value = '';
+            customProductQuantityInput.value = '1';
+            customProductPriceInput.value = '';
+            calculateCustomTotal(); // Resetuj wyświetlaną sumę
+            customProductModal.style.display = 'flex';
+            setTimeout(() => customProductNameInput.focus(), 50);
+        });
+    }
+
+    // 2. Obliczanie Sumy w czasie rzeczywistym
+    [customProductQuantityInput, customProductPriceInput].forEach(input => {
+        input.addEventListener('input', calculateCustomTotal);
+    });
+
+    // 3. Anuluj
+    if (customProductCancelBtn) {
+        customProductCancelBtn.addEventListener('click', () => {
+            customProductModal.style.display = 'none';
+        });
+    }
+
+    // 4. Dodaj produkt do paragonu
+    if (customProductAddBtn) {
+        customProductAddBtn.addEventListener('click', () => {
+            const name = customProductNameInput.value.trim();
+            const quantity = parseFloat(customProductQuantityInput.value) || 0;
+            const price = parseFloat(customProductPriceInput.value) || 0;
+            
+            if (!name) {
+                showToast("Nazwa produktu jest wymagana.", "error");
+                customProductNameInput.focus();
+                return;
+            }
+            if (quantity <= 0 || price <= 0) {
+                showToast("Ilość i cena muszą być większe niż 0.", "error");
+                return;
+            }
+
+            // Użyj istniejącej funkcji dodawania, przekazując cenę jako priceOverride
+            // Własne produkty traktujemy jako "nieistniejące" w mapie cen, ale podajemy cenę
+            addItemToReceipt(name, quantity, price);
+
+            customProductModal.style.display = 'none';
+            showToast(`Dodano własny produkt: ${name}`, "success");
+        });
+    }
+
+} catch(err) {
+    console.error("Błąd inicjalizacji Modułu Własnego Produktu:", err);
+}
+/* ======================================================== */
+/* ✅ KONIEC: Logika Własnego Produktu                      */
+/* ======================================================== */
 </script> 
 
 <div id="toastContainer" style="position: fixed; top: 20px; right: 20px; z-index: 20000; display: flex; flex-direction: column; gap: 10px;">
