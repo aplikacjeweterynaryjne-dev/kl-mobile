@@ -6682,6 +6682,11 @@ document.getElementById('correctionReceiptSelect').addEventListener('change', fu
 /**
  * ✅ MODUŁ 5: Ładuje ostatnie paragony wybranego klienta do listy Korekty.
  */
+/**
+ * ✅ ZMODYFIKOWANA FUNKCJA
+ * Ładuje ostatnie paragony wybranego klienta do listy Korekty,
+ * z uwzględnieniem uprawnień (punkt 2).
+ */
 async function loadArchivedReceiptsForCorrection(clientName) {
     const selectEl = document.getElementById('correctionReceiptSelect');
     if (!selectEl || !currentUserProfile) return;
@@ -6693,14 +6698,24 @@ async function loadArchivedReceiptsForCorrection(clientName) {
         return;
     }
     
-    // Używamy zapytania do archiwum paragonów
-    try {
-        const q = db.collection("archiwumParagony")
-            .where("id_lecznicy", "==", currentUserProfile['ID lecznicy'])
-            .where("klient", "==", clientName) // Filtrujemy po nazwie klienta
-            .orderBy("data", "desc")
-            .limit(20);
+    // --- KLUCZOWA ZMIANA: Budowanie zapytania z uwzględnieniem ról ---
+    let q = db.collection("archiwumParagony")
+        .where("id_lecznicy", "==", currentUserProfile['ID lecznicy'])
+        .where("klient", "==", clientName);
 
+    // 1. Ograniczenie do roli:
+    if (currentUserProfile.Rola !== 'administrator' && currentUserProfile.Rola !== 'właściciel') {
+        // Pracownik widzi TYLKO swoje paragony
+        q = q.where("lekarz_uid", "==", currentUserProfile.uid);
+        console.log("Tryb pracownika: Wczytywanie tylko własnych paragonów.");
+    } else {
+        // Właściciel/Admin widzi wszystkie paragony w lecznicy
+        console.log("Tryb właściciel/admin: Wczytywanie wszystkich paragonów lecznicy.");
+    }
+    // 2. Sortowanie
+    q = q.orderBy("data", "desc").limit(20);
+    
+    try {
         const snapshot = await q.get();
 
         if (snapshot.empty) {
@@ -6712,20 +6727,31 @@ async function loadArchivedReceiptsForCorrection(clientName) {
         snapshot.docs.forEach(doc => {
             const data = doc.data();
             const date = data.data || 'Brak daty';
-            const sum = typeof formatPrice === 'function' ? formatPrice(data.suma) : `${data.suma} zł`;
+            const sum = parseFloat(data.suma) || 0;
+            const sumFormatted = typeof formatPrice === 'function' ? formatPrice(sum) : `${sum} zł`;
+            const timeMillis = data.data ? new Date(data.data).getTime() : 0; // Dodaj timestamp
+
+            // Format wpisu: [Data, NrDokumentu, Suma, Wystawił]
+            const optionText = `${date} | ${data.nrDokumentu || 'Brak Nr'} | ${sumFormatted} | ${data.lekarz_nazwisko || 'Brak Lek.'}`;
             
-            // Format wpisu: [Data, NrDokumentu, Suma]
-            const optionText = `${date} | ${data.nrDokumentu || 'Brak Nr'} | Suma: ${sum}`;
             const option = new Option(optionText, doc.id);
+            // Dodaj atrybuty data-* dla filtrowania sumą i datą
+            option.dataset.sum = sum.toFixed(2);
+            option.dataset.time = timeMillis;
+            
             selectEl.add(option);
         });
+        
+        // Po załadowaniu danych, wywołaj filtrowanie (na wypadek, gdyby filtry były już aktywne)
+        if (typeof filterCorrectionReceipts === 'function') {
+            filterCorrectionReceipts();
+        }
 
     } catch (error) {
         console.error("Błąd ładowania paragonów do korekty:", error);
-        selectEl.innerHTML = '<option value="">-- BŁĄD ŁADOWANIA --</option>';
+        selectEl.innerHTML = '<option value="">-- BŁĄD ŁADOWANIA (Sprawdź konsolę) --</option>';
     }
-}    
-
+}
     /**
  * ✅ MODUŁ 5: Wczytuje dane starego paragonu do formularza.
  */
