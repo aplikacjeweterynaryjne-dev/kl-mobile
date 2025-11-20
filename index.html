@@ -6155,6 +6155,11 @@ const addCorrectionBtn = document.getElementById('addCorrectionBtn');
     const btnBackToStep2 = document.getElementById('btnBackToStep2');
     
     const calcFinalSumDisplay = document.getElementById('calcFinalSumDisplay');
+    const correctionFilterDate = document.getElementById('correctionFilterDate');
+const correctionFilterMinAmount = document.getElementById('correctionFilterMinAmount');
+const correctionFilterBtn = document.getElementById('correctionFilterBtn');
+// Upewnij się, że masz też:
+const correctionReceiptSelect = document.getElementById('correctionReceiptSelect');
     // ✅ KONIEC MODUŁU 2
     const calcNotatkaInput = document.getElementById('calcNotatkaInput'); // ✅ ZADANIE 2
 // Tablica przechowuje teraz { name: '...', quantity: 1, price: 10.50 }
@@ -6668,6 +6673,16 @@ document.getElementById('correctionModeCheckbox').addEventListener('change', fun
 document.getElementById('correctionReceiptSelect').addEventListener('change', function() {
     populateReceiptFromArchive(this.value);
 });
+    if (correctionFilterBtn) {
+    correctionFilterBtn.addEventListener('click', applyCorrectionFilter);
+}
+// Opcjonalnie: Filtruj również przy zmianie daty/kwoty (użyj debounce, jeśli lista jest długa)
+if (correctionFilterDate) {
+    correctionFilterDate.addEventListener('change', applyCorrectionFilter);
+}
+if (correctionFilterMinAmount) {
+    correctionFilterMinAmount.addEventListener('change', applyCorrectionFilter);
+}
 /**
 /**
  * ✅ KOREKTA 1: Ładuje ostatnie paragony wybranego klienta do listy Korekty, uwzględniając uprawnienia.
@@ -6731,7 +6746,49 @@ async function loadArchivedReceiptsForCorrection(clientName) {
         selectEl.innerHTML = '<option value="">-- BŁĄD ŁADOWANIA --</option>';
     }
 }
+/**
+ * ✅ MODUŁ 5: Filtracja opcji w select (po stronie klienta).
+ */
+function applyCorrectionFilter() {
+    if (!correctionReceiptSelect) return;
 
+    const filterDateValue = correctionFilterDate.value;
+    const filterAmount = parseFloat(correctionFilterMinAmount.value) || 0;
+    
+    // Przechowujemy oryginalne dane, które będą filtrowane
+    const originalOptions = Array.from(correctionReceiptSelect.options).filter(opt => opt.value !== '');
+
+    // Resetuj i pokaż tylko te, które pasują do filtra
+    correctionReceiptSelect.innerHTML = '<option value="">-- Wybierz paragon do korekty --</option>';
+
+    originalOptions.forEach(opt => {
+        const text = opt.text;
+        
+        // Parsowanie danych z tekstu opcji (Wymaga ściśle ustalonego formatu)
+        const parts = text.split('|').map(p => p.trim());
+        if (parts.length < 3) return; // Jeśli format jest nieprawidłowy
+
+        const itemDate = parts[0];
+        const itemSumText = parts[2]; // np. "Suma: 120,00 zł"
+        
+        const itemSum = parseFloat(itemSumText.replace('Suma:', '').replace('zł', '').replace(',', '.').trim()) || 0;
+        
+        let passDate = true;
+        if (filterDateValue) {
+            passDate = itemDate >= filterDateValue; // Filtrowanie daty
+        }
+        
+        const passAmount = itemSum >= filterAmount; // Filtrowanie kwoty
+
+        if (passDate && passAmount) {
+            correctionReceiptSelect.add(opt); // Dodaj opcję z powrotem do select
+        }
+    });
+
+    if (correctionReceiptSelect.options.length === 1) { // Tylko opcja nagłówkowa
+        correctionReceiptSelect.innerHTML += '<option value="" disabled>-- Brak pasujących paragonów --</option>';
+    }
+}
     /**
  * ✅ MODUŁ 5: Wczytuje dane starego paragonu do formularza.
  */
