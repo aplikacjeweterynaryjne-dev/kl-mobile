@@ -6573,40 +6573,91 @@ if (saveReceiptBtn) {
         savedReceiptSummary.appendChild(totalP);
     }
 
-    // --- 3. NOWA LOGIKA ZAPISU DO ARCHIWUM (Pkt 3) ---
-    // Zapytaj użytkownika
-    if (confirm("Paragon został wygenerowany.\n\nCzy chcesz zapisać ten paragon w ARCHIWUM?")) {
-        try {
-            saveReceiptBtn.disabled = true;
-            saveReceiptBtn.textContent = 'Zapisywanie...';
+  // --- 3. NOWA LOGIKA ZAPISU DO ARCHIWUM (Nadpisywanie) ---
 
-            // Wywołaj funkcję zapisującą do Firestore (dodamy ją w Kroku 2)
-        await saveReceiptToArchive(receiptData);
+// Sprawdź, czy jesteśmy w Trybie Korekty i mamy ID oryginalnego dokumentu
+const isCorrectionMode = document.getElementById('correctionModeCheckbox').checked;
+const originalReceiptId = document.getElementById('correctionReceiptSelect').value;
+const isUpdate = isCorrectionMode && originalReceiptId;
+const actionText = isUpdate ? 'nadpisać' : 'zapisać';
 
-            // ZMIANA 1: Zmiana komunikatu i logika odświeżania
-            if (confirm('Paragon został pomyślnie zapisany w archiwum.\n\nCzy chcesz odświeżyć aplikację i wrócić do Menu Głównego?')) {
-                // Symulacja odświeżenia (odpowiednik F5)
-                window.location.reload(); 
-            } else {
-                // Jeśli użytkownik nie chce odświeżać, po prostu pokaż komunikat
-                showToast('Paragon zapisany.', 'success');
-            }
-
-        } catch (error) {
-            console.error("Błąd zapisu paragonu do archiwum:", error);
-            alert("Wystąpił błąd podczas zapisu do archiwum. Sprawdź konsolę.");
-        } finally {
-            saveReceiptBtn.disabled = false;
-            saveReceiptBtn.textContent = 'Zapisz Paragon';
+if (confirm(`Paragon został wygenerowany.\n\nCzy chcesz ${actionText} ten paragon w ARCHIWUM?`)) {
+    
+    // --- Dodawanie stałego tekstu do Notatki (tylko przy korekcie) ---
+    if (isUpdate) {
+        const userName = currentUserProfile ? `${currentUserProfile.Imie} ${currentUserProfile.Nazwisko}` : 'Nieznany Użytkownik';
+        // Stały tekst do dodania na początku
+        const correctionNote = `Korekta paragonu - ${userName} (${new Date().toLocaleDateString('pl-PL')}) | `;
+        
+        // Sprawdź, czy notatka już nie zaczyna się od "Korekta paragonu"
+        let finalNote = receiptData.notatka || '';
+        if (!finalNote.startsWith("Korekta paragonu -")) {
+             finalNote = correctionNote + finalNote;
         }
-    } else {
-         alert('Paragon zapisany (tymczasowo), ale NIE został dodany do archiwum.');
+        receiptData.notatka = finalNote;
     }
-    if (calcNotatkaInput) calcNotatkaInput.value = ''; // ✅ ZADANIE 2: Wyczyść notatkę
-    // Resetowanie statusu (bez zmian)
+
+    try {
+        saveReceiptBtn.disabled = true;
+        saveReceiptBtn.textContent = isUpdate ? 'Nadpisywanie...' : 'Zapisywanie...';
+
+        if (isUpdate) {
+            // --- SCENARIUSZ 1: KOREKTA (NADPISANIE) ---
+            // Usuń pola do numeracji, aby ich nie nadpisywać - chcemy zachować stary numer
+            delete receiptData.counter;
+            delete receiptData.miesiac;
+            delete receiptData.rok;
+            // Usuwamy też nrDokumentu z danych do wysłania, bo zostaje ten z bazy
+            delete receiptData.nrDokumentu; 
+            
+            // Użyj update do nadpisania istniejącego dokumentu
+            await db.collection("archiwumParagony").doc(originalReceiptId).update(receiptData);
+            showToast(`Paragon (ID: ${originalReceiptId}) NADPISANY.`, 'success');
+            
+        } else {
+            // --- SCENARIUSZ 2: NOWY PARAGON (ADD) ---
+            await saveReceiptToArchive(receiptData); // Użyj istniejącej funkcji
+            showToast(`Paragon (Nr: ${receiptData.nrDokumentu}) zapisany.`, 'success');
+        }
+
+        // ZMIANA: Zmiana komunikatu i logika odświeżania
+        const confirmResult = confirm(`Paragon został pomyślnie ${actionText} w archiwum.\n\nCzy chcesz odświeżyć aplikację i wrócić do Menu Głównego?`);
+        
+        if (confirmResult) {
+            // Symulacja odświeżenia (odpowiednik F5)
+            window.location.reload(); 
+        }
+
+    } catch (error) {
+        console.error(`Błąd podczas ${actionText} paragonu do archiwum:`, error);
+        alert(`Wystąpił błąd podczas ${actionText} danych. Sprawdź konsolę.`);
+    } finally {
+        saveReceiptBtn.disabled = false;
+        saveReceiptBtn.textContent = '💾 ZAPISZ I ZAMKNIJ';
+        
+        // Zawsze czyść pola i resetuj UI, jeśli nie nastąpiło pełne odświeżenie strony (bo użytkownik je anulował)
+        if (!confirmResult) {
+            if (calcNotatkaInput) calcNotatkaInput.value = '';
+            if (paymentStatusPaidBtn) paymentStatusPaidBtn.classList.remove('active');
+            if (paymentStatusDebtBtn) paymentStatusDebtBtn.classList.remove('active');
+            
+            // Wyczyść pola korekty, aby zapobiec przypadkowemu nadpisaniu
+            document.getElementById('correctionModeCheckbox').checked = false;
+            document.getElementById('correctionReceiptSelect').value = ''; 
+            document.getElementById('correctionSelectContainer').style.display = 'none';
+            
+            // Wyczyść numer dokumentu, aby wymusić generowanie nowego przy kolejnym wejściu do kalkulatora
+            document.getElementById('calcNrDokInput').value = '';
+        }
+    }
+} else {
+    // Użytkownik anulował zapis
+    alert('Paragon zapisany (tymczasowo), ale NIE został dodany do archiwum.');
+    if (calcNotatkaInput) calcNotatkaInput.value = '';
+    // Resetowanie statusu
     if (paymentStatusPaidBtn) paymentStatusPaidBtn.classList.remove('active');
     if (paymentStatusDebtBtn) paymentStatusDebtBtn.classList.remove('active');
-  });
+}
 }
     /* ⬇️ WKLEJ TEN BLOK (Zadanie 1) ⬇️ */
 // --- Listener dla przycisku Zaokrąglij Sumę ---
