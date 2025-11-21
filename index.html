@@ -6198,28 +6198,26 @@ if (metodaModal) metodaModal.style.display = 'none';
 }
 
 // --- Przycisk: Formularz ---
+// --- Przycisk: Formularz ---
 if (metodaFormularzBtn) {
-metodaFormularzBtn.addEventListener('click', () => {
-if (metodaModal) metodaModal.style.display = 'none';
-// Pokaż sekcję karty (jest pod spodem)
+    metodaFormularzBtn.addEventListener('click', () => {
+        if (metodaModal) metodaModal.style.display = 'none';
+        
+        // 1. Synchronizuj nagłówek (zawsze pobieramy z Tabeli do Formularza)
+        if (typeof syncHeaderFormToTop === 'function') {
+            syncHeaderFormToTop(true);
+        } else {
+            console.error("Brak funkcji syncHeaderFormToTop!");
+        }
 
-
-// Otwórz formularz (logika skopiowana z Twojego listenera #formBtn)
-if (formModal) {
-formModal.style.display = 'flex';
-showStep(1); // Pokaż pierwszy krok formularza
-populateRowSelect();
-formRowSelect.dataset.prevIndex = 0; 
-
-// Synchronizuj dane z nagłówka (jeśli jakieś są)
-document.getElementById('formKlient').value = document.getElementById('klientSelect').value || '';
-document.getElementById('formAdres').value = document.getElementById('adresKlienta').textContent || '';
-document.getElementById('formNrStada').value = document.getElementById('nrStada').textContent || '';
-document.getElementById('formDataZgloszenia').value = document.getElementById('dataZgloszenia').value || '';
-document.getElementById('formDataWykonania').value = document.getElementById('dataWykonania').value || '';
-document.getElementById('formNrDokumentu').value = document.getElementById('nrDokumentu').value || '';
-}
-});
+        // 2. Przejdź do nowej, pełnoekranowej zakładki formularza
+        // Funkcja showSection('formKarta') automatycznie wywoła goToFormStep(1)
+        if (typeof showSection === 'function') {
+            showSection('formKarta');
+        } else {
+             console.error("Brak funkcji showSection!");
+        }
+    });
 }
 
 // --- Przycisk: Anuluj w Modalu Metody ---
