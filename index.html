@@ -4206,7 +4206,6 @@ const formBtn = document.getElementById('formBtn');
 const closeForm = document.getElementById('closeForm');
 const nextToProducts = document.getElementById('nextToProducts');
 const backToHeader = document.getElementById('backToHeader');
-const formRowSelect = document.getElementById('formRowSelect');
 const formNoweDaneContainer = document.getElementById('formNoweDaneContainer');
 const formBtnNoweDane = document.getElementById('formBtnNoweDane');
 const formRowDetailsContainer = document.getElementById('formRowDetailsContainer');
@@ -4265,19 +4264,7 @@ document.getElementById('nrDokumentu').value = nrDok;
 }
 
 /* ---- Row select: wypełnij select indeksami logicznych wierszy (1..13 bez wiersza 10) ---- */
-function populateRowSelect(){
-const sel = formRowSelect;
-sel.innerHTML = '';
-const logical = rowsEditable();
-logical.forEach((tr, idx) => {
-// compute displayed row number -> use first cell (like "1." etc)
-const display = tr.cells[0].textContent || (idx+1)+'.';
-const opt = document.createElement('option');
-opt.value = idx; // index within logical array
-opt.textContent = (idx+1) + '.';
-sel.appendChild(opt);
-});
-}
+
 /* ✅ POCZĄTEK: Moduł 5 - Funkcje wielokrotnego użytku do nawigacji po wierszach */
 
 /**
@@ -11890,18 +11877,24 @@ try {
     const modal = document.getElementById('formClientSearchModal');
     const input = document.getElementById('formClientSearchInputModal');
     const list = document.getElementById('formClientSearchListModal');
-    const closeBtn = document.getElementById('formClientSearchCloseBtn');
-    const trigger = document.getElementById('formKlient'); // Trigger z formularza
+const closeBtn = document.getElementById('formClientSearchCloseBtn');
+    
+    // ZASTĄPIONO: const trigger = document.getElementById('formKlient'); 
+    // Użyjemy nowej, bardziej precyzyjnej zmiennej, którą zdefiniowałeś wcześniej:
+    const formStep1KlientTrigger = document.getElementById('formKlient'); 
 
-    // Otwieranie modala
-    trigger.addEventListener('click', (e) => {
-        e.preventDefault();
-        if (!modal) return;
-        input.value = (trigger.value !== "Kliknij, aby wyszukać klienta...") ? trigger.value : "";
-        populateAndFilterFormClientList();
-        modal.style.display = 'flex';
-        setTimeout(() => input.focus(), 50);
-    });
+    // Otwieranie modala
+    if (formStep1KlientTrigger) { // Zabezpieczenie przed błędem "Cannot read properties of null"
+        formStep1KlientTrigger.addEventListener('click', (e) => {
+            e.preventDefault();
+            if (!modal) return;
+            // Użyj nowej nazwy zmiennej
+            input.value = (formStep1KlientTrigger.value !== "Kliknij, aby wyszukać klienta...") ? formStep1KlientTrigger.value : "";
+            populateAndFilterFormClientList();
+            modal.style.display = 'flex';
+            setTimeout(() => input.focus(), 50);
+        });
+    }
 
     // Zamykanie modala
     closeBtn.addEventListener('click', () => { modal.style.display = 'none'; });
@@ -12017,78 +12010,7 @@ try {
 
 /* ⬇️ KROK 3B: WKLEJ NOWY BLOK DLA MODALA PRODUKTU (FORMULARZ) ⬇️ */
 
-// --- Logika Modala Wyszukiwania Produktów (Formularz) ---
-try {
-    const modal = document.getElementById('formProductSearchModal');
-    const input = document.getElementById('formProductSearchInputModal');
-    const list = document.getElementById('formProductSearchListModal');
-    const closeBtn = document.getElementById('formProductSearchCloseBtn');
-    const trigger = document.getElementById('formLek'); // Trigger z formularza
 
-    // Otwieranie modala
-    trigger.addEventListener('click', (e) => {
-        e.preventDefault();
-        if (!modal) return;
-        input.value = (trigger.value !== "Kliknij, aby wyszukać produkt...") ? trigger.value : "";
-        populateAndFilterFormProductList();
-        modal.style.display = 'flex';
-        setTimeout(() => input.focus(), 50);
-    });
-
-    // Zamykanie modala
-    closeBtn.addEventListener('click', () => { modal.style.display = 'none'; });
-    // Filtrowanie listy
-    input.addEventListener('input', populateAndFilterFormProductList);
-
-    // Wypełnianie listy (czyta z globalnej `nazwyLekow`)
-    function populateAndFilterFormProductList() {
-        if (typeof nazwyLekow === 'undefined' || nazwyLekow.length === 0) {
-            list.innerHTML = '<div class="product-search-item">Błąd: Brak bazy leków.</div>';
-            return;
-        }
-
-        const filterText = input.value.toLowerCase().trim();
-        list.innerHTML = '';
-        let foundItems = 0;
-
-        nazwyLekow.forEach(lekName => {
-            if (filterText === '' || lekName.toLowerCase().includes(filterText)) {
-                const itemDiv = document.createElement('div');
-                itemDiv.className = 'product-search-item';
-                itemDiv.textContent = lekName;
-                itemDiv.dataset.lekName = lekName;
-                itemDiv.addEventListener('click', () => {
-                    selectFormProduct(lekName);
-                });
-                list.appendChild(itemDiv);
-                foundItems++;
-            }
-        });
-        if (foundItems === 0) list.innerHTML = '<div class="product-search-item" style="color: #999;">Brak pasujących produktów.</div>';
-    }
-
-    // Wybór produktu
-    function selectFormProduct(lekName) {
-        if (!lekName) return;
-
-        // Aktualizuj pola w formularzu (Step 2)
-        document.getElementById('formLek').value = lekName;
-        
-        // Uruchom logikę auto-uzupełniania (Twoja stara funkcja)
-        const n = lekName;
-        document.getElementById('formSeria').value = mapaSerii[n] || '';
-        document.getElementById('formDawkowanie').value = mapaIlosci[n] || '';
-        document.getElementById('formKarencja').value = mapaKarencji[n] || '';
-        
-        modal.style.display = 'none';
-        
-        // Opcjonalnie: Przesuń fokus na następne pole, np. Ilość
-        document.getElementById('formIlosc')?.focus();
-    }
-    
-} catch(err) {
-    console.error("Błąd inicjalizacji Modala Produktów (Formularz):", err);
-}
 /* ⬆️ KONIEC BLOKU PRODUKTU ⬆️ */
 /* ⬇️ KROK 3C: WKLEJ TEN BLOK KODU NA KOŃCU SKRYPTU ⬇️ */
 
