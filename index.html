@@ -2090,6 +2090,84 @@ table {
     margin-bottom: 5px;
 }
 /* ======================================================== */
+/* --- NOWE STYLE: Ujednolicenie Modala Formularza z Kalkulatorem --- */
+
+/* 1. Ulepszenie wizualne całego kontenera Formularza */
+#formModal .form-card {
+    /* Używamy stylów z Kroku 2, które już zostały dodane (zaokrąglenie, cień) */
+    border: 1px solid #E0E0E0; /* Delikatna ramka dla kontrastu */
+    box-shadow: 0 6px 16px rgba(0,0,0,0.1); /* Wyraźniejszy cień */
+    background: #FFFFFF; /* Zapewnij białe tło */
+    padding: 20px;
+    
+    /* Wyśrodkowanie pionowe i poziome (nadpisuje oryginalne wartości) */
+    width: 95vw;
+    max-width: 500px; /* Ogranicz szerokość dla wygody na dużych ekranach */
+    height: auto; /* Dostosuj wysokość do zawartości */
+    max-height: 90vh; /* Ogranicz maksymalną wysokość, aby zmieścił się na mniejszych ekranach */
+}
+
+/* 2. Style dla Nagłówków i Etykiet */
+#formModal h3 {
+    font-size: 24px; /* Trochę większy nagłówek */
+    font-weight: 700;
+    color: #333;
+    border-bottom: 2px solid #6A994E; /* Podkreślenie w kolorze primary */
+    padding-bottom: 8px;
+    margin-bottom: 15px;
+}
+
+#formModal .form-row label {
+    font-size: 16px; /* Mniejsze niż obecne 18px, aby ułatwić czytanie */
+    font-weight: 600;
+    color: #555;
+    margin-bottom: 3px;
+}
+
+/* 3. Wyrównanie pól Input do Kalkulatora (większy padding, zaokrąglenia) */
+#formModal .form-row input[type="text"],
+#formModal .form-row input[type="date"],
+#formModal .form-row input[type="number"],
+#formModal .form-row input[list],
+#formModal .form-row textarea,
+#formModal .form-row select {
+    padding: 10px 12px; /* Większy padding dla łatwiejszego klikania */
+    font-size: 18px; /* Standardowy dla pól formularza */
+    border-radius: 8px; /* Większe zaokrąglenia */
+    border: 1px solid #ccc;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+/* 4. Wizualizacja aktywnego wiersza (Step 2) */
+#step2 #formRowTitle {
+    font-size: 22px !important;
+    color: #6A994E !important; /* Zielony kolor z palety */
+    text-align: center;
+    margin-bottom: 15px;
+}
+
+/* 5. Ulepszenie przycisków nawigacyjnych (Strzałki) */
+#step2 #prevRow,
+#step2 #nextRow {
+    font-size: 24px; /* Duże strzałki */
+    width: 40px;
+    height: 40px;
+    min-width: 40px !important;
+    padding: 0;
+    margin: 0;
+    background: #f7f7f7;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+    transition: all 0.2s;
+    line-height: 1; /* Centrowanie strzałki */
+    color: #333 !important; /* Przywrócenie standardowego koloru */
+}
+#step2 #prevRow:hover,
+#step2 #nextRow:hover {
+    background-color: #eef;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
 </style>
     <div id="calcProductSearchModal" class="product-search-modal" style="display: none; z-index: 10003;">
     <div class="product-search-card">
@@ -2510,38 +2588,39 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
 </div>
 
 <div id="step2" class="form-step">
-    <h3 id="formRowTitle" style="color: red; font-size: 25px;">Edycja wierszy tabeli</h3>
+    <h3 id="formRowTitle">Edycja wierszy tabeli</h3> 
 
     <div id="formLivePreview" style="font-size: 14px; color: #333; background-color: #f4f4f4; border: 1px solid #ddd; border-radius: 6px; padding: 8px; margin-bottom: 12px; max-height: 70px; overflow-y: auto;">
         <strong style="color: #000;">Dodane do karty:</strong>
         <span id="previewProductList">ładowanie...</span>
     </div>
-<div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
-        <label style="margin:0; font-weight:600;">Wybierz wiersz</label>
-        <select id="formRowSelect" style="flex:1; padding:8px; border-radius:6px; border:1px solid #ccc;"></select>
-    </div>
-    <div style="margin-bottom: 12px;" id="formCopyPrevRowBtnContainer">
+    
+    <div class="form-row" style="margin-bottom: 12px;">
+        <label for="formRowSelect">Wybierz wiersz</label>
+        <select id="formRowSelect"></select>
+    </div>
+
+    <div id="formCopyPrevRowBtnContainer" style="margin-bottom: 12px;">
         <button type="button" id="formCopyPrevRowBtn" class="btn small" style="background-color: #f0f8ff; border-color: #b0c4de; width: 100%; font-weight: 600;">
             Kopiuj dane zwierzęcia z poprzedniego wiersza
         </button>
     </div>
-<div id="formCopyBtnContainer" style="display: none; margin-bottom: 8px; text-align: center;">
-        </div>
-    <div id="formNoweDaneContainer" style="display: none; margin-bottom: 8px;">
-        <button type="button" id="formBtnNoweDane" class="btn primary" style="width: 100%; font-size: 16px; padding: 10px;">+ Nowe Dane</button>
-    </div>
-    
-        <div id="formRowDetailsContainer" style="display: block;">
-<div class="form-row"><label for="formOpis">Nazwa siedziby stada i opis zwierzęcia</label><input type="text" id="formOpis" placeholder="Opis zwierzęcia"></div>
-<div class="form-row"><label for="formLiczba">Liczba leczonych zwierząt</label><input type="number" id="formLiczba" min="0" placeholder="0"></div>
-<div class="form-row"><label for="formRozpoznanie">Rozpoznanie / wstępne rozpoznanie</label><input type="text" id="formRozpoznanie" list="listaRozpoznan" placeholder="Wpisz lub wybierz schemat..."></div>
-    </div>      
-    <div style="display: flex; align-items: flex-end; gap: 8px; margin-bottom: 8px;">
-        
+    <div id="formCopyBtnContainer" style="display: none; margin-bottom: 12px;"></div>
+    <div id="formNoweDaneContainer" style="display: none; margin-bottom: 12px;">
+        <button type="button" id="formBtnNoweDane" class="btn primary" style="width: 100%; font-size: 16px; padding: 10px;">+ Nowe Dane</button>
+    </div>
+
+    <div id="formRowDetailsContainer" style="display: block;">
+        <div class="form-row"><label for="formOpis">Nazwa siedziby stada i opis zwierzęcia</label><input type="text" id="formOpis" placeholder="Opis zwierzęcia"></div>
+        <div class="form-row"><label for="formLiczba">Liczba leczonych zwierząt</label><input type="number" id="formLiczba" min="0" placeholder="0"></div>
+        <div class="form-row"><label for="formRozpoznanie">Rozpoznanie / wstępne rozpoznanie</label><input type="text" id="formRozpoznanie" list="listaRozpoznan" placeholder="Wpisz lub wybierz schemat..."></div>
+    </div>
+    
+    <div style="display: flex; align-items: flex-end; gap: 8px; margin-bottom: 12px;">
         <button id="prevRow" class="btn small">◀</button>
 
         <div class="form-row" style="flex: 1; margin-bottom: 0;">
-        <label for="formLek">Nazwa produktu leczniczego</label>
+            <label for="formLek">Nazwa produktu leczniczego</label>
             <input list="listaLekow" id="formLek" placeholder="Kliknij, aby wyszukać produkt..." readonly style="cursor: pointer; background: #fff;">
         </div>
 
@@ -2550,7 +2629,7 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
 
 
     <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
-        <button id="micBtn" class="" title="Dyktuj nazwę produktu">🎤</button>
+        <button id="micBtn" class="btn ghost small" title="Dyktuj nazwę produktu" style="font-size: 19px;">🎤</button>
         <small style="color:#666">Naciśnij mikrofon aby dyktować</small>
     </div>
 
@@ -2561,12 +2640,12 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
     <form id="myForm">
 
         <div class="form-row">
-            <label>Ilość </label>
-            <input type="number" inputmode="numeric" pattern="[0-9]*" id="formIlosc" placeholder="0" style="width:60px;">
+            <label for="formIlosc">Ilość</label>
+            <input type="number" inputmode="numeric" pattern="[0-9]*" id="formIlosc" placeholder="0">
         </div>
 
         <div class="form-row">
-            <label>Dawkowanie / jednostka</label>
+            <label for="formDawkowanie">Dawkowanie / jednostka</label>
             <input type="text" id="formDawkowanie" placeholder="np. 2 ml/kg">
         </div>
     </form>
@@ -2575,16 +2654,16 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
         <label for="formKarencja">Okres karencji / uwagi</label>
         <div class="mic-container" style="display: flex; gap: 8px; align-items: center;">
             <input type="text" id="formKarencja" placeholder="Okres karencji / uwagi">
-            <button type="button" id="micKarencja" class="mic-btn" title="Dyktuj" style="flex-shrink: 0;">🎤</button>
+            <button type="button" id="micKarencja" class="mic-btn btn ghost small" title="Dyktuj" style="flex-shrink: 0; font-size: 19px;">🎤</button>
         </div>
     </div>
 
-  <div class="form-actions" style="margin-top:12px; flex-direction: column; gap: 10px; border-top: 1px solid #eee; padding-top: 10px;">
+    <div class="form-actions" style="margin-top:20px; flex-direction: column; gap: 10px; border-top: 1px solid #eee; padding-top: 15px;">
         
         <div style="display: flex; gap: 8px; width: 100%;">
             <button type="button" id="formPrevRowBtn" class="btn small" style="flex: 1;">Poprzedni wiersz</button>
             
-            <button type="button" id="formSaveAndCloseBtn" class="btn warn small" style="flex: 2; font-weight: bold; font-size: 16px;">Zamknij i zapisz</button>
+            <button type="button" id="formSaveAndCloseBtn" class="btn primary small" style="flex: 2; font-weight: bold; font-size: 18px;">Zamknij i zapisz</button>
             
             <button type="button" id="formNextRowBtn" class="btn small" style="flex: 1;">Następny wiersz</button>
         </div>
@@ -2595,7 +2674,7 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
 
         <button id="saveRow" class="btn primary small" style="display: none;">Zapisz wiersz</button>
         <button id="formCopyBtn" class="btn small" style="display: none;">Przepisz dane z leczenia na miejscu</button>
-    </div>
+    </div>
 </div>
 </div>
 
