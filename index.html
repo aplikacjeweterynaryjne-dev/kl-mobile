@@ -2168,6 +2168,77 @@ table {
     transform: translateY(-1px);
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
+    /* --- Styl dla paska zakładek (Wizarda) w Formularzu Karty Leczenia --- */
+#formModal .form-steps-nav {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    background: #eee;
+    border-radius: 8px;
+    padding: 4px;
+}
+
+#formModal .step-indicator-form {
+    flex: 1;
+    text-align: center;
+    padding: 8px 2px;
+    font-size: 14px;
+    color: #777;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    user-select: none;
+}
+
+#formModal .step-indicator-form.active {
+    background: #fff;
+    color: #6A994E; /* Zielony */
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* Ukrywanie kroków */
+#formModal .form-step {
+    display: none;
+    animation: fadeIn 0.3s ease;
+}
+#formModal .form-step.active {
+    display: block;
+}
+
+#formModal .form-actions {
+    margin-top: 15px;
+    padding-top: 10px;
+    border-top: 1px solid #eee;
+}
+
+/* Dostosowanie dla pól w Step 2 i 3 (leczenie/produkty) */
+#step2Form .form-row-compact, #step3Form .form-row-compact {
+    display: flex;
+    gap: 10px;
+    align-items: flex-end;
+    margin-bottom: 12px;
+}
+#step2Form .form-row-compact > div, #step3Form .form-row-compact > div {
+    flex: 1;
+}
+#step2Form .form-row-compact label, #step3Form .form-row-compact label {
+    margin-bottom: 3px;
+}
+
+/* Style dla podsumowania w Step 4 */
+#step4Form ul {
+    list-style: none;
+    padding-left: 0;
+    margin-top: 10px;
+}
+#step4Form ul li {
+    padding: 5px 0;
+    border-bottom: 1px dotted #ccc;
+}
+#step4Form ul li:last-child {
+    border-bottom: none;
+}
 </style>
     <div id="calcProductSearchModal" class="product-search-modal" style="display: none; z-index: 10003;">
     <div class="product-search-card">
@@ -2548,138 +2619,438 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
 <button id="clearFullscreenSignBtn">Wyczyść podpis</button>
 </div>
 <!-- FORMULARZ (modal od dołu na mobilnych) -->
-<div id="formModal" aria-hidden="true">
-<div class="form-card" role="dialog" aria-modal="true">
-<!-- krok 1: nagłówek -->
-<div id="step1" class="form-step active">
-<h3>Dane posiadacza / nagłówek</h3>
-<div class="form-row">
-<label for="formKlient">Imię, nazwisko lub nazwa siedziby</label>
-<input list="klientList" id="formKlient" placeholder="Kliknij, aby wyszukać klienta..." readonly style="cursor: pointer; background: #fff;">
-</div>
-<div class="form-row">
-<label for="formAdres">Adres</label>
-<input type="text" id="formAdres" placeholder="Adres">
-</div>
-<div class="form-row">
-<label for="formNrStada">Nr stada</label>
-<input type="text" id="formNrStada" placeholder="Nr stada">
-</div>
-<div class="form-row">
-<label for="formDataZgloszenia">Data zgłoszenia</label>
-<input type="date" id="formDataZgloszenia">
-</div>
-<div class="form-row">
-<label for="formDataWykonania">Data wykonania</label>
-<input type="date" id="formDataWykonania">
-</div>
-<div class="form-row">
-<label for="formNrDokumentu">Nr dokumentu</label>
-<input type="text" id="formNrDokumentu" placeholder="Numer dokumentu">
-</div>
-<div class="form-actions">
-<div class="left">
-<button id="closeForm" class="btn ghost small">Zakończ</button>
-</div>
-<div class="right">
-<button id="nextToProducts" class="btn primary small">Dalej ➜</button>
-</div>
-</div>
-</div>
+/* ======================================================== */
+/* --- Nowa Logika Formularza (Wizard: 4 zakładki) --- */
+/* ======================================================== */
+// --- Nowe Zmienne Formularza ---
+const formModal = document.getElementById('formModal');
+const formBtn = document.getElementById('formBtn');
+const closeForm = document.getElementById('closeForm');
+const saveAndCloseForm = document.getElementById('saveAndCloseForm');
 
-<div id="step2" class="form-step">
-    <h3 id="formRowTitle">Edycja wierszy tabeli</h3> 
+// Nawigacja Kroków
+const indSteps = document.querySelectorAll('.step-indicator-form');
+const step1Form = document.getElementById('step1Form');
+const step2Form = document.getElementById('step2Form');
+const step3Form = document.getElementById('step3Form');
+const step4Form = document.getElementById('step4Form');
 
-    <div id="formLivePreview" style="font-size: 14px; color: #333; background-color: #f4f4f4; border: 1px solid #ddd; border-radius: 6px; padding: 8px; margin-bottom: 12px; max-height: 70px; overflow-y: auto;">
-        <strong style="color: #000;">Dodane do karty:</strong>
-        <span id="previewProductList">ładowanie...</span>
-    </div>
+// Przyciski Nawigacji między Krokami
+const nextToStep2Form = document.getElementById('nextToStep2Form');
+const nextToStep3Form = document.getElementById('nextToStep3Form');
+const nextToStep4Form = document.getElementById('nextToStep4Form');
+const backToStep1Form = document.getElementById('backToStep1Form');
+const backToStep2Form = document.getElementById('backToStep2Form');
+const backToStep3Form = document.getElementById('backToStep3Form');
+
+// Wybór Wierszy w Krokach 2 i 3
+const formRowSelectStep2 = document.getElementById('formRowSelectStep2');
+const prevRowStep2 = document.getElementById('prevRowStep2');
+const nextRowStep2 = document.getElementById('nextRowStep2');
+
+const formRowSelectStep3 = document.getElementById('formRowSelectStep3');
+const prevRowStep3 = document.getElementById('prevRowStep3');
+const nextRowStep3 = document.getElementById('nextRowStep3');
+
+const formCopy1to10Btn = document.getElementById('formCopy1to10Btn'); // Nowy przycisk kopiowania
+const formCopyPrevRowBtn = document.getElementById('formCopyPrevRowBtn');
+const formNoweDaneContainer = document.getElementById('formNoweDaneContainer');
+const formBtnNoweDane = document.getElementById('formBtnNoweDane');
+const formRowDetailsContainer = document.getElementById('formRowDetailsContainer');
+
+// Canvas
+const canvasPosiadaczForm = document.getElementById('canvasPosiadaczForm');
+const fullscreenBtnForm = document.getElementById('fullscreenBtnForm');
+const clearSignBtnForm = document.getElementById('clearSignBtnForm');
+
+let currentLogicalIndex = 0; // Globalny wskaźnik aktualnie edytowanego wiersza (0-11)
+
+// --- Funckje Pomocnicze Formularza ---
+
+/**
+ * Przełącza widok na dany krok w formularzu.
+ */
+function goToFormStep(stepNumber) {
+    [step1Form, step2Form, step3Form, step4Form].forEach((step, index) => {
+        step.classList.toggle('active', index + 1 === stepNumber);
+        if (indSteps[index]) indSteps[index].classList.toggle('active', index + 1 === stepNumber);
+    });
+
+    if (stepNumber === 2) {
+        populateRowSelect(formRowSelectStep2, 0, 8); // Leczenie na Miejscu (Wiersze 1-9 -> Indexy 0-8)
+        selectRowInForm(currentLogicalIndex);
+    } else if (stepNumber === 3) {
+        populateRowSelect(formRowSelectStep3, 9, 11); // Produkty Pozostawione (Wiersze 10-12 -> Indexy 9-11)
+        selectRowInForm(currentLogicalIndex);
+    } else if (stepNumber === 4) {
+        syncHeaderFormToTop(); // Zapisz zmiany nagłówka przed podsumowaniem
+        updateFormSummary();
+    }
+}
+
+/**
+ * Wypełnia <select> wierszami z danego zakresu.
+ */
+function populateRowSelect(selectEl, startIndex, endIndex) {
+    selectEl.innerHTML = '';
+    const logical = rowsEditable();
+
+    for (let i = startIndex; i <= endIndex; i++) {
+        const tr = logical[i];
+        if (tr) {
+            const display = tr.cells[0].textContent.trim(); // "1.", "2.", ...
+            const opt = document.createElement('option');
+            opt.value = i; // Używamy globalnego indeksu (0-11)
+            opt.textContent = `Wiersz ${display}`;
+            selectEl.appendChild(opt);
+        }
+    }
+}
+
+/**
+ * Czyta dane z aktualnego wiersza tabeli i wstawia je do pól formularza.
+ */
+function selectRowInForm(logicalIndex) {
+    // 1. Zabezpieczanie: Zapisz aktualnie edytowany wiersz PRZED zmianą
+    const prevIndex = parseInt(formRowSelectStep2.dataset.prevIndex || formRowSelectStep3.dataset.prevIndex, 10);
+    if (!isNaN(prevIndex) && prevIndex !== logicalIndex) {
+        saveRowToTable(prevIndex);
+    }
+
+    currentLogicalIndex = logicalIndex;
+    const logical = rowsEditable();
+    const row = logical[logicalIndex];
+    if (!row) return;
+
+    // 2. Ustawianie Tytułu Wiersza
+    const isStep2 = (logicalIndex >= 0 && logicalIndex <= 8);
+    const isStep3 = (logicalIndex >= 9 && logicalIndex <= 11);
+
+    if (isStep2) {
+        document.getElementById('formRowTitleLeczenie').textContent = `Leczenie na Miejscu (Wiersz ${logicalIndex + 1} z 9)`;
+    } else if (isStep3) {
+        document.getElementById('formRowTitlePozostawione').textContent = `Produkty Pozostawione (Wiersz ${logicalIndex - 8} z 3)`;
+    }
     
-    <div class="form-row" style="margin-bottom: 12px;">
-        <label for="formRowSelect">Wybierz wiersz</label>
-        <select id="formRowSelect"></select>
-    </div>
+    // 3. Synchronizacja pól wyboru w Step 2 i 3
+    if (isStep2) formRowSelectStep2.value = logicalIndex;
+    if (isStep3) formRowSelectStep3.value = logicalIndex;
 
-    <div id="formCopyPrevRowBtnContainer" style="margin-bottom: 12px;">
-        <button type="button" id="formCopyPrevRowBtn" class="btn small" style="background-color: #f0f8ff; border-color: #b0c4de; width: 100%; font-weight: 600;">
-            Kopiuj dane zwierzęcia z poprzedniego wiersza
-        </button>
-    </div>
-    <div id="formCopyBtnContainer" style="display: none; margin-bottom: 12px;"></div>
-    <div id="formNoweDaneContainer" style="display: none; margin-bottom: 12px;">
-        <button type="button" id="formBtnNoweDane" class="btn primary" style="width: 100%; font-size: 16px; padding: 10px;">+ Nowe Dane</button>
-    </div>
-
-    <div id="formRowDetailsContainer" style="display: block;">
-        <div class="form-row"><label for="formOpis">Nazwa siedziby stada i opis zwierzęcia</label><input type="text" id="formOpis" placeholder="Opis zwierzęcia"></div>
-        <div class="form-row"><label for="formLiczba">Liczba leczonych zwierząt</label><input type="number" id="formLiczba" min="0" placeholder="0"></div>
-        <div class="form-row"><label for="formRozpoznanie">Rozpoznanie / wstępne rozpoznanie</label><input type="text" id="formRozpoznanie" list="listaRozpoznan" placeholder="Wpisz lub wybierz schemat..."></div>
-    </div>
+    // 4. Obsługa przycisków
+    const isRowEmptyFlag = isRowEmpty(row);
+    const isFirstRowOfSection = (logicalIndex === 0 || logicalIndex === 9);
     
-    <div style="display: flex; align-items: flex-end; gap: 8px; margin-bottom: 12px;">
-        <button id="prevRow" class="btn small">◀</button>
+    // Pokaż/Ukryj przycisk "Kopiuj poprzedni wiersz"
+    if (formCopyPrevRowBtn) {
+        formCopyPrevRowBtn.closest('#formCopyPrevRowBtnContainer').style.display = (logicalIndex > 0 && logicalIndex !== 9) ? 'block' : 'none';
+    }
+    // Pokaż/Ukryj przycisk "Kopiuj Leczenie na Miejscu"
+    if (formCopy1to10Btn) {
+        formCopy1to10Btn.closest('#formCopyBtnContainerStep3').style.display = (logicalIndex === 9) ? 'block' : 'none';
+    }
 
-        <div class="form-row" style="flex: 1; margin-bottom: 0;">
-            <label for="formLek">Nazwa produktu leczniczego</label>
-            <input list="listaLekow" id="formLek" placeholder="Kliknij, aby wyszukać produkt..." readonly style="cursor: pointer; background: #fff;">
-        </div>
+    // Obsługa pól (ukrywanie/pokazywanie "Nowe Dane")
+    const formOpisInput = document.getElementById('formOpis');
+    if (isFirstRowOfSection || !isRowEmptyFlag) {
+        // Pierwszy wiersz w sekcji lub wiersz już wypełniony - Pokaż detale
+        document.getElementById('formRowDetailsContainer').style.display = 'block';
+        document.getElementById('formNoweDaneContainer').style.display = 'none';
+    } else if (!isFirstRowOfSection && isRowEmptyFlag) {
+        // Niepierwszy wiersz I jest pusty - Zapytaj o "Nowe Dane"
+        document.getElementById('formRowDetailsContainer').style.display = 'none';
+        document.getElementById('formNoweDaneContainer').style.display = 'block';
+    }
 
-        <button id="nextRow" class="btn small">▶</button>
-    </div>
 
+    // 5. Wczytywanie danych do formularza
+    formOpisInput.value = row.cells[1].textContent.trim();
+    
+    const inpLiczba = row.cells[2].querySelector('input');
+    document.getElementById('formLiczba').value = inpLiczba ? inpLiczba.value : '';
 
-    <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
-        <button id="micBtn" class="btn ghost small" title="Dyktuj nazwę produktu" style="font-size: 19px;">🎤</button>
-        <small style="color:#666">Naciśnij mikrofon aby dyktować</small>
-    </div>
+    const inpRozpoznanie = row.cells[3].querySelector('input');
+    document.getElementById('formRozpoznanie').value = inpRozpoznanie ? inpRozpoznanie.value : '';
 
-    <div class="form-row">
-        <label for="formSeria">Numer serii produktu</label>
-        <input type="text" id="formSeria" placeholder="Numer serii">
-    </div>
-    <form id="myForm">
+    const inpLek = row.cells[4].querySelector('input');
+    document.getElementById('formLek').value = inpLek ? inpLek.value : '';
 
-        <div class="form-row">
-            <label for="formIlosc">Ilość</label>
-            <input type="number" inputmode="numeric" pattern="[0-9]*" id="formIlosc" placeholder="0">
-        </div>
+    document.getElementById('formSeria').value = row.cells[5].textContent.trim();
 
-        <div class="form-row">
-            <label for="formDawkowanie">Dawkowanie / jednostka</label>
-            <input type="text" id="formDawkowanie" placeholder="np. 2 ml/kg">
-        </div>
-    </form>
+    const iloscInput = row.cells[6].querySelector('input[type="number"]');
+    document.getElementById('formIlosc').value = iloscInput ? iloscInput.value : '';
 
-    <div class="form-row">
-        <label for="formKarencja">Okres karencji / uwagi</label>
-        <div class="mic-container" style="display: flex; gap: 8px; align-items: center;">
-            <input type="text" id="formKarencja" placeholder="Okres karencji / uwagi">
-            <button type="button" id="micKarencja" class="mic-btn btn ghost small" title="Dyktuj" style="flex-shrink: 0; font-size: 19px;">🎤</button>
-        </div>
-    </div>
+    let tekstDawkowania = '';
+    const cell6 = row.cells[6];
+    if (cell6.childNodes.length > 1 && cell6.childNodes[1].nodeType === Node.TEXT_NODE) {
+        tekstDawkowania = cell6.childNodes[1].textContent.trim();
+    }
+    document.getElementById('formDawkowanie').value = tekstDawkowania;
+    document.getElementById('formKarencja').value = row.cells[7].textContent.trim();
 
-    <div class="form-actions" style="margin-top:20px; flex-direction: column; gap: 10px; border-top: 1px solid #eee; padding-top: 15px;">
+    // Ustaw 'prevIndex' dla autozapisu (doświadczalnie używamy tylko w Step 2)
+    formRowSelectStep2.dataset.prevIndex = logicalIndex;
+    formRowSelectStep3.dataset.prevIndex = logicalIndex;
+}
+
+/**
+ * Zapisuje dane z formularza do konkretnego wiersza w tabeli.
+ */
+function saveRowToTable(idx) {
+    const logical = rowsEditable();
+    const row = logical[idx];
+    if (!row) return;
+
+    // Pobierz wartości
+    const opis = document.getElementById('formOpis').value;
+    const liczba = document.getElementById('formLiczba').value;
+    const rozpoznanie = document.getElementById('formRozpoznanie').value;
+    const lek = document.getElementById('formLek').value;
+    const seria = document.getElementById('formSeria').value;
+    const ilosc = document.getElementById('formIlosc').value;
+    const dawkowanie = document.getElementById('formDawkowanie').value;
+    const karencja = document.getElementById('formKarencja').value;
+
+    // 1. Zapisz dane
+    row.cells[1].textContent = opis;
+
+    const inp2 = row.cells[2].querySelector('input');
+    if (inp2) inp2.value = liczba;
+
+    const inp3_save = row.cells[3].querySelector('input');
+    if (inp3_save) inp3_save.value = rozpoznanie;
+
+    const produktInput = row.cells[4].querySelector('input');
+    if (produktInput) {
+        produktInput.value = lek;
+        produktInput.dispatchEvent(new Event('input', { bubbles: true })); // Wymuś aktualizację serii/karencji
+    }
+    
+    row.cells[5].textContent = seria;
+
+    const cell = row.cells[6];
+    const iloscInput = cell.querySelector('input[type="number"]');
+    if (iloscInput) iloscInput.value = ilosc || '';
+    
+    if (cell.childNodes.length > 1 && cell.childNodes[1].nodeType === Node.TEXT_NODE) {
+        cell.childNodes[1].textContent = ' ' + dawkowanie;
+    } else if (dawkowanie) {
+        cell.appendChild(document.createTextNode(' ' + dawkowanie));
+    }
+    
+    row.cells[7].textContent = karencja;
+
+    // 2. Efekt wizualny
+    row.classList.add('highlight-row');
+    setTimeout(() => row.classList.remove('highlight-row'), 1600);
+
+    // 3. Jeśli nie jesteś w formularzu, wywołaj walidację stanów
+    if (typeof validateCardStock === 'function') validateCardStock();
+}
+
+/**
+ * Synchronizuje dane nagłówka z formularza do widoku głównej karty.
+ */
+function syncHeaderFormToTop() {
+    // 1. Nagłówek
+    document.getElementById('klientSelect').value = document.getElementById('formKlient').value;
+    document.getElementById('adresKlienta').textContent = document.getElementById('formAdres').value;
+    document.getElementById('nrStada').textContent = document.getElementById('formNrStada').value;
+    document.getElementById('nrDokumentu').value = document.getElementById('formNrDokumentu').value;
+    
+    // 2. Daty
+    const dataZ = document.getElementById('formDataZgloszenia').value;
+    if (dataZ) document.getElementById('dataZgloszenia').value = dataZ;
+    const dataW = document.getElementById('formDataWykonania').value;
+    if (dataW) document.getElementById('dataWykonania').value = dataW;
+}
+
+/**
+ * Wypełnia podsumowanie produktów dla Step 4.
+ */
+function updateFormSummary() {
+    const summaryList = document.getElementById('formSummaryList');
+    const logicalRows = rowsEditable();
+    let productsListHTML = '';
+    let hasProducts = false;
+    let productsLeczenie = [];
+    let productsPozostawione = [];
+
+    // Krok 1: Zbierz dane
+    logicalRows.forEach((row, index) => {
+        const lekInput = row.cells[4].querySelector('input');
+        const iloscInput = row.cells[6].querySelector('input[type="number"]');
         
-        <div style="display: flex; gap: 8px; width: 100%;">
-            <button type="button" id="formPrevRowBtn" class="btn small" style="flex: 1;">Poprzedni wiersz</button>
-            
-            <button type="button" id="formSaveAndCloseBtn" class="btn primary small" style="flex: 2; font-weight: bold; font-size: 18px;">Zamknij i zapisz</button>
-            
-            <button type="button" id="formNextRowBtn" class="btn small" style="flex: 1;">Następny wiersz</button>
-        </div>
+        if (lekInput && iloscInput && lekInput.value.trim() !== '' && (parseFloat(iloscInput.value) || 0) > 0) {
+            hasProducts = true;
+            const item = {
+                name: lekInput.value.trim(),
+                qty: iloscInput.value.trim(),
+                isLeczenie: index <= 8
+            };
+            if (item.isLeczenie) {
+                productsLeczenie.push(item);
+            } else {
+                productsPozostawione.push(item);
+            }
+        }
+    });
 
-        <div style="width: 100%; text-align: center; border-top: 1px solid #eee; padding-top: 10px; margin-top: 5px;">
-            <button id="backToHeader" class="btn ghost small">Dane posiadacza/Nagłówek</button>
-        </div>
+    // Krok 2: Generuj HTML
+    if (hasProducts) {
+        productsListHTML += '<ul>';
 
-        <button id="saveRow" class="btn primary small" style="display: none;">Zapisz wiersz</button>
-        <button id="formCopyBtn" class="btn small" style="display: none;">Przepisz dane z leczenia na miejscu</button>
-    </div>
-</div>
-</div>
+        if (productsLeczenie.length > 0) {
+            productsListHTML += '<li><strong>Leczenie na Miejscu:</strong></li>';
+            productsLeczenie.forEach(p => {
+                productsListHTML += `<li>${p.name} (x${p.qty})</li>`;
+            });
+        }
+        
+        if (productsPozostawione.length > 0) {
+            productsListHTML += '<li><strong>Produkty Pozostawione:</strong></li>';
+            productsPozostawione.forEach(p => {
+                productsListHTML += `<li>${p.name} (x${p.qty})</li>`;
+            });
+        }
+        
+        productsListHTML += '</ul>';
+    } else {
+        productsListHTML = '<ul style="text-align: center; color: #999;"><li>Brak produktów w karcie.</li></ul>';
+    }
 
-</div>
-</div>
+    summaryList.innerHTML = productsListHTML;
+}
+
+
+// --- GŁÓWNE LISTENERY ---
+
+// 1. Otwieranie Modala Formularza
+formBtn.addEventListener('click', () => {
+    // 1. Zsynchronizuj nagłówek z karty do formularza (przed otwarciem)
+    document.getElementById('formKlient').value = document.getElementById('klientSelect').value || '';
+    document.getElementById('formAdres').value = document.getElementById('adresKlienta').textContent || '';
+    document.getElementById('formNrStada').value = document.getElementById('nrStada').textContent || '';
+    document.getElementById('formDataZgloszenia').value = document.getElementById('dataZgloszenia').value || '';
+    document.getElementById('formDataWykonania').value = document.getElementById('dataWykonania').value || '';
+    document.getElementById('formNrDokumentu').value = document.getElementById('nrDokumentu').value || '';
+
+    // 2. Otwórz modal i przejdź do kroku 1
+    formModal.style.display = 'flex';
+    goToFormStep(1); 
+    currentLogicalIndex = 0; // Zawsze zaczynaj od wiersza 1
+});
+
+// 2. Przełączanie Kroków (Next)
+nextToStep2Form.addEventListener('click', () => {
+    syncHeaderFormToTop(); // Zapisz dane nagłówka przed przejściem
+    goToFormStep(2);
+});
+nextToStep3Form.addEventListener('click', () => {
+    saveRowToTable(currentLogicalIndex); // Zapisz bieżący wiersz (ostatnio edytowany w step 2)
+    currentLogicalIndex = 9; // Ustaw index na pierwszy wiersz produktów pozostawionych
+    goToFormStep(3);
+});
+nextToStep4Form.addEventListener('click', () => {
+    saveRowToTable(currentLogicalIndex); // Zapisz bieżący wiersz (ostatnio edytowany w step 3)
+    goToFormStep(4);
+});
+
+// 3. Przełączanie Kroków (Back)
+backToStep1Form.addEventListener('click', () => goToFormStep(1));
+backToStep2Form.addEventListener('click', () => {
+    currentLogicalIndex = 0; // Wróć do pierwszego wiersza leczenia
+    goToFormStep(2);
+});
+backToStep3Form.addEventListener('click', () => {
+    currentLogicalIndex = 9; // Wróć do pierwszego wiersza pozostawionych
+    goToFormStep(3);
+});
+
+
+// 4. Nawigacja Wierszy (Step 2)
+formRowSelectStep2.addEventListener('change', (e) => selectRowInForm(parseInt(e.target.value, 10)));
+prevRowStep2.addEventListener('click', () => {
+    const idx = parseInt(formRowSelectStep2.value, 10);
+    if (idx > 0) selectRowInForm(idx - 1);
+});
+nextRowStep2.addEventListener('click', () => {
+    const idx = parseInt(formRowSelectStep2.value, 10);
+    if (idx < 8) selectRowInForm(idx + 1);
+});
+
+// 5. Nawigacja Wierszy (Step 3)
+formRowSelectStep3.addEventListener('change', (e) => selectRowInForm(parseInt(e.target.value, 10)));
+prevRowStep3.addEventListener('click', () => {
+    const idx = parseInt(formRowSelectStep3.value, 10);
+    if (idx > 9) selectRowInForm(idx - 1);
+});
+nextRowStep3.addEventListener('click', () => {
+    const idx = parseInt(formRowSelectStep3.value, 10);
+    if (idx < 11) selectRowInForm(idx + 1);
+});
+
+// 6. Zapisz i Zamknij (Krok 4)
+saveAndCloseForm.addEventListener('click', () => {
+    syncHeaderFormToTop();
+    formModal.style.display = 'none';
+    showToast('Karta leczenia zapisana w tabeli.', 'success');
+});
+
+// 7. Anuluj
+closeForm.addEventListener('click', () => formModal.style.display = 'none');
+
+
+// 8. Podłączenie funkcji FormCopy1to10Btn (Kopiuj z 1. wiersza Leczenia do 1. Pozostawione)
+if (formCopy1to10Btn) {
+    formCopy1to10Btn.addEventListener('click', () => {
+        const sourceRow = rowsEditable()[0]; // 1. wiersz (index 0)
+        const targetRow = rowsEditable()[9]; // 10. wiersz (index 9)
+        
+        if (sourceRow && targetRow) {
+            // Kopiuj Opis
+            targetRow.cells[1].textContent = sourceRow.cells[1].textContent;
+            // Kopiuj Liczbę
+            const srcLiczba = sourceRow.cells[2].querySelector('input');
+            const tgtLiczba = targetRow.cells[2].querySelector('input');
+            if (srcLiczba && tgtLiczba) tgtLiczba.value = srcLiczba.value;
+            // Kopiuj Rozpoznanie
+            const srcRozp = sourceRow.cells[3].querySelector('input');
+            const tgtRozp = targetRow.cells[3].querySelector('input');
+            if (srcRozp && tgtRozp) tgtRozp.value = srcRozp.value;
+
+            // Odśwież formularz, aby pokazać skopiowane dane
+            selectRowInForm(9); 
+            showToast('Skopiowano dane zwierzęcia z wiersza 1.', 'info');
+        }
+    });
+}
+// 9. Podłączenie funkcji FormCopyPrevRowBtn (Kopiuj z poprzedniego wiersza)
+if (formCopyPrevRowBtn) {
+    formCopyPrevRowBtn.addEventListener('click', () => {
+        const currentIdx = currentLogicalIndex;
+        if (currentIdx > 0 && currentIdx !== 9) {
+            const prevRow = rowsEditable()[currentIdx - 1]; 
+            const currentRow = rowsEditable()[currentIdx]; 
+
+            if (prevRow && currentRow) {
+                // Kopiuj Opis
+                currentRow.cells[1].textContent = prevRow.cells[1].textContent;
+                // Kopiuj Liczbę
+                const srcLiczba = prevRow.cells[2].querySelector('input');
+                const tgtLiczba = currentRow.cells[2].querySelector('input');
+                if (srcLiczba && tgtLiczba) tgtLiczba.value = srcLiczba.value;
+                // Kopiuj Rozpoznanie
+                const srcRozp = prevRow.cells[3].querySelector('input');
+                const tgtRozp = currentRow.cells[3].querySelector('input');
+                if (srcRozp && tgtRozp) tgtRozp.value = srcRozp.value;
+    
+                // Odśwież formularz, aby pokazać skopiowane dane
+                selectRowInForm(currentIdx); 
+                showToast('Skopiowano dane zwierzęcia z poprzedniego wiersza.', 'info');
+            }
+        }
+    });
+}
 <div id="metodaModal" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.48); display: none; z-index: 10001; justify-content: center; align-items: center; overflow: hidden;">
 <div class="form-card" style="width: 90vw; max-width: 400px; height: auto;">
 <h3 style="font-size: 22px; text-align: center; margin-top: 0;">Wybierz metodę wypełniania</h3>
