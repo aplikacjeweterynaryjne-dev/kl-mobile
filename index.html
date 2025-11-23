@@ -4233,10 +4233,21 @@ const formBtn = document.getElementById('formBtn'); // Przycisk uruchamiający f
 const formCloseAndCancel = document.getElementById('formCloseAndCancel'); // Zakończ z kroku 4
 
 closeForm.addEventListener('click', ()=> formModal.style.display = 'none');
+formCloseAndCancel.addEventListener('click', ()=> formModal.style.display = 'none'); // Nowy przycisk z kroku 4
 
+// Funkcja do przełączania kroku (używana przez starą logikę, którą będziemy usuwać)
 function showStep(n){
-step1.classList.toggle('active', n===1);
-step2.classList.toggle('active', n===2);
+// Ukryj wszystkie
+formStep1.classList.remove('active');
+formStep2.classList.remove('active');
+formStep3.classList.remove('active');
+formStep4.classList.remove('active');
+// Pokaż właściwy
+if (n === 1) formStep1.classList.add('active');
+if (n === 2) formStep2.classList.add('active');
+if (n === 3) formStep3.classList.add('active');
+if (n === 4) formStep4.classList.add('active');
+// Pokażemy tu tylko, jeśli jakiś stary kod jej użyje. Docelowo użyjemy 'goToFormStep'.
 }
 
 /* Next -> synchronizuj nagłówek i przejdź do kroku 2 */
@@ -4272,18 +4283,38 @@ document.getElementById('nrDokumentu').value = nrDok;
 }
 
 /* ---- Row select: wypełnij select indeksami logicznych wierszy (1..13 bez wiersza 10) ---- */
+/* ---- Row select: wypełnij select indeksami logicznych wierszy (1..13 bez wiersza 10) ---- */
 function populateRowSelect(){
-const sel = formRowSelect;
-sel.innerHTML = '';
-const logical = rowsEditable();
-logical.forEach((tr, idx) => {
-// compute displayed row number -> use first cell (like "1." etc)
-const display = tr.cells[0].textContent || (idx+1)+'.';
-const opt = document.createElement('option');
-opt.value = idx; // index within logical array
-opt.textContent = (idx+1) + '.';
-sel.appendChild(opt);
-});
+    const sel2 = document.getElementById('formRowSelect2');
+    const sel3 = document.getElementById('formRowSelect3');
+    const logical = rowsEditable();
+
+    if (!sel2 || !sel3) {
+        console.warn("Brak elementów select w formularzu karty (Moduł 1).");
+        return;
+    }
+
+    sel2.innerHTML = ''; // Wyczyść select Leczenie
+    sel3.innerHTML = ''; // Wyczyść select Pozostawione
+    
+    logical.forEach((tr, idx) => {
+        const display = tr.cells[0].textContent || (idx+1)+'.';
+        const opt = document.createElement('option');
+        opt.value = idx; // index within logical array (0 do 11)
+        opt.textContent = display;
+
+        if (idx >= 0 && idx <= 8) {
+            // Wiersze 1-9 (indeksy 0-8)
+            sel2.appendChild(opt.cloneNode(true));
+        } else if (idx >= 9 && idx <= 11) {
+            // Wiersze 10-12 (indeksy 9-11)
+            sel3.appendChild(opt.cloneNode(true));
+        }
+    });
+
+    // Ustaw domyślny index (jeśli istnieje)
+    if (sel2.options.length > 0) sel2.value = 0;
+    if (sel3.options.length > 0) sel3.value = 9; // Zaczynamy od wiersza nr 10 (index 9)
 }
 /* ✅ POCZĄTEK: Moduł 5 - Funkcje wielokrotnego użytku do nawigacji po wierszach */
 
@@ -6196,12 +6227,74 @@ if (metodaModal) metodaModal.style.display = 'none';
 // Pokaż sekcję karty (jest pod spodem)
 
 
-// Otwórz formularz (logika skopiowana z Twojego listenera #formBtn)
-if (formModal) {
-formModal.style.display = 'flex';
-showStep(1); // Pokaż pierwszy krok formularza
-populateRowSelect();
-formRowSelect.dataset.prevIndex = 0; 
+/* ---- NOWA FUNKCJA: Przełączanie kroków (Moduł 2) ---- */
+function goToFormStep(stepNumber) {
+    if (!formStep1 || !formStep2 || !formStep3 || !formStep4) {
+        console.error("Błąd: Elementy kroków formularza nie są zdefiniowane.");
+        return;
+    }
+
+    // 1. Zsynchronizuj nagłówek (zawsze przy zmianie kroku)
+    syncHeaderFormToTop();
+    
+    // 2. Obsługa aktywacji/dezaktywacji (wizualna)
+    document.querySelectorAll('#kartaFormNav button').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    
+    // 3. Wyświetl właściwy krok i zaznacz wskaźnik
+    [formStep1, formStep2, formStep3, formStep4].forEach(step => step.classList.remove('active'));
+    
+    let targetStep;
+    let targetIndicator;
+
+    if (stepNumber === 1) {
+        targetStep = formStep1;
+        targetIndicator = document.getElementById('formIndStep1');
+    } else if (stepNumber === 2) {
+        targetStep = formStep2;
+        targetIndicator = document.getElementById('formIndStep2');
+    } else if (stepNumber === 3) {
+        targetStep = formStep3;
+        targetIndicator = document.getElementById('formIndStep3');
+    } else if (stepNumber === 4) {
+        targetStep = formStep4;
+        targetIndicator = document.getElementById('formIndStep4');
+        updateFormSummary(); // Odśwież podsumowanie przy wejściu do kroku 4
+    }
+
+    if (targetStep) targetStep.classList.add('active');
+    if (targetIndicator) targetIndicator.classList.add('active');
+    
+    // 4. Po wejściu do kroku 2 lub 3, upewnij się, że są poprawne dane
+    if (stepNumber === 2) {
+        populateRowSelect();
+        selectRowInForm(0); // Domyślnie wiersz 1
+    } else if (stepNumber === 3) {
+        populateRowSelect();
+        selectRowInForm(9); // Domyślnie wiersz 10 (Pozostawione 1)
+    }
+}
+
+/* ---- NOWA LOGIKA URUCHAMIANIA FORMULARZA (Moduł 2) ---- */
+formBtn.addEventListener('click', ()=>{
+    // 1. Pokaż modal
+    formModal.style.display = 'flex';
+    
+    // 2. Zsynchronizuj pola formularza z nagłówkiem tabeli (aby dane się nie straciły)
+    document.getElementById('formKlient').value = document.getElementById('klientSelect').value || '';
+    document.getElementById('formAdres').value = document.getElementById('adresKlienta').textContent || '';
+    document.getElementById('formNrStada').value = document.getElementById('nrStada').textContent || '';
+    document.getElementById('formDataZgloszenia').value = document.getElementById('dataZgloszenia').value || '';
+    document.getElementById('formDataWykonania').value = document.getElementById('dataWykonania').value || '';
+    document.getElementById('formNrDokumentu').value = document.getElementById('nrDokumentu').value || '';
+    
+    // 3. Rozpocznij od pierwszego kroku
+    goToFormStep(1);
+});
+
+// Usuń starego listenera dla przejścia do produktów, który teraz jest w nowej funkcji
+// nextToProducts.addEventListener('click', ...); // Ta linia powinna być usunięta
 
 // Synchronizuj dane z nagłówka (jeśli jakieś są)
 document.getElementById('formKlient').value = document.getElementById('klientSelect').value || '';
@@ -16021,6 +16114,23 @@ try {
 /* ======================================================== */
 /* ✅ KONIEC: Logika Własnego Produktu                      */
 /* ======================================================== */
+/* ---- Podpięcie przycisków nawigacyjnych Formularza (Moduł 2) ---- */
+
+// Krok 1 -> Krok 2
+document.getElementById('btnToFormStep2')?.addEventListener('click', () => goToFormStep(2));
+
+// Krok 2 -> Krok 1
+document.getElementById('btnBackToFormStep1')?.addEventListener('click', () => goToFormStep(1));
+// Krok 2 -> Krok 3
+document.getElementById('btnToFormStep3')?.addEventListener('click', () => goToFormStep(3));
+
+// Krok 3 -> Krok 2
+document.getElementById('btnBackToFormStep2')?.addEventListener('click', () => goToFormStep(2));
+// Krok 3 -> Krok 4
+document.getElementById('btnToFormStep4')?.addEventListener('click', () => goToFormStep(4));
+
+// Krok 4 -> Krok 3
+document.getElementById('btnBackToFormStep3')?.addEventListener('click', () => goToFormStep(3));
 </script> 
 
 <div id="toastContainer" style="position: fixed; top: 20px; right: 20px; z-index: 20000; display: flex; flex-direction: column; gap: 10px;">
