@@ -209,83 +209,33 @@ overflow: hidden;
 }
 
 .form-card {
-    width: 140vw;
-    max-width: 650px; /* Zwiększamy max-width, aby formularz był szerszy */
-    height: 98vh; /* Wysokość dla lepszej widoczności */
-    overflow-y: auto;
-    background: #fff;
-    border-radius: 12px;
-    padding: 24px;
-    box-sizing: border-box;
-    display: flex;
-    flex-direction: column;
-    justify-content: flex-start;
-    font-size: clamp(18px, 5vw, 22px);
-    border: 1px solid #E0E0E0; /* Dodanie ramki z kroku 2 (Styling) */
-    box-shadow: 0 6px 16px rgba(0,0,0,0.1); /* Dodanie cienia z kroku 2 (Styling) */
+width: 140vw;
+max-width: 600px;
+height: 120vh;
+overflow-y: auto;
+background: #fff;
+border-radius: 12px;
+padding: 24px;
+box-sizing: border-box;
+display: flex;
+flex-direction: column;
+justify-content: flex-start;
+font-size: clamp(18px, 5vw, 22px);
 }
 
-/* Dostosowanie dla mniejszych ekranów (np. telefony) */
 @media (max-width: 480px) {
-    .form-card {
-        width: 98vw;
-        height: 98vh;
-        padding: 12px;
-        max-width: none; /* Użyj pełnej szerokości na małych ekranach */
-    }
+.form-card {
+width: 98vw;
+height: 95vh;
+padding: 12px;
+}
+input, select, textarea, button {
+font-size: 1rem;
+}
 }
 
 .form-step { display:none; }
 .form-step.active { display:block; }
-
-/* --- STYLE DLA ZAKŁADEK (NOWE) --- */
-.tabbed-steps-nav {
-    display: flex;
-    justify-content: space-between;
-    margin-bottom: 20px;
-    background: #f7f7f7; /* Jasne tło, podobne do kalkulatora */
-    border-radius: 8px;
-    padding: 4px;
-    border: 1px solid #eee;
-}
-
-.tab-indicator {
-    flex: 1;
-    text-align: center;
-    padding: 10px 5px;
-    font-size: 15px;
-    color: #777;
-    border-radius: 6px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s ease-in-out;
-}
-
-.tab-indicator:hover {
-    background: #ededed;
-}
-
-.tab-indicator.active {
-    background: #fff;
-    color: #6A994E; /* Nasza główna zieleń */
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-/* Sekcja z przyciskami (żeby była na dole, jak w Kalkulatorze) */
-.form-summary-actions {
-    margin-top: auto; /* Wypycha ten div na sam dół */
-    padding-top: 15px;
-    border-top: 1px dashed #ccc;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-}
-
-.form-summary-actions .btn {
-    width: 100%;
-    font-size: 18px;
-    padding: 12px;
-}
 /* Zwiększenie czcionki nagłówków w formularzu */
 .form-step h3 {
 font-size: 25px; /* Domyślna jest zwykle ok. 20-21px */
@@ -2521,193 +2471,132 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
 </div>
 <!-- FORMULARZ (modal od dołu na mobilnych) -->
 <div id="formModal" aria-hidden="true">
-    <div class="form-card" role="dialog" aria-modal="true">
+<div class="form-card" role="dialog" aria-modal="true">
+<!-- krok 1: nagłówek -->
+<div id="step1" class="form-step active">
+<h3>Dane posiadacza / nagłówek</h3>
+<div class="form-row">
+<label for="formKlient">Imię, nazwisko lub nazwa siedziby</label>
+<input list="klientList" id="formKlient" placeholder="Kliknij, aby wyszukać klienta..." readonly style="cursor: pointer; background: #fff;">
+</div>
+<div class="form-row">
+<label for="formAdres">Adres</label>
+<input type="text" id="formAdres" placeholder="Adres">
+</div>
+<div class="form-row">
+<label for="formNrStada">Nr stada</label>
+<input type="text" id="formNrStada" placeholder="Nr stada">
+</div>
+<div class="form-row">
+<label for="formDataZgloszenia">Data zgłoszenia</label>
+<input type="date" id="formDataZgloszenia">
+</div>
+<div class="form-row">
+<label for="formDataWykonania">Data wykonania</label>
+<input type="date" id="formDataWykonania">
+</div>
+<div class="form-row">
+<label for="formNrDokumentu">Nr dokumentu</label>
+<input type="text" id="formNrDokumentu" placeholder="Numer dokumentu">
+</div>
+<div class="form-actions">
+<div class="left">
+<button id="closeForm" class="btn ghost small">Zakończ</button>
+</div>
+<div class="right">
+<button id="nextToProducts" class="btn primary small">Dalej ➜</button>
+</div>
+</div>
+</div>
 
-        <div class="tabbed-steps-nav">
-            <div class="tab-indicator active" id="tabInd1" data-step="1">1. Dane podstawowe</div>
-            <div class="tab-indicator" id="tabInd2" data-step="2">2. Leczenie na miejscu</div>
-            <div class="tab-indicator" id="tabInd3" data-step="3">3. Produkty pozostawione</div>
-            <div class="tab-indicator" id="tabInd4" data-step="4">4. Podsumowanie</div>
-        </div>
+<div id="step2" class="form-step">
+    <h3 id="formRowTitle" style="color: red; font-size: 25px;">Edycja wierszy tabeli</h3>
 
-        <div id="step1" class="form-step active" data-tab="1">
-            <h3 style="margin-top:0;">1. Dane podstawowe</h3>
-            <div class="form-row">
-                <label for="formKlient">Imię, nazwisko lub nazwa siedziby</label>
-                <input list="klientList" id="formKlient" placeholder="Kliknij, aby wyszukać klienta..." readonly style="cursor: pointer; background: #fff;">
-            </div>
-            <div class="form-row">
-                <label for="formAdres">Adres</label>
-                <input type="text" id="formAdres" placeholder="Adres">
-            </div>
-            <div class="form-row">
-                <label for="formNrStada">Nr stada</label>
-                <input type="text" id="formNrStada" placeholder="Nr stada">
-            </div>
-            <div class="form-row">
-                <label for="formDataZgloszenia">Data zgłoszenia</label>
-                <input type="date" id="formDataZgloszenia">
-            </div>
-            <div class="form-row">
-                <label for="formDataWykonania">Data wykonania</label>
-                <input type="date" id="formDataWykonania">
-            </div>
-            <div class="form-row">
-                <label for="formNrDokumentu">Nr dokumentu</label>
-                <input type="text" id="formNrDokumentu" placeholder="Numer dokumentu">
-            </div>
-            <div class="form-actions">
-                <button id="closeForm" class="btn ghost small">Zakończ</button>
-                <button id="nextToTab2" class="btn primary small" data-go-to="2">Dalej ➜</button>
-            </div>
-        </div>
-
-        <div id="step2" class="form-step" data-tab="2">
-            <h3 id="formRowTitle" style="margin-top:0;">2. Leczenie na miejscu (Wiersze 1-9)</h3>
-            <div id="formLivePreview" style="font-size: 14px; color: #333; background-color: #f4f4f4; border: 1px solid #ddd; border-radius: 6px; padding: 8px; margin-bottom: 12px; max-height: 70px; overflow-y: auto;">
-                <strong style="color: #000;">Dodane produkty (Lecz. na m.):</strong>
-                <span id="previewProductList">ładowanie...</span>
-            </div>
-            <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
-                <label style="margin:0; font-weight:600;">Wybierz wiersz (1-9)</label>
-                <select id="formRowSelectLeczenie" style="flex:1; padding:8px; border-radius:6px; border:1px solid #ccc;"></select>
-            </div>
-            <div style="margin-bottom: 12px;" id="formCopyPrevRowBtnContainer">
-                <button type="button" id="formCopyPrevRowBtn" class="btn small" style="background-color: #f0f8ff; border-color: #b0c4de; width: 100%; font-weight: 600;">
-                    Kopiuj dane zwierzęcia z poprzedniego wiersza
-                </button>
-            </div>
-            <div id="formRowDetailsContainer" style="display: block;">
-                <div class="form-row"><label for="formOpis">Nazwa siedziby stada i opis zwierzęcia</label><input type="text" id="formOpis" placeholder="Opis zwierzęcia"></div>
-                <div class="form-row"><label for="formLiczba">Liczba leczonych zwierząt</label><input type="number" id="formLiczba" min="0" placeholder="0"></div>
-                <div class="form-row"><label for="formRozpoznanie">Rozpoznanie / wstępne rozpoznanie</label><input type="text" id="formRozpoznanie" list="listaRozpoznan" placeholder="Wpisz lub wybierz schemat..."></div>
-            </div>
-            <div style="display: flex; align-items: flex-end; gap: 8px; margin-bottom: 8px;">
-                <button id="prevRow" class="btn small" data-nav-row="prev">◀</button>
-                <div class="form-row" style="flex: 1; margin-bottom: 0;">
-                    <label for="formLek">Nazwa produktu leczniczego</label>
-                    <input list="listaLekow" id="formLek" placeholder="Kliknij, aby wyszukać produkt..." readonly style="cursor: pointer; background: #fff;">
-                </div>
-                <button id="nextRow" class="btn small" data-nav-row="next">▶</button>
-            </div>
-            <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
-                <button id="micBtn" class="" title="Dyktuj nazwę produktu">🎤</button>
-                <small style="color:#666">Naciśnij mikrofon aby dyktować</small>
-            </div>
-            <div class="form-row">
-                <label for="formSeria">Numer serii produktu</label>
-                <input type="text" id="formSeria" placeholder="Numer serii">
-            </div>
-            <form id="myForm">
-                <div class="form-row" style="display: flex; gap: 10px;">
-                    <div style="flex:1;">
-                        <label>Ilość</label>
-                        <input type="number" inputmode="numeric" pattern="[0-9]*" id="formIlosc" placeholder="0" style="width:100%;">
-                    </div>
-                    <div style="flex:1;">
-                        <label>Dawkowanie / jednostka</label>
-                        <input type="text" id="formDawkowanie" placeholder="np. 2 ml/kg">
-                    </div>
-                </div>
-            </form>
-            <div class="form-row">
-                <label for="formKarencja">Okres karencji / uwagi</label>
-                <div class="mic-container" style="display: flex; gap: 8px; align-items: center;">
-                    <input type="text" id="formKarencja" placeholder="Okres karencji / uwagi">
-                    <button type="button" id="micKarencja" class="mic-btn" title="Dyktuj" style="flex-shrink: 0;">🎤</button>
-                </div>
-            </div>
-            <div class="form-actions">
-                <div class="left">
-                    <button id="prevToTab1" class="btn ghost small" data-go-to="1">⬅ Wróć do Danych</button>
-                </div>
-                <div class="right">
-                    <button id="nextToTab3" class="btn primary small" data-go-to="3">Dalej do Pozostawionych ➜</button>
-                </div>
-            </div>
-        </div>
-
-        <div id="step3" class="form-step" data-tab="3">
-            <h3 style="margin-top:0;">3. Produkty pozostawione (Wiersze 10-12)</h3>
-            <p style="font-size: 14px; color: #555;">Potwierdzenie nabycia produktu leczniczego weterynaryjnego/paszy leczniczej.</p>
-            <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
-                <label style="margin:0; font-weight:600;">Wybierz wiersz (1-3)</label>
-                <select id="formRowSelectPozostawione" style="flex:1; padding:8px; border-radius:6px; border:1px solid #ccc;"></select>
-            </div>
-            <div id="formCopyBtnContainer" style="margin-bottom: 12px; text-align: center;">
-                <button type="button" id="formCopyBtn" class="btn primary" style="width: 100%; font-size: 16px; padding: 10px;">
-                    Przepisz dane zwierzęcia z leczenia na miejscu
-                </button>
-            </div>
-            <div id="formPozostawioneDetailsContainer" style="display: block;">
-                <div class="form-row"><label for="formOpisPozostawione">Nazwa siedziby stada i opis zwierzęcia</label><input type="text" id="formOpisPozostawione" placeholder="Opis zwierzęcia"></div>
-                <div class="form-row"><label for="formLiczbaPozostawione">Liczba leczonych zwierząt</label><input type="number" id="formLiczbaPozostawione" min="0" placeholder="0"></div>
-                <div class="form-row"><label for="formRozpoznaniePozostawione">Rozpoznanie / wstępne rozpoznanie</label><input type="text" id="formRozpoznaniePozostawione" list="listaRozpoznan" placeholder="Wpisz lub wybierz schemat..."></div>
-            </div>
-
-            <div style="display: flex; align-items: flex-end; gap: 8px; margin-bottom: 8px;">
-                <button id="prevRowPozostawione" class="btn small" data-nav-row="prev">◀</button>
-                <div class="form-row" style="flex: 1; margin-bottom: 0;">
-                    <label for="formLekPozostawione">Nazwa produktu leczniczego</label>
-                    <input list="listaLekow" id="formLekPozostawione" placeholder="Kliknij, aby wyszukać produkt..." readonly style="cursor: pointer; background: #fff;">
-                </div>
-                <button id="nextRowPozostawione" class="btn small" data-nav-row="next">▶</button>
-            </div>
-            <div class="form-row">
-                <label for="formSeriaPozostawione">Numer serii produktu</label>
-                <input type="text" id="formSeriaPozostawione" placeholder="Numer serii">
-            </div>
-            <div class="form-row" style="display: flex; gap: 10px;">
-                <div style="flex:1;">
-                    <label>Ilość</label>
-                    <input type="number" inputmode="numeric" pattern="[0-9]*" id="formIloscPozostawione" placeholder="0" style="width:100%;">
-                </div>
-                <div style="flex:1;">
-                    <label>Dawkowanie / jednostka</label>
-                    <input type="text" id="formDawkowaniePozostawione" placeholder="np. 2 ml/kg">
-                </div>
-            </div>
-            <div class="form-row">
-                <label for="formKarencjaPozostawione">Okres karencji / uwagi</label>
-                <div class="mic-container" style="display: flex; gap: 8px; align-items: center;">
-                    <input type="text" id="formKarencjaPozostawione" placeholder="Okres karencji / uwagi">
-                    <button type="button" id="micKarencjaPozostawione" class="mic-btn" title="Dyktuj" style="flex-shrink: 0;">🎤</button>
-                </div>
-            </div>
-            <div class="form-actions">
-                <div class="left">
-                    <button id="prevToTab2" class="btn ghost small" data-go-to="2">⬅ Wróć do Leczenia na miejscu</button>
-                </div>
-                <div class="right">
-                    <button id="nextToTab4" class="btn primary small" data-go-to="4">Dalej do Podsumowania ➜</button>
-                </div>
-            </div>
-        </div>
-
-        <div id="step4" class="form-step" data-tab="4">
-            <h3 style="margin-top:0;">4. Podsumowanie</h3>
-            <div style="background-color: #f7f7f7; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
-                <h4 style="margin-top: 0;">Podsumowanie Danych:</h4>
-                <p style="font-size: 16px;"><strong>Klient:</strong> <span id="summaryKlient"></span></p>
-                <p style="font-size: 16px;"><strong>Data:</strong> <span id="summaryData"></span></p>
-                <p style="font-size: 16px;"><strong>Nr Dokumentu:</strong> <span id="summaryNrDokumentu"></span></p>
-                <hr style="border: 0; border-top: 1px dashed #ccc; margin: 10px 0;">
-                <h4 style="margin-top: 0;">Produkty Użyte:</h4>
-                <ul id="summaryProductsList" style="list-style: disc; padding-left: 20px; font-size: 15px;">
-                    </ul>
-            </div>
-
-            <div class="form-summary-actions">
-                <button id="saveCardToArchiveBtnSummary" class="btn primary">💾 Zapisz w Archiwum</button>
-                <button id="printBtnSummary" class="btn">🖨️ Drukuj / Zapisz PDF</button>
-                <button id="closeFormSummary" class="btn warn">❌ Zakończ i Zamknij</button>
-            </div>
-            <div class="form-actions" style="margin-top: 15px; border-top: none; padding-top: 0; justify-content: flex-start;">
-                <button id="prevToTab3" class="btn ghost small" data-go-to="3">⬅ Wróć do Pozostawionych</button>
-            </div>
-        </div>
-
+    <div id="formLivePreview" style="font-size: 14px; color: #333; background-color: #f4f4f4; border: 1px solid #ddd; border-radius: 6px; padding: 8px; margin-bottom: 12px; max-height: 70px; overflow-y: auto;">
+        <strong style="color: #000;">Dodane do karty:</strong>
+        <span id="previewProductList">ładowanie...</span>
     </div>
+<div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
+        <label style="margin:0; font-weight:600;">Wybierz wiersz</label>
+        <select id="formRowSelect" style="flex:1; padding:8px; border-radius:6px; border:1px solid #ccc;"></select>
+    </div>
+    <div style="margin-bottom: 12px;" id="formCopyPrevRowBtnContainer">
+        <button type="button" id="formCopyPrevRowBtn" class="btn small" style="background-color: #f0f8ff; border-color: #b0c4de; width: 100%; font-weight: 600;">
+            Kopiuj dane zwierzęcia z poprzedniego wiersza
+        </button>
+    </div>
+<div id="formCopyBtnContainer" style="display: none; margin-bottom: 8px; text-align: center;">
+        </div>
+    <div id="formNoweDaneContainer" style="display: none; margin-bottom: 8px;">
+        <button type="button" id="formBtnNoweDane" class="btn primary" style="width: 100%; font-size: 16px; padding: 10px;">+ Nowe Dane</button>
+    </div>
+    
+        <div id="formRowDetailsContainer" style="display: block;">
+<div class="form-row"><label for="formOpis">Nazwa siedziby stada i opis zwierzęcia</label><input type="text" id="formOpis" placeholder="Opis zwierzęcia"></div>
+<div class="form-row"><label for="formLiczba">Liczba leczonych zwierząt</label><input type="number" id="formLiczba" min="0" placeholder="0"></div>
+<div class="form-row"><label for="formRozpoznanie">Rozpoznanie / wstępne rozpoznanie</label><input type="text" id="formRozpoznanie" list="listaRozpoznan" placeholder="Wpisz lub wybierz schemat..."></div>
+    </div>      
+    <div style="display: flex; align-items: flex-end; gap: 8px; margin-bottom: 8px;">
+        
+        <button id="prevRow" class="btn small">◀</button>
+
+        <div class="form-row" style="flex: 1; margin-bottom: 0;">
+        <label for="formLek">Nazwa produktu leczniczego</label>
+            <input list="listaLekow" id="formLek" placeholder="Kliknij, aby wyszukać produkt..." readonly style="cursor: pointer; background: #fff;">
+        </div>
+
+        <button id="nextRow" class="btn small">▶</button>
+    </div>
+
+
+    <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
+        <button id="micBtn" class="" title="Dyktuj nazwę produktu">🎤</button>
+        <small style="color:#666">Naciśnij mikrofon aby dyktować</small>
+    </div>
+
+    <div class="form-row">
+        <label for="formSeria">Numer serii produktu</label>
+        <input type="text" id="formSeria" placeholder="Numer serii">
+    </div>
+    <form id="myForm">
+
+        <div class="form-row">
+            <label>Ilość </label>
+            <input type="number" inputmode="numeric" pattern="[0-9]*" id="formIlosc" placeholder="0" style="width:60px;">
+        </div>
+
+        <div class="form-row">
+            <label>Dawkowanie / jednostka</label>
+            <input type="text" id="formDawkowanie" placeholder="np. 2 ml/kg">
+        </div>
+    </form>
+
+    <div class="form-row">
+        <label for="formKarencja">Okres karencji / uwagi</label>
+        <div class="mic-container" style="display: flex; gap: 8px; align-items: center;">
+            <input type="text" id="formKarencja" placeholder="Okres karencji / uwagi">
+            <button type="button" id="micKarencja" class="mic-btn" title="Dyktuj" style="flex-shrink: 0;">🎤</button>
+        </div>
+    </div>
+
+  <div class="form-actions" style="margin-top:12px; flex-direction: column; gap: 10px; border-top: 1px solid #eee; padding-top: 10px;">
+        
+        <div style="display: flex; gap: 8px; width: 100%;">
+            <button type="button" id="formPrevRowBtn" class="btn small" style="flex: 1;">Poprzedni wiersz</button>
+            
+            <button type="button" id="formSaveAndCloseBtn" class="btn warn small" style="flex: 2; font-weight: bold; font-size: 16px;">Zamknij i zapisz</button>
+            
+            <button type="button" id="formNextRowBtn" class="btn small" style="flex: 1;">Następny wiersz</button>
+        </div>
+
+        <div style="width: 100%; text-align: center; border-top: 1px solid #eee; padding-top: 10px; margin-top: 5px;">
+            <button id="backToHeader" class="btn ghost small">Dane posiadacza/Nagłówek</button>
+        </div>
+
+        <button id="saveRow" class="btn primary small" style="display: none;">Zapisz wiersz</button>
+        <button id="formCopyBtn" class="btn small" style="display: none;">Przepisz dane z leczenia na miejscu</button>
+    </div>
+</div>
 </div>
 
 </div>
@@ -4229,190 +4118,18 @@ function rowsEditable(){
 return [...document.querySelectorAll('#karta tbody tr')].filter(tr=>tr.cells.length === 8);
 }
 
-/* ---- Formularz: otwieranie, krokowanie, synchronizacja nagłówka (NOWA STRUKTURA) ---- */
+/* ---- Formularz: otwieranie, krokowanie, synchronizacja nagłówka ---- */
 const formModal = document.getElementById('formModal');
-const formBtn = document.getElementById('formBtn'); // Przycisk otwierający modal
-const tabIndicators = document.querySelectorAll('.tab-indicator'); // Wszystkie zakładki
-const formRowSelectLeczenie = document.getElementById('formRowSelectLeczenie'); // NOWA lista Leczenie (1-9)
-const formRowSelectPozostawione = document.getElementById('formRowSelectPozostawione'); // NOWA lista Pozostawione (10-12)
-const formCopyPrevRowBtnContainer = document.getElementById('formCopyPrevRowBtnContainer'); // Kontener przycisku kopiowania opisu
-
-// Sekcje formularza (stepy)
-const step1 = document.getElementById('step1'); // Dane podstawowe
-const step2 = document.getElementById('step2'); // Leczenie na miejscu
-const step3 = document.getElementById('step3'); // Produkty pozostawione
-const step4 = document.getElementById('step4'); // Podsumowanie
-
-// Elementy do ukrywania/pokazywania w step2 (zostają)
-const formRowTitle = document.getElementById('formRowTitle');
+const step1 = document.getElementById('step1');
+const step2 = document.getElementById('step2');
+const formBtn = document.getElementById('formBtn');
+const closeForm = document.getElementById('closeForm');
+const nextToProducts = document.getElementById('nextToProducts');
+const backToHeader = document.getElementById('backToHeader');
+const formRowSelect = document.getElementById('formRowSelect');
 const formNoweDaneContainer = document.getElementById('formNoweDaneContainer');
 const formBtnNoweDane = document.getElementById('formBtnNoweDane');
 const formRowDetailsContainer = document.getElementById('formRowDetailsContainer');
-// Stare przyciski nawigacji wierszy (zostają)
-const nextRowBtn = document.getElementById('nextRow');
-const prevRowBtn = document.getElementById('prevRow');
-
-// Zmienne dla Wierszy Pozostawionych (nowe ID, aby nie kolidować w DOM)
-const formOpisPozostawione = document.getElementById('formOpisPozostawione');
-const formLiczbaPozostawione = document.getElementById('formLiczbaPozostawione');
-const formRozpoznaniePozostawione = document.getElementById('formRozpoznaniePozostawione');
-const formLekPozostawione = document.getElementById('formLekPozostawione');
-const formSeriaPozostawione = document.getElementById('formSeriaPozostawione');
-const formIloscPozostawione = document.getElementById('formIloscPozostawione');
-const formDawkowaniePozostawione = document.getElementById('formDawkowaniePozostawione');
-const formKarencjaPozostawione = document.getElementById('formKarencjaPozostawione');
-
-// Zmienne dla podsumowania (Step 4)
-const summaryKlient = document.getElementById('summaryKlient');
-const summaryData = document.getElementById('summaryData');
-const summaryNrDokumentu = document.getElementById('summaryNrDokumentu');
-const summaryProductsList = document.getElementById('summaryProductsList');
-const saveCardToArchiveBtnSummary = document.getElementById('saveCardToArchiveBtnSummary');
-const printBtnSummary = document.getElementById('printBtnSummary');
-const closeFormSummary = document.getElementById('closeFormSummary');
-
-/* --- NOWA LOGIKA ZAKŁADEK (STEPPER) --- */
-
-// Funkcja przełącza widok na dany krok (tab)
-function showTab(n) {
-    // 1. Ukryj wszystkie kroki i odznacz wskaźniki
-    [step1, step2, step3, step4].forEach(step => {
-        if (step) step.classList.remove('active');
-    });
-    tabIndicators.forEach(ind => ind.classList.remove('active'));
-
-    // 2. Pokaż wybrany krok i zaznacz wskaźnik
-    const targetStep = document.getElementById(`step${n}`);
-    const targetIndicator = document.getElementById(`tabInd${n}`);
-
-    if (targetStep) targetStep.classList.add('active');
-    if (targetIndicator) targetIndicator.classList.add('active');
-
-    // 3. Dodatkowe akcje dla konkretnych kroków
-    if (n === 1) {
-        // Zawsze synchronizuj dane z nagłówka przy wejściu do Krok 1
-        syncHeaderTopToForm();
-    }
-    if (n === 2) {
-        // Po wejściu do kroku 2, domyślnie wybierz pierwszy wiersz (indeks 0)
-        populateRowSelects(); // Upewnij się, że listy są pełne
-        selectRowInForm('leczenie', 0);
-    }
-    if (n === 3) {
-        // Po wejściu do kroku 3, domyślnie wybierz pierwszy wiersz pozostawiony (indeks 9)
-        populateRowSelects();
-        selectRowInForm('pozostawione', 9);
-    }
-    if (n === 4) {
-        // Po wejściu do kroku 4, zbuduj podsumowanie
-        syncHeaderFormToTop(); // Upewnij się, że nagłówek jest zapisany
-        buildSummary();
-    }
-}
-
-// Funkcja obsługująca kliknięcia w paski zakładek
-tabIndicators.forEach(indicator => {
-    indicator.addEventListener('click', () => {
-        const targetStep = parseInt(indicator.dataset.step, 10);
-        // Opcjonalnie: Dodaj walidację przed przejściem do przodu (jeśli potrzebujesz)
-        showTab(targetStep);
-    });
-});
-
-// Funkcja obsługująca przyciski "Dalej/Wróć"
-document.addEventListener('click', (e) => {
-    const target = e.target.closest('[data-go-to]');
-    if (target) {
-        const nextStep = parseInt(target.dataset.goTo, 10);
-        // Zapis nagłówka przed przejściem dalej (zawsze z Kroku 1)
-        if (nextStep > 1) {
-             syncHeaderFormToTop();
-        }
-        showTab(nextStep);
-    }
-});
-
-/* --- OBSŁUGA GŁÓWNEGO PRZYCISKU OTWIERAJĄCEGO FORMUARZ --- */
-formBtn.addEventListener('click', ()=>{
-    formModal.style.display = 'flex';
-    showTab(1); // Zawsze startuj od Krok 1
-});
-
-/* --- PRZYCISKI ZAMKNIĘCIA FORMUARZA --- */
-// Stary przycisk z kroku 1
-document.getElementById('closeForm').addEventListener('click', ()=> {
-    if (confirm("Czy na pewno chcesz zamknąć formularz? Niezapisane zmiany w nagłówku i wierszach zostaną utracone.")) {
-        formModal.style.display = 'none';
-        // Opcjonalnie: Zresetuj formularz po zamknięciu
-    }
-});
-
-// Nowy przycisk z kroku 4
-closeFormSummary.addEventListener('click', () => {
-    if (confirm("Czy na pewno chcesz zamknąć formularz? Upewnij się, że zapisałeś kartę.")) {
-        formModal.style.display = 'none';
-    }
-});
-
-/* --- SYNCHRONIZACJA DANYCH --- */
-
-// 1. Synchronizuje nagłówek z tabeli do pól w formie (przy otwarciu formy)
-function syncHeaderTopToForm(){
-    document.getElementById('formKlient').value = document.getElementById('klientSelect').value || '';
-    document.getElementById('formAdres').value = document.getElementById('adresKlienta').textContent || '';
-    document.getElementById('formNrStada').value = document.getElementById('nrStada').textContent || '';
-    document.getElementById('formDataZgloszenia').value = document.getElementById('dataZgloszenia').value || '';
-    document.getElementById('formDataWykonania').value = document.getElementById('dataWykonania').value || '';
-    document.getElementById('formNrDokumentu').value = document.getElementById('nrDokumentu').value || '';
-}
-
-// 2. Synchronizuje pola w formie do nagłówka w tabeli (przy przejściu Dalej/Zapisz)
-function syncHeaderFormToTop(){
-    const klient = document.getElementById('formKlient').value;
-    const adres = document.getElementById('formAdres').value;
-    const nrStada = document.getElementById('formNrStada').value;
-    const dataZ = document.getElementById('formDataZgloszenia').value;
-    const dataW = document.getElementById('formDataWykonania').value;
-    const nrDok = document.getElementById('formNrDokumentu').value;
-    document.getElementById('klientSelect').value = klient;
-    document.getElementById('adresKlienta').textContent = adres;
-    document.getElementById('nrStada').textContent = nrStada;
-    if (dataZ) document.getElementById('dataZgloszenia').value = dataZ;
-    if (dataW) document.getElementById('dataWykonania').value = dataW;
-    document.getElementById('nrDokumentu').value = nrDok;
-
-    // Po synchronizacji uruchom automatyczne uzupełnianie dla Klienta (jeśli się zmienił)
-    document.getElementById('klientSelect').dispatchEvent(new Event('input', { bubbles:true }));
-}
-
-/* --- FUNKCJA WYPEŁNIAJĄCA LISTY WYBORU WIERZY --- */
-function populateRowSelects(){
-    const logical = rowsEditable();
-    const rowsLeczenie = logical.slice(0, 9); // Wiersze 1-9
-    const rowsPozostawione = logical.slice(9, 12); // Wiersze 10-12
-
-    // 1. Wypełnij Leczenie (1-9)
-    if (formRowSelectLeczenie) {
-        formRowSelectLeczenie.innerHTML = '';
-        rowsLeczenie.forEach((tr, idx) => {
-            const opt = document.createElement('option');
-            opt.value = idx; // Indeks logiczny 0-8
-            opt.textContent = `Wiersz ${idx + 1}`;
-            formRowSelectLeczenie.appendChild(opt);
-        });
-    }
-
-    // 2. Wypełnij Pozostawione (10-12)
-    if (formRowSelectPozostawione) {
-        formRowSelectPozostawione.innerHTML = '';
-        rowsPozostawione.forEach((tr, idx) => {
-            const opt = document.createElement('option');
-            opt.value = idx + 9; // Indeks logiczny 9-11
-            opt.textContent = `Wiersz ${idx + 1}`;
-            formRowSelectPozostawione.appendChild(opt);
-        });
-    }
-}
 formBtn.addEventListener('click', ()=>{
 formModal.style.display = 'flex';
 showStep(1);
@@ -4567,102 +4284,205 @@ formRowSelect.dataset.prevIndex = idx; // zapamiętaj nowy indeks
 });
 
 /* ---- funkcja zapisu wiersza (jeśli jeszcze nie masz) ---- */
-/* ⬇️ ZASTĄP CAŁĄ FUNKCJĘ saveRow(idx) TYM NOWYM KODEM ⬇️ */
+function saveRow(idx){
+const logical = rowsEditable();
+const row = logical[idx];
+if (!row) return;
+
+// write values
+row.cells[1].textContent = document.getElementById('formOpis').value;
+const inp2 = row.cells[2].querySelector('input');
+if (inp2) inp2.value = document.getElementById('formLiczba').value;
+
+// ⬇️ POPRAWKA ⬇️
+const inp3_save = row.cells[3].querySelector('input');
+if (inp3_save) inp3_save.value = document.getElementById('formRozpoznanie').value;
+
+const produktInput = row.cells[4].querySelector('input');
+if (produktInput) {
+    const lekName = document.getElementById('formLek').value; // ⬅️ NOWA LINIA
+    produktInput.value = lekName;
+    row.cells[4].dataset.printValue = lekName; // ⬅️ NOWA LINIA
+    produktInput.dispatchEvent(new Event('input', { bubbles:true }));
+}
+row.cells[5].textContent = document.getElementById('formSeria').value;
+const iloInp = row.cells[6].querySelector('input');
+if (iloInp) iloInp.value = document.getElementById('formDawkowanie').value || iloInp.value;
+row.cells[7].textContent = document.getElementById('formKarencja').value;
+row.classList.add('highlight-row');
+setTimeout(()=>row.classList.remove('highlight-row'), 1600);
+}
+
+/* ⬇️ WKLEJ TĘ NOWĄ FUNKCJĘ (np. przed 'selectRowInForm') ⬇️ */
 
 /**
- * Zapisuje wartości z pól formularza (Step 2 lub Step 3) do wiersza tabeli.
- * @param {number} idx Indeks wiersza w tablicy logicalRows (0-11).
+ * Skanuje główną tabelę i aktualizuje podgląd w formularzu.
  */
-function saveRow(idx) {
-    const logical = rowsEditable();
-    const row = logical[idx];
-    if (!row) return;
+function updateFormLivePreview() {
+    // Znajdź element, w którym mamy wyświetlić listę
+    const previewSpan = document.getElementById('previewProductList');
+    if (!previewSpan) return; // Jeśli nie ma elementu, wyjdź
 
-    // 1. Ustal, z których pól czerpać dane
-    // Logika jest taka, że jeśli idx >= 9 (wiersze 10-12), używamy pól Pozostawione.
-    const isLeczenie = idx >= 0 && idx <= 8; // Wiersze 1-9
-    const isPozostawione = idx >= 9 && idx <= 11; // Wiersze 10-12
+    // Użyj istniejącej funkcji pomocniczej, aby pobrać wszystkie edytowalne wiersze
+    const logicalRows = rowsEditable();
+    let products = []; // Tablica na znalezione produkty
 
-    let opisVal, liczbaVal, rozpoznanieVal, lekVal, seriaVal, iloscVal, dawkowanieVal, karencjaVal;
-    
-    if (isLeczenie) {
-        // Tryb Leczenia (korzysta ze wspólnych pól)
-        opisVal = document.getElementById('formOpis').value;
-        liczbaVal = document.getElementById('formLiczba').value;
-        rozpoznanieVal = document.getElementById('formRozpoznanie').value;
-        lekVal = document.getElementById('formLek').value;
-        seriaVal = document.getElementById('formSeria').value;
-        iloscVal = document.getElementById('formIlosc').value;
-        dawkowanieVal = document.getElementById('formDawkowanie').value;
-        karencjaVal = document.getElementById('formKarencja').value;
-        
-    } else if (isPozostawione) {
-        // Tryb Pozostawione (korzysta z dedykowanych pól)
-        opisVal = document.getElementById('formOpisPozostawione').value;
-        liczbaVal = document.getElementById('formLiczbaPozostawione').value;
-        rozpoznanieVal = document.getElementById('formRozpoznaniePozostawione').value;
-        lekVal = document.getElementById('formLekPozostawione').value;
-        seriaVal = document.getElementById('formSeriaPozostawione').value;
-        iloscVal = document.getElementById('formIloscPozostawione').value;
-        dawkowanieVal = document.getElementById('formDawkowaniePozostawione').value;
-        karencjaVal = document.getElementById('formKarencjaPozostawione').value;
+    // Przejdź pętlą po każdym wierszu tabeli
+    logicalRows.forEach(row => {
+        // Znajdź pole <input> dla leku (komórka 4)
+        const lekInput = row.cells[4].querySelector('input[list="listaLekow"]');
+        // Znajdź pole <input> dla ilości (komórka 6)
+        const iloscInput = row.cells[6].querySelector('input[type="number"]');
 
+        const productName = lekInput ? lekInput.value.trim() : '';
+        const quantity = iloscInput ? iloscInput.value.trim() : '';
+
+        // Jeśli wiersz ma i nazwę, i ilość (i ilość nie jest zerem)
+        if (productName && quantity && quantity !== '0') {
+            // Dodaj do naszej tablicy w formacie "Nazwa - Ilość"
+            products.push(`<strong>${productName}</strong> - ${quantity}`);
+        }
+    });
+
+    // Zaktualizuj tekst w podglądzie
+    if (products.length > 0) {
+        // Połącz wszystkie znalezione produkty przecinkami
+        previewSpan.innerHTML = products.join(', ');
     } else {
-        return; // Wiersz nie pasuje do żadnej sekcji
+        // Jeśli tabela jest pusta
+        previewSpan.innerHTML = '<i>brak</i>';
     }
+}
+/* ⬆️ KONIEC NOWEJ FUNKCJI ⬆️ */
 
-    // 2. Wpisz wartości do wiersza (cells[1] do cells[7])
-
-    // a) Opis
-    row.cells[1].textContent = opisVal;
-    
-    // b) Liczba (input)
-    const inpLiczba = row.cells[2].querySelector('input');
-    if (inpLiczba) inpLiczba.value = liczbaVal;
-
-    // c) Rozpoznanie (input)
-    const inpRozpoznanie = row.cells[3].querySelector('input');
-    if (inpRozpoznanie) inpRozpoznanie.value = rozpoznanieVal;
-
-    // d) Lek (input)
-    const produktInput = row.cells[4].querySelector('input');
-    if (produktInput) {
-        produktInput.value = lekVal;
-        row.cells[4].dataset.printValue = lekVal; // Zapisz dla druku
-        
-        // Wymuś odświeżenie (to uzupełni Serię/Dawkowanie/Karencję w tabeli z map)
-        produktInput.dispatchEvent(new Event('input', { bubbles: true }));
-    }
-    
-    // e) Seria
-    row.cells[5].textContent = seriaVal;
-
-    // f) Ilość i Dawkowanie
-    const cellIloscDawka = row.cells[6];
-    const inpIlosc = cellIloscDawka.querySelector('input[type="number"]');
-
-    if (inpIlosc) {
-        // 1. Przepisz ilość
-        inpIlosc.value = iloscVal || '';
-        
-        // 2. Zaktualizuj tekst dawkowania (który jest Node.TEXT_NODE za inputem)
-        let dawkaNode = inpIlosc.nextSibling;
-        if (dawkaNode && dawkaNode.nodeType === Node.TEXT_NODE) {
-            dawkaNode.textContent = ' ' + (dawkowanieVal || '');
-        } else if (dawkowanieVal) {
-            // Dodaj Dawkowanie, jeśli go brakuje (np. w starym wierszu)
-            cellIloscDawka.appendChild(document.createTextNode(' ' + dawkowanieVal));
+/* ⬇️ KROK 2A: ZASTĄP CAŁĄ FUNKCJĘ ⬇️ */
+function selectRowInForm(logicalIndex){
+    updateFormLivePreview();
+    // ⬇️ ⬇️ ⬇️ WKLEJ TEN BLOK KODU ⬇️ ⬇️ ⬇️
+    const formCopyPrevRowBtnContainer = document.getElementById('formCopyPrevRowBtnContainer');
+    if (formCopyPrevRowBtnContainer) {
+        // Pokaż przycisk tylko dla wierszy 2-9 oraz 11-13
+        // Ukryj dla wiersza 1 (indeks 0) i wiersza 10 (indeks 9)
+        if (logicalIndex === 0 || logicalIndex === 9) {
+            formCopyPrevRowBtnContainer.style.display = 'none';
+        } else {
+            formCopyPrevRowBtnContainer.style.display = 'block';
         }
     }
+    // ⬆️ ⬆️ ⬆️ KONIEC WKLEJANIA ⬆️ ⬆️ ⬆️
+    const logical = rowsEditable();
+    const row = logical[logicalIndex];
+    if (!row) return;
 
-    // g) Karencja
-    row.cells[7].textContent = karencjaVal;
+    // --- LOGIKA "NOWE DANE" (TAK JAK BYŁO) ---
+    if (logicalIndex === 0 || logicalIndex === 9) {
+        formNoweDaneContainer.style.display = 'none';
+        formRowDetailsContainer.style.display = 'block';
+    } else {
+        formNoweDaneContainer.style.display = 'block';
+        formRowDetailsContainer.style.display = 'none';
+    }
+    
+    // --- ⬇️ NOWA LOGIKA DLA PRZYCISKU "PRZEPISZ DANE" (Pkt 1) ⬇️ ---
+    const copyBtnContainer = document.getElementById('formCopyBtnContainer');
+    if (logicalIndex === 9) {
+        // Pokaż kontener przycisku tylko w wierszu 10 (indeks 9)
+        copyBtnContainer.style.display = 'block';
+    } else {
+        copyBtnContainer.style.display = 'none';
+    }
+    // --- ⬆️ KONIEC NOWEJ LOGIKI ⬆️ ---
 
-    // Efekt wizualny i aktualizacja podglądu
-    row.classList.add('highlight-row');
-    setTimeout(() => row.classList.remove('highlight-row'), 1600);
-    updateFormLivePreview();
+    // Wczytaj dane do pól (tak jak było)
+    document.getElementById('formOpis').value = row.cells[1].textContent.trim();
+const inp = row.cells[2].querySelector('input');
+    document.getElementById('formLiczba').value = inp ? inp.value : '';
+
+    // ⬇️ POPRAWKA ⬇️
+    const inp3_select = row.cells[3].querySelector('input');
+    document.getElementById('formRozpoznanie').value = inp3_select ? inp3_select.value : '';
+
+    const lekInput = row.cells[4].querySelector('input');
+    document.getElementById('formLek').value = lekInput ? lekInput.value : ''; 
+    document.getElementById('formSeria').value = row.cells[5].textContent.trim();
+    
+    const cell6 = row.cells[6];
+    const iloscInput = cell6.querySelector('input[type="number"]');
+    document.getElementById('formIlosc').value = iloscInput ? iloscInput.value : '';
+    let tekstDawkowania = '';
+    if (cell6.childNodes.length > 1 && cell6.childNodes[1].nodeType === Node.TEXT_NODE) {
+        tekstDawkowania = cell6.childNodes[1].textContent.trim();
+    }
+    document.getElementById('formDawkowanie').value = tekstDawkowania;
+    document.getElementById('formKarencja').value = row.cells[7].textContent.trim();
+    
+    // Aktualizuj tytuł (tak jak było)
+    const titleEl = document.getElementById('formRowTitle');
+    if (titleEl) {
+        let titleText = '';
+        if (logicalIndex >= 0 && logicalIndex <= 8) {
+            titleText = `Jesteś w wierszu nr ${logicalIndex + 1}`;
+        } else if (logicalIndex === 9) {
+            titleText = 'Jesteś w produktach pozostawionych wiersz nr 1';
+        } else if (logicalIndex === 10) {
+            titleText = 'Jesteś w produktach pozostawionych wiersz nr 2';
+        } else if (logicalIndex === 11) {
+            titleText = 'Jesteś w produktach pozostawionych wiersz nr 3';
+        } else {
+            titleText = `Jesteś w wierszu nr ${logicalIndex + 1}`;
+        }
+        titleEl.textContent = titleText;
+    }
 }
+/* ⬆️ KONIEC ZASTĘPOWANIA ⬆️ */
+/* ---- po wyborze produktu w formularzu automatycznie uzupełnij seria/dawkowanie/karencja ---- */
+document.getElementById('formLek').addEventListener('input', function(){
+    const n = this.value;
+    document.getElementById('formSeria').value = mapaSerii[n] || '';
+    // jeśli dawkowanie ma być w polu 'tekstowym' (zachowujemy format tabeli)
+    document.getElementById('formDawkowanie').value = mapaIlosci[n] || '';
+    document.getElementById('formKarencja').value = mapaKarencji[n] || '';
+});
+
+/* ---- zapis wiersza: zapisuje do logicznego wiersza (nie zmienia struktury tabeli) ---- */
+document.getElementById('saveRow').addEventListener('click', ()=>{
+const idx = parseInt(formRowSelect.value,10);
+const logical = rowsEditable();
+const row = logical[idx];
+if (!row) { alert('Brak wybranego wiersza'); return; }
+
+// write values
+row.cells[1].textContent = document.getElementById('formOpis').value;
+// cell 2 -> input
+const inp2 = row.cells[2].querySelector('input');
+if (inp2) inp2.value = document.getElementById('formLiczba').value;
+row.cells[3].textContent = document.getElementById('formRozpoznanie').value;
+// produkt input
+const produktInput = row.cells[4].querySelector('input');
+if (produktInput) {
+produktInput.value = document.getElementById('formLek').value;
+// dispatch input event to trigger table logic (fills serie/ilosc/karencja like original)
+produktInput.dispatchEvent(new Event('input', { bubbles:true }));
+}
+// series
+row.cells[5].textContent = document.getElementById('formSeria').value;
+// ilość -> if there's input inside cell[6], set it; otherwise set text
+const iloInp = row.cells[6].querySelector('input');
+if (iloInp) {
+// if user provided numeric in formDawkowanie, try set numeric portion
+// but the table's cell[6] holds "<input> dostawanieTekst", so set input value
+iloInp.value = document.getElementById('formDawkowanie').value || iloInp.value;
+// ensure we don't destroy trailing dosing text - that part comes from map and already set by productInput.dispatchEvent
+} else {
+row.cells[6].textContent = document.getElementById('formDawkowanie').value;
+}
+row.cells[7].textContent = document.getElementById('formKarencja').value;
+
+// Visually confirm
+row.classList.add('highlight-row');
+setTimeout(()=>row.classList.remove('highlight-row'), 1600);
+showToast('Wiersz zapisany.', 'success');
+});
 
 
 
