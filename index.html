@@ -4567,205 +4567,102 @@ formRowSelect.dataset.prevIndex = idx; // zapamiętaj nowy indeks
 });
 
 /* ---- funkcja zapisu wiersza (jeśli jeszcze nie masz) ---- */
-function saveRow(idx){
-const logical = rowsEditable();
-const row = logical[idx];
-if (!row) return;
-
-// write values
-row.cells[1].textContent = document.getElementById('formOpis').value;
-const inp2 = row.cells[2].querySelector('input');
-if (inp2) inp2.value = document.getElementById('formLiczba').value;
-
-// ⬇️ POPRAWKA ⬇️
-const inp3_save = row.cells[3].querySelector('input');
-if (inp3_save) inp3_save.value = document.getElementById('formRozpoznanie').value;
-
-const produktInput = row.cells[4].querySelector('input');
-if (produktInput) {
-    const lekName = document.getElementById('formLek').value; // ⬅️ NOWA LINIA
-    produktInput.value = lekName;
-    row.cells[4].dataset.printValue = lekName; // ⬅️ NOWA LINIA
-    produktInput.dispatchEvent(new Event('input', { bubbles:true }));
-}
-row.cells[5].textContent = document.getElementById('formSeria').value;
-const iloInp = row.cells[6].querySelector('input');
-if (iloInp) iloInp.value = document.getElementById('formDawkowanie').value || iloInp.value;
-row.cells[7].textContent = document.getElementById('formKarencja').value;
-row.classList.add('highlight-row');
-setTimeout(()=>row.classList.remove('highlight-row'), 1600);
-}
-
-/* ⬇️ WKLEJ TĘ NOWĄ FUNKCJĘ (np. przed 'selectRowInForm') ⬇️ */
+/* ⬇️ ZASTĄP CAŁĄ FUNKCJĘ saveRow(idx) TYM NOWYM KODEM ⬇️ */
 
 /**
- * Skanuje główną tabelę i aktualizuje podgląd w formularzu.
+ * Zapisuje wartości z pól formularza (Step 2 lub Step 3) do wiersza tabeli.
+ * @param {number} idx Indeks wiersza w tablicy logicalRows (0-11).
  */
-function updateFormLivePreview() {
-    // Znajdź element, w którym mamy wyświetlić listę
-    const previewSpan = document.getElementById('previewProductList');
-    if (!previewSpan) return; // Jeśli nie ma elementu, wyjdź
-
-    // Użyj istniejącej funkcji pomocniczej, aby pobrać wszystkie edytowalne wiersze
-    const logicalRows = rowsEditable();
-    let products = []; // Tablica na znalezione produkty
-
-    // Przejdź pętlą po każdym wierszu tabeli
-    logicalRows.forEach(row => {
-        // Znajdź pole <input> dla leku (komórka 4)
-        const lekInput = row.cells[4].querySelector('input[list="listaLekow"]');
-        // Znajdź pole <input> dla ilości (komórka 6)
-        const iloscInput = row.cells[6].querySelector('input[type="number"]');
-
-        const productName = lekInput ? lekInput.value.trim() : '';
-        const quantity = iloscInput ? iloscInput.value.trim() : '';
-
-        // Jeśli wiersz ma i nazwę, i ilość (i ilość nie jest zerem)
-        if (productName && quantity && quantity !== '0') {
-            // Dodaj do naszej tablicy w formacie "Nazwa - Ilość"
-            products.push(`<strong>${productName}</strong> - ${quantity}`);
-        }
-    });
-
-    // Zaktualizuj tekst w podglądzie
-    if (products.length > 0) {
-        // Połącz wszystkie znalezione produkty przecinkami
-        previewSpan.innerHTML = products.join(', ');
-    } else {
-        // Jeśli tabela jest pusta
-        previewSpan.innerHTML = '<i>brak</i>';
-    }
-}
-/* ⬆️ KONIEC NOWEJ FUNKCJI ⬆️ */
-
-/* ⬇️ KROK 2A: ZASTĄP CAŁĄ FUNKCJĘ ⬇️ */
-function selectRowInForm(logicalIndex){
-    updateFormLivePreview();
-    // ⬇️ ⬇️ ⬇️ WKLEJ TEN BLOK KODU ⬇️ ⬇️ ⬇️
-    const formCopyPrevRowBtnContainer = document.getElementById('formCopyPrevRowBtnContainer');
-    if (formCopyPrevRowBtnContainer) {
-        // Pokaż przycisk tylko dla wierszy 2-9 oraz 11-13
-        // Ukryj dla wiersza 1 (indeks 0) i wiersza 10 (indeks 9)
-        if (logicalIndex === 0 || logicalIndex === 9) {
-            formCopyPrevRowBtnContainer.style.display = 'none';
-        } else {
-            formCopyPrevRowBtnContainer.style.display = 'block';
-        }
-    }
-    // ⬆️ ⬆️ ⬆️ KONIEC WKLEJANIA ⬆️ ⬆️ ⬆️
+function saveRow(idx) {
     const logical = rowsEditable();
-    const row = logical[logicalIndex];
-    if (!row) return;
+    const row = logical[idx];
+    if (!row) return;
 
-    // --- LOGIKA "NOWE DANE" (TAK JAK BYŁO) ---
-    if (logicalIndex === 0 || logicalIndex === 9) {
-        formNoweDaneContainer.style.display = 'none';
-        formRowDetailsContainer.style.display = 'block';
+    // 1. Ustal, z których pól czerpać dane
+    // Logika jest taka, że jeśli idx >= 9 (wiersze 10-12), używamy pól Pozostawione.
+    const isLeczenie = idx >= 0 && idx <= 8; // Wiersze 1-9
+    const isPozostawione = idx >= 9 && idx <= 11; // Wiersze 10-12
+
+    let opisVal, liczbaVal, rozpoznanieVal, lekVal, seriaVal, iloscVal, dawkowanieVal, karencjaVal;
+    
+    if (isLeczenie) {
+        // Tryb Leczenia (korzysta ze wspólnych pól)
+        opisVal = document.getElementById('formOpis').value;
+        liczbaVal = document.getElementById('formLiczba').value;
+        rozpoznanieVal = document.getElementById('formRozpoznanie').value;
+        lekVal = document.getElementById('formLek').value;
+        seriaVal = document.getElementById('formSeria').value;
+        iloscVal = document.getElementById('formIlosc').value;
+        dawkowanieVal = document.getElementById('formDawkowanie').value;
+        karencjaVal = document.getElementById('formKarencja').value;
+        
+    } else if (isPozostawione) {
+        // Tryb Pozostawione (korzysta z dedykowanych pól)
+        opisVal = document.getElementById('formOpisPozostawione').value;
+        liczbaVal = document.getElementById('formLiczbaPozostawione').value;
+        rozpoznanieVal = document.getElementById('formRozpoznaniePozostawione').value;
+        lekVal = document.getElementById('formLekPozostawione').value;
+        seriaVal = document.getElementById('formSeriaPozostawione').value;
+        iloscVal = document.getElementById('formIloscPozostawione').value;
+        dawkowanieVal = document.getElementById('formDawkowaniePozostawione').value;
+        karencjaVal = document.getElementById('formKarencjaPozostawione').value;
+
     } else {
-        formNoweDaneContainer.style.display = 'block';
-        formRowDetailsContainer.style.display = 'none';
+        return; // Wiersz nie pasuje do żadnej sekcji
+    }
+
+    // 2. Wpisz wartości do wiersza (cells[1] do cells[7])
+
+    // a) Opis
+    row.cells[1].textContent = opisVal;
+    
+    // b) Liczba (input)
+    const inpLiczba = row.cells[2].querySelector('input');
+    if (inpLiczba) inpLiczba.value = liczbaVal;
+
+    // c) Rozpoznanie (input)
+    const inpRozpoznanie = row.cells[3].querySelector('input');
+    if (inpRozpoznanie) inpRozpoznanie.value = rozpoznanieVal;
+
+    // d) Lek (input)
+    const produktInput = row.cells[4].querySelector('input');
+    if (produktInput) {
+        produktInput.value = lekVal;
+        row.cells[4].dataset.printValue = lekVal; // Zapisz dla druku
+        
+        // Wymuś odświeżenie (to uzupełni Serię/Dawkowanie/Karencję w tabeli z map)
+        produktInput.dispatchEvent(new Event('input', { bubbles: true }));
     }
     
-    // --- ⬇️ NOWA LOGIKA DLA PRZYCISKU "PRZEPISZ DANE" (Pkt 1) ⬇️ ---
-    const copyBtnContainer = document.getElementById('formCopyBtnContainer');
-    if (logicalIndex === 9) {
-        // Pokaż kontener przycisku tylko w wierszu 10 (indeks 9)
-        copyBtnContainer.style.display = 'block';
-    } else {
-        copyBtnContainer.style.display = 'none';
+    // e) Seria
+    row.cells[5].textContent = seriaVal;
+
+    // f) Ilość i Dawkowanie
+    const cellIloscDawka = row.cells[6];
+    const inpIlosc = cellIloscDawka.querySelector('input[type="number"]');
+
+    if (inpIlosc) {
+        // 1. Przepisz ilość
+        inpIlosc.value = iloscVal || '';
+        
+        // 2. Zaktualizuj tekst dawkowania (który jest Node.TEXT_NODE za inputem)
+        let dawkaNode = inpIlosc.nextSibling;
+        if (dawkaNode && dawkaNode.nodeType === Node.TEXT_NODE) {
+            dawkaNode.textContent = ' ' + (dawkowanieVal || '');
+        } else if (dawkowanieVal) {
+            // Dodaj Dawkowanie, jeśli go brakuje (np. w starym wierszu)
+            cellIloscDawka.appendChild(document.createTextNode(' ' + dawkowanieVal));
+        }
     }
-    // --- ⬆️ KONIEC NOWEJ LOGIKI ⬆️ ---
 
-    // Wczytaj dane do pól (tak jak było)
-    document.getElementById('formOpis').value = row.cells[1].textContent.trim();
-const inp = row.cells[2].querySelector('input');
-    document.getElementById('formLiczba').value = inp ? inp.value : '';
+    // g) Karencja
+    row.cells[7].textContent = karencjaVal;
 
-    // ⬇️ POPRAWKA ⬇️
-    const inp3_select = row.cells[3].querySelector('input');
-    document.getElementById('formRozpoznanie').value = inp3_select ? inp3_select.value : '';
-
-    const lekInput = row.cells[4].querySelector('input');
-    document.getElementById('formLek').value = lekInput ? lekInput.value : ''; 
-    document.getElementById('formSeria').value = row.cells[5].textContent.trim();
-    
-    const cell6 = row.cells[6];
-    const iloscInput = cell6.querySelector('input[type="number"]');
-    document.getElementById('formIlosc').value = iloscInput ? iloscInput.value : '';
-    let tekstDawkowania = '';
-    if (cell6.childNodes.length > 1 && cell6.childNodes[1].nodeType === Node.TEXT_NODE) {
-        tekstDawkowania = cell6.childNodes[1].textContent.trim();
-    }
-    document.getElementById('formDawkowanie').value = tekstDawkowania;
-    document.getElementById('formKarencja').value = row.cells[7].textContent.trim();
-    
-    // Aktualizuj tytuł (tak jak było)
-    const titleEl = document.getElementById('formRowTitle');
-    if (titleEl) {
-        let titleText = '';
-        if (logicalIndex >= 0 && logicalIndex <= 8) {
-            titleText = `Jesteś w wierszu nr ${logicalIndex + 1}`;
-        } else if (logicalIndex === 9) {
-            titleText = 'Jesteś w produktach pozostawionych wiersz nr 1';
-        } else if (logicalIndex === 10) {
-            titleText = 'Jesteś w produktach pozostawionych wiersz nr 2';
-        } else if (logicalIndex === 11) {
-            titleText = 'Jesteś w produktach pozostawionych wiersz nr 3';
-        } else {
-            titleText = `Jesteś w wierszu nr ${logicalIndex + 1}`;
-        }
-        titleEl.textContent = titleText;
-    }
+    // Efekt wizualny i aktualizacja podglądu
+    row.classList.add('highlight-row');
+    setTimeout(() => row.classList.remove('highlight-row'), 1600);
+    updateFormLivePreview();
 }
-/* ⬆️ KONIEC ZASTĘPOWANIA ⬆️ */
-/* ---- po wyborze produktu w formularzu automatycznie uzupełnij seria/dawkowanie/karencja ---- */
-document.getElementById('formLek').addEventListener('input', function(){
-    const n = this.value;
-    document.getElementById('formSeria').value = mapaSerii[n] || '';
-    // jeśli dawkowanie ma być w polu 'tekstowym' (zachowujemy format tabeli)
-    document.getElementById('formDawkowanie').value = mapaIlosci[n] || '';
-    document.getElementById('formKarencja').value = mapaKarencji[n] || '';
-});
-
-/* ---- zapis wiersza: zapisuje do logicznego wiersza (nie zmienia struktury tabeli) ---- */
-document.getElementById('saveRow').addEventListener('click', ()=>{
-const idx = parseInt(formRowSelect.value,10);
-const logical = rowsEditable();
-const row = logical[idx];
-if (!row) { alert('Brak wybranego wiersza'); return; }
-
-// write values
-row.cells[1].textContent = document.getElementById('formOpis').value;
-// cell 2 -> input
-const inp2 = row.cells[2].querySelector('input');
-if (inp2) inp2.value = document.getElementById('formLiczba').value;
-row.cells[3].textContent = document.getElementById('formRozpoznanie').value;
-// produkt input
-const produktInput = row.cells[4].querySelector('input');
-if (produktInput) {
-produktInput.value = document.getElementById('formLek').value;
-// dispatch input event to trigger table logic (fills serie/ilosc/karencja like original)
-produktInput.dispatchEvent(new Event('input', { bubbles:true }));
-}
-// series
-row.cells[5].textContent = document.getElementById('formSeria').value;
-// ilość -> if there's input inside cell[6], set it; otherwise set text
-const iloInp = row.cells[6].querySelector('input');
-if (iloInp) {
-// if user provided numeric in formDawkowanie, try set numeric portion
-// but the table's cell[6] holds "<input> dostawanieTekst", so set input value
-iloInp.value = document.getElementById('formDawkowanie').value || iloInp.value;
-// ensure we don't destroy trailing dosing text - that part comes from map and already set by productInput.dispatchEvent
-} else {
-row.cells[6].textContent = document.getElementById('formDawkowanie').value;
-}
-row.cells[7].textContent = document.getElementById('formKarencja').value;
-
-// Visually confirm
-row.classList.add('highlight-row');
-setTimeout(()=>row.classList.remove('highlight-row'), 1600);
-showToast('Wiersz zapisany.', 'success');
-});
 
 
 
