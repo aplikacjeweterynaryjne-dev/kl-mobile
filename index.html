@@ -4229,18 +4229,190 @@ function rowsEditable(){
 return [...document.querySelectorAll('#karta tbody tr')].filter(tr=>tr.cells.length === 8);
 }
 
-/* ---- Formularz: otwieranie, krokowanie, synchronizacja nagłówka ---- */
+/* ---- Formularz: otwieranie, krokowanie, synchronizacja nagłówka (NOWA STRUKTURA) ---- */
 const formModal = document.getElementById('formModal');
-const step1 = document.getElementById('step1');
-const step2 = document.getElementById('step2');
-const formBtn = document.getElementById('formBtn');
-const closeForm = document.getElementById('closeForm');
-const nextToProducts = document.getElementById('nextToProducts');
-const backToHeader = document.getElementById('backToHeader');
-const formRowSelect = document.getElementById('formRowSelect');
+const formBtn = document.getElementById('formBtn'); // Przycisk otwierający modal
+const tabIndicators = document.querySelectorAll('.tab-indicator'); // Wszystkie zakładki
+const formRowSelectLeczenie = document.getElementById('formRowSelectLeczenie'); // NOWA lista Leczenie (1-9)
+const formRowSelectPozostawione = document.getElementById('formRowSelectPozostawione'); // NOWA lista Pozostawione (10-12)
+const formCopyPrevRowBtnContainer = document.getElementById('formCopyPrevRowBtnContainer'); // Kontener przycisku kopiowania opisu
+
+// Sekcje formularza (stepy)
+const step1 = document.getElementById('step1'); // Dane podstawowe
+const step2 = document.getElementById('step2'); // Leczenie na miejscu
+const step3 = document.getElementById('step3'); // Produkty pozostawione
+const step4 = document.getElementById('step4'); // Podsumowanie
+
+// Elementy do ukrywania/pokazywania w step2 (zostają)
+const formRowTitle = document.getElementById('formRowTitle');
 const formNoweDaneContainer = document.getElementById('formNoweDaneContainer');
 const formBtnNoweDane = document.getElementById('formBtnNoweDane');
 const formRowDetailsContainer = document.getElementById('formRowDetailsContainer');
+// Stare przyciski nawigacji wierszy (zostają)
+const nextRowBtn = document.getElementById('nextRow');
+const prevRowBtn = document.getElementById('prevRow');
+
+// Zmienne dla Wierszy Pozostawionych (nowe ID, aby nie kolidować w DOM)
+const formOpisPozostawione = document.getElementById('formOpisPozostawione');
+const formLiczbaPozostawione = document.getElementById('formLiczbaPozostawione');
+const formRozpoznaniePozostawione = document.getElementById('formRozpoznaniePozostawione');
+const formLekPozostawione = document.getElementById('formLekPozostawione');
+const formSeriaPozostawione = document.getElementById('formSeriaPozostawione');
+const formIloscPozostawione = document.getElementById('formIloscPozostawione');
+const formDawkowaniePozostawione = document.getElementById('formDawkowaniePozostawione');
+const formKarencjaPozostawione = document.getElementById('formKarencjaPozostawione');
+
+// Zmienne dla podsumowania (Step 4)
+const summaryKlient = document.getElementById('summaryKlient');
+const summaryData = document.getElementById('summaryData');
+const summaryNrDokumentu = document.getElementById('summaryNrDokumentu');
+const summaryProductsList = document.getElementById('summaryProductsList');
+const saveCardToArchiveBtnSummary = document.getElementById('saveCardToArchiveBtnSummary');
+const printBtnSummary = document.getElementById('printBtnSummary');
+const closeFormSummary = document.getElementById('closeFormSummary');
+
+/* --- NOWA LOGIKA ZAKŁADEK (STEPPER) --- */
+
+// Funkcja przełącza widok na dany krok (tab)
+function showTab(n) {
+    // 1. Ukryj wszystkie kroki i odznacz wskaźniki
+    [step1, step2, step3, step4].forEach(step => {
+        if (step) step.classList.remove('active');
+    });
+    tabIndicators.forEach(ind => ind.classList.remove('active'));
+
+    // 2. Pokaż wybrany krok i zaznacz wskaźnik
+    const targetStep = document.getElementById(`step${n}`);
+    const targetIndicator = document.getElementById(`tabInd${n}`);
+
+    if (targetStep) targetStep.classList.add('active');
+    if (targetIndicator) targetIndicator.classList.add('active');
+
+    // 3. Dodatkowe akcje dla konkretnych kroków
+    if (n === 1) {
+        // Zawsze synchronizuj dane z nagłówka przy wejściu do Krok 1
+        syncHeaderTopToForm();
+    }
+    if (n === 2) {
+        // Po wejściu do kroku 2, domyślnie wybierz pierwszy wiersz (indeks 0)
+        populateRowSelects(); // Upewnij się, że listy są pełne
+        selectRowInForm('leczenie', 0);
+    }
+    if (n === 3) {
+        // Po wejściu do kroku 3, domyślnie wybierz pierwszy wiersz pozostawiony (indeks 9)
+        populateRowSelects();
+        selectRowInForm('pozostawione', 9);
+    }
+    if (n === 4) {
+        // Po wejściu do kroku 4, zbuduj podsumowanie
+        syncHeaderFormToTop(); // Upewnij się, że nagłówek jest zapisany
+        buildSummary();
+    }
+}
+
+// Funkcja obsługująca kliknięcia w paski zakładek
+tabIndicators.forEach(indicator => {
+    indicator.addEventListener('click', () => {
+        const targetStep = parseInt(indicator.dataset.step, 10);
+        // Opcjonalnie: Dodaj walidację przed przejściem do przodu (jeśli potrzebujesz)
+        showTab(targetStep);
+    });
+});
+
+// Funkcja obsługująca przyciski "Dalej/Wróć"
+document.addEventListener('click', (e) => {
+    const target = e.target.closest('[data-go-to]');
+    if (target) {
+        const nextStep = parseInt(target.dataset.goTo, 10);
+        // Zapis nagłówka przed przejściem dalej (zawsze z Kroku 1)
+        if (nextStep > 1) {
+             syncHeaderFormToTop();
+        }
+        showTab(nextStep);
+    }
+});
+
+/* --- OBSŁUGA GŁÓWNEGO PRZYCISKU OTWIERAJĄCEGO FORMUARZ --- */
+formBtn.addEventListener('click', ()=>{
+    formModal.style.display = 'flex';
+    showTab(1); // Zawsze startuj od Krok 1
+});
+
+/* --- PRZYCISKI ZAMKNIĘCIA FORMUARZA --- */
+// Stary przycisk z kroku 1
+document.getElementById('closeForm').addEventListener('click', ()=> {
+    if (confirm("Czy na pewno chcesz zamknąć formularz? Niezapisane zmiany w nagłówku i wierszach zostaną utracone.")) {
+        formModal.style.display = 'none';
+        // Opcjonalnie: Zresetuj formularz po zamknięciu
+    }
+});
+
+// Nowy przycisk z kroku 4
+closeFormSummary.addEventListener('click', () => {
+    if (confirm("Czy na pewno chcesz zamknąć formularz? Upewnij się, że zapisałeś kartę.")) {
+        formModal.style.display = 'none';
+    }
+});
+
+/* --- SYNCHRONIZACJA DANYCH --- */
+
+// 1. Synchronizuje nagłówek z tabeli do pól w formie (przy otwarciu formy)
+function syncHeaderTopToForm(){
+    document.getElementById('formKlient').value = document.getElementById('klientSelect').value || '';
+    document.getElementById('formAdres').value = document.getElementById('adresKlienta').textContent || '';
+    document.getElementById('formNrStada').value = document.getElementById('nrStada').textContent || '';
+    document.getElementById('formDataZgloszenia').value = document.getElementById('dataZgloszenia').value || '';
+    document.getElementById('formDataWykonania').value = document.getElementById('dataWykonania').value || '';
+    document.getElementById('formNrDokumentu').value = document.getElementById('nrDokumentu').value || '';
+}
+
+// 2. Synchronizuje pola w formie do nagłówka w tabeli (przy przejściu Dalej/Zapisz)
+function syncHeaderFormToTop(){
+    const klient = document.getElementById('formKlient').value;
+    const adres = document.getElementById('formAdres').value;
+    const nrStada = document.getElementById('formNrStada').value;
+    const dataZ = document.getElementById('formDataZgloszenia').value;
+    const dataW = document.getElementById('formDataWykonania').value;
+    const nrDok = document.getElementById('formNrDokumentu').value;
+    document.getElementById('klientSelect').value = klient;
+    document.getElementById('adresKlienta').textContent = adres;
+    document.getElementById('nrStada').textContent = nrStada;
+    if (dataZ) document.getElementById('dataZgloszenia').value = dataZ;
+    if (dataW) document.getElementById('dataWykonania').value = dataW;
+    document.getElementById('nrDokumentu').value = nrDok;
+
+    // Po synchronizacji uruchom automatyczne uzupełnianie dla Klienta (jeśli się zmienił)
+    document.getElementById('klientSelect').dispatchEvent(new Event('input', { bubbles:true }));
+}
+
+/* --- FUNKCJA WYPEŁNIAJĄCA LISTY WYBORU WIERZY --- */
+function populateRowSelects(){
+    const logical = rowsEditable();
+    const rowsLeczenie = logical.slice(0, 9); // Wiersze 1-9
+    const rowsPozostawione = logical.slice(9, 12); // Wiersze 10-12
+
+    // 1. Wypełnij Leczenie (1-9)
+    if (formRowSelectLeczenie) {
+        formRowSelectLeczenie.innerHTML = '';
+        rowsLeczenie.forEach((tr, idx) => {
+            const opt = document.createElement('option');
+            opt.value = idx; // Indeks logiczny 0-8
+            opt.textContent = `Wiersz ${idx + 1}`;
+            formRowSelectLeczenie.appendChild(opt);
+        });
+    }
+
+    // 2. Wypełnij Pozostawione (10-12)
+    if (formRowSelectPozostawione) {
+        formRowSelectPozostawione.innerHTML = '';
+        rowsPozostawione.forEach((tr, idx) => {
+            const opt = document.createElement('option');
+            opt.value = idx + 9; // Indeks logiczny 9-11
+            opt.textContent = `Wiersz ${idx + 1}`;
+            formRowSelectPozostawione.appendChild(opt);
+        });
+    }
+}
 formBtn.addEventListener('click', ()=>{
 formModal.style.display = 'flex';
 showStep(1);
