@@ -201,6 +201,7 @@ margin-top: 8px;
 }
 /* Używamy !important, aby nadpisać style domyślne */
 /* ---- formularz (dodany, nie wpływa na tabelę) ---- */
+/* ---- formularz (dodany, nie wpływa na tabelę) ---- */
 #formModal {
 position: fixed;
 top: 0;
@@ -209,7 +210,7 @@ width: 100vw;
 height: 100vh;
 background: rgba(0,0,0,0.48);
 display: none;
-z-index: 10000;
+z-index: 9999; /* ZMNIEJSZONO! Teraz jest pod fullscreen-overlay (10001) */
 justify-content: center;
 align-items: center;
 overflow: hidden;
@@ -2097,24 +2098,31 @@ table {
     margin-bottom: 5px;
 }
 /* ======================================================== */
-/* --- Style dla Zakładek Formularza (Krok 2) --- */
-/* --- Style dla Zakładek Formularza (Bardziej kompaktowe) --- */
+/* --- Style dla Zakładek Formularza (NOWY UKŁAD 2X2) --- */
 .form-step-nav {
-    display: flex;
-    justify-content: space-between;
+    display: flex; /* Zmieniamy na flex, aby układać rzędy pionowo */
+    flex-direction: column; /* Układamy rzędy pionowo */
+    gap: 5px; /* Odstęp między rzędami */
     margin-bottom: 20px !important;
     background: #eef;
     border-radius: 8px;
-    padding: 4px;
+    padding: 6px; /* Zwiększony padding, aby nie ściskać wierszy */
     box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
+}
+
+/* Stylizacja rzędu - Użyjemy flex dla 2x2 */
+.form-step-nav .tab-row {
+    display: flex;
+    gap: 5px; /* Odstęp między przyciskami w rzędzie */
+    width: 100%;
 }
 
 .form-step-nav button {
     flex: 1;
     text-align: center;
-    padding: 6px 3px; /* ZMNIEJSZONY PADDING */
-    font-size: 12px; /* ZMNIEJSZONA CZCIONKA */
-    line-height: 1.2; /* Poprawia upakowanie tekstu */
+    padding: 6px 3px;
+    font-size: 12px;
+    line-height: 1.2;
     color: #444;
     border-radius: 6px;
     font-weight: 600;
@@ -2124,34 +2132,27 @@ table {
     transition: all 0.2s ease;
     margin: 0;
     min-width: unset !important;
-    white-space: nowrap; /* Upewnia się, że tekst nie jest zawijany, wymuszając minimalną szerokość */
+    white-space: normal; /* POZWÓL TEKSTOWI ZAWIJAĆ SIĘ W PIONIE */
+    word-break: break-word; /* Pomocnicze dla długich słów */
+}
+
+/* Wyrównanie dla przycisku zajmującego całą szerokość w Krok 3 */
+.form-step-nav button.full-width {
+    flex: none; /* Wyłącz elastyczność */
+    width: 100%;
 }
 
 /* Stan aktywnej zakładki */
 .form-step-nav button:not(.ghost) {
     background: #fff;
-    color: #6A994E; /* Twoja główna zieleń */
+    color: #6A994E;
     box-shadow: 0 2px 5px rgba(0,0,0,0.1);
     border: 1px solid #ddd;
-    /* Usuń cienie z aktywnej, jeśli używasz */
 }
 /* Stan nieaktywnej zakładki */
 .form-step-nav button.ghost {
     background: transparent;
     color: #777;
-}
-
-/* Usuwamy niepotrzebne marginesy i style po konwersji na zakładki */
-.form-step-nav button[style*="margin"] {
-    margin: 0 !important;
-}
-.form-step-nav button[style*="flex"] {
-    flex: 1 !important;
-}
-/* Poprawka dla przycisku nagłówka/podsumowania w Kroku 2/3 */
-#navDanePodstawowe, #navLeczenieNaMiejscu, #navProduktyPozostawione, #navPodsumowanie {
-    margin: 0 !important;
-    flex: 1 !important;
 }
 </style>
     <div id="calcProductSearchModal" class="product-search-modal" style="display: none; z-index: 10003;">
@@ -2575,22 +2576,27 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
 <div id="step2" class="form-step">
     <h3 id="formRowTitle" style="color: red; font-size: 25px;">Edycja wierszy tabeli</h3>
     
- <div id="form-step-nav" class="form-step-nav">
+<div id="form-step-nav" class="form-step-nav">
         
-        <button id="navDanePodstawowe" class="btn small">
-            ⬅️ Dane Podstawowe
-        </button>
+        <div class="tab-row">
+            <button id="navDanePodstawowe" class="btn small">
+                ⬅️ Dane Podstawowe
+            </button>
 
-        <button id="navLeczenieNaMiejscu" class="btn small">
-            📝 Leczenie na miejscu
-        </button>
-        <button id="navProduktyPozostawione" class="btn small ghost">
-            📦 Produkty pozostawione
-        </button>
+            <button id="navLeczenieNaMiejscu" class="btn small">
+                📝 Leczenie na miejscu
+            </button>
+        </div>
+        
+        <div class="tab-row">
+            <button id="navProduktyPozostawione" class="btn small ghost">
+                📦 Produkty pozostawione
+            </button>
 
-        <button id="navPodsumowanie" class="btn small ghost">
-            Podsumowanie ➡️
-        </button>
+            <button id="navPodsumowanie" class="btn small ghost">
+                Podsumowanie ➡️
+            </button>
+        </div>
     </div>
 
     <div id="formLivePreview" style="font-size: 14px; color: #333; background-color: #f4f4f4; border: 1px solid #ddd; border-radius: 6px; padding: 8px; margin-bottom: 12px; max-height: 70px; overflow-y: auto;">
@@ -2683,17 +2689,21 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
     
 <div class="form-step-nav">
         
-        <button id="navDanePodstawowe2" class="btn small ghost">
-            ⬅️ Dane Podstawowe
-        </button>
+        <div class="tab-row">
+            <button id="navDanePodstawowe2" class="btn small ghost">
+                ⬅️ Dane Podstawowe
+            </button>
 
-        <button id="navLeczenieNaMiejscu2" class="btn small ghost">
-            📝 Edytuj Wiersze
-        </button>
+            <button id="navLeczenieNaMiejscu2" class="btn small ghost">
+                📝 Edytuj Wiersze
+            </button>
+        </div>
 
-        <button id="navPodsumowanie2" class="btn small">
-            Podsumowanie
-        </button>
+        <div class="tab-row">
+            <button id="navPodsumowanie2" class="btn small full-width">
+                Podsumowanie
+            </button>
+        </div>
     </div>
 
     <div id="form-zuzyte-produkty-podsumowanie" class="produkty-lista" style="padding: 10px; background: #f9f9f9; border: 1px solid #ddd; border-radius: 8px; margin-bottom: 20px;">
@@ -16522,6 +16532,53 @@ if (navLeczenieNaMiejscu2) {
     });
 }
 // ✅ KONIEC: Logika nawigacji z Podsumowania
+/* ======================================================== */
+/* ✅ RE-ZASILENIE PRZYCISKÓW AKCJI W KROKU 3 (Podsumowanie) */
+/* ======================================================== */
+
+// PRZYCISK: Zamknij i zapisz w archiwum
+document.getElementById('formSaveAndArchiveBtn')?.addEventListener('click', () => {
+    // 1. Zapisz dane z Krok 2, jeśli użytkownik wracał
+    const currentStep = document.querySelector('.form-step.active')?.id;
+    if (currentStep === 'step2') {
+         const prevIdx = parseInt(formRowSelect.dataset.prevIndex, 10);
+         if (!isNaN(prevIdx)) saveRow(prevIdx);
+    }
+
+    // 2. Skopiuj podpis z form-canvas do głównego canvasa (dla zapisu Base64)
+    if (typeof copyFormSignToCard === 'function') copyFormSignToCard();
+
+    // 3. Wywołaj logikę zapisu do archiwum (GŁÓWNY PRZYCISK)
+    const saveBtn = document.getElementById('saveCardToArchiveBtn');
+    if (saveBtn) {
+        saveBtn.click();
+        formModal.style.display = 'none'; // Zamknij modal po wywołaniu zapisu
+    } else {
+        showToast("Błąd: Nie znaleziono głównego przycisku zapisu.", "error");
+    }
+});
+
+
+// PRZYCISK: Drukuj / Zapisz PDF
+document.getElementById('formPrintBtn')?.addEventListener('click', () => {
+    // 1. Zapisz dane
+    const currentStep = document.querySelector('.form-step.active')?.id;
+    if (currentStep === 'step2') {
+         const prevIdx = parseInt(formRowSelect.dataset.prevIndex, 10);
+         if (!isNaN(prevIdx)) saveRow(prevIdx);
+    }
+    
+    // 2. Upewnij się, że podpis klienta jest na głównym płótnie (dla druku)
+    if (typeof copyFormSignToCard === 'function') copyFormSignToCard();
+
+    // 3. Wywołaj logikę drukowania (GŁÓWNY PRZYCISK)
+    const printBtn = document.getElementById('printBtn');
+    if (printBtn) {
+        printBtn.click(); // Wywołuje modal wyboru A4/110mm
+    } else {
+        showToast("Błąd: Nie znaleziono głównego przycisku drukowania.", "error");
+    }
+});
 </script> 
 
 <div id="toastContainer" style="position: fixed; top: 20px; right: 20px; z-index: 20000; display: flex; flex-direction: column; gap: 10px;">
