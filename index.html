@@ -2544,16 +2544,16 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
         </button>
     </div>
 <div id="formCopyBtnContainer" style="display: none; margin-bottom: 8px; text-align: center;">
-        </div>
+    </div>
     <div id="formNoweDaneContainer" style="display: none; margin-bottom: 8px;">
-        <button type="button" id="formBtnNoweDane" class="btn primary" style="width: 100%; font-size: 16px; padding: 10px;">+ Nowe Dane</button>
-    </div>
-    
-        <div id="formRowDetailsContainer" style="display: block;">
+        <button type="button" id="formBtnNoweDane" class="btn primary" style="width: 100%; font-size: 16px; padding: 10px;">+ Nowe Dane</button>
+    </div>
+    
+    <div id="formRowDetailsContainer" style="display: block;">
 <div class="form-row"><label for="formOpis">Nazwa siedziby stada i opis zwierzęcia</label><input type="text" id="formOpis" placeholder="Opis zwierzęcia"></div>
 <div class="form-row"><label for="formLiczba">Liczba leczonych zwierząt</label><input type="number" id="formLiczba" min="0" placeholder="0"></div>
 <div class="form-row"><label for="formRozpoznanie">Rozpoznanie / wstępne rozpoznanie</label><input type="text" id="formRozpoznanie" list="listaRozpoznan" placeholder="Wpisz lub wybierz schemat..."></div>
-    </div>      
+    </div>      
     <div style="display: flex; align-items: flex-end; gap: 8px; margin-bottom: 8px;">
         
         <button id="prevRow" class="btn small">◀</button>
@@ -2602,7 +2602,7 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
         <div style="display: flex; gap: 8px; width: 100%;">
             <button type="button" id="formPrevRowBtn" class="btn small" style="flex: 1;">Poprzedni wiersz</button>
             
-            <button type="button" id="formSaveAndCloseBtn" class="btn warn small" style="flex: 2; font-weight: bold; font-size: 16px;">Zamknij i zapisz</button>
+            <button type="button" id="formToPodsumowanieBtn" class="btn primary small" style="flex: 2; font-weight: bold; font-size: 16px;">Przejdź do Podsumowania</button>
             
             <button type="button" id="formNextRowBtn" class="btn small" style="flex: 1;">Następny wiersz</button>
         </div>
@@ -2613,7 +2613,53 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
 
         <button id="saveRow" class="btn primary small" style="display: none;">Zapisz wiersz</button>
         <button id="formCopyBtn" class="btn small" style="display: none;">Przepisz dane z leczenia na miejscu</button>
-    </div>
+    </div>
+</div>
+
+<div id="step3" class="form-step">
+    <h3>✅ Podsumowanie i Podpis</h3>
+    
+    <div class="form-actions" style="justify-content: space-between; margin-bottom: 12px; border: none; padding: 0; flex-wrap: nowrap;">
+        
+        <button id="navDanePodstawowe2" class="btn small ghost" style="flex: 1; margin-right: 5px;">
+            ⬅️ Dane Podstawowe
+        </button>
+
+        <button id="navLeczenieNaMiejscu2" class="btn small ghost" style="flex: 1; margin: 0 5px;">
+            📝 Edytuj Wiersze
+        </button>
+
+        <button class="btn small primary" style="flex: 1; margin-left: 5px; opacity: 0.8;">
+            Podsumowanie
+        </button>
+    </div>
+
+    <div id="form-zuzyte-produkty-podsumowanie" class="produkty-lista" style="padding: 10px; background: #f9f9f9; border: 1px solid #ddd; border-radius: 8px; margin-bottom: 20px;">
+        <h4 style="margin-top: 0; font-size: 18px; border-bottom: 1px solid #eee; padding-bottom: 5px;">Zużyte produkty:</h4>
+        <ul id="form-lista-produktow-podsumowanie" style="list-style: none; padding: 0; margin: 0;">
+            <li style="color: #999;">Brak produktów.</li>
+        </ul>
+    </div>
+    
+    <div class="signature-box" style="width: 100%;">
+        <span class="signature-label" style="font-size: 18px;">Podpis Posiadacza Zwierzęcia:</span>
+        <canvas id="formCanvasPosiadacz" class="signature-canvas" style="height: 120px;"></canvas>
+        <button id="formFullscreenBtn">Podpisz dokument (Pełny ekran)</button>
+        <button id="formClearSignBtn">Wyczyść podpis</button>
+    </div>
+    
+    <div class="form-actions" style="margin-top: 25px; flex-direction: column; gap: 10px;">
+        <button id="formSaveAndArchiveBtn" type="button" class="btn primary" style="font-size: 18px; padding: 15px;">
+            💾 Zamknij i zapisz w archiwum
+        </button>
+        <button id="formPrintBtn" type="button" class="btn" style="font-size: 18px; padding: 15px; background: #e6e6e6;">
+            🖨️ Drukuj / Zapisz PDF
+        </button>
+    </div>
+
+    <div class="form-actions" style="margin-top: 15px; justify-content: flex-start; border-top: 1px solid #eee; padding-top: 15px;">
+        <button id="backToRows" class="btn ghost small">⬅️ Wróć do edycji wierszy</button>
+    </div>
 </div>
 </div>
 
@@ -4179,11 +4225,40 @@ selectRowInForm(0); // default first logical row
 showStep(2);
 });
 
-/* back */
+/* back - Wróć do nagłówka */
 backToHeader.addEventListener('click', ()=>{
 updateFormLivePreview();
 showStep(1);
 });
+/* NOWA LOGIKA: Przejście z Krok 2 do Krok 3 (Podsumowanie) */
+const formToPodsumowanieBtn = document.getElementById('formToPodsumowanieBtn');
+if (formToPodsumowanieBtn) {
+    formToPodsumowanieBtn.addEventListener('click', () => {
+        const idx = parseInt(formRowSelect.value, 10);
+        if (!isNaN(idx)) {
+            saveRow(idx); // Ostatni autozapis przed przejściem
+        }
+        syncHeaderFormToTop(); // Zapisz nagłówek na wszelki wypadek
+        
+        // Funkcja z nowym krokiem
+        showStep(3);
+        // Odśwież widok podsumowania
+        updateFormPodsumowanie();
+    });
+}
+/* NOWA LOGIKA: Powrót z Krok 3 do Krok 2 (Edycja Wierszy) */
+const backToRows = document.getElementById('backToRows');
+if (backToRows) {
+    backToRows.addEventListener('click', () => {
+        showStep(2);
+        // Po powrocie do edycji wierszy, ustaw focus na pierwszym wierszu (indeks 0)
+        selectRowInForm(0);
+        formRowSelect.dataset.prevIndex = 0;
+    });
+}
+/* NOWA LOGIKA: Nawigacja z Krok 3 do Nagłówka/Wierszy */
+document.getElementById('navDanePodstawowe2').addEventListener('click', () => { showStep(1); });
+document.getElementById('navLeczenieNaMiejscu2').addEventListener('click', () => { showStep(2); selectRowInForm(0); });
 
 /* sync header: wpisane w formularzu wartości trafiają do headera */
 function syncHeaderFormToTop(){
@@ -4289,17 +4364,7 @@ formRowSelect.dataset.prevIndex = idx;
 
 
 
-/* ---- zapis aktualnego wiersza przy zmianie wiersza w formularzu ---- */
-formRowSelect.addEventListener('change', ()=> {
-// zapis aktualnego wiersza przed przejściem do nowego
-const prevIdx = parseInt(formRowSelect.dataset.prevIndex, 10);
-if (!isNaN(prevIdx)) {
-saveRow(prevIdx);
-}
-const idx = parseInt(formRowSelect.value, 10);
-selectRowInForm(idx);
-formRowSelect.dataset.prevIndex = idx; // zapamiętaj nowy indeks
-});
+
 
 /* ---- funkcja zapisu wiersza (jeśli jeszcze nie masz) ---- */
 function saveRow(idx){
@@ -16077,6 +16142,202 @@ try {
 /* ======================================================== */
 /* ✅ KONIEC: LOGIKA NAWIGACJI W FORMULARZU KARTY            */
 /* ======================================================== */
+/* ======================================================== */
+/* ✅ POCZĄTEK: FUNKCJE DLA KROKU 3 - PODSUMOWANIE (NOWY MODUŁ) */
+/* ======================================================== */
+
+/**
+ * 1. Pkt 4: Odświeża okno zużytych produktów w podsumowaniu (Krok 3).
+ */
+function updateFormPodsumowanie() {
+    const listaEl = document.getElementById('form-lista-produktow-podsumowanie');
+    if (!listaEl) return;
+    listaEl.innerHTML = '';
+
+    const logicalRows = rowsEditable();
+    const productsMap = new Map();
+
+    // 1. Przejdź przez wszystkie wiersze (1-12) i zlicz produkty
+    logicalRows.forEach(row => {
+        // Ignoruj wiersze bez komórek (np. separator)
+        if (row.cells.length < 8) return; 
+
+        // Pobierz dane, używając już zwalidowanych elementów
+        const lekInput = row.cells[4]?.querySelector('input[list="listaLekow"]');
+        const iloscInput = row.cells[6]?.querySelector('input[type="number"]');
+
+        const productName = lekInput ? lekInput.value.trim() : '';
+        const quantity = parseFloat(iloscInput?.value) || 0;
+
+        if (productName && quantity > 0) {
+            const currentQty = productsMap.get(productName) || 0;
+            productsMap.set(productName, currentQty + quantity);
+        }
+    });
+
+    // 2. Wyrenderuj listę
+    if (productsMap.size === 0) {
+        listaEl.innerHTML = '<li style="color: #999; font-style: italic;">Brak zużytych produktów w karcie.</li>';
+        return;
+    }
+
+    // Sortuj alfabetycznie dla lepszej czytelności
+    const sortedProducts = Array.from(productsMap.keys()).sort((a, b) => a.localeCompare(b, 'pl'));
+
+    sortedProducts.forEach(productName => {
+        const quantity = productsMap.get(productName);
+        const li = document.createElement('li');
+        li.innerHTML = `<strong>${productName}</strong>: ${quantity}`;
+        listaEl.appendChild(li);
+    });
+}
+
+
+/* 2. Pkt 1: Logika dla pola Podpisu Posiadacza (Krok 3) */
+// Używamy tej samej funkcji, ale z nowym ID canvasa w formularzu
+function initFormSignature() {
+    const formCanvas = document.getElementById('formCanvasPosiadacz');
+    if (!formCanvas) return;
+
+    const ctx = formCanvas.getContext('2d');
+    ctx.lineWidth = 4; // Grubsza linia dla dotyku
+    ctx.lineCap = 'round';
+    
+    // Zmienne dla trybu rysowania
+    let isDrawing = false;
+
+    // Funkcja pobierająca pozycję (MUSI BYĆ POPRAWIONA DLA SKALOWANIA BODY 0.95)
+    function getPos(e) {
+        const rect = formCanvas.getBoundingClientRect();
+        const scale = 0.95; // Wartość skalowania z CSS body
+        const clientX = (e.touches && e.touches[0]) ? e.touches[0].clientX : e.clientX;
+        const clientY = (e.touches && e.touches[0]) ? e.touches[0].clientY : e.clientY;
+        return { 
+            // Dzielimy przez skalę, aby uzyskać poprawną pozycję na Canvasie
+            x: (clientX - rect.left) / scale, 
+            y: (clientY - rect.top) / scale
+        };
+    }
+
+    const startDrawing = (e) => { 
+        e.preventDefault(); 
+        isDrawing = true; 
+        const pos = getPos(e); 
+        ctx.beginPath(); 
+        ctx.moveTo(pos.x, pos.y); 
+    };
+    const draw = (e) => { 
+        if (!isDrawing) return;
+        e.preventDefault(); 
+        const pos = getPos(e); 
+        ctx.lineTo(pos.x, pos.y); 
+        ctx.stroke(); 
+    };
+    const stopDrawing = () => { 
+        isDrawing = false; 
+        // Po zatrzymaniu rysowania, skopiuj podpis na canvas w Karcie Leczenia
+        copyFormSignToCard();
+    };
+
+    formCanvas.addEventListener('pointerdown', startDrawing);
+    formCanvas.addEventListener('pointermove', draw);
+    formCanvas.addEventListener('pointerup', stopDrawing);
+    formCanvas.addEventListener('pointerleave', stopDrawing);
+    
+    // Podpięcie przycisku Wyczyść (Pkt 1)
+    document.getElementById('formClearSignBtn')?.addEventListener('click', () => {
+        ctx.clearRect(0, 0, formCanvas.width, formCanvas.height);
+        copyFormSignToCard(); // Wyczyść też w karcie
+    });
+
+    // Podpięcie przycisku Pełny Ekran (Pkt 1) - Używamy Twojej istniejącej logiki
+    document.getElementById('formFullscreenBtn')?.addEventListener('click', () => {
+        // Musimy skopiować podpis z Formularza do Canvasa Pełnoekranowego, 
+        // a następnie uruchomić istniejącą funkcję z Canvasa KartaLeczenia (canvasPosiadacz).
+        
+        // Krok 1: Skopiuj na małe płótno KartaLeczenia, aby uruchomić oryginalną logikę
+        copyFormSignToCard();
+        
+        // Krok 2: Uruchom oryginalny przycisk fullscreen, który jest podpięty do canvasPosiadacz
+        const originalFullscreenBtn = document.getElementById('fullscreenBtn');
+        if (originalFullscreenBtn) {
+            originalFullscreenBtn.click();
+            showToast("Otwarto podpis. Upewnij się, że urządzenie jest w pozycji poziomej.", "info");
+        }
+    });
+
+}
+
+/**
+ * Funkcja pomocnicza: Kopiuje podpis z canvasa w formularzu do canvasa w Karcie Leczenia.
+ */
+function copyFormSignToCard() {
+    const formCanvas = document.getElementById('formCanvasPosiadacz');
+    const cardCanvas = document.getElementById('canvasPosiadacz');
+
+    if (!formCanvas || !cardCanvas) return;
+
+    const ctxCard = cardCanvas.getContext('2d');
+    
+    ctxCard.clearRect(0, 0, cardCanvas.width, cardCanvas.height);
+    
+    // Kopiuj zawartość z jednego canvasa na drugi
+    ctxCard.drawImage(formCanvas, 0, 0, cardCanvas.width, cardCanvas.height);
+    
+    // Dodatkowo, wyzwalamy kliknięcie na przycisk "Wyczyść" w tradycyjnej sekcji,
+    // aby upewnić się, że sygnatura jest też zapisana w Base64 w tle (chociaż to jest hack)
+    // Lepsza metoda: po prostu upewnij się, że w logice zapisu archiwum używasz .toDataURL() bezpośrednio z 'canvasPosiadacz'.
+}
+
+// Uruchom inicjalizację podpisu po załadowaniu
+document.addEventListener('DOMContentLoaded', initFormSignature);
+
+
+/* 3. Pkt 2, 3: Logika dla przycisków "Zamknij i zapisz" i "Drukuj" */
+
+// PRZYCISK: Zamknij i zapisz w archiwum
+document.getElementById('formSaveAndArchiveBtn')?.addEventListener('click', () => {
+    // 1. Zapisz aktualnie edytowany wiersz (jeśli jesteśmy w kroku 2)
+    const prevIdx = parseInt(formRowSelect.dataset.prevIndex, 10);
+    if (!isNaN(prevIdx) && document.getElementById('step2').classList.contains('active')) {
+        saveRow(prevIdx);
+    }
+    
+    // 2. Zapisz dane z nagłówka (jeśli zmieniono w kroku 1)
+    syncHeaderFormToTop();
+    
+    // 3. Skopiuj podpis z form-canvas do głównego canvasa (dla zapisu Base64)
+    copyFormSignToCard(); 
+
+    // 4. Wywołaj logikę zapisu do archiwum (Używamy istniejącej funkcji)
+    const saveBtn = document.getElementById('saveCardToArchiveBtn');
+    if (saveBtn) {
+        saveBtn.click();
+        formModal.style.display = 'none'; // Zamknij modal po wywołaniu zapisu
+    } else {
+        alert("Błąd: Nie znaleziono głównego przycisku zapisu.");
+    }
+});
+
+
+// PRZYCISK: Drukuj / Zapisz PDF
+document.getElementById('formPrintBtn')?.addEventListener('click', () => {
+    // 1. Zapisz dane
+    const prevIdx = parseInt(formRowSelect.dataset.prevIndex, 10);
+    if (!isNaN(prevIdx) && document.getElementById('step2').classList.contains('active')) {
+        saveRow(prevIdx);
+    }
+    syncHeaderFormToTop();
+    copyFormSignToCard();
+    
+    // 2. Wywołaj logikę drukowania (Używamy istniejącej funkcji)
+    const printBtn = document.getElementById('printBtn');
+    if (printBtn) {
+        printBtn.click(); // Wywołuje modal wyboru A4/110mm
+    } else {
+        alert("Błąd: Nie znaleziono głównego przycisku drukowania.");
+    }
+});
 </script> 
 
 <div id="toastContainer" style="position: fixed; top: 20px; right: 20px; z-index: 20000; display: flex; flex-direction: column; gap: 10px;">
