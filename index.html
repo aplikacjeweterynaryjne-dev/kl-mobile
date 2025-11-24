@@ -142,11 +142,15 @@ position: fixed;
 top: 0; left: 0; right: 0; bottom: 0; /* Pokryj cały ekran */
 background: #fff;
 display: none; /* ✅ POPRAWKA: Ukryj overlay na starcie */
-z-index: 10001;
+z-index: 10005;
 /* Użyj flexbox DOPIERO gdy jest widoczny (JS ustawi display: flex) */
 flex-direction: column;
 padding: 10px;
 box-sizing: border-box;
+}
+    /* ✅ BRAKUJĄCY KOD: Ustawia okno wyboru druku na wierzchu (z-index: 10005) */
+#printFormatModal {
+    z-index: 10005 !important; 
 }
 /* ... (reszta stylów dla .fullscreen-canvas i przycisków pozostaje bez zmian) ... */
 .fullscreen-canvas {
@@ -210,7 +214,7 @@ width: 100vw;
 height: 100vh;
 background: rgba(0,0,0,0.48);
 display: none;
-z-index: 9999; /* ZMNIEJSZONO! Teraz jest pod fullscreen-overlay (10001) */
+z-index: 10000; /* ZMNIEJSZONO! Teraz jest pod fullscreen-overlay (10001) */
 justify-content: center;
 align-items: center;
 overflow: hidden;
@@ -16579,6 +16583,61 @@ document.getElementById('formPrintBtn')?.addEventListener('click', () => {
         showToast("Błąd: Nie znaleziono głównego przycisku drukowania.", "error");
     }
 });
+    /* ======================================================== */
+/* ✅ BRAKUJĄCY KOD: Podpinanie przycisków akcji i nawigacji Krok 3 */
+/* ======================================================== */
+
+// --- LISTENER DLA PRZYCISKU "PODPISZ DOKUMENT" (ROZWIĄZUJE PROBLEM 1) ---
+document.getElementById('formFullscreenBtn')?.addEventListener('click', () => {
+    // Krok 1: Skopiuj podpis z Formularza (jeśli istnieje) do głównego canvasa KartaLeczenia (#canvasPosiadacz)
+    if (typeof copyFormSignToCard === 'function') {
+        copyFormSignToCard();
+    }
+    
+    // Krok 2: Odblokuj ramkę rysowania w Krok 3, jeśli została zablokowana
+    const formCanvas = document.getElementById('formCanvasPosiadacz');
+    formCanvas?.classList.remove('disabled-override');
+
+    // Krok 3: Wywołaj oryginalną funkcję pełnoekranową
+    const originalFullscreenBtn = document.getElementById('fullscreenBtn');
+    if (originalFullscreenBtn) {
+        originalFullscreenBtn.click(); // KLIKNIĘCIE W GŁÓWNY PRZYCISK
+        showToast("Otwarto podpis. Upewnij się, że urządzenie jest w pozycji poziomej.", "info");
+    }
+});
+
+
+// --- LISTENER DLA PRZYCISKU "DRUKUJ / ZAPISZ PDF" (ROZWIĄZUJE PROBLEM 2) ---
+document.getElementById('formPrintBtn')?.addEventListener('click', () => {
+    // 1. Upewnij się, że podpis klienta jest na głównym płótnie (dla druku)
+    if (typeof copyFormSignToCard === 'function') copyFormSignToCard();
+
+    // 2. Wywołaj logikę drukowania (GŁÓWNY PRZYCISK)
+    const printBtn = document.getElementById('printBtn');
+    if (printBtn) {
+        printBtn.click(); // Wywołuje modal wyboru A4/110mm
+    } else {
+        showToast("Błąd: Nie znaleziono głównego przycisku drukowania.", "error");
+    }
+});
+
+
+// --- LISTENER DLA PRZYCISKU "WRÓĆ DO EDYCJI WIERSZY" (ROZWIĄZUJE PROBLEM 3) ---
+const navLeczenieNaMiejscu2 = document.getElementById('navLeczenieNaMiejscu2');
+
+if (navLeczenieNaMiejscu2) {
+    navLeczenieNaMiejscu2.addEventListener('click', () => {
+        // Zapis nagłówka przed przejściem do wierszy (jeśli masz funkcję saveHeaderData)
+        if (typeof saveHeaderData === 'function') {
+            saveHeaderData();
+        }
+
+        if (typeof showStep === 'function') {
+            showStep(2); // Przejdź do Kroku 2
+        }
+        showToast('Przeniesiono do Edycji Wierszy.', 'info');
+    });
+}
 </script> 
 
 <div id="toastContainer" style="position: fixed; top: 20px; right: 20px; z-index: 20000; display: flex; flex-direction: column; gap: 10px;">
