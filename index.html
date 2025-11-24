@@ -2097,6 +2097,59 @@ table {
     margin-bottom: 5px;
 }
 /* ======================================================== */
+/* --- Style dla Zakładek Formularza (Krok 2) --- */
+.form-step-nav {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 20px !important;
+    background: #eef; /* Lekkie tło */
+    border-radius: 8px;
+    padding: 4px;
+    box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.form-step-nav button {
+    flex: 1;
+    text-align: center;
+    padding: 8px 5px;
+    font-size: 15px; /* Nieco mniejsza czcionka */
+    color: #444;
+    border-radius: 6px;
+    font-weight: 600;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    margin: 0;
+    min-width: unset !important; /* Resetuj min-width */
+}
+
+/* Stan aktywnej zakładki */
+.form-step-nav button:not(.ghost) {
+    background: #fff;
+    color: #6A994E; /* Twoja główna zieleń */
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    border: 1px solid #ddd;
+    /* Usuń cienie z aktywnej, jeśli używasz */
+}
+/* Stan nieaktywnej zakładki */
+.form-step-nav button.ghost {
+    background: transparent;
+    color: #777;
+}
+
+/* Usuwamy niepotrzebne marginesy i style po konwersji na zakładki */
+.form-step-nav button[style*="margin"] {
+    margin: 0 !important;
+}
+.form-step-nav button[style*="flex"] {
+    flex: 1 !important;
+}
+/* Poprawka dla przycisku nagłówka/podsumowania w Kroku 2/3 */
+#navDanePodstawowe, #navLeczenieNaMiejscu, #navProduktyPozostawione, #navPodsumowanie {
+    margin: 0 !important;
+    flex: 1 !important;
+}
 </style>
     <div id="calcProductSearchModal" class="product-search-modal" style="display: none; z-index: 10003;">
     <div class="product-search-card">
@@ -2519,20 +2572,20 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
 <div id="step2" class="form-step">
     <h3 id="formRowTitle" style="color: red; font-size: 25px;">Edycja wierszy tabeli</h3>
     
-    <div class="form-actions" id="form-step-nav" style="justify-content: space-between; margin-bottom: 12px; border: none; padding: 0; flex-wrap: nowrap;">
+ <div id="form-step-nav" class="form-step-nav">
         
-        <button id="navDanePodstawowe" class="btn small" style="flex: 1; margin-right: 5px;">
+        <button id="navDanePodstawowe" class="btn small">
             ⬅️ Dane Podstawowe
         </button>
 
-        <button id="navLeczenieNaMiejscu" class="btn small" style="flex: 1; margin: 0 5px;">
+        <button id="navLeczenieNaMiejscu" class="btn small">
             📝 Leczenie na miejscu
         </button>
-        <button id="navProduktyPozostawione" class="btn small ghost" style="flex: 1; margin-left: 5px;">
+        <button id="navProduktyPozostawione" class="btn small ghost">
             📦 Produkty pozostawione
         </button>
 
-        <button id="navPodsumowanie" class="btn small ghost" style="flex: 1; margin-left: 5px;">
+        <button id="navPodsumowanie" class="btn small ghost">
             Podsumowanie ➡️
         </button>
     </div>
@@ -2625,17 +2678,17 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
 <div id="step3" class="form-step">
     <h3>✅ Podsumowanie i Podpis</h3>
     
-    <div class="form-actions" style="justify-content: space-between; margin-bottom: 12px; border: none; padding: 0; flex-wrap: nowrap;">
+<div class="form-step-nav">
         
-        <button id="navDanePodstawowe2" class="btn small ghost" style="flex: 1; margin-right: 5px;">
+        <button id="navDanePodstawowe2" class="btn small ghost">
             ⬅️ Dane Podstawowe
         </button>
 
-        <button id="navLeczenieNaMiejscu2" class="btn small ghost" style="flex: 1; margin: 0 5px;">
+        <button id="navLeczenieNaMiejscu2" class="btn small ghost">
             📝 Edytuj Wiersze
         </button>
 
-        <button class="btn small primary" style="flex: 1; margin-left: 5px; opacity: 0.8;">
+        <button id="navPodsumowanie2" class="btn small">
             Podsumowanie
         </button>
     </div>
@@ -4223,7 +4276,33 @@ closeForm.addEventListener('click', ()=> formModal.style.display = 'none');
 function showStep(n){
     step1.classList.toggle('active', n===1);
     step2.classList.toggle('active', n===2);
-    step3.classList.toggle('active', n===3); // ⬅️ KLUCZOWA LINIA DLA KROKU 3
+    step3.classList.toggle('active', n===3); 
+
+    // --- LOGIKA WIZUALNA ZAKŁADEK (DODANA) ---
+    // Przyciski w Kroku 2/3:
+    const tabs = [
+        document.getElementById('navDanePodstawowe'), document.getElementById('navDanePodstawowe2'),
+        document.getElementById('navLeczenieNaMiejscu'), document.getElementById('navLeczenieNaMiejscu2'),
+        document.getElementById('navProduktyPozostawione'),
+        document.getElementById('navPodsumowanie'), document.getElementById('navPodsumowanie2')
+    ].filter(el => el != null);
+
+    // Czyszczenie i ustawianie klas
+    tabs.forEach(tab => {
+        tab.classList.remove('primary');
+        tab.classList.add('ghost');
+    });
+
+    if (n === 1) { // Dane Podstawowe
+        document.getElementById('navDanePodstawowe')?.classList.remove('ghost');
+        document.getElementById('navDanePodstawowe')?.classList.add('primary');
+    } else if (n === 2) { // Edycja Wierszy
+        document.getElementById('navLeczenieNaMiejscu')?.classList.remove('ghost');
+        document.getElementById('navLeczenieNaMiejscu')?.classList.add('primary');
+    } else if (n === 3) { // Podsumowanie
+        document.getElementById('navPodsumowanie2')?.classList.remove('ghost');
+        document.getElementById('navPodsumowanie2')?.classList.add('primary');
+    }
 }
 
 /* Next -> synchronizuj nagłówek i przejdź do kroku 2 */
