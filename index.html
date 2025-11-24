@@ -4027,14 +4027,20 @@ selectRowInForm(logicalIndex);
 formRowSelect.dataset.prevIndex = logicalIndex;
 }
 /* ---- lista lekow w datalist ---- */
+/* ---- lista lekow w datalist (zabezpieczona) ---- */
 function rebuildListaLekow(){
-const dl = document.getElementById('listaLekow');
-dl.innerHTML = '';
-nazwyLekow.forEach(n=>{
-const o = document.createElement('option');
-o.value = n;
-dl.appendChild(o);
-});
+    const dl = document.getElementById('listaLekow');
+    if (!dl) return; // Zabezpieczenie
+    
+    dl.innerHTML = '';
+    // Użyj zabezpieczonej zmiennej, jeśli nazwyLekow nie jest tablicą
+    const leki = Array.isArray(nazwyLekow) ? nazwyLekow : []; 
+    
+    leki.forEach(n=>{
+        const o = document.createElement('option');
+        o.value = n;
+        dl.appendChild(o);
+    });
 }
 
 /* ---- podłączenie autouzupełniania klienta (nagłówek i pole formularza) ---- */
@@ -4823,14 +4829,7 @@ function selectRowInForm(logicalIndex){
 }
 
 /* ⬆️ KONIEC ZASTĘPOWANIA ⬆️ */
-/* ---- po wyborze produktu w formularzu automatycznie uzupełnij seria/dawkowanie/karencja ---- */
-document.getElementById('formLek').addEventListener('input', function(){
-    const n = this.value;
-    document.getElementById('formSeria').value = mapaSerii[n] || '';
-    // jeśli dawkowanie ma być w polu 'tekstowym' (zachowujemy format tabeli)
-    document.getElementById('formDawkowanie').value = mapaIlosci[n] || '';
-    document.getElementById('formKarencja').value = mapaKarencji[n] || '';
-});
+
 
 /* ---- zapis wiersza: zapisuje do logicznego wiersza (nie zmienia struktury tabeli) ---- */
 document.getElementById('saveRow').addEventListener('click', ()=>{
@@ -6024,6 +6023,15 @@ const clientFormEmail = document.getElementById('clientFormEmail');
 const clientFormIdLecznicy = document.getElementById('clientFormIdLecznicy');
 const clientFormNrStada = document.getElementById('clientFormNrStada'); // Poprawiona, pojedyncza definicja
 // ✅ KONIEC: ZMIENNE DLA BAZY KLIENTÓW I MODALI
+
+// --- ZMIENNE USUNIĘTE/ZASTĄPIONE W NOWYM FORMULARZU KARTY ---
+// const step1 = document.getElementById('step1'); // Zastąpione przez formStep1
+// const step2 = document.getElementById('step2'); // Zastąpione przez formStep2
+const formNoweDaneContainer = null; // USUNIĘTE z HTML
+const formBtnNoweDane = null; // USUNIĘTE z HTML
+const formRowDetailsContainer = null; // USUNIĘTE z HTML
+// -------------------------------------------------------------
+
 // Zmienna do przechowywania wczytanych klientów w pamięci
 let cachedClients = null;
 let currentUserProfile = null; // ✅ DODAJ TĘ LINIĘ
