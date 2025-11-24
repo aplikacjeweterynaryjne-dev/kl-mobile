@@ -201,6 +201,7 @@ margin-top: 8px;
 }
 /* Używamy !important, aby nadpisać style domyślne */
 /* ---- formularz (dodany, nie wpływa na tabelę) ---- */
+/* ---- formularz (dodany, nie wpływa na tabelę) ---- */
 #formModal {
 position: fixed;
 top: 0;
@@ -209,7 +210,7 @@ width: 100vw;
 height: 100vh;
 background: rgba(0,0,0,0.48);
 display: none;
-z-index: 10000;
+z-index: 9999; /* ZMNIEJSZONO! Teraz jest pod fullscreen-overlay (10001) */
 justify-content: center;
 align-items: center;
 overflow: hidden;
@@ -2097,6 +2098,62 @@ table {
     margin-bottom: 5px;
 }
 /* ======================================================== */
+/* --- Style dla Zakładek Formularza (NOWY UKŁAD 2X2) --- */
+.form-step-nav {
+    display: flex; /* Zmieniamy na flex, aby układać rzędy pionowo */
+    flex-direction: column; /* Układamy rzędy pionowo */
+    gap: 5px; /* Odstęp między rzędami */
+    margin-bottom: 20px !important;
+    background: #eef;
+    border-radius: 8px;
+    padding: 6px; /* Zwiększony padding, aby nie ściskać wierszy */
+    box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
+}
+
+/* Stylizacja rzędu - Użyjemy flex dla 2x2 */
+.form-step-nav .tab-row {
+    display: flex;
+    gap: 5px; /* Odstęp między przyciskami w rzędzie */
+    width: 100%;
+}
+
+.form-step-nav button {
+    flex: 1;
+    text-align: center;
+    padding: 6px 3px;
+    font-size: 12px;
+    line-height: 1.2;
+    color: #444;
+    border-radius: 6px;
+    font-weight: 600;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    margin: 0;
+    min-width: unset !important;
+    white-space: normal; /* POZWÓL TEKSTOWI ZAWIJAĆ SIĘ W PIONIE */
+    word-break: break-word; /* Pomocnicze dla długich słów */
+}
+
+/* Wyrównanie dla przycisku zajmującego całą szerokość w Krok 3 */
+.form-step-nav button.full-width {
+    flex: none; /* Wyłącz elastyczność */
+    width: 100%;
+}
+
+/* Stan aktywnej zakładki */
+.form-step-nav button:not(.ghost) {
+    background: #fff;
+    color: #6A994E;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    border: 1px solid #ddd;
+}
+/* Stan nieaktywnej zakładki */
+.form-step-nav button.ghost {
+    background: transparent;
+    color: #777;
+}
 </style>
     <div id="calcProductSearchModal" class="product-search-modal" style="display: none; z-index: 10003;">
     <div class="product-search-card">
@@ -2519,22 +2576,27 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
 <div id="step2" class="form-step">
     <h3 id="formRowTitle" style="color: red; font-size: 25px;">Edycja wierszy tabeli</h3>
     
-    <div class="form-actions" id="form-step-nav" style="justify-content: space-between; margin-bottom: 12px; border: none; padding: 0; flex-wrap: nowrap;">
+<div id="form-step-nav" class="form-step-nav">
         
-        <button id="navDanePodstawowe" class="btn small" style="flex: 1; margin-right: 5px;">
-            ⬅️ Dane Podstawowe
-        </button>
+        <div class="tab-row">
+            <button id="navDanePodstawowe" class="btn small">
+                ⬅️ Dane Podstawowe
+            </button>
 
-        <button id="navLeczenieNaMiejscu" class="btn small" style="flex: 1; margin: 0 5px;">
-            📝 Leczenie na miejscu
-        </button>
-        <button id="navProduktyPozostawione" class="btn small ghost" style="flex: 1; margin-left: 5px;">
-            📦 Produkty pozostawione
-        </button>
+            <button id="navLeczenieNaMiejscu" class="btn small">
+                📝 Leczenie na miejscu
+            </button>
+        </div>
+        
+        <div class="tab-row">
+            <button id="navProduktyPozostawione" class="btn small ghost">
+                📦 Produkty pozostawione
+            </button>
 
-        <button id="navPodsumowanie" class="btn small ghost" style="flex: 1; margin-left: 5px;">
-            Podsumowanie ➡️
-        </button>
+            <button id="navPodsumowanie" class="btn small ghost">
+                Podsumowanie ➡️
+            </button>
+        </div>
     </div>
 
     <div id="formLivePreview" style="font-size: 14px; color: #333; background-color: #f4f4f4; border: 1px solid #ddd; border-radius: 6px; padding: 8px; margin-bottom: 12px; max-height: 70px; overflow-y: auto;">
@@ -2625,19 +2687,23 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
 <div id="step3" class="form-step">
     <h3>✅ Podsumowanie i Podpis</h3>
     
-    <div class="form-actions" style="justify-content: space-between; margin-bottom: 12px; border: none; padding: 0; flex-wrap: nowrap;">
+<div class="form-step-nav">
         
-        <button id="navDanePodstawowe2" class="btn small ghost" style="flex: 1; margin-right: 5px;">
-            ⬅️ Dane Podstawowe
-        </button>
+        <div class="tab-row">
+            <button id="navDanePodstawowe2" class="btn small ghost">
+                ⬅️ Dane Podstawowe
+            </button>
 
-        <button id="navLeczenieNaMiejscu2" class="btn small ghost" style="flex: 1; margin: 0 5px;">
-            📝 Edytuj Wiersze
-        </button>
+            <button id="navLeczenieNaMiejscu2" class="btn small ghost">
+                📝 Edytuj Wiersze
+            </button>
+        </div>
 
-        <button class="btn small primary" style="flex: 1; margin-left: 5px; opacity: 0.8;">
-            Podsumowanie
-        </button>
+        <div class="tab-row">
+            <button id="navPodsumowanie2" class="btn small full-width">
+                Podsumowanie
+            </button>
+        </div>
     </div>
 
     <div id="form-zuzyte-produkty-podsumowanie" class="produkty-lista" style="padding: 10px; background: #f9f9f9; border: 1px solid #ddd; border-radius: 8px; margin-bottom: 20px;">
@@ -4223,7 +4289,33 @@ closeForm.addEventListener('click', ()=> formModal.style.display = 'none');
 function showStep(n){
     step1.classList.toggle('active', n===1);
     step2.classList.toggle('active', n===2);
-    step3.classList.toggle('active', n===3); // ⬅️ KLUCZOWA LINIA DLA KROKU 3
+    step3.classList.toggle('active', n===3); 
+
+    // --- LOGIKA WIZUALNA ZAKŁADEK (DODANA) ---
+    // Przyciski w Kroku 2/3:
+    const tabs = [
+        document.getElementById('navDanePodstawowe'), document.getElementById('navDanePodstawowe2'),
+        document.getElementById('navLeczenieNaMiejscu'), document.getElementById('navLeczenieNaMiejscu2'),
+        document.getElementById('navProduktyPozostawione'),
+        document.getElementById('navPodsumowanie'), document.getElementById('navPodsumowanie2')
+    ].filter(el => el != null);
+
+    // Czyszczenie i ustawianie klas
+    tabs.forEach(tab => {
+        tab.classList.remove('primary');
+        tab.classList.add('ghost');
+    });
+
+    if (n === 1) { // Dane Podstawowe
+        document.getElementById('navDanePodstawowe')?.classList.remove('ghost');
+        document.getElementById('navDanePodstawowe')?.classList.add('primary');
+    } else if (n === 2) { // Edycja Wierszy
+        document.getElementById('navLeczenieNaMiejscu')?.classList.remove('ghost');
+        document.getElementById('navLeczenieNaMiejscu')?.classList.add('primary');
+    } else if (n === 3) { // Podsumowanie
+        document.getElementById('navPodsumowanie2')?.classList.remove('ghost');
+        document.getElementById('navPodsumowanie2')?.classList.add('primary');
+    }
 }
 
 /* Next -> synchronizuj nagłówek i przejdź do kroku 2 */
@@ -16409,6 +16501,84 @@ function handleFormCancel() {
 // Podpięcie listenerów do nowych przycisków Anuluj (Krok 2 i Krok 3)
 document.getElementById('formCancelStep2Btn')?.addEventListener('click', handleFormCancel);
 document.getElementById('formCancelStep3Btn')?.addEventListener('click', handleFormCancel);
+// ✅ START: Logika nawigacji z Podsumowania (Krok 3) do innych sekcji
+
+const navDanePodstawowe2 = document.getElementById('navDanePodstawowe2');
+const navLeczenieNaMiejscu2 = document.getElementById('navLeczenieNaMiejscu2');
+
+// Listener: Powrót do Danych Podstawowych (Krok 1)
+if (navDanePodstawowe2) {
+    navDanePodstawowe2.addEventListener('click', () => {
+        if (typeof showStep === 'function') {
+            showStep(1); // Przejdź do Kroku 1
+        }
+        showToast('Przeniesiono do Danych Podstawowych.', 'info');
+    });
+}
+
+// Listener: Powrót do Edycji Wierszy (Krok 2)
+if (navLeczenieNaMiejscu2) {
+    navLeczenieNaMiejscu2.addEventListener('click', () => {
+        // Musimy zapisać dane z nagłówka przed przejściem do wierszy
+        // (jeśli masz funkcję saveHeaderData)
+        if (typeof saveHeaderData === 'function') {
+            saveHeaderData();
+        }
+
+        if (typeof showStep === 'function') {
+            showStep(2); // Przejdź do Kroku 2
+        }
+        showToast('Przeniesiono do Edycji Wierszy.', 'info');
+    });
+}
+// ✅ KONIEC: Logika nawigacji z Podsumowania
+/* ======================================================== */
+/* ✅ RE-ZASILENIE PRZYCISKÓW AKCJI W KROKU 3 (Podsumowanie) */
+/* ======================================================== */
+
+// PRZYCISK: Zamknij i zapisz w archiwum
+document.getElementById('formSaveAndArchiveBtn')?.addEventListener('click', () => {
+    // 1. Zapisz dane z Krok 2, jeśli użytkownik wracał
+    const currentStep = document.querySelector('.form-step.active')?.id;
+    if (currentStep === 'step2') {
+         const prevIdx = parseInt(formRowSelect.dataset.prevIndex, 10);
+         if (!isNaN(prevIdx)) saveRow(prevIdx);
+    }
+
+    // 2. Skopiuj podpis z form-canvas do głównego canvasa (dla zapisu Base64)
+    if (typeof copyFormSignToCard === 'function') copyFormSignToCard();
+
+    // 3. Wywołaj logikę zapisu do archiwum (GŁÓWNY PRZYCISK)
+    const saveBtn = document.getElementById('saveCardToArchiveBtn');
+    if (saveBtn) {
+        saveBtn.click();
+        formModal.style.display = 'none'; // Zamknij modal po wywołaniu zapisu
+    } else {
+        showToast("Błąd: Nie znaleziono głównego przycisku zapisu.", "error");
+    }
+});
+
+
+// PRZYCISK: Drukuj / Zapisz PDF
+document.getElementById('formPrintBtn')?.addEventListener('click', () => {
+    // 1. Zapisz dane
+    const currentStep = document.querySelector('.form-step.active')?.id;
+    if (currentStep === 'step2') {
+         const prevIdx = parseInt(formRowSelect.dataset.prevIndex, 10);
+         if (!isNaN(prevIdx)) saveRow(prevIdx);
+    }
+    
+    // 2. Upewnij się, że podpis klienta jest na głównym płótnie (dla druku)
+    if (typeof copyFormSignToCard === 'function') copyFormSignToCard();
+
+    // 3. Wywołaj logikę drukowania (GŁÓWNY PRZYCISK)
+    const printBtn = document.getElementById('printBtn');
+    if (printBtn) {
+        printBtn.click(); // Wywołuje modal wyboru A4/110mm
+    } else {
+        showToast("Błąd: Nie znaleziono głównego przycisku drukowania.", "error");
+    }
+});
 </script> 
 
 <div id="toastContainer" style="position: fixed; top: 20px; right: 20px; z-index: 20000; display: flex; flex-direction: column; gap: 10px;">
