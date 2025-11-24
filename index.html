@@ -2098,11 +2098,12 @@ table {
 }
 /* ======================================================== */
 /* --- Style dla Zakładek Formularza (Krok 2) --- */
+/* --- Style dla Zakładek Formularza (Bardziej kompaktowe) --- */
 .form-step-nav {
     display: flex;
     justify-content: space-between;
     margin-bottom: 20px !important;
-    background: #eef; /* Lekkie tło */
+    background: #eef;
     border-radius: 8px;
     padding: 4px;
     box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
@@ -2111,8 +2112,9 @@ table {
 .form-step-nav button {
     flex: 1;
     text-align: center;
-    padding: 8px 5px;
-    font-size: 15px; /* Nieco mniejsza czcionka */
+    padding: 6px 3px; /* ZMNIEJSZONY PADDING */
+    font-size: 12px; /* ZMNIEJSZONA CZCIONKA */
+    line-height: 1.2; /* Poprawia upakowanie tekstu */
     color: #444;
     border-radius: 6px;
     font-weight: 600;
@@ -2121,7 +2123,8 @@ table {
     cursor: pointer;
     transition: all 0.2s ease;
     margin: 0;
-    min-width: unset !important; /* Resetuj min-width */
+    min-width: unset !important;
+    white-space: nowrap; /* Upewnia się, że tekst nie jest zawijany, wymuszając minimalną szerokość */
 }
 
 /* Stan aktywnej zakładki */
@@ -16488,6 +16491,37 @@ function handleFormCancel() {
 // Podpięcie listenerów do nowych przycisków Anuluj (Krok 2 i Krok 3)
 document.getElementById('formCancelStep2Btn')?.addEventListener('click', handleFormCancel);
 document.getElementById('formCancelStep3Btn')?.addEventListener('click', handleFormCancel);
+// ✅ START: Logika nawigacji z Podsumowania (Krok 3) do innych sekcji
+
+const navDanePodstawowe2 = document.getElementById('navDanePodstawowe2');
+const navLeczenieNaMiejscu2 = document.getElementById('navLeczenieNaMiejscu2');
+
+// Listener: Powrót do Danych Podstawowych (Krok 1)
+if (navDanePodstawowe2) {
+    navDanePodstawowe2.addEventListener('click', () => {
+        if (typeof showStep === 'function') {
+            showStep(1); // Przejdź do Kroku 1
+        }
+        showToast('Przeniesiono do Danych Podstawowych.', 'info');
+    });
+}
+
+// Listener: Powrót do Edycji Wierszy (Krok 2)
+if (navLeczenieNaMiejscu2) {
+    navLeczenieNaMiejscu2.addEventListener('click', () => {
+        // Musimy zapisać dane z nagłówka przed przejściem do wierszy
+        // (jeśli masz funkcję saveHeaderData)
+        if (typeof saveHeaderData === 'function') {
+            saveHeaderData();
+        }
+
+        if (typeof showStep === 'function') {
+            showStep(2); // Przejdź do Kroku 2
+        }
+        showToast('Przeniesiono do Edycji Wierszy.', 'info');
+    });
+}
+// ✅ KONIEC: Logika nawigacji z Podsumowania
 </script> 
 
 <div id="toastContainer" style="position: fixed; top: 20px; right: 20px; z-index: 20000; display: flex; flex-direction: column; gap: 10px;">
