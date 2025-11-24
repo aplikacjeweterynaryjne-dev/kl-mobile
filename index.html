@@ -2472,135 +2472,151 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
 <!-- FORMULARZ (modal od dołu na mobilnych) -->
 <div id="formModal" aria-hidden="true">
 <div class="form-card" role="dialog" aria-modal="true">
+<!-- krok 1: nagłówek -->
+<div id="step1" class="form-step active">
+<h3>Dane posiadacza / nagłówek</h3>
+<div class="form-row">
+<label for="formKlient">Imię, nazwisko lub nazwa siedziby</label>
+<input list="klientList" id="formKlient" placeholder="Kliknij, aby wyszukać klienta..." readonly style="cursor: pointer; background: #fff;">
+</div>
+<div class="form-row">
+<label for="formAdres">Adres</label>
+<input type="text" id="formAdres" placeholder="Adres">
+</div>
+<div class="form-row">
+<label for="formNrStada">Nr stada</label>
+<input type="text" id="formNrStada" placeholder="Nr stada">
+</div>
+<div class="form-row">
+<label for="formDataZgloszenia">Data zgłoszenia</label>
+<input type="date" id="formDataZgloszenia">
+</div>
+<div class="form-row">
+<label for="formDataWykonania">Data wykonania</label>
+<input type="date" id="formDataWykonania">
+</div>
+<div class="form-row">
+<label for="formNrDokumentu">Nr dokumentu</label>
+<input type="text" id="formNrDokumentu" placeholder="Numer dokumentu">
+</div>
+<div class="form-actions">
+<div class="left">
+<button id="closeForm" class="btn ghost small">Zakończ</button>
+</div>
+<div class="right">
+<button id="nextToProducts" class="btn primary small">Dalej ➜</button>
+</div>
+</div>
+</div>
+
+<div id="step2" class="form-step">
+    <h3 id="formRowTitle" style="color: red; font-size: 25px;">Edycja wierszy tabeli</h3>
     
-    <div class="form-actions" id="form-step-nav" style="justify-content: space-around; margin-bottom: 0; border: none; padding: 0;">
-        <button id="navDanePodstawowe" class="form-tab-btn tab-active" data-target="tabDanePodstawoweContent" style="flex: 1; margin-right: 3px;">
-            👤 Dane podstawowe
+    <div class="form-actions" id="form-step-nav" style="justify-content: space-between; margin-bottom: 12px; border: none; padding: 0; flex-wrap: nowrap;">
+        
+        <button id="navDanePodstawowe" class="btn small" style="flex: 1; margin-right: 5px;">
+            ⬅️ Dane Podstawowe
         </button>
-        <button id="navLeczenieNaMiejscu" class="form-tab-btn" data-target="tabEdycjaWierszyContent" style="flex: 1; margin: 0 3px;">
+
+        <button id="navLeczenieNaMiejscu" class="btn small" style="flex: 1; margin: 0 5px;">
             📝 Leczenie na miejscu
         </button>
-        <button id="navPodsumowanie" class="form-tab-btn" data-target="tabPodsumowanieContent" style="flex: 1; margin-left: 3px;">
-            📊 Podsumowanie
+        <button id="navProduktyPozostawione" class="btn small ghost" style="flex: 1; margin-left: 5px;">
+            📦 Produkty pozostawione
+        </button>
+
+        <button id="navPodsumowanie" class="btn small ghost" style="flex: 1; margin-left: 5px;">
+            Podsumowanie ➡️
         </button>
     </div>
-    <div id="step2" class="form-step active" style="margin-top: -1px; border-radius: 0 6px 6px 6px;">
-        
-        <div id="tabDanePodstawoweContent" class="tab-content active" style="padding-top: 15px;">
-            <h3>Dane posiadacza / nagłówek</h3>
-            <div class="form-row">
-                <label for="formKlient">Imię, nazwisko lub nazwa siedziby</label>
-                <input list="klientList" id="formKlient" placeholder="Kliknij, aby wyszukać klienta..." readonly style="cursor: pointer; background: #fff;">
-            </div>
-            <div class="form-row">
-                <label for="formAdres">Adres</label>
-                <input type="text" id="formAdres" placeholder="Adres">
-            </div>
-            <div class="form-row">
-                <label for="formNrStada">Nr stada</label>
-                <input type="text" id="formNrStada" placeholder="Nr stada">
-            </div>
-            <div class="form-row">
-                <label for="formDataZgloszenia">Data zgłoszenia</label>
-                <input type="date" id="formDataZgloszenia">
-            </div>
-            <div class="form-row">
-                <label for="formDataWykonania">Data wykonania</label>
-                <input type="date" id="formDataWykonania">
-            </div>
-            <div class="form-row">
-                <label for="formNrDokumentu">Nr dokumentu</label>
-                <input type="text" id="formNrDokumentu" placeholder="Numer dokumentu">
-            </div>
-            </div>
 
-        <div id="tabEdycjaWierszyContent" class="tab-content">
-            <h3 id="formRowTitle" style="color: red; font-size: 25px;">Edycja wierszy tabeli</h3>
-            
-            <div id="formLivePreview" style="font-size: 14px; color: #333; background-color: #f4f4f4; border: 1px solid #ddd; border-radius: 6px; padding: 8px; margin-bottom: 12px; max-height: 70px; overflow-y: auto;">
-                <strong style="color: #000;">Dodane do karty:</strong>
-                <span id="previewProductList">ładowanie...</span>
-            </div>
-            <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
-                <label style="margin:0; font-weight:600;">Wybierz wiersz</label>
-                <select id="formRowSelect" style="flex:1; padding:8px; border-radius:6px; border:1px solid #ccc;"></select>
-            </div>
-            <div style="margin-bottom: 12px;" id="formCopyPrevRowBtnContainer">
-                <button type="button" id="formCopyPrevRowBtn" class="btn small" style="background-color: #f0f8ff; border-color: #b0c4de; width: 100%; font-weight: 600;">
-                    Kopiuj dane zwierzęcia z poprzedniego wiersza
-                </button>
-            </div>
-            <div id="formCopyBtnContainer" style="display: none; margin-bottom: 8px; text-align: center;">
-            </div>
-            <div id="formNoweDaneContainer" style="display: none; margin-bottom: 8px;">
-                <button type="button" id="formBtnNoweDane" class="btn primary" style="width: 100%; font-size: 16px; padding: 10px;">+ Nowe Dane</button>
-            </div>
-            
-            <div id="formRowDetailsContainer" style="display: block;">
-                <div class="form-row"><label for="formOpis">Nazwa siedziby stada i opis zwierzęcia</label><input type="text" id="formOpis" placeholder="Opis zwierzęcia"></div>
-                <div class="form-row"><label for="formLiczba">Liczba leczonych zwierząt</label><input type="number" id="formLiczba" min="0" placeholder="0"></div>
-                <div class="form-row"><label for="formRozpoznanie">Rozpoznanie / wstępne rozpoznanie</label><input type="text" id="formRozpoznanie" list="listaRozpoznan" placeholder="Wpisz lub wybierz schemat..."></div>
-            </div>      
-            <div style="display: flex; align-items: flex-end; gap: 8px; margin-bottom: 8px;">
-                
-                <button id="prevRow" class="btn small">◀</button>
-
-                <div class="form-row" style="flex: 1; margin-bottom: 0;">
-                    <label for="formLek">Nazwa produktu leczniczego</label>
-                    <input list="listaLekow" id="formLek" placeholder="Kliknij, aby wyszukać produkt..." readonly style="cursor: pointer; background: #fff;">
-                </div>
-
-                <button id="nextRow" class="btn small">▶</button>
-            </div>
-
-
-            <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
-                <button id="micBtn" class="" title="Dyktuj nazwę produktu">🎤</button>
-                <small style="color:#666">Naciśnij mikrofon aby dyktować</small>
-            </div>
-
-            <div class="form-row">
-                <label for="formSeria">Numer serii produktu</label>
-                <input type="text" id="formSeria" placeholder="Numer serii">
-            </div>
-            <form id="myForm">
-
-                <div class="form-row">
-                    <label>Ilość </label>
-                    <input type="number" inputmode="numeric" pattern="[0-9]*" id="formIlosc" placeholder="0" style="width:60px;">
-                </div>
-
-                <div class="form-row">
-                    <label>Dawkowanie / jednostka</label>
-                    <input type="text" id="formDawkowanie" placeholder="np. 2 ml/kg">
-                </div>
-            </form>
-
-            <div class="form-row">
-                <label for="formKarencja">Okres karencji / uwagi</label>
-                <div class="mic-container" style="display: flex; gap: 8px; align-items: center;">
-                    <input type="text" id="formKarencja" placeholder="Okres karencji / uwagi">
-                    <button type="button" id="micKarencja" class="mic-btn" title="Dyktuj" style="flex-shrink: 0;">🎤</button>
-                </div>
-            </div>
-        </div>
-        
-        <div id="tabPodsumowanieContent" class="tab-content">
-            <h3>Podsumowanie Karta Leczenia</h3>
-            <p style="text-align: center; color: #555; padding: 20px;">
-                (Tutaj w przyszłości pojawi się podsumowanie wypełnionych danych z tabeli przed zapisem.)
-            </p>
-        </div>
-        
-        <div class="form-actions" style="margin-top: 12px; flex-direction: column; gap: 10px; border-top: 1px solid #eee; padding-top: 10px;">
-             <div style="width: 100%; text-align: center;">
-                <button id="closeForm" class="btn ghost small" style="font-size: 19px; width: 100%;">❌ Zamknij Formularz (Bez zapisu nagłówka)</button>
-            </div>
-            <div style="width: 100%; text-align: center; border-top: 1px solid #eee; padding-top: 10px; margin-top: 5px;">
-                <button id="formSaveAndCloseBtn" class="btn primary small" style="font-weight: bold; font-size: 16px; width: 100%;">💾 Zapisz i Zamknij</button>
-            </div>
-            </div>
+    <div id="formLivePreview" style="font-size: 14px; color: #333; background-color: #f4f4f4; border: 1px solid #ddd; border-radius: 6px; padding: 8px; margin-bottom: 12px; max-height: 70px; overflow-y: auto;">
+        <strong style="color: #000;">Dodane do karty:</strong>
+        <span id="previewProductList">ładowanie...</span>
     </div>
+    <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
+        <label style="margin:0; font-weight:600;">Wybierz wiersz</label>
+        <select id="formRowSelect" style="flex:1; padding:8px; border-radius:6px; border:1px solid #ccc;"></select>
+    </div>
+    <div style="margin-bottom: 12px;" id="formCopyPrevRowBtnContainer">
+        <button type="button" id="formCopyPrevRowBtn" class="btn small" style="background-color: #f0f8ff; border-color: #b0c4de; width: 100%; font-weight: 600;">
+            Kopiuj dane zwierzęcia z poprzedniego wiersza
+        </button>
+    </div>
+<div id="formCopyBtnContainer" style="display: none; margin-bottom: 8px; text-align: center;">
+        </div>
+    <div id="formNoweDaneContainer" style="display: none; margin-bottom: 8px;">
+        <button type="button" id="formBtnNoweDane" class="btn primary" style="width: 100%; font-size: 16px; padding: 10px;">+ Nowe Dane</button>
+    </div>
+    
+        <div id="formRowDetailsContainer" style="display: block;">
+<div class="form-row"><label for="formOpis">Nazwa siedziby stada i opis zwierzęcia</label><input type="text" id="formOpis" placeholder="Opis zwierzęcia"></div>
+<div class="form-row"><label for="formLiczba">Liczba leczonych zwierząt</label><input type="number" id="formLiczba" min="0" placeholder="0"></div>
+<div class="form-row"><label for="formRozpoznanie">Rozpoznanie / wstępne rozpoznanie</label><input type="text" id="formRozpoznanie" list="listaRozpoznan" placeholder="Wpisz lub wybierz schemat..."></div>
+    </div>      
+    <div style="display: flex; align-items: flex-end; gap: 8px; margin-bottom: 8px;">
+        
+        <button id="prevRow" class="btn small">◀</button>
+
+        <div class="form-row" style="flex: 1; margin-bottom: 0;">
+        <label for="formLek">Nazwa produktu leczniczego</label>
+            <input list="listaLekow" id="formLek" placeholder="Kliknij, aby wyszukać produkt..." readonly style="cursor: pointer; background: #fff;">
+        </div>
+
+        <button id="nextRow" class="btn small">▶</button>
+    </div>
+
+
+    <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
+        <button id="micBtn" class="" title="Dyktuj nazwę produktu">🎤</button>
+        <small style="color:#666">Naciśnij mikrofon aby dyktować</small>
+    </div>
+
+    <div class="form-row">
+        <label for="formSeria">Numer serii produktu</label>
+        <input type="text" id="formSeria" placeholder="Numer serii">
+    </div>
+    <form id="myForm">
+
+        <div class="form-row">
+            <label>Ilość </label>
+            <input type="number" inputmode="numeric" pattern="[0-9]*" id="formIlosc" placeholder="0" style="width:60px;">
+        </div>
+
+        <div class="form-row">
+            <label>Dawkowanie / jednostka</label>
+            <input type="text" id="formDawkowanie" placeholder="np. 2 ml/kg">
+        </div>
+    </form>
+
+    <div class="form-row">
+        <label for="formKarencja">Okres karencji / uwagi</label>
+        <div class="mic-container" style="display: flex; gap: 8px; align-items: center;">
+            <input type="text" id="formKarencja" placeholder="Okres karencji / uwagi">
+            <button type="button" id="micKarencja" class="mic-btn" title="Dyktuj" style="flex-shrink: 0;">🎤</button>
+        </div>
+    </div>
+
+  <div class="form-actions" style="margin-top:12px; flex-direction: column; gap: 10px; border-top: 1px solid #eee; padding-top: 10px;">
+        
+        <div style="display: flex; gap: 8px; width: 100%;">
+            <button type="button" id="formPrevRowBtn" class="btn small" style="flex: 1;">Poprzedni wiersz</button>
+            
+            <button type="button" id="formSaveAndCloseBtn" class="btn warn small" style="flex: 2; font-weight: bold; font-size: 16px;">Zamknij i zapisz</button>
+            
+            <button type="button" id="formNextRowBtn" class="btn small" style="flex: 1;">Następny wiersz</button>
+        </div>
+
+        <div style="width: 100%; text-align: center; border-top: 1px solid #eee; padding-top: 10px; margin-top: 5px;">
+            <button id="backToHeader" class="btn ghost small">Dane posiadacza/Nagłówek</button>
+        </div>
+
+        <button id="saveRow" class="btn primary small" style="display: none;">Zapisz wiersz</button>
+        <button id="formCopyBtn" class="btn small" style="display: none;">Przepisz dane z leczenia na miejscu</button>
+    </div>
+</div>
+</div>
+
 </div>
 </div>
 <div id="metodaModal" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.48); display: none; z-index: 10001; justify-content: center; align-items: center; overflow: hidden;">
@@ -3842,160 +3858,158 @@ setupClientAutoFill();
 
     }
 /* ---- generowanie wierszy (dokładnie tak jak wcześniej) ---- */
-/* ---- generowanie wierszy (ZAKTUALIZOWANE DLA Wiersza 13) ---- */
 function generateRows(){
-    const tbody = document.querySelector('#karta tbody');
-    tbody.innerHTML = '';
-    // Pętla do 14 (co daje 12 wierszy edytowalnych + 1 nagłówek Potwierdzenia + 1 Dane podstawowe)
-    for (let i=1;i<=14;i++){ 
-        const row = document.createElement('tr');
-        
-        // Wiersz nagłówkowy (Potwierdzenie nabycia) pozostaje bez zmian (i=10)
-        if (i===10) {
-            const cell = document.createElement('td');
-            cell.colSpan = 8;
-            // ... (reszta kodu wiersza Potwierdzenie nabycia) ...
-            const mainContainer = document.createElement('div');
-            mainContainer.style.display = 'flex'; // Ustawienie elementów obok siebie
-            mainContainer.style.alignItems = 'center'; // Wyrównanie pionowe do środka
-            mainContainer.style.justifyContent = 'space-between'; // Opcjonalnie: rozsuń tekst i przycisk
-            cell.appendChild(mainContainer);
+const tbody = document.querySelector('#karta tbody');
+tbody.innerHTML = '';
+for (let i=1;i<=13;i++){
+const row = document.createElement('tr');
+if (i===10) {
+const cell = document.createElement('td');
+cell.colSpan = 8;
+cell.style.textAlign = 'left'; // Wyrównanie dla całej komórki
 
-            const textDiv = document.createElement('div');
-            textDiv.textContent = 'Potwierdzenie nabycia produktu leczniczego weterynaryjnego/paszy leczniczej';
-            textDiv.style.fontWeight = 'bold';
-            mainContainer.appendChild(textDiv);
+// Główny kontener w komórce, używający flexbox
+const mainContainer = document.createElement('div');
+mainContainer.style.display = 'flex'; // Ustawienie elementów obok siebie
+mainContainer.style.alignItems = 'center'; // Wyrównanie pionowe do środka
+mainContainer.style.justifyContent = 'space-between'; // Opcjonalnie: rozsuń tekst i przycisk
+cell.appendChild(mainContainer);
 
-            const newCopyBtn = document.createElement('button');
-            newCopyBtn.id = 'copyBtnTable'; // Nowe ID, aby uniknąć konfliktu
-            newCopyBtn.className = 'btn small';
-            newCopyBtn.textContent = 'Przepisz dane z leczenia na miejscu';
-            newCopyBtn.style.marginLeft = '10px';
-            newCopyBtn.style.fontSize = '12px'; // Mniejsza czcionka, aby się zmieścił
-            newCopyBtn.title = 'Kopiuje dane z wierszy 1-3 do wierszy 10-12';
-            newCopyBtn.addEventListener('click', (e) => {
-                e.stopPropagation(); // Zapobiegaj innym kliknięciom
-                if (typeof copyRows123To101112 === 'function') {
-                    copyRows123To101112();
-                } else {
-                    alert('Błąd: Funkcja kopiowania nie jest gotowa.');
-                }
-            });
-            mainContainer.appendChild(newCopyBtn);
+// Kontener na tekst (aby zachować pogrubienie)
+const textDiv = document.createElement('div');
+textDiv.textContent = 'Potwierdzenie nabycia produktu leczniczego weterynaryjnego/paszy leczniczej';
+textDiv.style.fontWeight = 'bold';
+mainContainer.appendChild(textDiv); // Dodaj tekst do głównego kontenera
 
-            row.appendChild(cell);
-            tbody.appendChild(row);
-            continue; // Kontynuuj pętlę
-        } 
-        
-        // ✅ NOWY WIERSZ DANE PODSTAWOWE (i=14, indeks logiczny 12)
-        if (i===14) {
-             const cell = document.createElement('td');
-             cell.colSpan = 8;
-             cell.style.textAlign = 'left';
-             cell.style.backgroundColor = '#f7f7f7';
-             cell.style.fontWeight = 'bold';
-             cell.textContent = '--- WIERSZ DANYCH PODSTAWOWYCH / NOTATEK ---';
-             row.appendChild(cell);
-             tbody.appendChild(row);
-             continue;
-        }
-
-        // Standardowe wiersze edytowalne
-        for (let j=1;j<=8;j++){
-            const cell = document.createElement('td');
-            if (j===1) {
-                // Obliczamy "logiczny" indeks wiersza
-                const logicalIndex = (i > 10) ? i - 2 : i - 1; 
-
-                // Bierzemy tekst
-                let rowNumText;
-                if (i <= 9) {
-                    rowNumText = i + '.'; // 1. - 9.
-                } else if (i >= 11 && i <= 13) {
-                    rowNumText = (i - 10) + '.'; // 1. - 3. dla pozostawionych
-                }
-
-                // Dla wierszy 1-9 i 11-13 (czyli wszystkie poza 10 i 14)
-                if (rowNumText) { 
-                    cell.textContent = rowNumText + ' '; 
-                    const btn = document.createElement('button');
-                    btn.textContent = '➡️'; 
-                    btn.className = 'btn-edit-row';
-                    btn.title = 'Edytuj ten wiersz w formularzu';
-
-                    btn.addEventListener('click', (e) => {
-                        e.stopPropagation();  
-                        // Przenosi do edycji wiersza i aktywuje odpowiednią zakładkę
-                        navigateToRow(logicalIndex, 'tabEdycjaWierszyContent'); 
-                    });
-
-                    cell.appendChild(btn);
-                } else {
-                    cell.textContent = ''; // Powinno być puste, ale dla pewności
-                }
-            }
-
-            if (i !== 10 && i !== 14 && j !== 3 && j !== 4 && j !== 5 && j !== 7) { 
-                cell.contentEditable = true;
-            }
-            if (j>=2 && j<=4) cell.classList.add('center-text');
-            
-            // Wstawianie inputów w komórki (bez zmian)
-            if (j===3 && i!==10 && i!==14){
-                const input = document.createElement('input');
-                input.type = 'number';
-                input.inputMode = 'numeric';
-                input.pattern = '[0-9]*';
-                input.style.width = '60px'; 
-                input.style.textAlign = 'center';
-                cell.textContent = ''; 
-                cell.appendChild(input);
-            }
-            if (j === 4 && i !== 10 && i!==14) {
-                const input = document.createElement('input');
-                input.setAttribute('list', 'listaRozpoznan');
-                input.style.width = '95%';
-                input.placeholder = 'Rozpoznanie...';
-                input.readOnly = false;
-                input.style.cursor = 'text'; 
-                input.style.background = '#fefefe';
-
-                input.addEventListener('input', function(){ this.parentElement.dataset.printValue = this.value; });
-                input.addEventListener('input', applySchema);
-                input.addEventListener('dblclick', openSchemaSearchModalIfNeeded);
-                
-                cell.textContent = '';
-                cell.appendChild(input);
-            }
-            if (j===5 && i!==10 && i!==14){
-                const input = document.createElement('input');
-                input.setAttribute('list','listaLekow');
-                input.style.width = '95%';
-                input.addEventListener('input', function(){
-                    const row = this.closest('tr');
-                    const nrCell = row.cells[5];
-                    const iloscCell = row.cells[6];
-                    const karCell = row.cells[7];
-                    const nazwa = this.value;
-                    this.parentElement.dataset.printValue = nazwa;
-                    const nr = mapaSerii[nazwa] || '';
-                    const dawka = mapaIlosci[nazwa] || '';
-                    const kar = mapaKarencji[nazwa] || '';
-                    nrCell.textContent = nr;
-                    iloscCell.innerHTML = `<input class="small-input" type="number" inputmode="numeric" pattern="[0-9]*" placeholder="ilość"> ${dawka||''}`;
-                    karCell.textContent = kar;
-                    if (typeof validateCardStock === 'function') validateCardStock();
-                });
-                cell.textContent = '';
-                cell.appendChild(input);
-            }
-            row.appendChild(cell);
-        }
-        tbody.appendChild(row);
+// ✅ Fix 1: Tworzymy placeholder, do którego JS przeniesie przycisk
+// ✅ MODUŁ 2.1: Tworzymy przycisk bezpośrednio tutaj
+const newCopyBtn = document.createElement('button');
+newCopyBtn.id = 'copyBtnTable'; // Nowe ID, aby uniknąć konfliktu
+newCopyBtn.className = 'btn small';
+newCopyBtn.textContent = 'Przepisz dane z leczenia na miejscu';
+newCopyBtn.style.marginLeft = '10px';
+newCopyBtn.style.fontSize = '12px'; // Mniejsza czcionka, aby się zmieścił
+newCopyBtn.title = 'Kopiuje dane z wierszy 1-3 do wierszy 10-12';
+newCopyBtn.addEventListener('click', (e) => {
+    e.stopPropagation(); // Zapobiegaj innym kliknięciom
+    if (typeof copyRows123To101112 === 'function') {
+        copyRows123To101112();
+    } else {
+        alert('Błąd: Funkcja kopiowania nie jest gotowa.');
     }
-    // napelnij select w formularzu odpowiadającym wierszom
-    populateRowSelect();
+});
+mainContainer.appendChild(newCopyBtn);
+
+row.appendChild(cell);
+tbody.appendChild(row);
+continue; // Kontynuuj pętlę
+}
+for (let j=1;j<=8;j++){
+    const cell = document.createElement('td');
+    if (j===1) {
+        // Obliczamy "logiczny" indeks wiersza (0-11),
+        // który jest używany przez funkcje formularza
+        const logicalIndex = (i > 10) ? i - 2 : i - 1;
+
+        // Bierzemy tekst, który miałeś tam wcześniej (np. "1.", "2." itd.)
+        const rowNumText = (i > 10 ? i - 10 : i) + '.';
+
+        // Wyczyść komórkę i dodaj numer
+        cell.textContent = rowNumText + ' '; 
+
+        // Stwórz i dodaj przycisk "edytuj"
+        const btn = document.createElement('button');
+        btn.textContent = '➡️'; // Możesz zmienić na '✏️' lub inny symbol
+        btn.className = 'btn-edit-row';
+        btn.title = 'Edytuj ten wiersz w formularzu';
+
+        btn.addEventListener('click', (e) => {
+            // Zatrzymujemy propagację, aby kliknięcie przycisku
+            // nie aktywowało edycji komórki (contenteditable)
+            e.stopPropagation(); 
+
+            // Wywołujemy naszą nową funkcję z indeksem tego wiersza
+            openFormAtRow(logicalIndex);
+        });
+
+        cell.appendChild(btn);
+    }
+
+    // Ustaw contentEditable TYLKO dla komórek, które NIE mają własnego inputa
+    // j=3 (Liczba), j=4 (Rozpoznanie), j=5 (Produkt), j=7 (Ilość) będą miały inputy
+    if (i !== 10 && j !== 3 && j !== 4 && j !== 5 && j !== 7) { 
+        cell.contentEditable = true;
+    }
+    if (j>=2 && j<=4) cell.classList.add('center-text');
+/* ⬇️ ⬇️ ⬇️ WKLEJ TEN NOWY BLOK ⬇️ ⬇️ ⬇️ */
+    // kolumna 3 -> input dla Liczby
+    if (j===3 && i!==10){
+        const input = document.createElement('input');
+        input.type = 'number';
+        input.inputMode = 'numeric';
+        input.pattern = '[0-9]*';
+        input.style.width = '60px'; // Możesz dostosować szerokość
+        input.style.textAlign = 'center';
+        cell.textContent = ''; // Wyczyść komórkę
+        cell.appendChild(input);
+    }
+/* ⬆️ ⬆️ ⬆️ KONIEC NOWEGO BLOKU ⬆️ ⬆️ ⬆️ */
+  // ✅ NOWY BLOK DLA KOLUMNY 4 (ROZPOZNANIE) - WERSJA MODAL (Fix 4)
+    if (j === 4 && i !== 10) {
+        const input = document.createElement('input');
+        input.setAttribute('list', 'listaRozpoznan');
+        input.style.width = '95%';
+        input.placeholder = 'Rozpoznanie...';
+        
+        // ⬇️ MODUŁ 4 (Wersja Poprawiona): Pole jest ZAPISYWALNE ⬇️
+        input.readOnly = false;
+        input.style.cursor = 'text'; // Zwykły kursor tekstowy
+        input.style.background = '#fefefe';
+
+        // Listener do zapisu data-print-value (dla drukowania)
+        input.addEventListener('input', function(){
+            this.parentElement.dataset.printValue = this.value;
+        });
+
+        // Uruchom logikę schematów przy WPISYWANIU (nie klikaniu)
+        // Funkcja applySchema sprawdzi, czy wpisany tekst pasuje do schematu
+        input.addEventListener('input', applySchema);
+   // ⬇️ ZMIEŃ 'click' NA 'dblclick' ⬇️
+        input.addEventListener('dblclick', openSchemaSearchModalIfNeeded);
+        // ⬆️ KONIEC MODUŁU 4 (Wersja Poprawiona) ⬆️
+        
+        // ⬇️ TE LINIE BYŁY BRAKUJĄCE / W ZŁYM MIEJSCU ⬇️
+        cell.textContent = '';
+        cell.appendChild(input);
+    }
+    // kolumna 5 -> input z listą leków
+    if (j===5 && i!==10){
+        const input = document.createElement('input');
+        input.setAttribute('list','listaLekow');
+        input.style.width = '95%';
+        input.addEventListener('input', function(){
+            const nrCell = row.cells[5];
+            const iloscCell = row.cells[6];
+            const karCell = row.cells[7];
+            const nazwa = this.value;
+            this.parentElement.dataset.printValue = nazwa;
+            const nr = mapaSerii[nazwa] || '';
+            const dawka = mapaIlosci[nazwa] || '';
+            const kar = mapaKarencji[nazwa] || '';
+            nrCell.textContent = nr;
+            iloscCell.innerHTML = `<input class="small-input" type="number" inputmode="numeric" pattern="[0-9]*" placeholder="ilość"> ${dawka||''}`;
+            karCell.textContent = kar;
+            if (typeof validateCardStock === 'function') validateCardStock();
+        });
+        cell.textContent = '';
+        cell.appendChild(input);
+    }
+    row.appendChild(cell);
+}
+tbody.appendChild(row);
+}
+// napelnij select w formularzu odpowiadającym wierszom
+populateRowSelect();
 }
 /* ✅ DODAJ TĘ NOWĄ FUNKCJĘ: ✅ */
 
@@ -4148,7 +4162,28 @@ document.getElementById('formDataWykonania').value = document.getElementById('da
 document.getElementById('formNrDokumentu').value = document.getElementById('nrDokumentu').value || '';
 });
 
+closeForm.addEventListener('click', ()=> formModal.style.display = 'none');
 
+function showStep(n){
+step1.classList.toggle('active', n===1);
+step2.classList.toggle('active', n===2);
+}
+
+/* Next -> synchronizuj nagłówek i przejdź do kroku 2 */
+nextToProducts.addEventListener('click', ()=>{
+// sync header form -> top header immediately (as user wanted)
+syncHeaderFormToTop();
+// populate first selected row data into form fields
+populateRowSelect();
+selectRowInForm(0); // default first logical row
+showStep(2);
+});
+
+/* back */
+backToHeader.addEventListener('click', ()=>{
+updateFormLivePreview();
+showStep(1);
+});
 
 /* sync header: wpisane w formularzu wartości trafiają do headera */
 function syncHeaderFormToTop(){
@@ -4942,69 +4977,6 @@ if (printFormat110 && receiptPrintContainer) {
                                 orientation: portrait;
                             }
                         }
-                    /* ✅ DODANE: Style dla przycisków jako zakładek w formularzu */
-.form-tab-btn {
-    /* Ustawienia podstawowe dla przycisku */
-    height: 40px; /* Nieco wyższa wysokość */
-    padding: 0 10px;
-    font-size: 14px;
-    font-weight: 600;
-    cursor: pointer;
-    border: 1px solid #ddd;
-    background-color: #f0f0f0;
-    color: #555;
-    border-bottom: none; /* Usuwamy dolną ramkę */
-    border-radius: 6px 6px 0 0; /* Zaokrąglenie tylko góry */
-    transition: all 0.2s ease;
-    white-space: nowrap; /* Zapobiega łamaniu tekstu */
-}
-
-.form-tab-btn:hover:not(.tab-active) {
-    background-color: #e0e0e0;
-    color: #333;
-}
-
-.form-tab-btn.tab-active {
-    /* Aktywna zakładka */
-    background-color: #fff;
-    color: #c0392b; /* Używam twojego koloru WARN/Tytułu - dla kontrastu */
-    border-color: #ddd;
-    border-bottom: 1px solid #fff; /* "Wtopienie" w tło formularza */
-    z-index: 10;
-    position: relative; /* Wystaje ponad inne elementy */
-}
-
-/* Właściwy kontener treści (nowe) */
-.tab-content {
-    display: none; /* Domyślnie ukryty */
-    /* Reszta paddingu z formularza */
-    padding-left: 24px;
-    padding-right: 24px;
-}
-/* Aktywna treść (nowe) */
-.tab-content.active {
-    display: block; 
-}
-
-/* Zapewniamy spójny styl po skalowaniu w form-card (poprawka marginesów) */
-#formModal .form-card {
-    padding: 0;
-}
-#formModal .form-card .form-row {
-    padding: 0 24px;
-}
-
-/* Upewnij się, że content #tabDanePodstawoweContent ma padding u góry, bo zakładka zajęła miejsce*/
-#tabDanePodstawoweContent {
-    padding-top: 15px; /* Dodatkowe odsunięcie, aby nagłówek nie był przyklejony */
-}
-
-/* Usuwamy niepotrzebny margines pod nagłówkiem w formularzu edycji wierszy, bo jest już margines zakładek */
-#tabEdycjaWierszyContent h3 {
-    margin-top: 0 !important;
-}
-
-/* ❌ KONIEC DODANEGO FRAGMENTU CSS ❌ */
                     </style>
                 </head>
                 <body>
@@ -5311,9 +5283,10 @@ alert('❌ Nie udało się zapisać adresu e-mail lokalnie.');
 }
 });
 }
-    </script>
+</script>
+<script>
 // ✅ POCZĄTEK: ZMIENNE DLA BAZY KLIENTÓW I MODALI
-// =======================================================
+// ========================================================
 // ✅ POCZĄTEK: BLOK PRZECHWYTYWANIA PRZYCISKU WSTECZ
 // ========================================================
 
@@ -15981,160 +15954,128 @@ try {
 /* ======================================================== */
 /* ======================================================== */
 /* ======================================================== */
-/* ✅ NOWA LOGIKA: Zarządzanie Zakładkami i Nawigacją (v2)  */
+/* ✅ POCZĄTEK: LOGIKA NAWIGACJI W FORMULARZU KARTY        */
 /* ======================================================== */
+try {
+    // Zmienne dla nowych przycisków
+    const navLeczenieNaMiejscu = document.getElementById('navLeczenieNaMiejscu');
+    const navProduktyPozostawione = document.getElementById('navProduktyPozostawione');
+    // NOWE ZMIENNE
+    const navDanePodstawowe = document.getElementById('navDanePodstawowe');
+    const navPodsumowanie = document.getElementById('navPodsumowanie');
+    
+    const formRowSelect = document.getElementById('formRowSelect');
+    
+    // Funkcja nawigacji
+    function navigateToRow(targetIndex, targetButton) {
+        // 1. Zapisz aktualnie edytowany wiersz (użyjemy Twojej istniejącej logiki autozapisu)
+        const prevIdx = parseInt(formRowSelect.dataset.prevIndex, 10);
+        if (!isNaN(prevIdx)) {
+            if (typeof saveRow === 'function') {
+                saveRow(prevIdx);
+            }
+        }
 
-// --- Nowe Zmienne ---
-const navDanePodstawowe = document.getElementById('navDanePodstawowe');
-const navLeczenieNaMiejscu = document.getElementById('navLeczenieNaMiejscu');
-const navProduktyPozostawione = document.getElementById('navProduktyPozostawione');
-const navPodsumowanie = document.getElementById('navPodsumowanie');
+        // 2. Ustaw odpowiedni indeks w liście rozwijanej i odśwież formularz
+        formRowSelect.value = targetIndex; 
+        if (typeof selectRowInForm === 'function') {
+            selectRowInForm(targetIndex);
+        }
+        
+        // 3. Ustaw nowy 'prevIndex' dla kolejnego autozapisu
+        formRowSelect.dataset.prevIndex = targetIndex;
 
-const formRowSelect = document.getElementById('formRowSelect');
-const navButtons = [navDanePodstawowe, navLeczenieNaMiejscu, navProduktyPozostawione, navPodsumowanie];
-const tabContents = document.querySelectorAll('.tab-content');
+        // 4. Zaktualizuj stan wizualny przycisków
+        // Resetujemy wszystkie przyciski (oprócz aktywnego) do stanu 'ghost'
+        navDanePodstawowe.classList.remove('ghost');
+        navLeczenieNaMiejscu.classList.remove('ghost');
+        navProduktyPozostawione.classList.remove('ghost');
+        navPodsumowanie.classList.remove('ghost');
 
-// --- Logika Przełączania Zakładek ---
-function switchTab(targetId) {
-    // 1. Ukryj całą treść
-    tabContents.forEach(content => content.classList.remove('active'));
+        // Ustaw stan 'ghost' na NIEAKTYWNYCH przyciskach grupy "wierszy"
+        if (targetIndex >= 0 && targetIndex <= 8) { // Leczenie
+            navProduktyPozostawione.classList.add('ghost');
+        } else if (targetIndex >= 9 && targetIndex <= 11) { // Pozostawione
+            navLeczenieNaMiejscu.classList.add('ghost');
+        } else {
+            // Przy innych indeksach - nic nie rób
+        }
+        
+        showToast(`Przeniesiono do wiersza nr ${targetIndex + 1}.`, 'info');
+    }
+    
+    // Listener 1: Dane Podstawowe (powrót do KROKU 1)
+    if (navDanePodstawowe) {
+        navDanePodstawowe.addEventListener('click', () => {
+            // 1. Zapisz aktualnie edytowany wiersz
+            const prevIdx = parseInt(formRowSelect.dataset.prevIndex, 10);
+            if (!isNaN(prevIdx) && typeof saveRow === 'function') {
+                saveRow(prevIdx);
+            }
+            // 2. Przejdź do kroku 1 (Nagłówek)
+            if (typeof showStep === 'function') {
+                showStep(1);
+            }
+            showToast('Przeniesiono do Danych Podstawowych.', 'info');
+        });
+    }
 
-    // 2. Dezaktywuj wszystkie przyciski
-    navButtons.forEach(btn => btn.classList.remove('tab-active'));
+    // Listener 2: Leczenie na miejscu (Wiersz 1) - Index 0
+    if (navLeczenieNaMiejscu) {
+        navLeczenieNaMiejscu.addEventListener('click', () => {
+            navigateToRow(0, navProduktyPozostawione); // 0 to index pierwszego wiersza
+        });
+    }
 
-    // 3. Pokaż nową treść i aktywuj przycisk
-    const targetContent = document.getElementById(targetId);
-    if (targetContent) {
-        targetContent.classList.add('active');
-        const targetButton = document.querySelector(`[data-target="${targetId}"]`);
-        if (targetButton) {
-            targetButton.classList.add('tab-active');
-        }
-    }
+    // Listener 3: Produkty pozostawione (Wiersz 10) - Index 9
+    if (navProduktyPozostawione) {
+        navProduktyPozostawione.addEventListener('click', () => {
+            navigateToRow(9, navLeczenieNaMiejscu); // 9 to index dziesiątego wiersza
+        });
+    }
+    
+    // Listener 4: Podsumowanie (narazie puste, tylko powrót do kroku 1)
+    if (navPodsumowanie) {
+        navPodsumowanie.addEventListener('click', () => {
+            // 1. Zapisz aktualnie edytowany wiersz
+            const prevIdx = parseInt(formRowSelect.dataset.prevIndex, 10);
+            if (!isNaN(prevIdx) && typeof saveRow === 'function') {
+                saveRow(prevIdx);
+            }
+            // 2. Przejdź do kroku 1 (Nagłówek)
+            if (typeof showStep === 'function') {
+                showStep(1);
+            }
+            // Zmień stan wizualny przycisków w pasku (opcjonalnie)
+            navLeczenieNaMiejscu.classList.remove('ghost');
+            navProduktyPozostawione.classList.add('ghost');
+            navPodsumowanie.classList.remove('ghost');
+
+            showToast('Przeniesiono do Podsumowania (Krok 1).', 'info');
+        });
+    }
+
+    // Korekta wizualna przy inicjalizacji / zmianie
+    if (formRowSelect) {
+        formRowSelect.addEventListener('change', (e) => {
+             const currentIndex = parseInt(e.target.value, 10);
+             // Zaktualizuj tylko przyciski Leczenie/Produkty
+             if (currentIndex >= 0 && currentIndex <= 8) {
+                 navLeczenieNaMiejscu.classList.remove('ghost');
+                 navProduktyPozostawione.classList.add('ghost');
+             } else if (currentIndex >= 9 && currentIndex <= 11) {
+                 navLeczenieNaMiejscu.classList.add('ghost');
+                 navProduktyPozostawione.classList.remove('ghost');
+             }
+             // Inne przyciski (Dane Podstawowe / Podsumowanie) pozostają aktywne
+        });
+    }
+    
+} catch (err) {
+    console.error("Błąd inicjalizacji nawigacji w formularzu:", err);
 }
-
-// --- Logika Nawigacji Między Wierszami a Zakładkami ---
-
-// Funkcja ogólna do przeskoku do wiersza (używana przez Zakładki)
-function navigateToRow(targetIndex, targetTabContentId) {
-    // 1. Zapisz aktualny wiersz PRZED zmianą indeksu w select
-    const prevIdx = parseInt(formRowSelect.dataset.prevIndex, 10);
-    if (!isNaN(prevIdx)) {
-        if (typeof saveRow === 'function') {
-            saveRow(prevIdx);
-        }
-    }
-
-    // 2. Przełącz zakładkę (zawsze musi być widoczna)
-    switchTab(targetTabContentId);
-    
-    // 3. Ustaw i załaduj dane dla docelowego wiersza
-    formRowSelect.value = targetIndex; 
-    if (typeof selectRowInForm === 'function') {
-        selectRowInForm(targetIndex);
-    }
-    
-    // 4. Ustaw nowy 'prevIndex'
-    formRowSelect.dataset.prevIndex = targetIndex;
-
-    // 5. Przewiń do wybranego wiersza (wizualnie)
-    const logicalRows = rowsEditable();
-    if(logicalRows[targetIndex]) {
-        logicalRows[targetIndex].scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }
-}
-
-// --- Listenery Zakładek ---
-
-// 1. Dane podstawowe (Przechodzi do pierwszego elementu tabeli, Index 0)
-if (navDanePodstawowe) {
-    navDanePodstawowe.addEventListener('click', () => {
-        // SCENARIUSZ: Dane Podstawowe to pierwszy wiersz Edycji Wierszy (index 0)
-        // Musimy zsynchronizować nagłówek, zanim udamy się do edycji wierszy.
-        syncHeaderFormToTop();
-        switchTab('tabDanePodstawoweContent');
-        // Po przełączeniu zakładki, ustawiamy aktywny wiersz na Index 0 (Wiersz 1)
-        formRowSelect.value = 0;
-        if (typeof selectRowInForm === 'function') {
-            selectRowInForm(0);
-        }
-        formRowSelect.dataset.prevIndex = 0;
-        showToast("Synchronizowano dane nagłówka. Wybierz wiersz.", 'info');
-    });
-}
-
-// 2. Leczenie na miejscu (Index 0)
-if (navLeczenieNaMiejscu) {
-    navLeczenieNaMiejscu.addEventListener('click', () => {
-        // SCENARIUSZ: Przeskok do wiersza Leczenia na Miejscu (Index 0)
-        navigateToRow(0, 'tabEdycjaWierszyContent'); 
-    });
-}
-
-// 3. Produkty pozostawione (Index 9)
-if (navProduktyPozostawione) {
-    navProduktyPozostawione.addEventListener('click', () => {
-        // SCENARIUSZ: Przeskok do wiersza Produktów Pozostawionych (Index 9)
-        navigateToRow(9, 'tabEdycjaWierszyContent'); 
-    });
-}
-
-// 4. Podsumowanie (Puste)
-if (navPodsumowanie) {
-    navPodsumowanie.addEventListener('click', () => {
-        // SCENARIUSZ: Podsumowanie (puste)
-        switchTab('tabPodsumowanieContent');
-    });
-}
-
-// --- Poprawiona logika otwierania formularza (zamiast formBtn.addEventListener) ---
-
-// Zlokalizuj istniejący kod:
-if (formBtn) {
-    formBtn.addEventListener('click', () => {
-        formModal.style.display = 'flex';
-        // 1. Domyślnie aktywuj zakładkę DANE PODSTAWOWE
-        switchTab('tabDanePodstawoweContent');
-
-        // 2. Zsynchronizuj formularz z nagłówkiem karty
-        document.getElementById('formKlient').value = document.getElementById('klientSelect').value || '';
-        document.getElementById('formAdres').value = document.getElementById('adresKlienta').textContent || '';
-        document.getElementById('formNrStada').value = document.getElementById('nrStada').textContent || '';
-        document.getElementById('formDataZgloszenia').value = document.getElementById('dataZgloszenia').value || '';
-        document.getElementById('formDataWykonania').value = document.getElementById('dataWykonania').value || '';
-        document.getElementById('formNrDokumentu').value = document.getElementById('nrDokumentu').value || '';
-        
-        // 3. Wypełnij listę rozwijaną i ustaw prevIndex
-        populateRowSelect();
-        formRowSelect.dataset.prevIndex = 0; // Początkowo ustawiamy na pierwszy wiersz
-    });
-}
-
-// --- Akcje po zmianie wiersza (przełączanie widoku zakładek) ---
-
-if (formRowSelect) {
-    formRowSelect.addEventListener('change', (e) => {
-        const currentIndex = parseInt(e.target.value, 10);
-        
-        // Wykonaj autozapis (jak w poprzedniej wersji)
-        const prevIdx = parseInt(formRowSelect.dataset.prevIndex, 10);
-        if (!isNaN(prevIdx)) saveRow(prevIdx);
-
-        // Ustawienie aktywnej zakładki na podstawie indeksu
-        if (currentIndex === 12) { // Index 12 (Nowy wiersz Podstawowe)
-             switchTab('tabDanePodstawoweContent');
-        } else if (currentIndex >= 0 && currentIndex <= 11) { // Index 0-11 (Wiersze edycji)
-             switchTab('tabEdycjaWierszyContent');
-        }
-        
-        // Załaduj dane do pól (jak w oryginalnej logice)
-        selectRowInForm(currentIndex);
-        formRowSelect.dataset.prevIndex = currentIndex;
-    });
-}
-
 /* ======================================================== */
-/* ✅ KONIEC: NOWA LOGIKA: Zarządzanie Zakładkami i Nawigacją */
+/* ✅ KONIEC: LOGIKA NAWIGACJI W FORMULARZU KARTY            */
 /* ======================================================== */
 </script> 
 
