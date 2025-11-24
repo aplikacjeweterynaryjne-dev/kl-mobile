@@ -4712,24 +4712,33 @@ window.addEventListener('resize', handleResize);
 
 });
 
-closeBtn.addEventListener('click', ()=>{
-window.removeEventListener('resize', handleResize);
+// ... (fragment kodu wewnątrz function initSignature(id){ ... } )
+    closeBtn.addEventListener('click', ()=>{
+    window.removeEventListener('resize', handleResize);
 
-// ✅ ZMIANA: Odblokuj orientację
-if (screen.orientation && screen.orientation.unlock) {
-screen.orientation.unlock();
-console.log("Orientacja odblokowana.");
-}
+    // ✅ ZMIANA: Odblokuj orientację
+    if (screen.orientation && screen.orientation.unlock) {
+        screen.orientation.unlock();
+        console.log("Orientacja odblokowana.");
+    }
 
-ctx.clearRect(0, 0, canvas.width, canvas.height);
-ctx.drawImage(fullscreenCanvas, 0, 0, canvas.width, canvas.height);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(fullscreenCanvas, 0, 0, canvas.width, canvas.height);
+    
+    // --- KLUCZOWA ZMIANA ---
+    // Po skopiowaniu podpisu z powrotem do głównego canvasa KartaLeczenia (#canvasPosiadacz),
+    // kopiujemy go również do canvasa w formularzu (#formCanvasPosiadacz).
+    if (typeof copyCardSignToForm === 'function') {
+        copyCardSignToForm(); 
+    }
+    // --- KONIEC ZMIANY ---
 
-fullscreenOverlay.style.display = 'none';
+    fullscreenOverlay.style.display = 'none';
 
-fullscreenCanvas.removeEventListener('pointerdown', startDrawingFullscreen);
-fullscreenCanvas.removeEventListener('pointermove', drawFullscreen);
-fullscreenCanvas.removeEventListener('pointerup', stopDrawingFullscreen);
-fullscreenCanvas.removeEventListener('pointerleave', stopDrawingFullscreen);
+    fullscreenCanvas.removeEventListener('pointerdown', startDrawingFullscreen);
+    fullscreenCanvas.removeEventListener('pointermove', drawFullscreen);
+    fullscreenCanvas.removeEventListener('pointerup', stopDrawingFullscreen);
+    fullscreenCanvas.removeEventListener('pointerleave', stopDrawingFullscreen);
 });
 
 clearFullscreenBtn.addEventListener('click', ()=>{
