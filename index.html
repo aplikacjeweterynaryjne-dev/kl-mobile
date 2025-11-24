@@ -4204,21 +4204,32 @@ function showFormStep(n) {
 /**
  * Logika inicjalizująca Krok 2 (Leczenie na miejscu, wiersze 1-9)
  */
+/**
+ * Logika inicjalizująca Krok 2 (Leczenie na miejscu, wiersze 1-9)
+ */
 function setupStep2() {
     // Leczenie na miejscu to wiersze 1-9 (indeksy 0 do 8)
     const selectLeczenie = populateRowSelect('formRowEditor', 0, 8);
     const rowEditorHtml = generateRowEditor(selectLeczenie);
     formRowEditor.innerHTML = rowEditorHtml;
     
+    // MUSIMY POBRAĆ ELEMENT SELECT Z DOM PO WSTAWINIU HTMLA
+    const activeSelect = document.getElementById('formRowSelect0');
+    
     // Ustaw listenery i wczytaj pierwszy wiersz
     setupRowEditorListeners('formRowEditor');
     selectRowInForm(0); // Domyślnie wczytaj wiersz 1 (indeks 0)
     
-    document.getElementById('formRowSelect0').dataset.prevIndex = 0;
+    if (activeSelect) {
+        activeSelect.dataset.prevIndex = 0;
+    }
 }
 
 /**
  * Logika inicjalizująca Krok 3 (Produkty pozostawione, wiersze 1-3)
+ */
+/**
+ * Logika inicjalizująca Krok 3 (Produkty pozostawione, wiersze 10-12)
  */
 function setupStep3() {
     // Produkty pozostawione to wiersze 10-12 (indeksy 9 do 11)
@@ -4226,11 +4237,16 @@ function setupStep3() {
     const rowEditorHtml = generateRowEditor(selectPozostawione, true); // Opcja 'isPozostawione' na true
     formRowEditorPozostawione.innerHTML = rowEditorHtml;
 
+    // MUSIMY POBRAĆ ELEMENT SELECT Z DOM PO WSTAWINIU HTMLA
+    const activeSelect = document.getElementById('formRowSelectPozostawione');
+
     // Ustaw listenery i wczytaj pierwszy wiersz
     setupRowEditorListeners('formRowEditorPozostawione');
     selectRowInForm(9); // Domyślnie wczytaj wiersz 10 (indeks 9)
 
-    document.getElementById('formRowSelectPozostawione').dataset.prevIndex = 9;
+    if (activeSelect) {
+        activeSelect.dataset.prevIndex = 9;
+    }
 }
 /**
  * Logika generująca podsumowanie (Krok 4)
@@ -4340,6 +4356,9 @@ function generateRowEditor(selectElement, isPozostawione = false) {
 /**
  * Podpina listenery do dynamicznie generowanego edytora wiersza (DLA DOWOLNEGO KROKU)
  */
+/**
+ * Podpina listenery do dynamicznie generowanego edytora wiersza (DLA DOWOLNEGO KROKU)
+ */
 function setupRowEditorListeners(containerId) {
     const container = document.getElementById(containerId);
     if (!container) return;
@@ -4347,9 +4366,9 @@ function setupRowEditorListeners(containerId) {
     // Przekazanie focusu na kliknięcie w input
     const inputLek = container.querySelector('#formLek');
     if (inputLek) inputLek.addEventListener('click', (e) => {
-        // Używamy globalnego modala wyszukiwania produktów (tego samego co w karcie)
+        // Używamy funkcji, która jest zdefiniowana w bloku Modala Produktów (Formularz)
         if (typeof openFormProductSearchModal === 'function') {
-            openFormProductSearchModal(e);
+            openFormProductSearchModal(e); // <-- POPRAWNE WYWOŁANIE
         } else {
             console.error("Błąd: Funkcja openFormProductSearchModal nie znaleziona.");
         }
@@ -4466,9 +4485,13 @@ if (dataW) document.getElementById('dataWykonania').value = dataW;
 document.getElementById('nrDokumentu').value = nrDok;
 }
 /* ---- Moduł 4: Wypełnia select wierszami dla danego kroku (2 lub 3) ---- */
+/* ---- Moduł 4: Wypełnia select wierszami dla danego kroku (2 lub 3) ---- */
 function populateRowSelect(targetElementId, startIndex, endIndex){
+    // Zabezpieczenie przed wywołaniem .replace() na undefined
+    const safeTargetId = targetElementId ? targetElementId.replace('#formRowEditor', '') : ''; 
+
     const select = document.createElement('select');
-    select.id = 'formRowSelect' + targetElementId.replace('#formRowEditor', ''); // Unikalne ID
+    select.id = 'formRowSelect' + safeTargetId; // Unikalne ID
 
     const logical = rowsEditable();
     
@@ -6492,6 +6515,7 @@ showSection('konfiguracja');
 // --- LOGIKA MODALA WYBORU METODY ---
 
 // --- Przycisk: Metoda Tradycyjna ---
+// --- Przycisk: Metoda Tradycyjna ---
 if (metodaTradycyjnaBtn) {
 metodaTradycyjnaBtn.addEventListener('click', () => {
 if (metodaModal) metodaModal.style.display = 'none';
@@ -6509,10 +6533,12 @@ if (metodaModal) metodaModal.style.display = 'none';
 // Otwórz formularz (logika skopiowana z Twojego listenera #formBtn)
 if (formModal) {
 formModal.style.display = 'flex';
-showStep(1); // Pokaż pierwszy krok formularza
-populateRowSelect();
-formRowSelect.dataset.prevIndex = 0; 
-
+showFormStep(1); // <-- POPRAWIONE NA showFormStep(1)
+// Usunęliśmy stary blok inicjalizacyjny, który powodował błędy odwołań
+// Nowa funkcja formBtn.addEventListener (Moduł 3) wykonuje resztę pracy
+}
+});
+}
 // Synchronizuj dane z nagłówka (jeśli jakieś są)
 document.getElementById('formKlient').value = document.getElementById('klientSelect').value || '';
 document.getElementById('formAdres').value = document.getElementById('adresKlienta').textContent || '';
