@@ -2554,17 +2554,17 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
 <div class="form-row"><label for="formLiczba">Liczba leczonych zwierząt</label><input type="number" id="formLiczba" min="0" placeholder="0"></div>
 <div class="form-row"><label for="formRozpoznanie">Rozpoznanie / wstępne rozpoznanie</label><input type="text" id="formRozpoznanie" list="listaRozpoznan" placeholder="Wpisz lub wybierz schemat..."></div>
     </div>      
-    <div style="display: flex; align-items: flex-end; gap: 8px; margin-bottom: 8px;">
-        
-        <button id="prevRow" class="btn small">◀</button>
+<div style="display: flex; align-items: flex-end; gap: 8px; margin-bottom: 8px;">
+        
+        <button id="prevRowProduct" class="btn small">◀</button>
 
-        <div class="form-row" style="flex: 1; margin-bottom: 0;">
-        <label for="formLek">Nazwa produktu leczniczego</label>
-            <input list="listaLekow" id="formLek" placeholder="Kliknij, aby wyszukać produkt..." readonly style="cursor: pointer; background: #fff;">
-        </div>
+        <div class="form-row" style="flex: 1; margin-bottom: 0;">
+        <label for="formLek">Nazwa produktu leczniczego</label>
+            <input list="listaLekow" id="formLek" placeholder="Kliknij, aby wyszukać produkt..." readonly style="cursor: pointer; background: #fff;">
+        </div>
 
-        <button id="nextRow" class="btn small">▶</button>
-    </div>
+        <button id="nextRowProduct" class="btn small">▶</button>
+    </div>
 
 
     <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
@@ -4277,20 +4277,23 @@ function goToNextRow() {
 /* ✅ KONIEC: Moduł 5 - Funkcje */
 /* ---- wybierz kolejny/poprzedni w formularzu ---- */
 
-// ✅ Moduł 5: Podłączenie starych przycisków (strzałek) do nowych funkcji
-document.getElementById('nextRow').addEventListener('click', goToNextRow);
-document.getElementById('prevRow').addEventListener('click', goToPrevRow);
-
-// ✅ Moduł 5: Podłączenie nowych przycisków (na dole formularza) do nowych funkcji
+// ✅ Moduł 5: Podłączenie strzałek "wiersza" (na dole formularza) do funkcji
 const formPrevRowBtn = document.getElementById('formPrevRowBtn');
 const formNextRowBtn = document.getElementById('formNextRowBtn');
 
 if (formPrevRowBtn) {
-    formPrevRowBtn.addEventListener('click', goToPrevRow);
+    formPrevRowBtn.addEventListener('click', goToPrevRow);
 }
 if (formNextRowBtn) {
-    formNextRowBtn.addEventListener('click', goToNextRow);
+    formNextRowBtn.addEventListener('click', goToNextRow);
 }
+
+// ✅ NOWE: Podłączenie strzałek "produktu" do nawigacji wiersza (muszą używać goToNextRow/goToPrevRow)
+const nextRowProduct = document.getElementById('nextRowProduct');
+const prevRowProduct = document.getElementById('prevRowProduct');
+
+if (nextRowProduct) nextRowProduct.addEventListener('click', goToNextRow);
+if (prevRowProduct) prevRowProduct.addEventListener('click', goToPrevRow);
 
 // dodatkowo przy ręcznym wyborze wiersza w dropdown autozapis
 formRowSelect.addEventListener('change', ()=>{
@@ -4406,15 +4409,26 @@ function selectRowInForm(logicalIndex){
     const row = logical[logicalIndex];
     if (!row) return;
 
-    // --- LOGIKA "NOWE DANE" (TAK JAK BYŁO) ---
+  /* ⬇️ ⬇️ ⬇️ ZASTĄP USUNIĘTY BLOK TYM NOWYM KODEM ⬇️ ⬇️ ⬇️ */
+
+    // --- LOGIKA ZARZĄDZANIA WIDOKAMI W KROKU 2 ---
+    // Logika Nowe Dane / Edytuj Wiersz
     if (logicalIndex === 0 || logicalIndex === 9) {
+        // Wiersz 1 lub wiersz 10: Zawsze edytuj
         formNoweDaneContainer.style.display = 'none';
         formRowDetailsContainer.style.display = 'block';
     } else {
-        formNoweDaneContainer.style.display = 'block';
-        formRowDetailsContainer.style.display = 'none';
+        // Wiersze 2-8, 11-12: Sprawdź, czy są puste
+        const logicalRows = rowsEditable();
+        if (typeof isRowEmpty === 'function' && isRowEmpty(logicalRows[logicalIndex])) {
+            formNoweDaneContainer.style.display = 'block';
+            formRowDetailsContainer.style.display = 'none';
+        } else {
+            formNoweDaneContainer.style.display = 'none';
+            formRowDetailsContainer.style.display = 'block';
+        }
     }
-    
+/* ⬆️ ⬆️ ⬆️ KONIEC BLOKU ZASTĘPUJĄCEGO ⬆️ ⬆️ ⬆️ */
     // --- ⬇️ NOWA LOGIKA DLA PRZYCISKU "PRZEPISZ DANE" (Pkt 1) ⬇️ ---
     const copyBtnContainer = document.getElementById('formCopyBtnContainer');
     if (logicalIndex === 9) {
