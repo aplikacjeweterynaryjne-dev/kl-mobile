@@ -193,6 +193,13 @@ margin-top: 8px;
     pointer-events: none; /* Blokuje rysowanie myszką/palcem */
     cursor: not-allowed;  /* Pokazuje kursor "zablokowany" */
 }
+    /* DODANY STYL: Blokuje rysowanie na płótnie w podsumowaniu */
+#formCanvasPosiadacz.disabled-override {
+    pointer-events: none !important;
+    cursor: not-allowed !important;
+    opacity: 0.7;
+}
+/* Używamy !important, aby nadpisać style domyślne */
 /* ---- formularz (dodany, nie wpływa na tabelę) ---- */
 #formModal {
 position: fixed;
@@ -2598,14 +2605,17 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
     </div>
 
   <div class="form-actions" style="margin-top:12px; flex-direction: column; gap: 10px; border-top: 1px solid #eee; padding-top: 10px;">
-        
         <div style="display: flex; gap: 8px; width: 100%;">
-            <button type="button" id="formPrevRowBtn" class="btn small" style="flex: 1;">Poprzedni wiersz</button>
+            <button type="button" id="formPrevRowBtn" class="btn small" style="flex: 1;">Poprzednia pozycja</button>
             
             <button type="button" id="formToPodsumowanieBtn" class="btn primary small" style="flex: 2; font-weight: bold; font-size: 16px;">Przejdź do Podsumowania</button>
             
-            <button type="button" id="formNextRowBtn" class="btn small" style="flex: 1;">Następny wiersz</button>
+            <button type="button" id="formNextRowBtn" class="btn small" style="flex: 1;">Następna pozycja</button>
         </div>
+
+        <button id="formCancelStep2Btn" type="button" class="btn warn small" style="margin-top: 10px; width: 100%; border-color: #c0392b;">
+            ❌ Anuluj
+        </button>
 
         <div style="width: 100%; text-align: center; border-top: 1px solid #eee; padding-top: 10px; margin-top: 5px;">
             <button id="backToHeader" class="btn ghost small">Dane posiadacza/Nagłówek</button>
@@ -2641,19 +2651,22 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
         </ul>
     </div>
     
-    <div class="signature-box" style="width: 100%;">
+<div class="signature-box" style="width: 100%;">
         <span class="signature-label" style="font-size: 18px;">Podpis Posiadacza Zwierzęcia:</span>
-        <canvas id="formCanvasPosiadacz" class="signature-canvas" style="height: 120px;"></canvas>
+        <canvas id="formCanvasPosiadacz" class="signature-canvas disabled-override" style="height: 120px;"></canvas>
         <button id="formFullscreenBtn">Podpisz dokument (Pełny ekran)</button>
         <button id="formClearSignBtn">Wyczyść podpis</button>
     </div>
     
-    <div class="form-actions" style="margin-top: 25px; flex-direction: column; gap: 10px;">
+<div class="form-actions" style="margin-top: 25px; flex-direction: column; gap: 10px;">
         <button id="formSaveAndArchiveBtn" type="button" class="btn primary" style="font-size: 18px; padding: 15px;">
             💾 Zamknij i zapisz w archiwum
         </button>
         <button id="formPrintBtn" type="button" class="btn" style="font-size: 18px; padding: 15px; background: #e6e6e6;">
             🖨️ Drukuj / Zapisz PDF
+        </button>
+        <button id="formCancelStep3Btn" type="button" class="btn warn small" style="width: 100%; font-size: 18px; padding: 15px; border-color: #c0392b;">
+            ❌ Anuluj
         </button>
     </div>
 
@@ -16275,6 +16288,7 @@ function initFormSignature() {
             originalFullscreenBtn.click();
             showToast("Otwarto podpis. Upewnij się, że urządzenie jest w pozycji poziomej.", "info");
         }
+        formCanvas.classList.remove('disabled-override');
     });
 
 }
@@ -16368,6 +16382,37 @@ function copyCardSignToForm() {
     
     console.log("Podpis zaktualizowany w Formularzu (Krok 3).");
 }
+    /* ======================================================== */
+/* ✅ POCZĄTEK: Logika Przycisku ANULUJ (Krok 2 i Krok 3) */
+/* ======================================================== */
+
+function handleFormCancel() {
+    if (confirm("Czy na pewno chcesz opuścić formularz bez zapisu? Wszystkie niezapisane dane w formularzu i nagłówku zostaną utracone.")) {
+        // Wyczyść formularz, a następnie zamknij modal
+        if (formModal) {
+            formModal.style.display = 'none';
+        }
+        
+        // Opcjonalnie: Upewnij się, że inne modale są zamknięte
+        if (document.getElementById('metodaModal')) {
+             document.getElementById('metodaModal').style.display = 'none';
+        }
+        
+        // Najważniejsze: Resetowanie formularza i karty
+        if (typeof clearKartaLeczenia === 'function') {
+            clearKartaLeczenia();
+        } else {
+            // Fallback (np. jeśli clearKartaLeczenia nie ma w obecnym bloku)
+            console.error("Brak funkcji clearKartaLeczenia - konieczne ręczne czyszczenie!");
+        }
+        
+        showToast("Anulowano. Formularz zamknięty bez zapisu.", "info");
+    }
+}
+
+// Podpięcie listenerów do nowych przycisków Anuluj (Krok 2 i Krok 3)
+document.getElementById('formCancelStep2Btn')?.addEventListener('click', handleFormCancel);
+document.getElementById('formCancelStep3Btn')?.addEventListener('click', handleFormCancel);
 </script> 
 
 <div id="toastContainer" style="position: fixed; top: 20px; right: 20px; z-index: 20000; display: flex; flex-direction: column; gap: 10px;">
