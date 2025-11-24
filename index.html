@@ -2511,7 +2511,15 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
 
 <div id="step2" class="form-step">
     <h3 id="formRowTitle" style="color: red; font-size: 25px;">Edycja wierszy tabeli</h3>
-
+    
+    <div class="form-actions" id="form-step-nav" style="justify-content: space-around; margin-bottom: 12px; border: none; padding: 0;">
+        <button id="navLeczenieNaMiejscu" class="btn small" style="flex: 1; margin-right: 5px;">
+            📝 Leczenie na miejscu (Wiersz 1)
+        </button>
+        <button id="navProduktyPozostawione" class="btn small ghost" style="flex: 1; margin-left: 5px;">
+            📦 Produkty pozostawione (Wiersz 10)
+        </button>
+    </div>
     <div id="formLivePreview" style="font-size: 14px; color: #333; background-color: #f4f4f4; border: 1px solid #ddd; border-radius: 6px; padding: 8px; margin-bottom: 12px; max-height: 70px; overflow-y: auto;">
         <strong style="color: #000;">Dodane do karty:</strong>
         <span id="previewProductList">ładowanie...</span>
@@ -15933,6 +15941,76 @@ try {
 }
 /* ======================================================== */
 /* ✅ KONIEC: Logika Własnego Produktu                      */
+/* ======================================================== */
+/* ======================================================== */
+/* ✅ POCZĄTEK: LOGIKA NAWIGACJI W FORMULARZU KARTY        */
+/* ======================================================== */
+try {
+    // Zmienne dla nowych przycisków
+    const navLeczenieNaMiejscu = document.getElementById('navLeczenieNaMiejscu');
+    const navProduktyPozostawione = document.getElementById('navProduktyPozostawione');
+    const formRowSelect = document.getElementById('formRowSelect');
+    
+    // Funkcja nawigacji
+    function navigateToRow(targetIndex, targetButton) {
+        // 1. Zapisz aktualnie edytowany wiersz (użyjemy Twojej istniejącej logiki autozapisu)
+        const prevIdx = parseInt(formRowSelect.dataset.prevIndex, 10);
+        if (!isNaN(prevIdx)) {
+            if (typeof saveRow === 'function') {
+                saveRow(prevIdx);
+            }
+        }
+
+        // 2. Ustaw odpowiedni indeks w liście rozwijanej i odśwież formularz
+        formRowSelect.value = targetIndex; 
+        if (typeof selectRowInForm === 'function') {
+            selectRowInForm(targetIndex);
+        }
+        
+        // 3. Ustaw nowy 'prevIndex' dla kolejnego autozapisu
+        formRowSelect.dataset.prevIndex = targetIndex;
+
+        // 4. Zaktualizuj stan wizualny przycisków (opcjonalnie, dla lepszego UX)
+        navLeczenieNaMiejscu.classList.remove('ghost');
+        navProduktyPozostawione.classList.remove('ghost');
+        targetButton.classList.add('ghost');
+        
+        showToast(`Przeniesiono do wiersza nr ${targetIndex + 1}.`, 'info');
+    }
+
+    // Listener 1: Leczenie na miejscu (Wiersz 1) - Index 0
+    if (navLeczenieNaMiejscu) {
+        navLeczenieNaMiejscu.addEventListener('click', () => {
+            navigateToRow(0, navProduktyPozostawione); // 0 to index pierwszego wiersza
+        });
+    }
+
+    // Listener 2: Produkty pozostawione (Wiersz 10) - Index 9
+    if (navProduktyPozostawione) {
+        navProduktyPozostawione.addEventListener('click', () => {
+            navigateToRow(9, navLeczenieNaMiejscu); // 9 to index dziesiątego wiersza
+        });
+    }
+
+    // Korekta wizualna przy inicjalizacji / zmianie
+    if (formRowSelect) {
+        formRowSelect.addEventListener('change', (e) => {
+             const currentIndex = parseInt(e.target.value, 10);
+             if (currentIndex >= 0 && currentIndex <= 8) {
+                 navLeczenieNaMiejscu.classList.remove('ghost');
+                 navProduktyPozostawione.classList.add('ghost');
+             } else if (currentIndex >= 9 && currentIndex <= 11) {
+                 navLeczenieNaMiejscu.classList.add('ghost');
+                 navProduktyPozostawione.classList.remove('ghost');
+             }
+        });
+    }
+    
+} catch (err) {
+    console.error("Błąd inicjalizacji nawigacji w formularzu:", err);
+}
+/* ======================================================== */
+/* ✅ KONIEC: LOGIKA NAWIGACJI W FORMULARZU KARTY            */
 /* ======================================================== */
 </script> 
 
