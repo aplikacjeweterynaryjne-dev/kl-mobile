@@ -2519,23 +2519,22 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
 <div id="step2" class="form-step">
     <h3 id="formRowTitle" style="color: red; font-size: 25px;">Edycja wierszy tabeli</h3>
     
-    <div class="form-actions" id="form-step-nav" style="justify-content: space-between; margin-bottom: 12px; border: none; padding: 0; flex-wrap: nowrap;">
-        
-        <button id="navDanePodstawowe" class="btn small" style="flex: 1; margin-right: 5px;">
-            ⬅️ Dane Podstawowe
-        </button>
+   <div id="form-step-nav">
+    <button id="navDanePodstawowe" class="btn small" data-target-step="1">
+        ⬅️ Dane Podstawowe
+    </button>
 
-        <button id="navLeczenieNaMiejscu" class="btn small" style="flex: 1; margin: 0 5px;">
-            📝 Leczenie na miejscu
-        </button>
-        <button id="navProduktyPozostawione" class="btn small ghost" style="flex: 1; margin-left: 5px;">
-            📦 Produkty pozostawione
-        </button>
+    <button id="navLeczenieNaMiejscu" class="btn small active-nav-btn" data-target-index="0" data-nav-group="leczenie">
+        📝 Leczenie na miejscu
+    </button>
+    <button id="navProduktyPozostawione" class="btn small" data-target-index="9" data-nav-group="pozostawione">
+        📦 Produkty pozostawione
+    </button>
 
-        <button id="navPodsumowanie" class="btn small ghost" style="flex: 1; margin-left: 5px;">
-            Podsumowanie ➡️
-        </button>
-    </div>
+    <button id="navPodsumowanie" class="btn small" data-target-step="3">
+        Podsumowanie ➡️
+    </button>
+</div>
 
     <div id="formLivePreview" style="font-size: 14px; color: #333; background-color: #f4f4f4; border: 1px solid #ddd; border-radius: 6px; padding: 8px; margin-bottom: 12px; max-height: 70px; overflow-y: auto;">
         <strong style="color: #000;">Dodane do karty:</strong>
@@ -16056,109 +16055,126 @@ try {
     const formRowSelect = document.getElementById('formRowSelect');
     
     // Funkcja nawigacji
-    function navigateToRow(targetIndex, targetButton) {
-        // 1. Zapisz aktualnie edytowany wiersz (użyjemy Twojej istniejącej logiki autozapisu)
-        const prevIdx = parseInt(formRowSelect.dataset.prevIndex, 10);
-        if (!isNaN(prevIdx)) {
-            if (typeof saveRow === 'function') {
-                saveRow(prevIdx);
-            }
-        }
+ /* Plik: index.html (zastąp całą funkcję navigateToRow, ok. linii 5136) */
 
-        // 2. Ustaw odpowiedni indeks w liście rozwijanej i odśwież formularz
-        formRowSelect.value = targetIndex; 
-        if (typeof selectRowInForm === 'function') {
-            selectRowInForm(targetIndex);
-        }
-        
-        // 3. Ustaw nowy 'prevIndex' dla kolejnego autozapisu
-        formRowSelect.dataset.prevIndex = targetIndex;
+/**
+ * Przenosi widok na wybrany wiersz i podświetla przycisk nawigacji.
+ */
+function navigateToRow(targetIndex) { // Usuwamy 'targetButton' z argumentów, jest niepotrzebny
+    // 1. Zapisz aktualnie edytowany wiersz
+    const prevIdx = parseInt(formRowSelect.dataset.prevIndex, 10);
+    if (!isNaN(prevIdx)) {
+        if (typeof saveRow === 'function') {
+            saveRow(prevIdx);
+        }
+    }
 
-        // 4. Zaktualizuj stan wizualny przycisków
-        // Resetujemy wszystkie przyciski (oprócz aktywnego) do stanu 'ghost'
-        navDanePodstawowe.classList.remove('ghost');
-        navLeczenieNaMiejscu.classList.remove('ghost');
-        navProduktyPozostawione.classList.remove('ghost');
-        navPodsumowanie.classList.remove('ghost');
+    // 2. Ustaw odpowiedni indeks w liście rozwijanej i odśwież formularz
+    formRowSelect.value = targetIndex;
+    if (typeof selectRowInForm === 'function') {
+        selectRowInForm(targetIndex);
+    }
 
-        // Ustaw stan 'ghost' na NIEAKTYWNYCH przyciskach grupy "wierszy"
-        if (targetIndex >= 0 && targetIndex <= 8) { // Leczenie
-            navProduktyPozostawione.classList.add('ghost');
-        } else if (targetIndex >= 9 && targetIndex <= 11) { // Pozostawione
-            navLeczenieNaMiejscu.classList.add('ghost');
-        } else {
-            // Przy innych indeksach - nic nie rób
-        }
-        
-        showToast(`Przeniesiono do wiersza nr ${targetIndex + 1}.`, 'info');
-    }
-    
-    // Listener 1: Dane Podstawowe (powrót do KROKU 1)
-    if (navDanePodstawowe) {
-        navDanePodstawowe.addEventListener('click', () => {
-            // 1. Zapisz aktualnie edytowany wiersz
-            const prevIdx = parseInt(formRowSelect.dataset.prevIndex, 10);
-            if (!isNaN(prevIdx) && typeof saveRow === 'function') {
-                saveRow(prevIdx);
-            }
-            // 2. Przejdź do kroku 1 (Nagłówek)
-            if (typeof showStep === 'function') {
-                showStep(1);
-            }
-            showToast('Przeniesiono do Danych Podstawowych.', 'info');
-        });
-    }
+    // 3. Ustaw nowy 'prevIndex' dla kolejnego autozapisu
+    formRowSelect.dataset.prevIndex = targetIndex;
 
-    // Listener 2: Leczenie na miejscu (Wiersz 1) - Index 0
-    if (navLeczenieNaMiejscu) {
-        navLeczenieNaMiejscu.addEventListener('click', () => {
-            navigateToRow(0, navProduktyPozostawione); // 0 to index pierwszego wiersza
-        });
-    }
+    // 4. Zaktualizuj stan wizualny przycisków (Nowa logika)
+    navLeczenieNaMiejscu.classList.remove('active-nav-btn');
+    navProduktyPozostawione.classList.remove('active-nav-btn');
+    navDanePodstawowe.classList.remove('active-nav-btn');
+    navPodsumowanie.classList.remove('active-nav-btn');
 
-    // Listener 3: Produkty pozostawione (Wiersz 10) - Index 9
-    if (navProduktyPozostawione) {
-        navProduktyPozostawione.addEventListener('click', () => {
-            navigateToRow(9, navLeczenieNaMiejscu); // 9 to index dziesiątego wiersza
-        });
-    }
-    
-  // Listener 4: Podsumowanie (teraz przenosi do Kroku 3)
-if (navPodsumowanie) {
-    navPodsumowanie.addEventListener('click', () => {
-        // 1. Zapisz aktualnie edytowany wiersz (użyjemy Kroku 2)
+    if (targetIndex >= 0 && targetIndex <= 8) { // Leczenie na miejscu
+        navLeczenieNaMiejscu.classList.add('active-nav-btn');
+    } else if (targetIndex >= 9 && targetIndex <= 11) { // Produkty pozostawione
+        navProduktyPozostawione.classList.add('active-nav-btn');
+    }
+
+    showToast(`Przeniesiono do wiersza nr ${targetIndex + 1}.`, 'info');
+}
+
+
+// Nadpiszmy listenery z sekcji 2 (ponownie) i dodajmy nową logikę podświetlenia
+// Wymaga to przejęcia kontroli nad logiką przełączania kroków!
+
+// Listener 1: Dane Podstawowe (powrót do KROKU 1)
+if (navDanePodstawowe) {
+    navDanePodstawowe.addEventListener('click', () => {
         const prevIdx = parseInt(formRowSelect.dataset.prevIndex, 10);
         if (!isNaN(prevIdx) && typeof saveRow === 'function') {
             saveRow(prevIdx);
         }
-        // 2. Przejdź do Kroku 3 (Podsumowanie)
         if (typeof showStep === 'function') {
-            showStep(3); // ⬅️ Upewnij się, że to jest "3"
+            showStep(1); // Przejdź do kroku 1
         }
-        // 3. Odśwież zawartość (jeśli funkcja istnieje)
+        navDanePodstawowe.classList.add('active-nav-btn');
+        navLeczenieNaMiejscu.classList.remove('active-nav-btn');
+        navProduktyPozostawione.classList.remove('active-nav-btn');
+        navPodsumowanie.classList.remove('active-nav-btn');
+        showToast('Przeniesiono do Danych Podstawowych.', 'info');
+    });
+}
+
+// Listener 2: Leczenie na miejscu (Wiersz 1) - Index 0
+if (navLeczenieNaMiejscu) {
+    navLeczenieNaMiejscu.addEventListener('click', () => {
+        navigateToRow(0); 
+        navPodsumowanie.classList.remove('active-nav-btn'); // Wyczyść podsumowanie
+        navDanePodstawowe.classList.remove('active-nav-btn'); // Wyczyść dane podstawowe
+    });
+}
+
+// Listener 3: Produkty pozostawione (Wiersz 10) - Index 9
+if (navProduktyPozostawione) {
+    navProduktyPozostawione.addEventListener('click', () => {
+        navigateToRow(9);
+        navPodsumowanie.classList.remove('active-nav-btn');
+        navDanePodstawowe.classList.remove('active-nav-btn');
+    });
+}
+
+// Listener 4: Podsumowanie (teraz przenosi do Kroku 3)
+if (navPodsumowanie) {
+    navPodsumowanie.addEventListener('click', () => {
+        const prevIdx = parseInt(formRowSelect.dataset.prevIndex, 10);
+        if (!isNaN(prevIdx) && typeof saveRow === 'function') {
+            saveRow(prevIdx);
+        }
+        if (typeof showStep === 'function') {
+            showStep(3);
+        }
         if (typeof updateFormPodsumowanie === 'function') {
             updateFormPodsumowanie();
         }
-        
+        navPodsumowanie.classList.add('active-nav-btn'); // Aktywuj ten
+        navLeczenieNaMiejscu.classList.remove('active-nav-btn');
+        navProduktyPozostawione.classList.remove('active-nav-btn');
+        navDanePodstawowe.classList.remove('active-nav-btn');
         showToast('Przeniesiono do Podsumowania.', 'info');
     });
 }
 
-    // Korekta wizualna przy inicjalizacji / zmianie
-    if (formRowSelect) {
-        formRowSelect.addEventListener('change', (e) => {
-             const currentIndex = parseInt(e.target.value, 10);
-             // Zaktualizuj tylko przyciski Leczenie/Produkty
-             if (currentIndex >= 0 && currentIndex <= 8) {
-                 navLeczenieNaMiejscu.classList.remove('ghost');
-                 navProduktyPozostawione.classList.add('ghost');
-             } else if (currentIndex >= 9 && currentIndex <= 11) {
-                 navLeczenieNaMiejscu.classList.add('ghost');
-                 navProduktyPozostawione.classList.remove('ghost');
-             }
-             // Inne przyciski (Dane Podstawowe / Podsumowanie) pozostają aktywne
-        });
-    }
+
+// Korekta wizualna PRZY ZMIANIE WYBORU W SELECT
+if (formRowSelect) {
+    formRowSelect.addEventListener('change', (e) => {
+        // ... (Tu możesz pozostawić starą logikę, która była w tym bloku)
+        // Domyślnie używa Twojej starej logiki (która jest na końcu bloku)
+
+        // Dodajemy logikę podświetlenia, gdy użytkownik ręcznie wybierze wiersz
+        const currentIndex = parseInt(e.target.value, 10);
+        navPodsumowanie.classList.remove('active-nav-btn');
+        navDanePodstawowe.classList.remove('active-nav-btn');
+
+        if (currentIndex >= 0 && currentIndex <= 8) {
+            navLeczenieNaMiejscu.classList.add('active-nav-btn');
+            navProduktyPozostawione.classList.remove('active-nav-btn');
+        } else if (currentIndex >= 9 && currentIndex <= 11) {
+            navLeczenieNaMiejscu.classList.remove('active-nav-btn');
+            navProduktyPozostawione.classList.add('active-nav-btn');
+        }
+    });
+}
     
 } catch (err) {
     console.error("Błąd inicjalizacji nawigacji w formularzu:", err);
