@@ -13404,30 +13404,32 @@ function checkSchemaFit(schema, startingIndex) {
 /* ⬇️ ⬇️ ⬇️ WKLEJ TEN BLOK (zastępuje starą funkcję applySchema) ⬇️ ⬇️ ⬇️ */
 /* ======================================================== */
 /* ✅ ZAKTUALIZOWANA LOGIKA applySchema (Moduł 4.2)       */
-/* Naprawia błąd rozpoznania ORAZ błąd pustego wiersza. */
-/* ======================================================== */
+/**
+ * ZAKTUALIZOWANA LOGIKA applySchema (Moduł 4.2)
+ * NAPRAWIONY BŁĄD: Zapobiega czyszczeniu pól Opis i Liczba w wierszu kontrolującym schemat.
+ */
 function applySchema(event) {
     const input = event.target;
-    // Zapiszmy oryginalną nazwę schematu (np. "Mastitis"), a nie tylko małe litery
+    // Zapiszmy oryginalną nazwę schematu
     const oryginalnaNazwaRozpoznania = input.value.trim();
     const rozpoznanieKey = oryginalnaNazwaRozpoznania.toLowerCase();
 
     // 1. Sprawdź checkbox
     if (!schemaCheckbox || !schemaCheckbox.checked) {
-        return; 
+        return;
     }
 
     // 2. Znajdź schemat
     const schema = cachedSchemaMap.get(rozpoznanieKey);
     if (!schema) {
-        return; 
+        return;
     }
 
     console.log("Znaleziono pasujący schemat:", schema.rozpoznanie);
     const logicalRows = rowsEditable();
     if (logicalRows.length === 0) return;
 
-    // --- NOWA LOGIKA WYSZUKIWANIA MIEJSCA (FIX 3.0) ---
+    // --- LOGIKA WYSZUKIWANIA MIEJSCA ---
 
     // 3. Ustal, od którego wiersza zacząć szukanie
     let currentIndex = 0;
@@ -13441,41 +13443,37 @@ function applySchema(event) {
     }
     if (currentIndex === -1) currentIndex = 0;
 
-    // 4. Znajdź następny dostępny "slot"
+    // 4. Znajdź następny dostępny "slot" (Bez zmian)
     let actualStartingIndex = -1;
-    
+
     // Pętla szuka pierwszego wolnego wiersza 'i', który może być początkiem schematu
     for (let i = currentIndex; i < logicalRows.length; i++) {
-        
         // A. Sprawdź, czy sam wiersz 'i' jest pusty
-        // Wyjątek: jeśli 'i' to wiersz, w którym piszemy, pozwól mu być "niepustym" (bo ma rozpoznanie)
         if (i === currentIndex || isRowEmpty(logicalRows[i])) {
-            
+
             // B. Sprawdź, czy wszystkie wiersze docelowe DLA TEGO SCHEMATU są wolne
             let canFit = true;
             for (const p of schema.produkty) {
                 const targetIndex = i + p.wierszDocelowy;
-                
+
                 // Sprawdź granice tabeli
                 if (targetIndex >= logicalRows.length) {
                     canFit = false;
                     break; // Schemat wychodzi poza tabelę
                 }
-                
+
                 // Sprawdź, czy wiersz docelowy jest pusty
-                // Wyjątek: jeśli wiersz docelowy to 'i' (wiersz startowy), to jest OK
                 if (targetIndex !== i && !isRowEmpty(logicalRows[targetIndex])) {
                     canFit = false;
                     break; // Wiersz docelowy (np. "Pozostawione 1") jest już zajęty
                 }
             }
-            
+
             // Jeśli 'canFit' jest nadal true, znaleźliśmy idealne miejsce!
             if (canFit) {
                 actualStartingIndex = i;
                 break; // Przerwij pętlę szukania 'i'
             }
-            // Jeśli 'canFit' jest false, pętla 'i' idzie dalej i sprawdza następny wiersz
         }
     }
 
@@ -13485,15 +13483,15 @@ function applySchema(event) {
         input.value = ''; // Wyczyść pole
         return;
     }
-// --- POPRAWIONA LOGIKA (v2): Pobranie Mnożnika i podpięcie listenera ---
-    
+    // --- POPRAWIONA LOGIKA (v2): Pobranie Mnożnika i podpięcie listenera ---
+
     // 1. Znajdź wiersz KONTROLUJĄCY (ten, w którym wpisano rozpoznanie)
     const controllerRow = logicalRows[currentIndex];
     if (!controllerRow) {
         console.error("Błąd krytyczny: Nie można znaleźć wiersza kontrolującego schemat.");
         return;
     }
-    
+
     const liczbaInput = controllerRow.cells[2].querySelector('input[type="number"]');
     let liczbaZwierzaDlaSchematu = 1; // Domyślnie 1
 
@@ -13505,14 +13503,14 @@ function applySchema(event) {
         }
     }
     console.log(`Mnożnik schematu (liczba zwierząt): ${liczbaZwierzaDlaSchematu}`);
-    
+
     // 3. Nadaj unikalne ID polu "Liczba" (na podstawie wiersza, w którym jest)
     const liczbaInputId = 'liczba-zwierzat-' + currentIndex; // Użyj 'currentIndex'
     if (liczbaInput) {
         liczbaInput.id = liczbaInputId;
-        
+
         // 4. Podepnij listener do WŁAŚCIWEGO pola "Liczba"
-        liczbaInput.removeEventListener('input', handleLiczbaChange); 
+        liczbaInput.removeEventListener('input', handleLiczbaChange);
         liczbaInput.addEventListener('input', handleLiczbaChange);
         console.log(`Podpięto listener 'handleLiczbaChange' do ${liczbaInputId}`);
     }
@@ -13520,50 +13518,66 @@ function applySchema(event) {
     // --- KONIEC LOGIKI WYSZUKIWANIA MIEJSCA ---
 
 
- // 6. Wypełnij pole Rozpoznanie (NOWA, INTELIGENTNA LOGIKA)
-    
-// Znajdź pierwszy wiersz "Leczenie" (0-8), którego wymaga schemat
-const firstLeczenieProduct = schema.produkty
-    .filter(p => p.wierszDocelowy < 9)
-    .sort((a, b) => a.wierszDocelowy - b.wierszDocelowy)[0];
+    // 6. Wypełnij pole Rozpoznanie (NOWA, INTELIGENTNA LOGIKA)
 
-// Znajdź pierwszy wiersz "Pozostawione" (9-11), którego wymaga schemat
-const firstPozostawioneProduct = schema.produkty
-    .filter(p => p.wierszDocelowy >= 9)
-    .sort((a, b) => a.wierszDocelowy - b.wierszDocelowy)[0];
+    // Znajdź pierwszy wiersz "Leczenie" (0-8), którego wymaga schemat
+    const firstLeczenieProduct = schema.produkty
+        .filter(p => p.wierszDocelowy < 9)
+        .sort((a, b) => a.wierszDocelowy - b.wierszDocelowy)[0];
 
-// A. Wpisz diagnozę w wierszu "Leczenie"
-if (firstLeczenieProduct) {
-    // Jeśli schemat używa wierszy "Leczenie", wpisz diagnozę w pierwszym z nich.
-    const targetIndex = actualStartingIndex + firstLeczenieProduct.wierszDocelowy;
-    if (targetIndex < logicalRows.length) {
-        const diagInput = logicalRows[targetIndex].cells[3].querySelector('input');
+    // Znajdź pierwszy wiersz "Pozostawione" (9-11), którego wymaga schemat
+    const firstPozostawioneProduct = schema.produkty
+        .filter(p => p.wierszDocelowy >= 9)
+        .sort((a, b) => a.wierszDocelowy - b.wierszDocelowy)[0];
+
+    // **********************************************
+    // ************ P O P R A W K A *****************
+    // **********************************************
+
+    // Wiersz kontrolujący to ten, w którym piszemy (controllerRow / currentIndex)
+
+    // A. Wpisz diagnozę w wierszu Leczenie (jeśli go używasz jako startowego)
+    if (firstLeczenieProduct) {
+        // Jeśli schemat używa wierszy "Leczenie", wpisz diagnozę w pierwszym z nich.
+        const targetIndex = actualStartingIndex + firstLeczenieProduct.wierszDocelowy;
+        if (targetIndex < logicalRows.length) {
+            const diagInput = logicalRows[targetIndex].cells[3].querySelector('input');
+            if (diagInput) {
+                diagInput.value = schema.rozpoznanie;
+            }
+        }
+    } else {
+        // Jeśli schemat NIE MA wierszy "Leczenie" (jest tylko dla "Pozostawione"),
+        // usuwamy tylko rozpoznanie w tym wierszu, jeśli nie jest wierszem startowym
+        const diagInput = controllerRow.cells[3].querySelector('input');
         if (diagInput) {
-            diagInput.value = schema.rozpoznanie;
+            // FIX: Pozwól diagnozie pozostać w wierszu, w którym wpisano schemat,
+            // nawet jeśli nie jest wierszem docelowym dla produktów.
+            // Błąd polegał na czyszczeniu diagnozy, gdy schemat trafiał do wierszy "Pozostawione".
+            // Nie ruszamy go, bo użytkownik już go wpisał.
         }
     }
-} else {
-    // FIX 2: Jeśli schemat NIE MA wierszy "Leczenie" (jest tylko dla "Pozostawione"),
-    // NIE wpisuj diagnozy w wierszu `actualStartingIndex` (np. 0 lub 1).
-    // To zapobiega "brudzeniu" wierszy Leczenie i rozwiązuje problem z pustym wierszem.
-    console.log("Schemat tylko dla 'Pozostawione'. Pomijanie diagnozy w wierszu 'Leczenie'.");
-}
 
-// B. Wpisz diagnozę w wierszu "Pozostawione" (FIX 1)
-if (firstPozostawioneProduct) {
-    // Jeśli schemat używa wierszy "Pozostawione", wpisz diagnozę w pierwszym z nich.
-    const targetIndex = actualStartingIndex + firstPozostawioneProduct.wierszDocelowy;
-    if (targetIndex < logicalRows.length) {
-        const diagInput = logicalRows[targetIndex].cells[3].querySelector('input');
-        if (diagInput) {
-            diagInput.value = schema.rozpoznanie;
+
+    // B. Wpisz diagnozę w wierszu "Pozostawione"
+    if (firstPozostawioneProduct) {
+        // Jeśli schemat używa wierszy "Pozostawione", wpisz diagnozę w pierwszym z nich.
+        const targetIndex = actualStartingIndex + firstPozostawioneProduct.wierszDocelowy;
+        if (targetIndex < logicalRows.length) {
+            const diagInput = logicalRows[targetIndex].cells[3].querySelector('input');
+            if (diagInput) {
+                diagInput.value = schema.rozpoznanie;
+            }
         }
     }
-}
 
-    // 7. Wypełnij wiersze produktów
+    // **********************************************
+    // ********** KONIEC POPRAWKI *******************
+    // **********************************************
+
+    // 7. Wypełnij wiersze produktów (BEZ ZMIAN)
     schema.produkty.forEach(p => {
-        const targetRowIndex = actualStartingIndex + p.wierszDocelowy; 
+        const targetRowIndex = actualStartingIndex + p.wierszDocelowy;
 
         if (targetRowIndex >= 0 && targetRowIndex < logicalRows.length) {
             const row = logicalRows[targetRowIndex];
@@ -13571,64 +13585,63 @@ if (firstPozostawioneProduct) {
                 const produktInput = row.cells[4].querySelector('input');
 
                 produktInput.value = p.produkt;
-                produktInput.dispatchEvent(new Event('input', { bubbles: true })); 
-                
-               const iloscInput = row.cells[6].querySelector('input[type="number"]');
+                produktInput.dispatchEvent(new Event('input', { bubbles: true }));
 
-            row.cells[5].textContent = p.seria || '';  
-            
-            // --- START ZMODYFIKOWANEJ LOGIKI (Mnożenie ilości) ---
+                const iloscInput = row.cells[6].querySelector('input[type="number"]');
 
-            // 1. Pobierz ilość ze schematu (obsługuje "0.5" i "0,5")
-            let schemaIlosc = 0;
-            if (p.ilosc && String(p.ilosc).trim() !== '') {
-                const parsedSchemaIlosc = parseFloat(String(p.ilosc).replace(',', '.')); 
-                if (!isNaN(parsedSchemaIlosc)) {
-                    schemaIlosc = parsedSchemaIlosc;
+                row.cells[5].textContent = p.seria || '';
+
+                // --- START ZMODYFIKOWANEJ LOGIKI (Mnożenie ilości) ---
+
+                // 1. Pobierz ilość ze schematu (obsługuje "0.5" i "0,5")
+                let schemaIlosc = 0;
+                if (p.ilosc && String(p.ilosc).trim() !== '') {
+                    const parsedSchemaIlosc = parseFloat(String(p.ilosc).replace(',', '.'));
+                    if (!isNaN(parsedSchemaIlosc)) {
+                        schemaIlosc = parsedSchemaIlosc;
+                    }
                 }
-            }
 
-            // 2. Oblicz końcową ilość (Ilość * Liczba Zwierząt)
-            const finalIlosc = schemaIlosc * liczbaZwierzaDlaSchematu;
+                // 2. Oblicz końcową ilość (Ilość * Liczba Zwierząt)
+                const finalIlosc = schemaIlosc * liczbaZwierzaDlaSchematu;
 
- // 3. Wstaw obliczoną wartość do pola i OTAGUJ POLE
-            if (iloscInput) {
-                let finalValue = finalIlosc;
-                
-                if (finalIlosc % 1 !== 0) {
-                    finalValue = finalIlosc.toFixed(2);
+                // 3. Wstaw obliczoną wartość do pola i OTAGUJ POLE
+                if (iloscInput) {
+                    let finalValue = finalIlosc;
+
+                    if (finalIlosc % 1 !== 0) {
+                        finalValue = finalIlosc.toFixed(2);
+                    }
+
+                    iloscInput.value = finalValue > 0 ? String(finalValue) : '';
+
+                    // --- START TAGOWANIA ---
+                    // Zapisz w polu "Ilość", jaka jest jego bazowa ilość na 1 szt.
+                    iloscInput.dataset.schemaBaseQty = String(schemaIlosc);
+
+                    // Zapisz w polu "Ilość", które pole "Liczba" je kontroluje
+                    iloscInput.dataset.schemaControllerId = liczbaInputId;
+
+                    // Dodaj listener, który zerwie to połączenie, jeśli użytkownik zacznie pisać
+                    iloscInput.removeEventListener('keydown', handleIloscOverride);
+                    iloscInput.addEventListener('keydown', handleIloscOverride);
+                    // --- KONIEC TAGOWANIA ---
+
+                } else {
+                    console.warn("Nie znaleziono pola input ilości w wierszu " + targetRowIndex);
                 }
-                
-                iloscInput.value = finalValue > 0 ? String(finalValue) : ''; 
 
-                // --- START TAGOWANIA ---
-                // Zapisz w polu "Ilość", jaka jest jego bazowa ilość na 1 szt.
-                iloscInput.dataset.schemaBaseQty = String(schemaIlosc);
-                
-                // Zapisz w polu "Ilość", które pole "Liczba" je kontroluje
-                iloscInput.dataset.schemaControllerId = liczbaInputId;
-                
-                // Dodaj listener, który zerwie to połączenie, jeśli użytkownik zacznie pisać
-                // Używamy "keydown", aby odpalił się ZANIM "input" (co pozwala nam odróżnić wpisanie ręczne od programistycznego)
-                iloscInput.removeEventListener('keydown', handleIloscOverride);
-                iloscInput.addEventListener('keydown', handleIloscOverride);
-                // --- KONIEC TAGOWANIA ---
+                // --- KONIEC ZMODYFIKOWANEJ LOGIKI ---
 
-            } else {
-                console.warn("Nie znaleziono pola input ilości w wierszu " + targetRowIndex);
-            }
-            
-            // --- KONIEC ZMODYFIKOWANEJ LOGIKI ---
-                
                 const dawkaText = p.dawkowanie || '';
-                const textNode = row.cells[6].childNodes[1]; 
+                const textNode = row.cells[6].childNodes[1];
                 if (textNode && textNode.nodeType === Node.TEXT_NODE) {
                     textNode.textContent = ' ' + dawkaText;
                 } else if (dawkaText) {
                     row.cells[6].appendChild(document.createTextNode(' ' + dawkaText));
                 }
-                
-                row.cells[7].textContent = p.karencja || ''; 
+
+                row.cells[7].textContent = p.karencja || '';
                 row.cells[4].dataset.printValue = p.produkt;
 
                 row.classList.add('highlight-row');
@@ -13645,19 +13658,19 @@ if (firstPozostawioneProduct) {
         // --- POPRAWKA BŁĘDU 1 (Race Condition) ---
         setTimeout(() => {
             // Odśwież widok formularza do wiersza, w którym wstawiono schemat
-            selectRowInForm(actualStartingIndex); 
+            selectRowInForm(actualStartingIndex);
             input.value = ''; // Wyczyść input formularza DOPIERO TERAZ
         }, 0);
         // --- KONIEC POPRAWKI ---
     } else {
-         // Jesteśmy w tabeli. Jeśli wstawiliśmy schemat do TEGO SAMEGO wiersza,
-         // w którym pisaliśmy (bo był pusty), nie czyść pola (bo zawiera już nazwę).
-         // Jeśli wstawiliśmy NIŻEJ (bo był zajęty), wyczyść pole, w którym pisaliśmy.
-         if (actualStartingIndex !== currentIndex) {
-             input.value = ''; // Wyczyść pole wyzwalacza, bo wstawiliśmy schemat gdzie indziej
-         }
+        // Jesteśmy w tabeli. Jeśli wstawiliśmy schemat do TEGO SAMEGO wiersza,
+        // w którym pisaliśmy (bo był pusty), nie czyść pola (bo zawiera już nazwę).
+        // Jeśli wstawiliśmy NIŻEJ (bo był zajęty), wyczyść pole, w którym pisaliśmy.
+        if (actualStartingIndex !== currentIndex) {
+            input.value = ''; // Wyczyść pole wyzwalacza, bo wstawiliśmy schemat gdzie indziej
+        }
     }
-    
+
     showToast(`Zastosowano schemat: ${schema.rozpoznanie}`, 'success');
 }
 
