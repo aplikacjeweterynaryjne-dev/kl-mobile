@@ -13694,28 +13694,41 @@ function applySchema(event) {
 
  /* Plik: index.html (ZASTĄP fragment wewnątrz applySchema, ok. linii 6125) */
 
+ /* Plik: index.html (ZASTĄP fragment wewnątrz applySchema, ok. linii 6125) */
+
     // 8. Odśwież formularz (jeśli był używany)
     if (inFormModal) {
-        // Skopiuj Nazwę Schematu z inputa formularza do właściwego wiersza w tabeli
-        // (Wiersz kontrolujący to ten, w którym pisano - currentIndex)
-        // Zapobiega to utracie Nazwy Schematu przed przejściem do selectRowInForm(actualStartingIndex).
-        const diagInput = logicalRows[currentIndex].cells[3].querySelector('input');
-        if (diagInput) {
-            diagInput.value = input.value; // Wstaw Nazwę Schematu do tabeli
-        }
+        // **********************************************
+        // ******* KLUCZOWA POPRAWKA: RĘCZNY ZAPIS OPISU I LICZBY *
+        // **********************************************
         
+        // Zapisz wartości Opis, Liczba i Rozpoznanie z formularza modalnego 
+        // do wiersza w tabeli, ZANIM odświeżymy formularz (co wyczyści pola).
+        
+        const currentRow = logicalRows[currentIndex];
+        
+        // 1. Nazwa siedziby stada i opis zwierzęcia (Kolumna 2 / cells[1])
+        currentRow.cells[1].textContent = document.getElementById('formOpis').value; 
+        
+        // 2. Liczba leczonych zwierząt (Kolumna 3 / cells[2] -> input)
+        const inpLiczba = currentRow.cells[2].querySelector('input');
+        if (inpLiczba) inpLiczba.value = document.getElementById('formLiczba').value;
+
+        // 3. Rozpoznanie (Kolumna 4 / cells[3] -> input)
+        const inpRozpoznanie = currentRow.cells[3].querySelector('input');
+        if (inpRozpoznanie) inpRozpoznanie.value = input.value; // input.value to nazwa schematu
+
+        // Teraz, gdy dane są zapisane w tabeli, bezpiecznie odświeżamy formularz:
         setTimeout(() => {
-            // Odśwież widok formularza do wiersza, w którym wstawiono schemat
-            // selectRowInForm() użyje teraz wartości wpisanej w linii powyżej.
-            selectRowInForm(currentIndex); // <--- ZATRZYMAJ NA WŁAŚCIWYM WIESZE
+            selectRowInForm(currentIndex); 
+            // selectRowInForm odczyta teraz zapisane wartości z tabeli.
         }, 0);
         
-        // Zostawiamy input.value, aby utrzymać stan w polu.
+        // **********************************************
+        // ******* KONIEC POPRAWKI *******************
+        // **********************************************
     } else {
-        // W trybie tabeli: upewniamy się, że w wierszu startowym zostaje rozpoznanie,
-        // a reszta wierszy (gdzie wstawiono produkty) będzie miała je skopiowane przez logikę.
-        // Nie czyscimy inputa, bo zawiera poprawną nazwę schematu.
-        
+        // W trybie tabeli (BEZ ZMIAN)
         // Wymuś załadowanie wartości wiersza startowego do formularza, aby zaktualizować podgląd
         const formRowSelect = document.getElementById('formRowSelect');
         if(formRowSelect) {
@@ -13724,7 +13737,7 @@ function applySchema(event) {
             formRowSelect.dispatchEvent(new Event('change'));
         }
     }
-
+    
     showToast(`Zastosowano schemat: ${schema.rozpoznanie}`, 'success');
 }
 
