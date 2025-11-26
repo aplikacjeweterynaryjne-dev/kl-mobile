@@ -4498,9 +4498,11 @@ function updateFormLivePreview() {
 /* ⬆️ KONIEC NOWEJ FUNKCJI ⬆️ */
 
 /* ⬇️ KROK 2A: ZASTĄP CAŁĄ FUNKCJĘ ⬇️ */
+/* Plik: index.html (ZASTĄP CAŁĄ FUNKCJĘ selectRowInForm, ok. linii 5005) */
+
 function selectRowInForm(logicalIndex){
-    updateFormLivePreview();
-    // ⬇️ ⬇️ ⬇️ WKLEJ TEN BLOK KODU ⬇️ ⬇️ ⬇️
+    updateFormLivePreview();
+    // ⬇️ ⬇️ ⬇️ WKLEJ TEN BLOK KODU (Logika pokazywania przycisku "Kopiuj poprzedni") ⬇️ ⬇️ ⬇️
     const formCopyPrevRowBtnContainer = document.getElementById('formCopyPrevRowBtnContainer');
     if (formCopyPrevRowBtnContainer) {
         // Pokaż przycisk tylko dla wierszy 2-9 oraz 11-13
@@ -4513,10 +4515,10 @@ function selectRowInForm(logicalIndex){
     }
     // ⬆️ ⬆️ ⬆️ KONIEC WKLEJANIA ⬆️ ⬆️ ⬆️
     const logical = rowsEditable();
-    const row = logical[logicalIndex];
-    if (!row) return;
+    const row = logical[logicalIndex];
+    if (!row) return;
 
-    // --- LOGIKA "NOWE DANE" (TAK JAK BYŁO) ---
+    // --- LOGIKA "NOWE DANE" (tak jak było) ---
     if (logicalIndex === 0 || logicalIndex === 9) {
         formNoweDaneContainer.style.display = 'none';
         formRowDetailsContainer.style.display = 'block';
@@ -4524,57 +4526,71 @@ function selectRowInForm(logicalIndex){
         formNoweDaneContainer.style.display = 'block';
         formRowDetailsContainer.style.display = 'none';
     }
-    
-    // --- ⬇️ NOWA LOGIKA DLA PRZYCISKU "PRZEPISZ DANE" (Pkt 1) ⬇️ ---
+
+    // --- LOGIKA DLA PRZYCISKU "PRZEPISZ DANE" ---
     const copyBtnContainer = document.getElementById('formCopyBtnContainer');
-    if (logicalIndex === 9) {
-        // Pokaż kontener przycisku tylko w wierszu 10 (indeks 9)
-        copyBtnContainer.style.display = 'block';
-    } else {
-        copyBtnContainer.style.display = 'none';
+    if (copyBtnContainer) { // Dodaj zabezpieczenie na wszelki wypadek
+        if (logicalIndex === 9) {
+            copyBtnContainer.style.display = 'block';
+        } else {
+            copyBtnContainer.style.display = 'none';
+        }
     }
-    // --- ⬆️ KONIEC NOWEJ LOGIKI ⬆️ ---
+    // --- KONIEC LOGIKI ---
 
-    // Wczytaj dane do pól (tak jak było)
-    document.getElementById('formOpis').value = row.cells[1].textContent.trim();
-const inp = row.cells[2].querySelector('input');
-    document.getElementById('formLiczba').value = inp ? inp.value : '';
+    // *******************************************************************
+    // ************ P O P R A W K A: ŁADOWANIE DANYCH PÓL ****************
+    // *******************************************************************
+    
+    // Wczytaj dane do pól (teraz z pewnością, że pobieramy z wiersza)
+    
+    // 1. Nazwa siedziby stada i opis zwierzęcia (Kolumna 2 / cells[1])
+    document.getElementById('formOpis').value = row.cells[1].textContent.trim();
 
-    // ⬇️ POPRAWKA ⬇️
-    const inp3_select = row.cells[3].querySelector('input');
-    document.getElementById('formRozpoznanie').value = inp3_select ? inp3_select.value : '';
+    // 2. Liczba leczonych zwierząt (Kolumna 3 / cells[2])
+    const inpLiczba = row.cells[2].querySelector('input');
+    document.getElementById('formLiczba').value = inpLiczba ? inpLiczba.value : '';
 
-    const lekInput = row.cells[4].querySelector('input');
-    document.getElementById('formLek').value = lekInput ? lekInput.value : ''; 
-    document.getElementById('formSeria').value = row.cells[5].textContent.trim();
-    
-    const cell6 = row.cells[6];
-    const iloscInput = cell6.querySelector('input[type="number"]');
-    document.getElementById('formIlosc').value = iloscInput ? iloscInput.value : '';
-    let tekstDawkowania = '';
-    if (cell6.childNodes.length > 1 && cell6.childNodes[1].nodeType === Node.TEXT_NODE) {
-        tekstDawkowania = cell6.childNodes[1].textContent.trim();
-    }
-    document.getElementById('formDawkowanie').value = tekstDawkowania;
-    document.getElementById('formKarencja').value = row.cells[7].textContent.trim();
-    
+    // 3. Rozpoznanie (Kolumna 4 / cells[3])
+    const inpRozpoznanie = row.cells[3].querySelector('input');
+    document.getElementById('formRozpoznanie').value = inpRozpoznanie ? inpRozpoznanie.value : '';
+    
+    // *******************************************************************
+    // ************ K O N I E C P O P R A W K I **************************
+    // *******************************************************************
+
+    // 4. Pozostałe pola (Produkty)
+    const lekInput = row.cells[4].querySelector('input');
+    document.getElementById('formLek').value = lekInput ? lekInput.value : '';
+    document.getElementById('formSeria').value = row.cells[5].textContent.trim();
+
+    const cell6 = row.cells[6];
+    const iloscInput = cell6.querySelector('input[type="number"]');
+    document.getElementById('formIlosc').value = iloscInput ? iloscInput.value : '';
+    let tekstDawkowania = '';
+    if (iloscInput && iloscInput.nextSibling && iloscInput.nextSibling.nodeType === Node.TEXT_NODE) {
+        tekstDawkowania = iloscInput.nextSibling.textContent.trim();
+    }
+    document.getElementById('formDawkowanie').value = tekstDawkowania;
+    document.getElementById('formKarencja').value = row.cells[7].textContent.trim();
+
     // Aktualizuj tytuł (tak jak było)
-    const titleEl = document.getElementById('formRowTitle');
-    if (titleEl) {
-        let titleText = '';
-        if (logicalIndex >= 0 && logicalIndex <= 8) {
-            titleText = `Jesteś w wierszu nr ${logicalIndex + 1}`;
-        } else if (logicalIndex === 9) {
-            titleText = 'Jesteś w produktach pozostawionych wiersz nr 1';
-        } else if (logicalIndex === 10) {
-            titleText = 'Jesteś w produktach pozostawionych wiersz nr 2';
-        } else if (logicalIndex === 11) {
-            titleText = 'Jesteś w produktach pozostawionych wiersz nr 3';
-        } else {
-            titleText = `Jesteś w wierszu nr ${logicalIndex + 1}`;
-        }
-        titleEl.textContent = titleText;
-    }
+    const titleEl = document.getElementById('formRowTitle');
+    if (titleEl) {
+        let titleText = '';
+        if (logicalIndex >= 0 && logicalIndex <= 8) {
+            titleText = `Jesteś w wierszu nr ${logicalIndex + 1}`;
+        } else if (logicalIndex === 9) {
+            titleText = 'Jesteś w produktach pozostawionych wiersz nr 1';
+        } else if (logicalIndex === 10) {
+            titleText = 'Jesteś w produktach pozostawionych wiersz nr 2';
+        } else if (logicalIndex === 11) {
+            titleText = 'Jesteś w produktach pozostawionych wiersz nr 3';
+        } else {
+            titleText = `Jesteś w wierszu nr ${logicalIndex + 1}`;
+        }
+        titleEl.textContent = titleText;
+    }
 }
 /* ⬆️ KONIEC ZASTĘPOWANIA ⬆️ */
 /* ---- po wyborze produktu w formularzu automatycznie uzupełnij seria/dawkowanie/karencja ---- */
