@@ -2143,6 +2143,43 @@ table {
     border: none !important;
     background: transparent !important;
 }
+    /* --- Styl dla paska nawigacji w edycji wiersza (ZAKŁADKI: DANE/PRODUKT) --- */
+#form-step-nav-row-edit {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 15px;
+    background: #F7F9F5;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 4px;
+    overflow: hidden;
+}
+
+#form-step-nav-row-edit .step-indicator {
+    flex: 1;
+    text-align: center;
+    padding: 8px 2px;
+    font-size: 16px;
+    color: #777;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+#form-step-nav-row-edit .step-indicator.active {
+    background: #fff;
+    color: #333; /* Użyjemy czerni dla podświetlenia */
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.form-tab {
+    animation: fadeIn 0.3s ease;
+}
+
+.form-tab.active {
+    display: block !important;
+}
 </style>
     <div id="calcProductSearchModal" class="product-search-modal" style="display: none; z-index: 10003;">
     <div class="product-search-card">
@@ -2565,89 +2602,103 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
 <div id="step2" class="form-step">
     <h3 id="formRowTitle" style="color: red; font-size: 25px;">Edycja wierszy tabeli</h3>
     
- <div id="form-step-nav">
-    <button id="navLeczenieNaMiejscu" class="btn small active-nav-btn" data-target-index="0" data-nav-group="leczenie">
-        <span class="nav-icon">📝</span>
-        Na miejscu
-    </button>
-    <button id="navProduktyPozostawione" class="btn small" data-target-index="9" data-nav-group="pozostawione">
-        <span class="nav-icon">📦</span>
-        Pozostawione
-    </button>
+    <div id="form-step-nav-row-edit" class="calc-steps-nav" style="margin-bottom: 15px;">
+        <div class="step-indicator active" data-tab="dane">1. Dane</div>
+        <div class="step-indicator" data-tab="produkt">2. Produkt</div>
+    </div>
 
-    <button id="navPodsumowanie" class="btn small" data-target-step="3">
-        <span class="nav-icon">📊</span>
-        Podsumowanie
-    </button>
-</div>
+    <div id="form-step-nav">
+        <button id="navLeczenieNaMiejscu" class="btn small active-nav-btn" data-target-index="0" data-nav-group="leczenie">
+            <span class="nav-icon">📝</span>
+            Na miejscu
+        </button>
+        <button id="navProduktyPozostawione" class="btn small" data-target-index="9" data-nav-group="pozostawione">
+            <span class="nav-icon">📦</span>
+            Pozostawione
+        </button>
+
+        <button id="navPodsumowanie" class="btn small" data-target-step="3">
+            <span class="nav-icon">📊</span>
+            Podsumowanie
+        </button>
+    </div>
 
     <div id="formLivePreview" style="font-size: 14px; color: #333; background-color: #f4f4f4; border: 1px solid #ddd; border-radius: 6px; padding: 8px; margin-bottom: 12px; max-height: 70px; overflow-y: auto;">
         <strong style="color: #000;">Dodane do karty:</strong>
         <span id="previewProductList">ładowanie...</span>
     </div>
+    
     <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
         <label style="margin:0; font-weight:600;">Wybierz wiersz</label>
         <select id="formRowSelect" style="flex:1; padding:8px; border-radius:6px; border:1px solid #ccc;"></select>
     </div>
-    <div style="margin-bottom: 12px;" id="formCopyPrevRowBtnContainer">
+    
+    <div id="formCopyPrevRowBtnContainer" style="margin-bottom: 12px;">
         <button type="button" id="formCopyPrevRowBtn" class="btn small" style="background-color: #f0f8ff; border-color: #b0c4de; width: 100%; font-weight: 600;">
             Kopiuj dane zwierzęcia z poprzedniego wiersza
         </button>
     </div>
-<div id="formCopyBtnContainer" style="display: none; margin-bottom: 8px; text-align: center;">
+    <div id="formCopyBtnContainer" style="display: none; margin-bottom: 8px; text-align: center;">
     </div>
     <div id="formNoweDaneContainer" style="display: none; margin-bottom: 8px;">
         <button type="button" id="formBtnNoweDane" class="btn primary" style="width: 100%; font-size: 16px; padding: 10px;">+ Nowe Dane</button>
     </div>
     
-    <div id="formRowDetailsContainer" style="display: block;">
-<div class="form-row"><label for="formOpis">Nazwa siedziby stada i opis zwierzęcia</label><input type="text" id="formOpis" placeholder="Opis zwierzęcia"></div>
-<div class="form-row"><label for="formLiczba">Liczba leczonych zwierząt</label><input type="number" id="formLiczba" min="0" placeholder="0"></div>
-<div class="form-row"><label for="formRozpoznanie">Rozpoznanie / wstępne rozpoznanie</label><input type="text" id="formRozpoznanie" list="listaRozpoznan" placeholder="Wpisz lub wybierz schemat..."></div>
-    </div>      
-    <div style="display: flex; align-items: flex-end; gap: 8px; margin-bottom: 8px;">
+    
+    <div id="tabDane" class="form-tab active">
+        <div id="formRowDetailsContainer" style="display: block;">
+            <div class="form-row"><label for="formOpis">Nazwa siedziby stada i opis zwierzęcia</label><input type="text" id="formOpis" placeholder="Opis zwierzęcia"></div>
+            <div class="form-row"><label for="formLiczba">Liczba leczonych zwierząt</label><input type="number" id="formLiczba" min="0" placeholder="0"></div>
+            <div class="form-row"><label for="formRozpoznanie">Rozpoznanie / wstępne rozpoznanie</label><input type="text" id="formRozpoznanie" list="listaRozpoznan" placeholder="Wpisz lub wybierz schemat..."></div>
+        </div>
+    </div>
+    
+    <div id="tabProdukt" class="form-tab" style="display: none;">
+        <div style="display: flex; align-items: flex-end; gap: 8px; margin-bottom: 8px;">
+            <button id="prevRow" class="btn small">◀</button>
+
+            <div class="form-row" style="flex: 1; margin-bottom: 0;">
+                <label for="formLek">Nazwa produktu leczniczego</label>
+                <input list="listaLekow" id="formLek" placeholder="Kliknij, aby wyszukać produkt..." readonly style="cursor: pointer; background: #fff;">
+            </div>
+
+            <button id="nextRow" class="btn small">▶</button>
+        </div>
         
-        <button id="prevRow" class="btn small">◀</button>
-
-        <div class="form-row" style="flex: 1; margin-bottom: 0;">
-        <label for="formLek">Nazwa produktu leczniczego</label>
-            <input list="listaLekow" id="formLek" placeholder="Kliknij, aby wyszukać produkt..." readonly style="cursor: pointer; background: #fff;">
-        </div>
-
-        <button id="nextRow" class="btn small">▶</button>
-    </div>
-
-
-    <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
-        <button id="micBtn" class="" title="Dyktuj nazwę produktu">🎤</button>
-        <small style="color:#666">Naciśnij mikrofon aby dyktować</small>
-    </div>
-
-    <div class="form-row">
-        <label for="formSeria">Numer serii produktu</label>
-        <input type="text" id="formSeria" placeholder="Numer serii">
-    </div>
-    <form id="myForm">
-
-        <div class="form-row">
-            <label>Ilość </label>
-            <input type="number" inputmode="numeric" pattern="[0-9]*" id="formIlosc" placeholder="0" style="width:60px;">
+        <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
+            <button id="micBtn" class="" title="Dyktuj nazwę produktu">🎤</button>
+            <small style="color:#666">Naciśnij mikrofon aby dyktować</small>
         </div>
 
         <div class="form-row">
-            <label>Dawkowanie / jednostka</label>
-            <input type="text" id="formDawkowanie" placeholder="np. 2 ml/kg">
+            <label for="formSeria">Numer serii produktu</label>
+            <input type="text" id="formSeria" placeholder="Numer serii">
         </div>
-    </form>
 
-    <div class="form-row">
-        <label for="formKarencja">Okres karencji / uwagi</label>
-        <div class="mic-container" style="display: flex; gap: 8px; align-items: center;">
-            <input type="text" id="formKarencja" placeholder="Okres karencji / uwagi">
-            <button type="button" id="micKarencja" class="mic-btn" title="Dyktuj" style="flex-shrink: 0;">🎤</button>
+        <div id="product-details-container">
+            <form id="myForm">
+                <div class="form-row">
+                    <label>Ilość</label>
+                    <input type="number" inputmode="numeric" pattern="[0-9]*" id="formIlosc" placeholder="0" style="width:60px;">
+                </div>
+                <div class="form-row" id="dawkowanie-container" style="display: none;">
+                    <label>Dawkowanie / jednostka</label>
+                    <input type="text" id="formDawkowanie" placeholder="np. 2 ml/kg">
+                </div>
+            </form>
+            <div class="form-row" id="karencja-container" style="display: none;">
+                <label for="formKarencja">Okres karencji / uwagi</label>
+                <div class="mic-container" style="display: flex; gap: 8px; align-items: center;">
+                    <input type="text" id="formKarencja" placeholder="Okres karencji / uwagi">
+                    <button type="button" id="micKarencja" class="mic-btn" title="Dyktuj" style="flex-shrink: 0;">🎤</button>
+                </div>
+            </div>
         </div>
     </div>
-
+    
+    <div class="form-actions" style="margin-top:12px; flex-direction: column; gap: 10px; border-top: 1px solid #eee; padding-top: 10px;">
+    </div>
+</div>
   <div class="form-actions" style="margin-top:12px; flex-direction: column; gap: 10px; border-top: 1px solid #eee; padding-top: 10px;">
         <div style="display: flex; gap: 8px; width: 100%;">
             <button type="button" id="formPrevRowBtn" class="btn small" style="flex: 1;">Poprzednia pozycja</button>
@@ -16535,6 +16586,97 @@ function handleFormCancel() {
 // Podpięcie listenerów do nowych przycisków Anuluj (Krok 2 i Krok 3)
 document.getElementById('formCancelStep2Btn')?.addEventListener('click', handleFormCancel);
 document.getElementById('formCancelStep3Btn')?.addEventListener('click', handleFormCancel);
+/* ======================================================== */
+/* ✅ POCZĄTEK: Moduł 3 - Logika zakładek i pól dynamicznych */
+/* ======================================================== */
+
+function setupRowEditTabs() {
+    const tabsContainer = document.getElementById('form-step-nav-row-edit');
+    const tabDane = document.getElementById('tabDane');
+    const tabProdukt = document.getElementById('tabProdukt');
+
+    if (!tabsContainer || !tabDane || !tabProdukt) return;
+
+    // Przełączanie zakładek
+    tabsContainer.querySelectorAll('.step-indicator').forEach(tabBtn => {
+        tabBtn.addEventListener('click', () => {
+            const targetTab = tabBtn.dataset.tab;
+
+            // Zmień aktywne przyciski
+            tabsContainer.querySelectorAll('.step-indicator').forEach(btn => btn.classList.remove('active'));
+            tabBtn.classList.add('active');
+
+            // Pokaż/ukryj zawartość
+            tabDane.style.display = 'none';
+            tabProdukt.style.display = 'none';
+
+            if (targetTab === 'dane') {
+                tabDane.style.display = 'block';
+                document.getElementById('formOpis')?.focus();
+            } else if (targetTab === 'produkt') {
+                tabProdukt.style.display = 'block';
+                document.getElementById('formLek')?.focus();
+            }
+        });
+    });
+
+    // Ustaw domyślnie aktywną pierwszą zakładkę
+    tabsContainer.querySelector('[data-tab="dane"]').classList.add('active');
+    tabProdukt.style.display = 'none';
+
+
+    // --- Logika pól dynamicznych (Karencja / Dawkowanie) ---
+    const iloscInput = document.getElementById('formIlosc');
+    const dawkowanieContainer = document.getElementById('dawkowanie-container');
+    const karencjaContainer = document.getElementById('karencja-container');
+    const formKarencjaInput = document.getElementById('formKarencja'); // Input w form-row z mic-container
+
+    // Funkcja weryfikująca widoczność pól
+    function checkProductDetailsVisibility() {
+        if (!iloscInput || !dawkowanieContainer || !karencjaContainer) return;
+
+        // Czy pole "Ilość" jest wypełnione (różne od zera)
+        const quantity = parseFloat(iloscInput.value) || 0;
+
+        if (quantity > 0) {
+            // Jeśli jest ilość, pokaż pozostałe pola
+            dawkowanieContainer.style.display = 'block';
+            karencjaContainer.style.display = 'block';
+        } else {
+            // Jeśli nie ma ilości, ukryj i zresetuj
+            dawkowanieContainer.style.display = 'none';
+            karencjaContainer.style.display = 'none';
+            
+            // Opcjonalnie: Wyczyść wartości, jeśli są ukryte
+            document.getElementById('formDawkowanie').value = '';
+            formKarencjaInput.value = '';
+        }
+    }
+
+    // Podepnij listener do pola ilości (przy każdej zmianie)
+    if (iloscInput) {
+        iloscInput.addEventListener('input', checkProductDetailsVisibility);
+    }
+    
+    // Dodatkowy listener, aby obsłużyć to, co dzieje się po załadowaniu wiersza
+    // Musimy się upewnić, że pola są widoczne/ukryte po załadowaniu danych wiersza.
+    document.getElementById('formRowSelect')?.addEventListener('change', checkProductDetailsVisibility);
+    
+    // Wymuszenie logiki przy starcie sekcji, gdy jest widoczna
+    // Domyślnie musi to być wywołane raz przy wczytaniu kodu
+    checkProductDetailsVisibility(); 
+}
+
+// Uruchomienie logiki po załadowaniu DOM
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', setupRowEditTabs);
+} else {
+    setupRowEditTabs();
+}
+
+/* ======================================================== */
+/* ✅ KONIEC: Moduł 3 - Logika zakładek i pól dynamicznych */
+/* ======================================================== */
 </script> 
 
 <div id="toastContainer" style="position: fixed; top: 20px; right: 20px; z-index: 20000; display: flex; flex-direction: column; gap: 10px;">
