@@ -2143,6 +2143,15 @@ table {
     border: none !important;
     background: transparent !important;
 }
+    /* --- Styl dla kontenerów zakładek (tabDane / tabProdukt) --- */
+.form-tab-content {
+    display: none; /* Domyślnie ukryj zawartość zakładek */
+    animation: fadeIn 0.3s ease;
+}
+
+.form-tab-content.active-tab {
+    display: block; /* Pokaż aktywną zakładkę */
+}
 </style>
     <div id="calcProductSearchModal" class="product-search-modal" style="display: none; z-index: 10003;">
     <div class="product-search-card">
@@ -2565,90 +2574,103 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
 <div id="step2" class="form-step">
     <h3 id="formRowTitle" style="color: red; font-size: 25px;">Edycja wierszy tabeli</h3>
     
- <div id="form-step-nav">
-    <button id="navLeczenieNaMiejscu" class="btn small active-nav-btn" data-target-index="0" data-nav-group="leczenie">
-        <span class="nav-icon">📝</span>
-        Na miejscu
-    </button>
-    <button id="navProduktyPozostawione" class="btn small" data-target-index="9" data-nav-group="pozostawione">
-        <span class="nav-icon">📦</span>
-        Pozostawione
-    </button>
+    <div id="form-step-nav">
+        <button id="navLeczenieNaMiejscu" class="btn small active-nav-btn" data-target-index="0" data-nav-group="leczenie">
+            <span class="nav-icon">📝</span>
+            Na miejscu
+        </button>
+        <button id="navProduktyPozostawione" class="btn small" data-target-index="9" data-nav-group="pozostawione">
+            <span class="nav-icon">📦</span>
+            Pozostawione
+        </button>
 
-    <button id="navPodsumowanie" class="btn small" data-target-step="3">
-        <span class="nav-icon">📊</span>
-        Podsumowanie
-    </button>
-</div>
-
+        <button id="navPodsumowanie" class="btn small" data-target-step="3">
+            <span class="nav-icon">📊</span>
+            Podsumowanie
+        </button>
+    </div>
+    
     <div id="formLivePreview" style="font-size: 14px; color: #333; background-color: #f4f4f4; border: 1px solid #ddd; border-radius: 6px; padding: 8px; margin-bottom: 12px; max-height: 70px; overflow-y: auto;">
         <strong style="color: #000;">Dodane do karty:</strong>
         <span id="previewProductList">ładowanie...</span>
     </div>
-    <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
+    
+    <div style="display:flex; gap:8px; align-items:center; margin-bottom:15px;">
         <label style="margin:0; font-weight:600;">Wybierz wiersz</label>
         <select id="formRowSelect" style="flex:1; padding:8px; border-radius:6px; border:1px solid #ccc;"></select>
     </div>
-    <div style="margin-bottom: 12px;" id="formCopyPrevRowBtnContainer">
-        <button type="button" id="formCopyPrevRowBtn" class="btn small" style="background-color: #f0f8ff; border-color: #b0c4de; width: 100%; font-weight: 600;">
-            Kopiuj dane zwierzęcia z poprzedniego wiersza
-        </button>
-    </div>
-<div id="formCopyBtnContainer" style="display: none; margin-bottom: 8px; text-align: center;">
-    </div>
-    <div id="formNoweDaneContainer" style="display: none; margin-bottom: 8px;">
-        <button type="button" id="formBtnNoweDane" class="btn primary" style="width: 100%; font-size: 16px; padding: 10px;">+ Nowe Dane</button>
-    </div>
     
-    <div id="formRowDetailsContainer" style="display: block;">
-<div class="form-row"><label for="formOpis">Nazwa siedziby stada i opis zwierzęcia</label><input type="text" id="formOpis" placeholder="Opis zwierzęcia"></div>
-<div class="form-row"><label for="formLiczba">Liczba leczonych zwierząt</label><input type="number" id="formLiczba" min="0" placeholder="0"></div>
-<div class="form-row"><label for="formRozpoznanie">Rozpoznanie / wstępne rozpoznanie</label><input type="text" id="formRozpoznanie" list="listaRozpoznan" placeholder="Wpisz lub wybierz schemat..."></div>
-    </div>      
-    <div style="display: flex; align-items: flex-end; gap: 8px; margin-bottom: 8px;">
+    <div id="rowDetailsTabs" style="border-top: 1px solid #ccc; padding-top: 15px;">
+        <div id="form-tab-buttons" style="display: flex; gap: 8px; margin-bottom: 15px;">
+            <button type="button" id="btnTabDane" class="btn small primary" data-tab="dane">1. Dane</button>
+            <button type="button" id="btnTabProdukt" class="btn small" data-tab="produkt" disabled>2. Produkt</button>
+        </div>
+
+        <div id="tabDane" class="form-tab-content active-tab">
+            
+            <div id="formCopyPrevRowBtnContainer" style="margin-bottom: 12px;">
+                <button type="button" id="formCopyPrevRowBtn" class="btn small" style="background-color: #f0f8ff; border-color: #b0c4de; width: 100%; font-weight: 600;">
+                    Kopiuj dane zwierzęcia z poprzedniego wiersza
+                </button>
+            </div>
+            
+            <div id="formNoweDaneContainer" style="display: none; margin-bottom: 8px;">
+                <button type="button" id="formBtnNoweDane" class="btn primary" style="width: 100%; font-size: 16px; padding: 10px;">+ Nowe Dane</button>
+            </div>
+            
+            <div id="formRowDetailsContainer" style="display: block;">
+                <div class="form-row"><label for="formOpis">Nazwa siedziby stada i opis zwierzęcia</label><input type="text" id="formOpis" placeholder="Opis zwierzęcia"></div>
+                <div class="form-row"><label for="formLiczba">Liczba leczonych zwierząt</label><input type="number" id="formLiczba" min="0" placeholder="0"></div>
+                <div class="form-row"><label for="formRozpoznanie">Rozpoznanie / wstępne rozpoznanie</label><input type="text" id="formRozpoznanie" list="listaRozpoznan" placeholder="Wpisz lub wybierz schemat..."></div>
+            </div>
+        </div>
+
+        <div id="tabProdukt" class="form-tab-content">
+            
+            <div style="display: flex; align-items: flex-end; gap: 8px; margin-bottom: 8px;">
+                <button id="prevRow" class="btn small">◀</button>
+                <div class="form-row" style="flex: 1; margin-bottom: 0;">
+                    <label for="formLek">Nazwa produktu leczniczego</label>
+                    <input list="listaLekow" id="formLek" placeholder="Kliknij, aby wyszukać produkt..." readonly style="cursor: pointer; background: #fff;">
+                </div>
+                <button id="nextRow" class="btn small">▶</button>
+            </div>
+
+            <div style="display:flex; gap:8px; align-items:center; margin-bottom:15px;">
+                <button id="micBtn" class="" title="Dyktuj nazwę produktu">🎤</button>
+                <small style="color:#666">Naciśnij mikrofon aby dyktować</small>
+            </div>
+
+            <div class="form-row">
+                <label for="formSeria">Numer serii produktu</label>
+                <input type="text" id="formSeria" placeholder="Numer serii">
+            </div>
+            
+            <div id="productDetailsContainer" style="display: none;">
+                <form id="myForm">
+                    <div class="form-row">
+                        <label>Ilość</label>
+                        <input type="number" inputmode="numeric" pattern="[0-9]*" id="formIlosc" placeholder="0" style="width:60px;">
+                    </div>
+                    <div class="form-row">
+                        <label>Dawkowanie / jednostka</label>
+                        <input type="text" id="formDawkowanie" placeholder="np. 2 ml/kg">
+                    </div>
+                </form>
+                <div class="form-row">
+                    <label for="formKarencja">Okres karencji / uwagi</label>
+                    <div class="mic-container" style="display: flex; gap: 8px; align-items: center;">
+                        <input type="text" id="formKarencja" placeholder="Okres karencji / uwagi">
+                        <button type="button" id="micKarencja" class="mic-btn" title="Dyktuj" style="flex-shrink: 0;">🎤</button>
+                    </div>
+                </div>
+            </div>
+            <div id="formCopyBtnContainer" style="display: none; margin-bottom: 8px; text-align: center;">
+            </div>
+        </div>
         
-        <button id="prevRow" class="btn small">◀</button>
-
-        <div class="form-row" style="flex: 1; margin-bottom: 0;">
-        <label for="formLek">Nazwa produktu leczniczego</label>
-            <input list="listaLekow" id="formLek" placeholder="Kliknij, aby wyszukać produkt..." readonly style="cursor: pointer; background: #fff;">
-        </div>
-
-        <button id="nextRow" class="btn small">▶</button>
     </div>
-
-
-    <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
-        <button id="micBtn" class="" title="Dyktuj nazwę produktu">🎤</button>
-        <small style="color:#666">Naciśnij mikrofon aby dyktować</small>
-    </div>
-
-    <div class="form-row">
-        <label for="formSeria">Numer serii produktu</label>
-        <input type="text" id="formSeria" placeholder="Numer serii">
-    </div>
-    <form id="myForm">
-
-        <div class="form-row">
-            <label>Ilość </label>
-            <input type="number" inputmode="numeric" pattern="[0-9]*" id="formIlosc" placeholder="0" style="width:60px;">
-        </div>
-
-        <div class="form-row">
-            <label>Dawkowanie / jednostka</label>
-            <input type="text" id="formDawkowanie" placeholder="np. 2 ml/kg">
-        </div>
-    </form>
-
-    <div class="form-row">
-        <label for="formKarencja">Okres karencji / uwagi</label>
-        <div class="mic-container" style="display: flex; gap: 8px; align-items: center;">
-            <input type="text" id="formKarencja" placeholder="Okres karencji / uwagi">
-            <button type="button" id="micKarencja" class="mic-btn" title="Dyktuj" style="flex-shrink: 0;">🎤</button>
-        </div>
-    </div>
-
-  <div class="form-actions" style="margin-top:12px; flex-direction: column; gap: 10px; border-top: 1px solid #eee; padding-top: 10px;">
+    <div class="form-actions" style="margin-top:20px; flex-direction: column; gap: 10px; border-top: 1px solid #eee; padding-top: 10px;">
         <div style="display: flex; gap: 8px; width: 100%;">
             <button type="button" id="formPrevRowBtn" class="btn small" style="flex: 1;">Poprzednia pozycja</button>
             
@@ -4500,6 +4522,8 @@ function updateFormLivePreview() {
 /* ⬇️ KROK 2A: ZASTĄP CAŁĄ FUNKCJĘ ⬇️ */
 /* Plik: index.html (ZASTĄP CAŁĄ FUNKCJĘ selectRowInForm, ok. linii 5005) */
 
+/* Plik: index.html (ZASTĄP CAŁĄ FUNKCJĘ selectRowInForm, ok. linii 5005) */
+
 function selectRowInForm(logicalIndex){
     updateFormLivePreview();
     // ⬇️ ⬇️ ⬇️ WKLEJ TEN BLOK KODU (Logika pokazywania przycisku "Kopiuj poprzedni") ⬇️ ⬇️ ⬇️
@@ -4561,7 +4585,8 @@ function selectRowInForm(logicalIndex){
 
     // 4. Pozostałe pola (Produkty)
     const lekInput = row.cells[4].querySelector('input');
-    document.getElementById('formLek').value = lekInput ? lekInput.value : '';
+    const lekValue = lekInput ? lekInput.value : '';
+    document.getElementById('formLek').value = lekValue;
     document.getElementById('formSeria').value = row.cells[5].textContent.trim();
 
     const cell6 = row.cells[6];
@@ -4573,6 +4598,28 @@ function selectRowInForm(logicalIndex){
     }
     document.getElementById('formDawkowanie').value = tekstDawkowania;
     document.getElementById('formKarencja').value = row.cells[7].textContent.trim();
+
+    // *******************************************************************
+    // ************ ✅ NOWA LOGIKA ZAKŁADEK I WIDOCZNOŚCI *****************
+    // *******************************************************************
+    
+    // 5. Wymuś aktualizację widoczności (Moduł 3.1)
+    if (typeof updateProductTabVisibility === 'function') {
+        updateProductTabVisibility();
+    }
+
+    // 6. Przełącz na zakładkę Dane (lub Produkt, jeśli to nie był wiersz "Nowe Dane" i produkt jest wybrany)
+    const activeTabButton = document.querySelector('#form-tab-buttons .primary');
+    if (activeTabButton && activeTabButton.dataset.tab === 'produkt' && lekValue.trim() !== '' && formNoweDaneContainer.style.display !== 'block') {
+        switchRowTab('produkt'); 
+    } else {
+        switchRowTab('dane'); 
+    }
+    
+    // *******************************************************************
+    // ************ ✅ KONIEC NOWEJ LOGIKI ********************************
+    // *******************************************************************
+
 
     // Aktualizuj tytuł (tak jak było)
     const titleEl = document.getElementById('formRowTitle');
@@ -4593,6 +4640,8 @@ function selectRowInForm(logicalIndex){
     }
 }
 /* ⬆️ KONIEC ZASTĘPOWANIA ⬆️ */
+/* Plik: index.html (ok. linii 5320) */
+
 /* ---- po wyborze produktu w formularzu automatycznie uzupełnij seria/dawkowanie/karencja ---- */
 document.getElementById('formLek').addEventListener('input', function(){
     const n = this.value;
@@ -4600,6 +4649,19 @@ document.getElementById('formLek').addEventListener('input', function(){
     // jeśli dawkowanie ma być w polu 'tekstowym' (zachowujemy format tabeli)
     document.getElementById('formDawkowanie').value = mapaIlosci[n] || '';
     document.getElementById('formKarencja').value = mapaKarencji[n] || '';
+    
+    // ✅ NOWA LINIA: Wymuś aktualizację widoczności (Moduł 3.1)
+    if (typeof updateProductTabVisibility === 'function') {
+        updateProductTabVisibility();
+    }
+    
+    // Jeśli produkt został wybrany, spróbuj ustawić focus na Ilości i przenieś na zakładkę Produkt
+    if (n.trim() !== '') {
+        document.getElementById('formIlosc')?.focus();
+        if (typeof switchRowTab === 'function') {
+            switchRowTab('produkt'); // Przełącz na zakładkę Produkt
+        }
+    }
 });
 
 /* ---- zapis wiersza: zapisuje do logicznego wiersza (nie zmienia struktury tabeli) ---- */
@@ -13968,6 +14030,66 @@ function selectCalcClient(klientName) {
 /* ======================================================== */
 /* ✅ KONIEC: MODUŁ 6 */
 /* ======================================================== */
+    /* ======================================================== */
+/* ✅ MODUŁ 3.1: LOGIKA ZAKŁADEK I WIDOCZNOŚCI PÓL (Krok 2) */
+/* ======================================================== */
+
+const btnTabDane = document.getElementById('btnTabDane');
+const btnTabProdukt = document.getElementById('btnTabProdukt');
+const tabDane = document.getElementById('tabDane');
+const tabProdukt = document.getElementById('tabProdukt');
+// formLek jest już zdefiniowany globalnie
+const productDetailsContainer = document.getElementById('productDetailsContainer');
+
+
+// --- 1. Logika przełączania zakładek (Dane/Produkt) ---
+
+function switchRowTab(tabName) {
+    if (tabName === 'dane') {
+        tabDane.classList.add('active-tab');
+        tabProdukt.classList.remove('active-tab');
+        btnTabDane.classList.add('primary');
+        btnTabProdukt.classList.remove('primary');
+    } else if (tabName === 'produkt') {
+        tabProdukt.classList.add('active-tab');
+        tabDane.classList.remove('active-tab');
+        btnTabProdukt.classList.add('primary');
+        btnTabDane.classList.remove('primary');
+    }
+}
+
+// Podpięcie przycisków
+if (btnTabDane && btnTabProdukt) {
+    btnTabDane.addEventListener('click', () => switchRowTab('dane'));
+    btnTabProdukt.addEventListener('click', () => switchRowTab('produkt'));
+}
+
+
+// --- 2. Logika widoczności pól w zakładce "Produkt" ---
+// Wywołuje się przy każdym wpisie/wyborze produktu
+
+function updateProductTabVisibility() {
+    // 1. Sprawdź, czy pole Nazwa Produktu jest puste
+    const hasProduct = formLek.value.trim() !== '';
+
+    if (hasProduct) {
+        // Produkt WYBRANY: Pokaż detale
+        productDetailsContainer.style.display = 'block';
+        btnTabProdukt.disabled = false; // Odblokuj zakładkę
+    } else {
+        // Produkt PUSTY: Ukryj detale, zablokuj zakładkę
+        productDetailsContainer.style.display = 'none';
+        btnTabProdukt.disabled = true;
+        // Wróć na zakładkę "Dane", jeśli nie ma produktu
+        switchRowTab('dane');
+    }
+}
+
+// Po załadowaniu strony, domyślnie pokaż zakładkę "Dane"
+document.addEventListener('DOMContentLoaded', () => {
+    // Upewnij się, że przełączamy się na Dane na starcie
+    if (btnTabDane) switchRowTab('dane');
+});
 /* Plik: index.html (dodaj ok. linii 2470) */
 // === Logika dla nowego przycisku "Podgląd paragonu" (110mm) ===
 const previewReceiptBtn = document.getElementById('previewReceiptBtn');
