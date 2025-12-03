@@ -12196,24 +12196,46 @@ try {
         if (foundItems === 0) list.innerHTML = '<div class="product-search-item" style="color: #999;">Brak pasujących produktów.</div>';
     }
 
-    // Wybór produktu
-    function selectFormProduct(lekName) {
-        if (!lekName) return;
+    /* Plik: index.html (ZASTĄP CAŁĄ FUNKCJĘ selectFormProduct) */
 
-        // Aktualizuj pola w formularzu (Step 2)
-        document.getElementById('formLek').value = lekName;
+    // Wybór produktu
+    function selectFormProduct(lekName) {
+        if (!lekName) return;
         
-        // Uruchom logikę auto-uzupełniania (Twoja stara funkcja)
-        const n = lekName;
-        document.getElementById('formSeria').value = mapaSerii[n] || '';
-        document.getElementById('formDawkowanie').value = mapaIlosci[n] || '';
-        document.getElementById('formKarencja').value = mapaKarencji[n] || '';
+        // 1. Zapisz produkt
+        const formLekInput = document.getElementById('formLek');
+        if (formLekInput) {
+            formLekInput.value = lekName;
+        }
+
+        // 2. Uruchom logikę auto-uzupełniania (z zabezpieczeniem)
+        const n = lekName;
         
-        modal.style.display = 'none';
+        const formSeria = document.getElementById('formSeria');
+        if (formSeria) formSeria.value = mapaSerii[n] || '';
         
-        // Opcjonalnie: Przesuń fokus na następne pole, np. Ilość
-        document.getElementById('formIlosc')?.focus();
-    }
+        const formDawkowanie = document.getElementById('formDawkowanie');
+        if (formDawkowanie) formDawkowanie.value = mapaIlosci[n] || '';
+        
+        const formKarencja = document.getElementById('formKarencja');
+        if (formKarencja) formKarencja.value = mapaKarencji[n] || '';
+        
+        // 3. Wymuś aktualizację widoczności (Moduł 3.1)
+        if (typeof updateProductTabVisibility === 'function') {
+            updateProductTabVisibility();
+        }
+        
+        // 4. Zamknij modal i ustaw focus
+        modal.style.display = 'none';
+        
+        // Opcjonalnie: Przesuń fokus na następne pole, np. Ilość (i przełącz zakładkę)
+        const formIlosc = document.getElementById('formIlosc');
+        if (formIlosc) formIlosc.focus();
+        
+        if (typeof switchRowTab === 'function') {
+            switchRowTab('produkt');
+        }
+    }
     
 } catch(err) {
     console.error("Błąd inicjalizacji Modala Produktów (Formularz):", err);
