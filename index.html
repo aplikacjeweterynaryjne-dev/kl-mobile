@@ -14021,20 +14021,42 @@ try {
         if (calcClientSearchModal) calcClientSearchModal.style.display = 'none';
     }
 
-  // 3. Wypełnianie i filtrowanie listy (Kalkulator - z obsługą polskich znaków)
+ // 3. Wypełnianie i filtrowanie listy (Kalkulator - z obsługą polskich znaków i opcją niestandardową)
     function populateAndFilterCalcClientList() {
         const dataList = document.getElementById('klientList');
+        
+        // Pobieramy surowy tekst (do wyświetlenia/użycia) i znormalizowany (do filtrowania)
+        const rawText = calcClientSearchInput.value.trim();
+        const filterText = normalizePL(rawText);
+        
+        calcClientSearchList.innerHTML = '';
+        
+        // --- ✅ NOWOŚĆ: Opcja użycia wpisanego tekstu (nawet jak nie ma w bazie) ---
+        if (rawText.length > 0) {
+            const customDiv = document.createElement('div');
+            customDiv.className = 'client-search-item';
+            // Wyróżniamy ten element kolorem, żeby było widać, że to "nowy" wpis
+            customDiv.style.backgroundColor = '#e8f5e9'; 
+            customDiv.style.borderBottom = '2px solid #6A994E';
+            customDiv.innerHTML = `<strong>➕ Użyj wpisanego:</strong> "${rawText}"`;
+            
+            customDiv.addEventListener('click', () => {
+                selectCalcClient(rawText);
+            });
+            calcClientSearchList.appendChild(customDiv);
+        }
+        // --------------------------------------------------------------------------
+
         if (!dataList || dataList.options.length === 0) {
-            calcClientSearchList.innerHTML = '<div class="client-search-item">Błąd: Brak bazy klientów.</div>';
+            const infoDiv = document.createElement('div');
+            infoDiv.className = 'client-search-item';
+            infoDiv.style.color = '#999';
+            infoDiv.textContent = 'Brak bazy klientów (ale możesz wpisać własnego powyżej).';
+            calcClientSearchList.appendChild(infoDiv);
             return;
         }
 
-        // ✅ ZMIANA: Używamy normalizePL
-        const filterText = normalizePL(calcClientSearchInput.value.trim());
-        
-        calcClientSearchList.innerHTML = '';
         let foundItems = 0;
-
         const options = Array.from(dataList.options);
         options.sort((a, b) => (a.value || '').localeCompare(b.value || '', 'pl'));
 
@@ -14043,7 +14065,6 @@ try {
             const adres = opt.dataset.adres || '';
             const nrStada = opt.dataset.nrstada || ''; 
             
-            // ✅ ZMIANA: Normalizujemy tekst do przeszukania
             const searchableText = normalizePL(`${nazwa} ${adres} ${nrStada}`);
             
             if (filterText === '' || searchableText.includes(filterText)) {
@@ -14064,7 +14085,12 @@ try {
                 foundItems++;
             }
         });
-        if (foundItems === 0) calcClientSearchList.innerHTML = '<div class="client-search-item" style="color: #999;">Brak pasujących klientów.</div>';
+
+        // Jeśli nic nie znaleziono w bazie, a pole nie jest puste, komunikat jest zbędny bo mamy przycisk "Użyj wpisanego"
+        // Ale jeśli pole jest puste i nic nie znaleziono (np. pusta baza), to wyświetlamy info
+        if (foundItems === 0 && rawText === '') {
+             calcClientSearchList.innerHTML = '<div class="client-search-item" style="color: #999;">Brak pasujących klientów.</div>';
+        }
     }
 
 // 4. Funkcja wyboru klienta z modala (Zezwolenie na ręczny wpis)
