@@ -4561,11 +4561,13 @@ function selectRowInForm(logicalIndex){
     }
     // --- KONIEC LOGIKI ---
 
+   /* Plik: index.html (Fragment w selectRowInForm, ok. linii 5078) */
+
     // *******************************************************************
-    // ************ P O P R A W K A: ŁADOWANIE DANYCH PÓL ****************
+    // ************ P O B R A N I E   D A N Y C H   P Ó L ****************
     // *******************************************************************
     
-    // Zabezpieczenie przed null w nowej strukturze
+    // Zabezpieczenie przed null w nowej strukturze (pobieramy elementy)
     const formOpis = document.getElementById('formOpis');
     const formLiczba = document.getElementById('formLiczba');
     const formRozpoznanie = document.getElementById('formRozpoznanie');
@@ -4592,10 +4594,12 @@ function selectRowInForm(logicalIndex){
     const lekValue = lekInput ? lekInput.value : '';
 
     if (formLek) formLek.value = lekValue;
-    if (formSeria) formSeria.value = row.cells[5].textContent.trim();
-
+    
+    /* ✅ POPRAWKA DLA NR SERII, ILOŚCI, DAWKOWANIA, KARENCJI */
     const cell6 = row.cells[6];
     const iloscInput = cell6.querySelector('input[type="number"]');
+
+    if (formSeria) formSeria.value = row.cells[5].textContent.trim(); /* <-- TERAZ BEZPIECZNE */
     if (formIlosc) formIlosc.value = iloscInput ? iloscInput.value : '';
     
     let tekstDawkowania = '';
@@ -16434,26 +16438,6 @@ if (navPodsumowanie) {
 }
 
 
-// Korekta wizualna PRZY ZMIANIE WYBORU W SELECT
-if (formRowSelect) {
-    formRowSelect.addEventListener('change', (e) => {
-        // ... (Tu możesz pozostawić starą logikę, która była w tym bloku)
-        // Domyślnie używa Twojej starej logiki (która jest na końcu bloku)
-
-        // Dodajemy logikę podświetlenia, gdy użytkownik ręcznie wybierze wiersz
-        const currentIndex = parseInt(e.target.value, 10);
-        navPodsumowanie.classList.remove('active-nav-btn');
-        navDanePodstawowe.classList.remove('active-nav-btn');
-
-        if (currentIndex >= 0 && currentIndex <= 8) {
-            navLeczenieNaMiejscu.classList.add('active-nav-btn');
-            navProduktyPozostawione.classList.remove('active-nav-btn');
-        } else if (currentIndex >= 9 && currentIndex <= 11) {
-            navLeczenieNaMiejscu.classList.remove('active-nav-btn');
-            navProduktyPozostawione.classList.add('active-nav-btn');
-        }
-    });
-}
     
 } catch (err) {
     console.error("Błąd inicjalizacji nawigacji w formularzu:", err);
