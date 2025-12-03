@@ -10369,12 +10369,10 @@ if(archiveCloseBtn) archiveCloseBtn.addEventListener('click', () => {
 
 // Lepsza funkcja drukowania (bez przeładowania strony)
 /* ⬇️ ZASTĄP CAŁY BLOK "archivePrintBtn" (ok. linii 3080) TYM KODEM ⬇️ */
-
-// OSTATECZNA funkcja drukowania v4 - Implementacja Twojego pomysłu
-// OSTATECZNA funkcja drukowania v5 - Podgląd w nowym oknie (Styl 110mm + Format A4)
+// OSTATECZNA funkcja drukowania v5 (POPRAWIONA) - Podgląd w nowym oknie
 if (archivePrintBtn) {
     archivePrintBtn.addEventListener('click', () => {
-        // 1. Pobierz zawartość karty z modala (to gwarantuje, że treść jest identyczna w 100%)
+        // 1. Pobierz zawartość karty z modala
         const cardContentEl = document.getElementById('archiveCardContent');
         if (!cardContentEl) {
             alert('Błąd: Nie znaleziono zawartości karty.');
@@ -10389,7 +10387,7 @@ if (archivePrintBtn) {
             return;
         }
 
-        // 3. Wpisz strukturę HTML (Styl podglądu + Style Karty A4)
+        // 3. Wpisz strukturę HTML (Bez komentarzy w CSS, aby uniknąć błędów)
         printWindow.document.write(`
             <!DOCTYPE html>
             <html lang="pl">
@@ -10398,12 +10396,11 @@ if (archivePrintBtn) {
                 <title>Podgląd Wydruku A4</title>
                 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
                 <style>
-                    /* --- 1. Style Interfejsu Podglądu (Ciemne tło, przyciski) --- */
                     body { 
                         font-family: 'Nunito', sans-serif; 
                         margin: 0; 
                         padding: 0; 
-                        background-color: #525659; /* Ciemnoszare tło PDF */
+                        background-color: #525659; 
                         display: flex; 
                         flex-direction: column; 
                         align-items: center; 
@@ -10438,18 +10435,16 @@ if (archivePrintBtn) {
                     .print-controls .close-btn { background-color: #f44336; border-color: #D32F2F; }
                     .print-controls .close-btn:hover { background-color: #E53935; }
 
-                    /* --- 2. Kartka A4 (Wizualizacja na ekranie) --- */
                     .page-preview {
                         background-color: white;
-                        width: 297mm; /* Szerokość A4 Poziomo */
-                        min-height: 210mm; /* Wysokość A4 Poziomo */
+                        width: 297mm; 
+                        min-height: 210mm; 
                         padding: 1cm;
                         margin: 30px auto;
                         box-shadow: 0 5px 30px rgba(0,0,0,0.5);
                         box-sizing: border-box;
                     }
 
-                    /* --- 3. Style Karty Leczenia (Oryginalne Style CSS) --- */
                     h2 { text-align: center; font-size: 14pt; text-transform: uppercase; margin-bottom: 15px; font-weight: 700; color: #000; }
                     
                     .top-section { display: grid; grid-template-columns: 1fr 1fr 1fr; font-size: 10pt; margin-bottom: 15px; gap: 10px; color: #000; }
@@ -10464,17 +10459,14 @@ if (archivePrintBtn) {
                     
                     p { font-size: 10pt; margin: 5px 0; color: #000; }
                     
-                    /* Podpisy */
                     .signatures { display: flex; justify-content: space-between; margin-top: 30px; page-break-inside: avoid; }
                     .signature-box { display: flex; flex-direction: column; align-items: center; width: 40%; }
                     .signature-label { font-weight: bold; margin-bottom: 5px; font-size: 10pt; border-top: 1px dashed #000; padding-top: 5px; width: 100%; text-align: center; }
                     .signature-img { display: block; height: 60px; max-width: 100%; object-fit: contain; margin-bottom: 5px; }
                     .signature-name { font-size: 10pt; }
 
-                    /* Ukrywanie zbędnych elementów z podglądu (guziki wewnątrz treści) */
                     .btn-edit-row, button { display: none !important; }
 
-                    /* --- 4. Ustawienia DRUKU (Resetowanie tła) --- */
                     @media print {
                         body { 
                             background-color: white !important; 
@@ -10486,12 +10478,12 @@ if (archivePrintBtn) {
                         .page-preview {
                             width: 100% !important;
                             margin: 0 !important;
-                            padding: 0 !important; /* Marginesy ustawi @page */
+                            padding: 0 !important; 
                             box-shadow: none !important;
                             min-height: auto !important;
                         }
                         @page {
-                            size: A4 landscape; /* Wymuś orientację poziomą */
+                            size: A4 landscape;
                             margin: 1cm;
                         }
                     }
