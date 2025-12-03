@@ -16844,13 +16844,15 @@ document.getElementById('formCancelStep2Btn')?.addEventListener('click', handleF
 document.getElementById('formCancelStep3Btn')?.addEventListener('click', handleFormCancel);
 /**
 /**
- * ✅ NOWA FUNKCJA (POPRAWIONA): Generuje okno podglądu IDENTYCZNE z oryginałem.
+/**
+ * ✅ NOWA FUNKCJA (ZAGĘSZCZONA NA 1 STRONĘ A4):
+ * Generuje kompaktowy podgląd, aby zmieścić się na jednej kartce.
  */
 function openDirectPrintWindow(card) {
     const header = card.header || {};
     const savedRows = card.table || [];
 
-    // --- 1. Generowanie Wierszy Tabeli (13 wierszy) ---
+    // --- 1. Generowanie Wierszy Tabeli ---
     let rowsHTML = '';
     
     const findRowData = (logicalIndex, lpFallback) => {
@@ -16868,8 +16870,8 @@ function openDirectPrintWindow(card) {
             logicalIndex = i - 1; 
             displayLp = `${i}.`;
         } else if (i === 10) {
-            // Wiersz specjalny - tekst musi być wyrównany do lewej
-            rowsHTML += `<tr><td colspan="8" style="text-align: left; font-weight: bold; padding: 5px;">Potwierdzenie nabycia produktu leczniczego weterynaryjnego/paszy leczniczej</td></tr>`;
+            // Wiersz specjalny - bardzo kompaktowy padding
+            rowsHTML += `<tr><td colspan="8" style="text-align: left; font-weight: bold; padding: 2px 4px; background-color: #f9f9f9; font-size: 8pt;">Potwierdzenie nabycia produktu leczniczego weterynaryjnego/paszy leczniczej</td></tr>`;
             continue; 
         } else {
             logicalIndex = i - 2; 
@@ -16878,20 +16880,17 @@ function openDirectPrintWindow(card) {
 
         const rowData = findRowData(logicalIndex, displayLp);
 
-        // Tworzymy puste komórki, jeśli brak danych, aby zachować kratki
         const opis = rowData ? rowData.opis : '';
         const liczba = rowData ? rowData.liczba : '';
         const rozpoznanie = rowData ? rowData.rozpoznanie : '';
         const lek = rowData ? rowData.lek : '';
         const seria = rowData ? rowData.seria : '';
-        const ilosc = rowData ? rowData.iloscDawka : ''; // Tu może być HTML (input + tekst), ale w archiwum to string
+        const ilosc = rowData ? rowData.iloscDawka : ''; 
         const karencja = rowData ? rowData.karencja : '';
 
-        // Funkcja usuwająca tagi HTML z iloscDawka (jeśli zostały zapisane jako input)
         const cleanIlosc = (html) => {
             if (!html) return '';
             if (html.includes('<input')) {
-                // Prostym sposobem wyciągamy wartość z value="..." i tekst obok
                 const tempDiv = document.createElement('div');
                 tempDiv.innerHTML = html;
                 const inputVal = tempDiv.querySelector('input')?.value || '';
@@ -16922,7 +16921,7 @@ function openDirectPrintWindow(card) {
         return;
     }
 
-    // --- 3. Budowanie HTML (Oryginalne Style i Teksty) ---
+    // --- 3. Budowanie HTML (KOMPAKTOWE STYLE CSS) ---
     printWindow.document.write(`
         <!DOCTYPE html>
         <html lang="pl">
@@ -16940,64 +16939,113 @@ function openDirectPrintWindow(card) {
                     min-height: 100vh;
                 }
                 .print-controls { 
-                    width: 100%; padding: 15px; text-align: center; 
+                    width: 100%; padding: 10px; text-align: center; 
                     background-color: #333; color: white;
                     position: sticky; top: 0; z-index: 9999;
-                    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+                    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
                     display: flex; justify-content: center; gap: 20px;
                 }
                 .btn {
-                    padding: 10px 25px; font-size: 16px; cursor: pointer; 
-                    border-radius: 6px; border: 1px solid #777; font-weight: 700;
+                    padding: 8px 20px; font-size: 14px; cursor: pointer; 
+                    border-radius: 4px; border: 1px solid #777; font-weight: 700;
                     color: white; font-family: 'Nunito', sans-serif;
                 }
                 .btn-print { background-color: #4CAF50; border-color: #388E3C; }
                 .btn-close { background-color: #f44336; border-color: #D32F2F; }
 
-                /* Kartka A4 (Styl Oryginalny) */
+                /* Kartka A4 - Kompaktowa */
                 .page-preview {
                     background-color: white;
                     width: 297mm; /* A4 Landscape */
                     min-height: 210mm; 
-                    padding: 1cm;
-                    margin: 30px auto;
+                    padding: 0.5cm; /* ✅ ZMNIEJSZONY MARGINES WEWNĘTRZNY */
+                    margin: 20px auto;
                     box-shadow: 0 10px 30px rgba(0,0,0,0.5);
                     box-sizing: border-box;
-                    color: #333;
+                    color: #000;
                 }
 
-                /* --- Oryginalne Style z Twojego pliku --- */
+                /* --- Kompaktowe Style Wewnętrzne --- */
+                
                 h2 { 
-                    text-align: center; font-size: 13px; text-transform: uppercase; 
-                    margin-bottom: 10px; font-weight: 700; color: #000;
+                    text-align: center; font-size: 12pt; /* Mniejszy tytuł */
+                    text-transform: uppercase; 
+                    margin-bottom: 5px; margin-top: 0;
+                    font-weight: 800; color: #000;
                 }
+                
                 .top-section { 
                     display: grid; grid-template-columns: 1fr 1fr 1fr; 
-                    font-size: 12px; margin-bottom: 10px; gap: 5px;
+                    font-size: 9pt; /* Mniejsza czcionka nagłówka */
+                    margin-bottom: 5px; gap: 5px; 
                 }
-                .top-section div { padding: 5px; }
+                .top-section div { 
+                    border: 1px solid #ddd; padding: 4px; border-radius: 4px; 
+                }
                 
-                /* Powiększenie dla konkretnych pól (zgodnie z oryginałem) */
-                .top-data-bold { font-size: 14px; font-weight: bold; }
+                /* Pogrubienia w nagłówku */
+                .top-data-bold { font-size: 10pt; font-weight: bold; }
 
-                table { border-collapse: collapse; width: 100%; font-size: 11px; }
-                th, td { border: 1px solid #000; padding: 4px; text-align: left; vertical-align: middle; }
-                th { background: #EBF5E6 !important; text-align: center; font-weight: bold; }
+                /* Tabela */
+                table { 
+                    border-collapse: collapse; width: 100%; 
+                    font-size: 8pt; /* ✅ ZNACZNIE MNIEJSZA CZCIONKA TABELI */
+                    margin-bottom: 5px; 
+                }
+                th, td { 
+                    border: 1px solid #000; 
+                    padding: 1px 3px; /* ✅ MINIMALNY PADDING W KOMÓRKACH */
+                    text-align: left; vertical-align: middle; 
+                    height: 18px; /* Wymuszenie niskich wierszy */
+                }
+                th { 
+                    background: #EBF5E6 !important; 
+                    text-align: center; font-weight: bold; 
+                    padding: 3px;
+                }
                 
-                .signatures { display: flex; justify-content: space-between; margin-top: 20px; }
-                .signature-box { display: flex; flex-direction: column; align-items: center; width: 48%; }
-                .signature-label { font-weight: bold; margin-bottom: 2px; display: block; text-align: center; width: 100%; font-size: 12px;}
-                .signature-img { display: block; height: 80px; width: 100%; object-fit: contain; margin-top: 5px; }
-                .signature-name { margin-top: 2px; font-weight: normal; text-align: center; font-size: 12px;}
+                p { 
+                    margin-top: 2px; margin-bottom: 2px; 
+                    font-size: 8pt; 
+                }
 
-                p { margin-top: 4px; margin-bottom: 4px; font-size: 11px; }
+                /* Podpisy */
+                .signatures { 
+                    display: flex; justify-content: space-between; 
+                    margin-top: 10px; /* Mniejszy odstęp */
+                }
+                .signature-box { 
+                    display: flex; flex-direction: column; align-items: center; width: 45%; 
+                }
+                .signature-label { 
+                    font-weight: bold; font-size: 9pt; 
+                    border-top: 1px dashed #000; padding-top: 2px; 
+                    width: 90%; text-align: center; 
+                }
+                .signature-img { 
+                    display: block; height: 45px; /* ✅ MNIEJSZY OBRAZEK PODPISU */
+                    max-width: 100%; object-fit: contain; margin-bottom: 2px; 
+                }
+                .signature-name { font-size: 8pt; }
 
-                /* Druk */
+                /* Styl dla druku */
                 @media print {
-                    body { background-color: white !important; margin: 0 !important; display: block !important; }
+                    body { 
+                        background-color: white !important; margin: 0 !important; padding: 0 !important;
+                        display: block !important; 
+                    }
                     .print-controls { display: none !important; }
-                    .page-preview { width: 100% !important; margin: 0 !important; padding: 0 !important; box-shadow: none !important; }
-                    @page { size: A4 landscape; margin: 1cm; }
+                    .page-preview { 
+                        width: 100% !important; 
+                        margin: 0 !important; 
+                        padding: 0 !important; /* Marginesy ustawi @page */
+                        box-shadow: none !important; 
+                        border: none !important;
+                    }
+                    @page { 
+                        size: A4 landscape; 
+                        margin: 0.5cm; /* ✅ MAŁE MARGINESY DRUKARKI */
+                    }
                 }
             </style>
         </head>
@@ -17013,8 +17061,8 @@ function openDirectPrintWindow(card) {
                 <div class="top-section">
                     <div>
                         Nazwa i adres zakładu leczniczego dla zwierząt:<br>
-                        <span class="top-data-bold">${header.nazwaLecznicy || ''}</span><br><br>
-                        Wykonanie czynności lekarsko-weterynaryjnych dnia: <span class="top-data-bold">${header.dataWykonania || ''}</span><br><br>
+                        <span class="top-data-bold">${header.nazwaLecznicy || ''}</span><br>
+                        Wykonanie czynności lekarsko-weterynaryjnych dnia: <span class="top-data-bold">${header.dataWykonania || ''}</span><br>
                         Nr stada: <span class="top-data-bold">${header.nrStada || ''}</span>
                     </div>
                     <div>
@@ -17023,20 +17071,30 @@ function openDirectPrintWindow(card) {
                         <span class="top-data-bold">${header.adresKlienta || ''}</span>
                     </div>
                     <div>
-                        Zgłoszenie: Data: <span class="top-data-bold">${header.dataZgloszenia || ''}</span><br><br>
+                        Zgłoszenie: Data: <span class="top-data-bold">${header.dataZgloszenia || ''}</span><br>
                         Nr dokumentu: <span class="top-data-bold">${header.nrDokumentu || ''}</span>
                     </div>
                 </div>
 
                 <table>
+                    <colgroup>
+                       <col style="width: 30px;">
+                       <col style="width: 20%;">
+                       <col style="width: 50px;">
+                       <col style="width: 15%;">
+                       <col style="width: 20%;">
+                       <col style="width: 10%;">
+                       <col style="width: 10%;">
+                       <col>
+                    </colgroup>
                     <thead>
                         <tr>
-                            <th rowspan="2" style="width:30px;">Lp.</th>
+                            <th rowspan="2">Lp.</th>
                             <th rowspan="2">
                                 Nazwa siedziby stada i opis leczonego zwierzęcia<br>
                                 (gatunek, płeć numer identyfikacyjny, sposób oznakowania, wiek, masa ciała)
                             </th>
-                            <th rowspan="2">Liczba leczonych zwierząt</th>
+                            <th rowspan="2">Liczba lecz. zw.</th>
                             <th rowspan="2">Rozpoznanie albo wstępne rozpoznanie choroby</th>
                             <th colspan="3">
                                 Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posiadacza zwierzęcia produkty lecznicze weterynaryjne lub pasze lecznicze
@@ -17045,8 +17103,8 @@ function openDirectPrintWindow(card) {
                         </tr>
                         <tr>
                             <th>Nazwa produktu leczniczego/ produktu leczniczego weterynaryjnego/ paszy leczniczej</th>
-                            <th>Numer serii produktu leczniczego lub produktu leczniczego weterynaryjnego</th>
-                            <th>Ilość, dawkowanie zastosowanego produktu leczniczego lub ilość, dawkowanie i okres stosowanie nabytego produktu leczniczego, weterynaryjnego/paszy leczniczej</th>
+                            <th>Numer serii produktu lecz.</th>
+                            <th>Ilość, dawkowanie zas. produktu</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -17059,12 +17117,12 @@ function openDirectPrintWindow(card) {
                 <div class="signatures">
                     <div class="signature-box">
                         <span class="signature-label">Lekarz weterynarii</span>
-                        ${header.podpisLekarzaImg ? `<img src="${header.podpisLekarzaImg}" class="signature-img">` : ''}
+                        ${header.podpisLekarzaImg ? `<img src="${header.podpisLekarzaImg}" class="signature-img">` : '<div style="height:45px;"></div>'}
                         <span class="signature-name">${header.podpisLekarzaLinia || ''}</span>
                     </div>
                     <div class="signature-box">
                         <span class="signature-label">Podpis posiadacza zwierzęcia</span>
-                        ${card.podpisPosiadacza ? `<img src="${card.podpisPosiadacza}" class="signature-img">` : ''}
+                        ${card.podpisPosiadacza ? `<img src="${card.podpisPosiadacza}" class="signature-img">` : '<div style="height:45px;"></div>'}
                     </div>
                 </div>
 
