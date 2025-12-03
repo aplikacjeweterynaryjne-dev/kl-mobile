@@ -4521,6 +4521,8 @@ function updateFormLivePreview() {
 
 /* Plik: index.html (ZASTĄP CAŁĄ FUNKCJĘ selectRowInForm, ok. linii 5005) */
 
+/* Plik: index.html (ZASTĄP CAŁĄ FUNKCJĘ selectRowInForm, ok. linii 5005) */
+
 function selectRowInForm(logicalIndex){
     updateFormLivePreview();
     // ⬇️ ⬇️ ⬇️ WKLEJ TEN BLOK KODU (Logika pokazywania przycisku "Kopiuj poprzedni") ⬇️ ⬇️ ⬇️
@@ -4563,41 +4565,49 @@ function selectRowInForm(logicalIndex){
     // ************ P O P R A W K A: ŁADOWANIE DANYCH PÓL ****************
     // *******************************************************************
     
-    // Wczytaj dane do pól (teraz z pewnością, że pobieramy z wiersza)
-    
+    // Zabezpieczenie przed null w nowej strukturze
+    const formOpis = document.getElementById('formOpis');
+    const formLiczba = document.getElementById('formLiczba');
+    const formRozpoznanie = document.getElementById('formRozpoznanie');
+    const formLek = document.getElementById('formLek');
+    const formSeria = document.getElementById('formSeria');
+    const formIlosc = document.getElementById('formIlosc');
+    const formDawkowanie = document.getElementById('formDawkowanie');
+    const formKarencja = document.getElementById('formKarencja');
+
+
     // 1. Nazwa siedziby stada i opis zwierzęcia (Kolumna 2 / cells[1])
-    document.getElementById('formOpis').value = row.cells[1].textContent.trim();
+    if (formOpis) formOpis.value = row.cells[1].textContent.trim();
 
     // 2. Liczba leczonych zwierząt (Kolumna 3 / cells[2])
     const inpLiczba = row.cells[2].querySelector('input');
-    document.getElementById('formLiczba').value = inpLiczba ? inpLiczba.value : '';
+    if (formLiczba) formLiczba.value = inpLiczba ? inpLiczba.value : '';
 
     // 3. Rozpoznanie (Kolumna 4 / cells[3])
     const inpRozpoznanie = row.cells[3].querySelector('input');
-    document.getElementById('formRozpoznanie').value = inpRozpoznanie ? inpRozpoznanie.value : '';
+    if (formRozpoznanie) formRozpoznanie.value = inpRozpoznanie ? inpRozpoznanie.value : '';
     
-    // *******************************************************************
-    // ************ K O N I E C P O P R A W K I **************************
-    // *******************************************************************
-
     // 4. Pozostałe pola (Produkty)
     const lekInput = row.cells[4].querySelector('input');
     const lekValue = lekInput ? lekInput.value : '';
-    document.getElementById('formLek').value = lekValue;
-    document.getElementById('formSeria').value = row.cells[5].textContent.trim();
+
+    if (formLek) formLek.value = lekValue;
+    if (formSeria) formSeria.value = row.cells[5].textContent.trim();
 
     const cell6 = row.cells[6];
     const iloscInput = cell6.querySelector('input[type="number"]');
-    document.getElementById('formIlosc').value = iloscInput ? iloscInput.value : '';
+    if (formIlosc) formIlosc.value = iloscInput ? iloscInput.value : '';
+    
     let tekstDawkowania = '';
     if (iloscInput && iloscInput.nextSibling && iloscInput.nextSibling.nodeType === Node.TEXT_NODE) {
         tekstDawkowania = iloscInput.nextSibling.textContent.trim();
     }
-    document.getElementById('formDawkowanie').value = tekstDawkowania;
-    document.getElementById('formKarencja').value = row.cells[7].textContent.trim();
+    if (formDawkowanie) formDawkowanie.value = tekstDawkowania;
+    if (formKarencja) formKarencja.value = row.cells[7].textContent.trim();
+
 
     // *******************************************************************
-    // ************ ✅ NOWA LOGIKA ZAKŁADEK I WIDOCZNOŚCI *****************
+    // ************ ✅ LOGIKA ZAKŁADEK I WIDOCZNOŚCI *****************
     // *******************************************************************
     
     // 5. Wymuś aktualizację widoczności (Moduł 3.1)
@@ -4608,9 +4618,13 @@ function selectRowInForm(logicalIndex){
     // 6. Przełącz na zakładkę Dane (lub Produkt, jeśli to nie był wiersz "Nowe Dane" i produkt jest wybrany)
     const activeTabButton = document.querySelector('#form-tab-buttons .primary');
     if (activeTabButton && activeTabButton.dataset.tab === 'produkt' && lekValue.trim() !== '' && formNoweDaneContainer.style.display !== 'block') {
-        switchRowTab('produkt'); 
+        if (typeof switchRowTab === 'function') {
+            switchRowTab('produkt'); 
+        }
     } else {
-        switchRowTab('dane'); 
+        if (typeof switchRowTab === 'function') {
+            switchRowTab('dane'); 
+        }
     }
     
     // *******************************************************************
