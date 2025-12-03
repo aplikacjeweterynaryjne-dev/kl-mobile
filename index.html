@@ -10189,55 +10189,59 @@ if(archiveUserSelect) archiveUserSelect.addEventListener('change', () => {
  * Pkt 6: Logika podglądu zapisanej karty
  */
 // Używamy delegacji zdarzeń, bo przyciski są dynamiczne
+// Listener dla tabeli archiwum (Podgląd i Usuwanie)
 const archiveCardTableBody = document.getElementById('archiveCardTableBody');
 if (archiveCardTableBody) {
     archiveCardTableBody.addEventListener('click', async (e) => {
-        const target = e.target; // Cel kliknięcia
+        const target = e.target; // Cel kliknięcia
 
-        // --- Logika Podglądu Karty ---
-        if (target.classList.contains('btn-view-archived-card')) {
-            const cardId = target.dataset.cardId;
-            target.textContent = 'Ładowanie...';
-            
-            try {
-                const doc = await db.collection("archiwumKarty").doc(cardId).get();
-                if (!doc.exists) {
-                    alert("Błąd: Nie znaleziono tej karty w archiwum.");
-                    return;
-                }
-                const cardData = doc.data();
-                
-                buildArchivedCardView(cardData); // Tę funkcję zaraz naprawimy
-                archiveCardViewerModal.style.display = 'flex';
-                
-            } catch (error) {
-                console.error("Błąd wczytywania karty do podglądu:", error);
-                alert("Błąd wczytywania karty.");
-            } finally {
-                target.textContent = 'Podgląd KL';
-            }
-        } 
+        // --- ✅ NOWA LOGIKA: BEZPOŚREDNIE OTWARCIE OKNA PODGLĄDU ---
+        if (target.classList.contains('btn-view-archived-card')) {
+            const cardId = target.dataset.cardId;
+            const originalText = target.textContent;
+            target.textContent = 'Ładowanie...';
+            target.disabled = true;
+            
+            try {
+                // 1. Pobierz dane z Firebase
+                const doc = await db.collection("archiwumKarty").doc(cardId).get();
+                if (!doc.exists) {
+                    alert("Błąd: Nie znaleziono tej karty w archiwum.");
+                    return;
+                }
+                const cardData = doc.data();
+                
+                // 2. Otwórz bezpośrednio okno druku (omijamy modal)
+                openDirectPrintWindow(cardData);
+                
+            } catch (error) {
+                console.error("Błąd wczytywania karty do podglądu:", error);
+                alert("Błąd wczytywania karty.");
+            } finally {
+                target.textContent = originalText;
+                target.disabled = false;
+            }
+        } 
 
-        // --- ✅ NOWA LOGIKA: Usuwanie Karty ---
-        else if (target.classList.contains('btn-delete-archived-card')) {
-            const cardId = target.dataset.cardId;
-            const cardNr = target.dataset.cardNr;
-            
-            if (confirm(`Czy na pewno chcesz trwale usunąć kartę nr: ${cardNr}?`)) {
-                target.textContent = 'Usuwanie...';
-                try {
-                    await db.collection("archiwumKarty").doc(cardId).delete();
-                    // Usuń element z widoku
-                    target.closest('tr').remove(); // <-- ✅ POPRAWKA
-                    alert('Karta została usunięta.');
-                } catch (error) {
-                    console.error("Błąd usuwania karty:", error);
-                    alert("Wystąpił błąd podczas usuwania.");
-                    target.textContent = 'Usuń';
-                }
-            }
-        }
-    });
+        // --- Usuwanie Karty (Bez zmian) ---
+        else if (target.classList.contains('btn-delete-archived-card')) {
+            const cardId = target.dataset.cardId;
+            const cardNr = target.dataset.cardNr;
+            
+            if (confirm(`Czy na pewno chcesz trwale usunąć kartę nr: ${cardNr}?`)) {
+                target.textContent = 'Usuwanie...';
+                try {
+                    await db.collection("archiwumKarty").doc(cardId).delete();
+                    target.closest('tr').remove(); 
+                    alert('Karta została usunięta.');
+                } catch (error) {
+                    console.error("Błąd usuwania karty:", error);
+                    alert("Wystąpił błąd podczas usuwania.");
+                    target.textContent = 'Usuń';
+                }
+            }
+        }
+    });
 }
 
 /**
@@ -16838,6 +16842,211 @@ function handleFormCancel() {
 // Podpięcie listenerów do nowych przycisków Anuluj (Krok 2 i Krok 3)
 document.getElementById('formCancelStep2Btn')?.addEventListener('click', handleFormCancel);
 document.getElementById('formCancelStep3Btn')?.addEventListener('click', handleFormCancel);
+/**
+ * ✅ NOWA FUNKCJA: Generuje i otwiera okno podglądu bezpośrednio z danych JSON.
+ */
+function openDirectPrintWindow(card) {
+    const header = card.header || {};
+    const savedRows = card.table || [];
+
+    // --- 1. Generowanie Wierszy Tabeli (Logika 13 wierszy) ---
+    let rowsHTML = '';
+    
+    // Funkcja szukająca danych wiersza
+    const findRowData = (logicalIndex, lpFallback) => {
+        let row = savedRows.find(r => r.logicalIndex === logicalIndex);
+        if (row) return row;
+        row = savedRows.find(r => r.lp && r.lp.startsWith(lpFallback));
+        return row; 
+    };
+
+    for (let i = 1; i <= 13; i++) {
+        let logicalIndex = -1;
+        let displayLp = '';
+
+        // Ustalanie indeksów i LP
+        if (i < 10) {
+            logicalIndex = i - 1; 
+            displayLp = `${i}.`;
+        } else if (i === 10) {
+            // Wiersz specjalny (rozdzielający)
+            rowsHTML += `<tr><td colspan="8" style="font-weight: bold; padding: 3px 2px; background-color: #eee;">Potwierdzenie nabycia produktu leczniczego weterynaryjnego/paszy leczniczej</td></tr>`;
+            continue; 
+        } else {
+            logicalIndex = i - 2; 
+            displayLp = `${i - 10}.`; 
+        }
+
+        const rowData = findRowData(logicalIndex, displayLp);
+
+        if (rowData) {
+            rowsHTML += `
+                <tr>
+                    <td>${displayLp}</td>
+                    <td>${rowData.opis || ''}</td>
+                    <td style="text-align: center;">${rowData.liczba || ''}</td>
+                    <td style="text-align: center;">${rowData.rozpoznanie || ''}</td>
+                    <td>${rowData.lek || ''}</td>
+                    <td>${rowData.seria || ''}</td>
+                    <td>${rowData.iloscDawka || ''}</td>
+                    <td>${rowData.karencja || ''}</td>
+                </tr>
+            `;
+        } else {
+            // Pusty wiersz
+            rowsHTML += `<tr><td>${displayLp}</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>`;
+        }
+    }
+
+    // --- 2. Otwarcie Okna ---
+    const printWindow = window.open('', '_blank', 'width=1100,height=850,scrollbars=yes,resizable=yes');
+    if (!printWindow) {
+        alert('Nie udało się otworzyć nowego okna. Wyłącz blokowanie wyskakujących okienek.');
+        return;
+    }
+
+    // --- 3. Budowanie HTML (Style + Treść) ---
+    printWindow.document.write(`
+        <!DOCTYPE html>
+        <html lang="pl">
+        <head>
+            <meta charset="utf-8">
+            <title>Karta Leczenia - ${header.nrDokumentu || 'Podgląd'}</title>
+            <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
+            <style>
+                /* Style Interfejsu (Ciemne Tło) */
+                body { 
+                    font-family: 'Nunito', sans-serif; 
+                    margin: 0; padding: 0; 
+                    background-color: #525659; /* Ciemne tło */
+                    display: flex; flex-direction: column; align-items: center; 
+                    min-height: 100vh;
+                }
+                
+                /* Pasek z guzikami */
+                .print-controls { 
+                    width: 100%; padding: 15px; text-align: center; 
+                    background-color: #333; color: white;
+                    position: sticky; top: 0; z-index: 9999;
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+                    display: flex; justify-content: center; gap: 20px;
+                }
+                .btn {
+                    padding: 10px 25px; font-size: 16px; cursor: pointer; 
+                    border-radius: 6px; border: none; font-weight: 700;
+                    transition: transform 0.1s;
+                }
+                .btn:active { transform: scale(0.98); }
+                .btn-print { background-color: #4CAF50; color: white; }
+                .btn-close { background-color: #f44336; color: white; }
+
+                /* Kartka A4 */
+                .page-preview {
+                    background-color: white;
+                    width: 297mm; /* A4 Landscape */
+                    min-height: 210mm; 
+                    padding: 15mm;
+                    margin: 40px auto;
+                    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+                    box-sizing: border-box;
+                    color: #000;
+                }
+
+                /* Style Wewnętrzne Karty (Tabela) */
+                h2 { text-align: center; font-size: 14pt; text-transform: uppercase; margin-bottom: 15px; font-weight: 700; }
+                .top-section { display: grid; grid-template-columns: 1fr 1fr 1fr; font-size: 10pt; margin-bottom: 15px; gap: 15px; }
+                .top-section div { border: 1px solid #ddd; padding: 8px; border-radius: 4px; }
+                
+                table { border-collapse: collapse; width: 100%; font-size: 9pt; margin-bottom: 15px; }
+                th, td { border: 1px solid #000; padding: 4px; text-align: left; vertical-align: middle; }
+                th { background: #EBF5E6 !important; text-align: center; font-weight: bold; }
+                
+                p { font-size: 10pt; margin: 5px 0; }
+
+                /* Podpisy */
+                .signatures { display: flex; justify-content: space-between; margin-top: 30px; }
+                .signature-box { display: flex; flex-direction: column; align-items: center; width: 45%; }
+                .signature-label { font-weight: bold; font-size: 10pt; border-top: 1px dashed #000; padding-top: 5px; width: 80%; text-align: center; }
+                .signature-img { display: block; height: 60px; max-width: 100%; object-fit: contain; margin-bottom: 5px; }
+
+                /* Styl dla druku */
+                @media print {
+                    body { background-color: white !important; margin: 0 !important; display: block !important; }
+                    .print-controls { display: none !important; }
+                    .page-preview { width: 100% !important; margin: 0 !important; padding: 0 !important; box-shadow: none !important; }
+                    @page { size: A4 landscape; margin: 1cm; }
+                }
+            </style>
+        </head>
+        <body>
+            <div class="print-controls">
+                <button class="btn btn-print" onclick="window.print()">🖨️ Drukuj / Zapisz PDF</button>
+                <button class="btn btn-close" onclick="window.close()">❌ Zamknij okno</button>
+            </div>
+
+            <div class="page-preview">
+                <h2>KARTA LECZENIA ZWIERZĄT GOSPODARSKICH ORAZ ZWIERZĄT, Z KTÓRYCH POZYSKANE TKANKI LUB PRODUKTY SĄ PRZEZNACZONE DO SPOŻYCIA PRZEZ LUDZI</h2>
+
+                <div class="top-section">
+                    <div>
+                        <b>Zakład leczniczy:</b><br>
+                        ${header.nazwaLecznicy || ''}<br><br>
+                        <b>Data wykonania:</b> ${header.dataWykonania || ''}<br>
+                        <b>Nr stada:</b> ${header.nrStada || ''}
+                    </div>
+                    <div>
+                        <b>Posiadacz zwierzęcia:</b><br>
+                        <strong style="font-size: 1.1em;">${header.klient || ''}</strong><br>
+                        ${header.adresKlienta || ''}
+                    </div>
+                    <div>
+                        <b>Zgłoszenie:</b> ${header.dataZgloszenia || ''}<br><br>
+                        <b>Nr dokumentu:</b> <span style="font-size: 1.2em; font-weight: bold;">${header.nrDokumentu || ''}</span>
+                    </div>
+                </div>
+
+                <table>
+                    <thead>
+                        <tr>
+                            <th rowspan="2" style="width:30px;">Lp.</th>
+                            <th rowspan="2">Opis zwierzęcia</th>
+                            <th rowspan="2">Liczba</th>
+                            <th rowspan="2">Rozpoznanie</th>
+                            <th colspan="3">Zastosowane produkty lecznicze</th>
+                            <th rowspan="2">Karencja / Uwagi</th>
+                        </tr>
+                        <tr>
+                            <th>Nazwa produktu</th>
+                            <th>Seria</th>
+                            <th>Ilość/Dawkowanie</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${rowsHTML}
+                    </tbody>
+                </table>
+
+                <p><b>Oświadczam, że nabyte produkty lecznicze weterynaryjne/pasze lecznicze zostaną zastosowane zgodnie z zaleceniami lekarza weterynarii.</b></p>
+
+                <div class="signatures">
+                    <div class="signature-box">
+                        <span class="signature-label">Lekarz weterynarii</span>
+                        ${header.podpisLekarzaImg ? `<img src="${header.podpisLekarzaImg}" class="signature-img">` : ''}
+                        <span>${header.podpisLekarzaLinia || ''}</span>
+                    </div>
+                    <div class="signature-box">
+                        <span class="signature-label">Podpis posiadacza zwierzęcia</span>
+                        ${card.podpisPosiadacza ? `<img src="${card.podpisPosiadacza}" class="signature-img">` : ''}
+                    </div>
+                </div>
+            </div>
+        </body>
+        </html>
+    `);
+
+    printWindow.document.close();
+    printWindow.focus();
+}
 </script> 
 
 <div id="toastContainer" style="position: fixed; top: 20px; right: 20px; z-index: 20000; display: flex; flex-direction: column; gap: 10px;">
