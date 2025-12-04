@@ -10420,81 +10420,74 @@ if (archiveCardTableBody) {
 * NAPRAWIA błąd z zagnieżdżonym <tr>.
  */
 function buildArchivedCardView(card) {
-    const header = card.header;
+    const header = card.header;
 
-    // 1. Wypełnij Nagłówek (Top Section)
-    document.getElementById('archive_nazwaLecznicy').textContent = header.nazwaLecznicy || '';
-    document.getElementById('archive_dataWykonania').textContent = header.dataWykonania || '';
-    document.getElementById('archive_nrStada').textContent = header.nrStada || '';
-    document.getElementById('archive_klient').textContent = header.klient || '';
-    document.getElementById('archive_adresKlienta').textContent = header.adresKlienta || '';
-    document.getElementById('archive_dataZgloszenia').textContent = header.dataZgloszenia || '';
-    document.getElementById('archive_nrDokumentu').textContent = header.nrDokumentu || '';
+    // 1. Wypełnij Nagłówek
+    document.getElementById('archive_nazwaLecznicy').textContent = header.nazwaLecznicy || '';
+    document.getElementById('archive_dataWykonania').textContent = header.dataWykonania || '';
+    document.getElementById('archive_nrStada').textContent = header.nrStada || '';
+    document.getElementById('archive_klient').textContent = header.klient || '';
+    document.getElementById('archive_adresKlienta').textContent = header.adresKlienta || '';
+    document.getElementById('archive_dataZgloszenia').textContent = header.dataZgloszenia || '';
+    document.getElementById('archive_nrDokumentu').textContent = header.nrDokumentu || '';
 
-    // 2. Wypełnij Tabelę (NOWA, BEZPIECZNA LOGIKA DOM)
-    const tbody = document.querySelector('#archive_karta tbody');
-    tbody.innerHTML = ''; // Wyczyść stare wiersze
+    // 2. Wypełnij Tabelę
+    const tbody = document.querySelector('#archive_karta tbody');
+    tbody.innerHTML = ''; 
 
-    const savedRows = card.table || [];
-    
-    // Funkcja pomocnicza do wyszukiwania danych dla wiersza
-    const findRowData = (logicalIndex, lpFallback) => {
-        let row = savedRows.find(r => r.logicalIndex === logicalIndex);
-        if (row) return row;
-        row = savedRows.find(r => r.lp && r.lp.startsWith(lpFallback));
-        return row; // Zwróci 'row' lub 'undefined'
-    };
-    
-    // Funkcja pomocnicza do tworzenia komórek
-    const createCell = (htmlContent = '', isCenter = false) => {
-        const td = document.createElement('td');
-        td.innerHTML = htmlContent;
-        if (isCenter) {
-            td.style.textAlign = 'center';
-        }
-        return td;
-    };
+    const savedRows = card.table || [];
+    
+    // --- KLUCZOWA POPRAWKA ---
+    // Szukamy TYLKO po logicalIndex. Usuwamy szukanie po LP, które powodowało błędy.
+    const findRowData = (logicalIndex) => {
+        return savedRows.find(r => r.logicalIndex === logicalIndex);
+    };
+    
+    const createCell = (htmlContent = '', isCenter = false) => {
+        const td = document.createElement('td');
+        td.innerHTML = htmlContent;
+        if (isCenter) td.style.textAlign = 'center';
+        return td;
+    };
 
-    // Odtwarzamy DOKŁADNIE 13-wierszową strukturę
-    for (let i = 1; i <= 13; i++) {
-        const tr = tbody.insertRow();
-        let logicalIndex = -1;
-        let displayLp = '';
+    for (let i = 1; i <= 13; i++) {
+        const tr = tbody.insertRow();
+        let logicalIndex = -1;
+        let displayLp = '';
 
-        if (i < 10) {
-            logicalIndex = i - 1; // 0 do 8
-            displayLp = `${i}.`;
-        } else if (i === 10) {
-            tr.innerHTML = `<td colspan="8" style="font-weight: bold; padding: 3px 2px;">Potwierdzenie nabycia produktu leczniczego weterynaryjnego/paszy leczniczej</td>`;
-            continue;
-        } else {
-            logicalIndex = i - 2; // 9, 10, 11
-            displayLp = `${i - 10}.`; // 1., 2., 3.
-        }
+        if (i < 10) {
+            logicalIndex = i - 1; 
+            displayLp = `${i}.`;
+        } else if (i === 10) {
+            tr.innerHTML = `<td colspan="8" style="font-weight: bold; padding: 3px 2px;">Potwierdzenie nabycia produktu leczniczego weterynaryjnego/paszy leczniczej</td>`;
+            continue;
+        } else {
+            logicalIndex = i - 2; 
+            displayLp = `${i - 10}.`; 
+        }
 
-        const rowData = findRowData(logicalIndex, displayLp);
-        
-        if (rowData) {
-            // ✅ BUDOWANIE WIERSZA METODĄ DOM (BEZPIECZNE)
-            // To jest poprawna kolejność kolumn
-            tr.appendChild(createCell(displayLp));   // Kol 1: Lp
-            tr.appendChild(createCell(rowData.opis));   // Kol 2: Opis
-            tr.appendChild(createCell(rowData.liczba, true)); // Kol 3: Liczba (wyśrodk.)
-            tr.appendChild(createCell(rowData.rozpoznanie)); // Kol 4: Rozpoznanie
-            tr.appendChild(createCell(rowData.lek));   // Kol 5: Lek
-            tr.appendChild(createCell(rowData.seria));   // Kol 6: Seria
-            tr.appendChild(createCell(rowData.iloscDawka)); // Kol 7: Ilosc (z HTML)
-            tr.appendChild(createCell(rowData.karencja)); // Kol 8: Karencja
-        } else {
-            // Renderuj pusty wiersz
-            tr.innerHTML = `<td>${displayLp}</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>`;
-        }
-    }
+        // Używamy nowej, bezpiecznej funkcji
+        const rowData = findRowData(logicalIndex);
+        
+        if (rowData) {
+            tr.appendChild(createCell(displayLp, true));
+            tr.appendChild(createCell(rowData.opis));
+            tr.appendChild(createCell(rowData.liczba, true));
+            tr.appendChild(createCell(rowData.rozpoznanie)); // Usunięto center
+            tr.appendChild(createCell(rowData.lek));
+            tr.appendChild(createCell(rowData.seria, true));
+            tr.appendChild(createCell(rowData.iloscDawka));
+            tr.appendChild(createCell(rowData.karencja));
+        } else {
+            // Pusty wiersz
+            tr.innerHTML = `<td style="text-align: center;">${displayLp}</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>`;
+        }
+    }
 
-    // 3. Wypełnij Podpisy
-    document.getElementById('archive_doctor-signature').src = header.podpisLekarzaImg || '';
-    document.getElementById('archive_doctor-signature-name').textContent = header.podpisLekarzaLinia || '';
-    document.getElementById('archive_podpisPosiadacza').src = card.podpisPosiadacza || '';
+    // 3. Wypełnij Podpisy
+    document.getElementById('archive_doctor-signature').src = header.podpisLekarzaImg || '';
+    document.getElementById('archive_doctor-signature-name').textContent = header.podpisLekarzaLinia || '';
+    document.getElementById('archive_podpisPosiadacza').src = card.podpisPosiadacza || '';
 }
 /* ⬆️ ======================================================= ⬆️ */
 
@@ -17001,14 +16994,11 @@ function openDirectPrintWindow(card) {
     const header = card.header || {};
     const savedRows = card.table || [];
 
-    // --- 1. Generowanie Wierszy Tabeli ---
     let rowsHTML = '';
     
-    const findRowData = (logicalIndex, lpFallback) => {
-        let row = savedRows.find(r => r.logicalIndex === logicalIndex);
-        if (row) return row;
-        row = savedRows.find(r => r.lp && r.lp.startsWith(lpFallback));
-        return row; 
+    // --- KLUCZOWA POPRAWKA LOGIKI WYSZUKIWANIA ---
+    const findRowData = (logicalIndex) => {
+        return savedRows.find(r => r.logicalIndex === logicalIndex);
     };
 
     for (let i = 1; i <= 13; i++) {
@@ -17019,7 +17009,6 @@ function openDirectPrintWindow(card) {
             logicalIndex = i - 1; 
             displayLp = `${i}.`;
         } else if (i === 10) {
-            // Wiersz specjalny
             rowsHTML += `<tr><td colspan="8" style="text-align: left; font-weight: bold; padding: 2px 4px; background-color: #f9f9f9; font-size: 8pt;">Potwierdzenie nabycia produktu leczniczego weterynaryjnego/paszy leczniczej</td></tr>`;
             continue; 
         } else {
@@ -17027,27 +17016,29 @@ function openDirectPrintWindow(card) {
             displayLp = `${i - 10}.`; 
         }
 
-        const rowData = findRowData(logicalIndex, displayLp);
+        const rowData = findRowData(logicalIndex);
 
         const opis = rowData ? rowData.opis : '';
         const liczba = rowData ? rowData.liczba : '';
         const rozpoznanie = rowData ? rowData.rozpoznanie : '';
         const lek = rowData ? rowData.lek : '';
         const seria = rowData ? rowData.seria : '';
-        const ilosc = rowData ? rowData.iloscDawka : ''; 
-        const karencja = rowData ? rowData.karencja : '';
-
-        const cleanIlosc = (html) => {
-            if (!html) return '';
-            if (html.includes('<input')) {
+        
+        // Czysta ilość bez HTML inputów
+        let ilosc = '';
+        if (rowData) {
+             if (rowData.iloscDawka && rowData.iloscDawka.includes('<input')) {
                 const tempDiv = document.createElement('div');
-                tempDiv.innerHTML = html;
+                tempDiv.innerHTML = rowData.iloscDawka;
                 const inputVal = tempDiv.querySelector('input')?.value || '';
                 const textVal = tempDiv.textContent || '';
-                return inputVal + ' ' + textVal;
-            }
-            return html;
-        };
+                ilosc = inputVal + ' ' + textVal;
+             } else {
+                ilosc = rowData.iloscDawka || '';
+             }
+        }
+        
+        const karencja = rowData ? rowData.karencja : '';
 
         rowsHTML += `
             <tr>
@@ -17057,230 +17048,17 @@ function openDirectPrintWindow(card) {
                 <td style="text-align: center;">${rozpoznanie}</td>
                 <td>${lek}</td>
                 <td style="text-align: center;">${seria}</td>
-                <td>${cleanIlosc(ilosc)}</td>
+                <td>${ilosc}</td>
                 <td>${karencja}</td>
             </tr>
         `;
     }
 
-    // --- 2. Otwarcie Okna ---
     const printWindow = window.open('', '_blank', 'width=1100,height=850,scrollbars=yes,resizable=yes');
-    if (!printWindow) {
-        alert('Nie udało się otworzyć nowego okna. Wyłącz blokowanie wyskakujących okienek.');
-        return;
-    }
+    if (!printWindow) { alert('Zablokowano okno.'); return; }
 
-    // --- 3. Budowanie HTML ---
-    printWindow.document.write(`
-        <!DOCTYPE html>
-        <html lang="pl">
-        <head>
-            <meta charset="utf-8">
-            <title>Karta Leczenia - ${header.nrDokumentu || 'Podgląd'}</title>
-            <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
-            <style>
-                /* Tło i kontrolki */
-                body { 
-                    font-family: 'Nunito', sans-serif; 
-                    margin: 0; padding: 0; 
-                    background-color: #525659; 
-                    display: flex; flex-direction: column; align-items: center; 
-                    min-height: 100vh;
-                }
-                .print-controls { 
-                    width: 100%; padding: 10px; text-align: center; 
-                    background-color: #333; color: white;
-                    position: sticky; top: 0; z-index: 9999;
-                    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-                    display: flex; justify-content: center; gap: 20px;
-                }
-                .btn {
-                    padding: 8px 20px; font-size: 14px; cursor: pointer; 
-                    border-radius: 4px; border: 1px solid #777; font-weight: 700;
-                    color: white; font-family: 'Nunito', sans-serif;
-                }
-                .btn-print { background-color: #4CAF50; border-color: #388E3C; }
-                .btn-close { background-color: #f44336; border-color: #D32F2F; }
-
-                /* Kartka A4 - Kompaktowa */
-                .page-preview {
-                    background-color: white;
-                    width: 297mm; /* A4 Landscape */
-                    min-height: 210mm; 
-                    padding: 0.5cm; 
-                    margin: 20px auto;
-                    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-                    box-sizing: border-box;
-                    color: #000;
-                }
-
-                /* --- Kompaktowe Style Wewnętrzne --- */
-                
-                h2 { 
-                    text-align: center; font-size: 12pt; 
-                    text-transform: uppercase; 
-                    margin-bottom: 5px; margin-top: 0;
-                    font-weight: 800; color: #000;
-                }
-                
-                .top-section { 
-                    display: grid; grid-template-columns: 1fr 1fr 1fr; 
-                    font-size: 9pt; 
-                    margin-bottom: 5px; gap: 5px; 
-                }
-                .top-section div { 
-                    border: 1px solid #ddd; padding: 4px; border-radius: 4px; 
-                }
-                
-                .top-data-bold { font-size: 10pt; font-weight: bold; }
-
-                /* Tabela */
-                table { 
-                    border-collapse: collapse; width: 100%; 
-                    font-size: 8pt; 
-                    margin-bottom: 5px; 
-                }
-                th, td { 
-                    border: 1px solid #000; 
-                    padding: 1px 3px; 
-                    text-align: left; vertical-align: middle; 
-                    height: 18px; 
-                }
-                th { 
-                    background: #EBF5E6 !important; 
-                    text-align: center; font-weight: bold; 
-                    padding: 3px;
-                }
-                
-                p { 
-                    margin-top: 2px; margin-bottom: 2px; 
-                    font-size: 8pt; 
-                }
-
-                /* Podpisy - POPRAWKA: Usunięto border-top (kropki) */
-                .signatures { 
-                    display: flex; justify-content: space-between; 
-                    margin-top: 10px; 
-                }
-                .signature-box { 
-                    display: flex; flex-direction: column; align-items: center; width: 45%; 
-                }
-                .signature-label { 
-                    font-weight: bold; font-size: 9pt; 
-                    border-top: none; /* ✅ USUNIĘTO KROPKI */
-                    padding-top: 2px; 
-                    width: 90%; text-align: center; 
-                }
-                .signature-img { 
-                    display: block; height: 45px; 
-                    max-width: 100%; object-fit: contain; margin-bottom: 2px; 
-                }
-                .signature-name { font-size: 8pt; }
-
-                /* Styl dla druku */
-                @media print {
-                    body { 
-                        background-color: white !important; margin: 0 !important; padding: 0 !important;
-                        display: block !important; 
-                    }
-                    .print-controls { display: none !important; }
-                    .page-preview { 
-                        width: 100% !important; 
-                        margin: 0 !important; 
-                        padding: 0 !important; 
-                        box-shadow: none !important; 
-                        border: none !important;
-                    }
-                    @page { 
-                        size: A4 landscape; 
-                        margin: 0.5cm; 
-                    }
-                }
-            </style>
-        </head>
-        <body>
-            <div class="print-controls">
-                <button class="btn btn-print" onclick="window.print()">🖨️ Drukuj / Zapisz PDF</button>
-                <button class="btn btn-close" onclick="window.close()">❌ Zamknij okno</button>
-            </div>
-
-            <div class="page-preview">
-                <h2>KARTA LECZENIA ZWIERZĄT GOSPODARSKICH ORAZ ZWIERZĄT, Z KTÓRYCH POZYSKANE TKANKI LUB PRODUKTY SĄ PRZEZNACZONE DO SPOŻYCIA PRZEZ LUDZI / EWIDENCJA LECZENIA ZWIERZĄT</h2>
-
-                <div class="top-section">
-                    <div>
-                        Nazwa i adres zakładu leczniczego dla zwierząt:<br>
-                        <span class="top-data-bold">${header.nazwaLecznicy || ''}</span><br>
-                        Wykonanie czynności lekarsko-weterynaryjnych dnia: <span class="top-data-bold">${header.dataWykonania || ''}</span><br>
-                        Nr stada: <span class="top-data-bold">${header.nrStada || ''}</span>
-                    </div>
-                    <div>
-                        Imię, nazwisko i adres albo nazwa siedziby i adres posiadacza zwierzęcia:<br>
-                        <span class="top-data-bold">${header.klient || ''}</span><br>
-                        <span class="top-data-bold">${header.adresKlienta || ''}</span>
-                    </div>
-                    <div>
-                        Zgłoszenie: Data: <span class="top-data-bold">${header.dataZgloszenia || ''}</span><br>
-                        Nr dokumentu: <span class="top-data-bold">${header.nrDokumentu || ''}</span>
-                    </div>
-                </div>
-
-                <table>
-                    <colgroup>
-                       <col style="width: 30px;">
-                       <col style="width: 20%;">
-                       <col style="width: 50px;">
-                       <col style="width: 15%;">
-                       <col style="width: 20%;">
-                       <col style="width: 10%;">
-                       <col style="width: 10%;">
-                       <col>
-                    </colgroup>
-                    <thead>
-                        <tr>
-                            <th rowspan="2">Lp.</th>
-                            <th rowspan="2">
-                                Nazwa siedziby stada i opis leczonego zwierzęcia<br>
-                                (gatunek, płeć numer identyfikacyjny, sposób oznakowania, wiek, masa ciała)
-                            </th>
-                            <th rowspan="2">Liczba lecz. zw.</th>
-                            <th rowspan="2">Rozpoznanie albo wstępne rozpoznanie choroby</th>
-                            <th colspan="3">
-                                Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posiadacza zwierzęcia produkty lecznicze weterynaryjne lub pasze lecznicze
-                            </th>
-                            <th rowspan="2">okres karencji / Zabieg leczniczy lub profilaktyczne zalecenia lekarskie oraz uwagi</th>
-                        </tr>
-                        <tr>
-                            <th>Nazwa produktu leczniczego/ produktu leczniczego weterynaryjnego/ paszy leczniczej</th>
-                            <th>Numer serii produktu lecz.</th>
-                            <th>Ilość, dawkowanie zas. produktu</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${rowsHTML}
-                    </tbody>
-                </table>
-
-                <p><b>Oświadczam, że nabyte produkty lecznicze weterynaryjne/pasze lecznicze zostaną zastosowane zgodnie z zaleceniami lekarza weterynarii.</b></p>
-
-                <div class="signatures">
-                    <div class="signature-box">
-                        <span class="signature-label">Lekarz weterynarii</span>
-                        ${header.podpisLekarzaImg ? `<img src="${header.podpisLekarzaImg}" class="signature-img">` : '<div style="height:45px;"></div>'}
-                        <span class="signature-name">${header.podpisLekarzaLinia || ''}</span>
-                    </div>
-                    <div class="signature-box">
-                        <span class="signature-label">Podpis posiadacza zwierzęcia</span>
-                        ${card.podpisPosiadacza ? `<img src="${card.podpisPosiadacza}" class="signature-img">` : '<div style="height:45px;"></div>'}
-                    </div>
-                </div>
-
-                <p><b>Wyniki badań uzupełniających:</b><br>*W przypadku zwierząt znajdujących się w rejestrze zwierząt gospodarskich oznakowanych</p>
-            </div>
-        </body>
-        </html>
-    `);
-
+    // Używamy ujednoliconego szablonu HTML (tego samego co w Generatorze)
+    printWindow.document.write(getUnifiedPrintHTML(header, rowsHTML));
     printWindow.document.close();
     printWindow.focus();
 }
@@ -17452,9 +17230,9 @@ function createSmartDosageCell(cell, row) {
  * Skala: 80%, Zmniejszone marginesy pionowe.
  */
 function openCurrentA4PrintWindow() {
-    console.log("Generowanie podglądu A4 (Compact - Anti-spill)...");
+    console.log("Generowanie podglądu A4 (Generator - Unified)...");
 
-    // --- 1. POBIERANIE DANYCH Z EKRANU ---
+    // 1. Pobieranie danych z inputów
     const header = {
         nazwaLecznicy: document.getElementById('nazwaLecznicy').textContent,
         dataWykonania: document.getElementById('dataWykonania').value,
@@ -17468,13 +17246,11 @@ function openCurrentA4PrintWindow() {
         podpisPosiadaczaImg: document.getElementById('canvasPosiadacz').toDataURL()
     };
 
-    // Pobieranie wierszy z tabeli
     let rowsHTML = '';
     const rows = document.querySelectorAll('#karta tbody tr');
     
     rows.forEach((tr, index) => {
         if (tr.cells.length === 1) {
-            // Wiersz separatora - zmniejszony padding
             rowsHTML += `<tr><td colspan="8" style="text-align: left; font-weight: bold; padding: 2px 4px; background-color: #f9f9f9; font-size: 8pt;">Potwierdzenie nabycia produktu leczniczego weterynaryjnego/paszy leczniczej</td></tr>`;
             return;
         }
@@ -17530,19 +17306,24 @@ function openCurrentA4PrintWindow() {
         `;
     });
 
-    // --- 2. OTWARCIE OKNA I WSTRZYKNIĘCIE HTML ---
     const printWindow = window.open('', '_blank', 'width=1150,height=800,scrollbars=yes,resizable=yes');
-    if (!printWindow) {
-        alert('Nie udało się otworzyć okna druku. Wyłącz blokowanie wyskakujących okienek.');
-        return;
-    }
+    if (!printWindow) { alert('Zablokowano okno.'); return; }
 
-    printWindow.document.write(`
+    // UŻYCIE WSPÓLNEGO SZABLONU
+    printWindow.document.write(getUnifiedPrintHTML(header, rowsHTML));
+    printWindow.document.close();
+    printWindow.focus();
+}
+    /* ======================================================== */
+/* ✅ NOWA FUNKCJA POMOCNICZA: WSPÓLNY SZABLON WYDRUKU (FIX) */
+/* ======================================================== */
+function getUnifiedPrintHTML(header, rowsHTML) {
+    return `
         <!DOCTYPE html>
         <html lang="pl">
         <head>
             <meta charset="utf-8">
-            <title>Karta Leczenia - Wydruk</title>
+            <title>Karta Leczenia</title>
             <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
             <style>
                 body { 
@@ -17551,70 +17332,51 @@ function openCurrentA4PrintWindow() {
                     margin: 0; padding: 20px; 
                     display: flex; flex-direction: column; align-items: center;
                 }
-
                 .print-controls {
                     position: sticky; top: 0; z-index: 1000;
-                    background: #333; color: #fff;
-                    padding: 10px; border-radius: 8px;
-                    margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-                    display: flex; gap: 15px;
+                    background: #333; color: #fff; padding: 10px; border-radius: 8px;
+                    margin-bottom: 20px; display: flex; gap: 15px;
                 }
-                .btn {
-                    padding: 8px 20px; font-size: 16px; cursor: pointer;
-                    border: none; border-radius: 4px; font-weight: bold;
-                }
+                .btn { padding: 8px 20px; cursor: pointer; border-radius: 4px; border:none; font-weight:bold; }
                 .btn-print { background: #4CAF50; color: white; }
                 .btn-close { background: #f44336; color: white; }
 
-                /* --- KARTKA A4 --- */
+                /* KARTKA A4 */
                 .page-sheet {
                     background: white;
-                    width: 297mm; /* A4 Poziomo */
-                    min-height: 210mm;
-                    padding: 10mm;
-                    box-shadow: 0 0 15px rgba(0,0,0,0.2);
+                    width: 297mm; min-height: 210mm;
+                    padding: 8mm; 
                     box-sizing: border-box;
-                    
-                    /* Podgląd na ekranie (80%) */
-                    transform: scale(0.8);
-                    transform-origin: top center;
+                    transform: scale(0.8); transform-origin: top center; /* Podgląd na ekranie */
+                    box-shadow: 0 0 15px rgba(0,0,0,0.2);
                 }
 
-                /* --- STYLE ZAGĘSZCZONE (COMPACT) --- */
-                h2 { 
-                    text-align: center; font-size: 11pt; text-transform: uppercase; 
-                    margin-bottom: 5px; margin-top: 0; /* Mniejszy margines */
-                    font-weight: 700; color: #000;
-                }
+                h2 { text-align: center; font-size: 11pt; margin: 0 0 5px 0; font-weight: 700; color: #000; text-transform: uppercase; }
                 
-                .top-section { 
-                    display: grid; grid-template-columns: 1fr 1fr 1fr; 
-                    font-size: 9pt; margin-bottom: 5px; gap: 5px; /* Mniejszy margines */
-                }
-                .top-section div { padding: 2px; border: 1px solid #ccc; }
+                .top-section { display: grid; grid-template-columns: 1fr 1fr 1fr; font-size: 9pt; margin-bottom: 5px; gap: 5px; }
+                .top-section div { padding: 2px; border: 1px solid #000; }
                 .bold { font-weight: 700; }
 
-                /* Tabela */
                 table { border-collapse: collapse; width: 100%; font-size: 8pt; margin-bottom: 2px; }
                 th, td { border: 1px solid #000; padding: 2px; text-align: left; vertical-align: middle; }
-                th { background-color: #EBF5E6; text-align: center; font-weight: bold; padding: 3px 2px; }
+                th { background-color: #EBF5E6; text-align: center; font-weight: bold; }
                 .center-text { text-align: center; }
+                p { font-size: 9pt; margin: 2px 0; }
 
-                p { font-size: 9pt; margin: 2px 0; } /* Bardzo małe marginesy akapitów */
-
-                /* Podpisy */
                 .signatures { display: flex; justify-content: space-between; margin-top: 10px; }
                 .sig-box { display: flex; flex-direction: column; align-items: center; width: 45%; }
                 .sig-label { font-weight: bold; margin-bottom: 2px; font-size: 9pt; display: block; text-align: center; width: 100%; }
-                /* Zmniejszona wysokość podpisu */
-                .sig-img { display: block; height: 40px; width: 100%; object-fit: contain; margin-top: 2px; }
-                .sig-name { margin-top: 1px; font-weight: normal; text-align: center; font-size: 9pt; }
+                .sig-img { display: block; height: 35px; width: 100%; object-fit: contain; margin-top: 2px; }
+                .sig-name { margin-top: 1px; font-size: 9pt; text-align: center; }
 
-                /* --- USTAWIENIA DRUKARKI --- */
+                /* --- USTAWIENIA DRUKARKI (Fix Pustej Strony + Skala 80%) --- */
                 @media print {
-                    body { 
-                        background: none; margin: 0; padding: 0; 
-                        display: block; 
+                    html, body {
+                        height: 99%; /* Wymuszenie wysokości */
+                        overflow: hidden; /* Ukrycie ewentualnego nadmiaru */
+                        background-color: white !important;
+                        margin: 0 !important; padding: 0 !important;
+                        display: block !important;
                     }
                     .print-controls { display: none; }
                     
@@ -17624,15 +17386,14 @@ function openCurrentA4PrintWindow() {
                         /* Skalowanie 80% */
                         transform: scale(0.80); 
                         transform-origin: top left;
-                        width: 125%; /* 100 / 0.8 = 125% */
+                        width: 125%; /* 100 / 0.8 = 125% - Kompensacja szerokości */
                         
-                        /* Zapobieganie łamaniu strony wewnątrz */
-                        page-break-inside: avoid;
+                        page-break-after: avoid !important;
+                        page-break-before: avoid !important;
                     }
-
                     @page {
                         size: A4 landscape;
-                        margin: 0.4cm; /* Minimalny bezpieczny margines */
+                        margin: 5mm; 
                     }
                 }
             </style>
@@ -17645,7 +17406,6 @@ function openCurrentA4PrintWindow() {
 
             <div class="page-sheet">
                 <h2>KARTA LECZENIA ZWIERZĄT GOSPODARSKICH ORAZ ZWIERZĄT, Z KTÓRYCH POZYSKANE TKANKI LUB PRODUKTY SĄ PRZEZNACZONE DO SPOŻYCIA PRZEZ LUDZI / EWIDENCJA LECZENIA ZWIERZĄT</h2>
-                
                 <div class="top-section">
                     <div>
                         Nazwa i adres zakładu leczniczego dla zwierząt:<br>
@@ -17668,15 +17428,10 @@ function openCurrentA4PrintWindow() {
                     <thead>
                         <tr>
                             <th rowspan="2" style="width:30px;">Lp.</th>
-                            <th rowspan="2" class="center-text">
-                                Nazwa siedziby stada i opis leczonego zwierzęcia<br>
-                                (gatunek, płeć numer identyfikacyjny, sposób oznakowania, wiek, masa ciała)
-                            </th>
+                            <th rowspan="2" class="center-text">Nazwa siedziby stada i opis leczonego zwierzęcia<br>(gatunek, płeć numer identyfikacyjny, sposób oznakowania, wiek, masa ciała)</th>
                             <th rowspan="2" class="center-text">Liczba leczonych zwierząt</th>
                             <th rowspan="2" class="center-text">Rozpoznanie albo wstępne rozpoznanie choroby</th>
-                            <th colspan="3">
-                                Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posiadacza zwierzęcia produkty lecznicze weterynaryjne lub pasze lecznicze
-                            </th>
+                            <th colspan="3">Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posiadacza zwierzęcia produkty lecznicze weterynaryjne lub pasze lecznicze</th>
                             <th rowspan="2">okres karencji / Zabieg leczniczy lub profilaktyczne zalecenia lekarskie oraz uwagi</th>
                         </tr>
                         <tr>
@@ -17685,9 +17440,7 @@ function openCurrentA4PrintWindow() {
                             <th>Ilość, dawkowanie zastosowanego produktu leczniczego lub ilość, dawkowanie i okres stosowanie nabytego produktu leczniczego, weterynaryjnego/paszy leczniczej</th>
                         </tr>
                     </thead>
-                    <tbody>
-                        ${rowsHTML}
-                    </tbody>
+                    <tbody>${rowsHTML}</tbody>
                 </table>
 
                 <p><b>Oświadczam, że nabyte produkty lecznicze weterynaryjne/pasze lecznicze zostaną zastosowane zgodnie z zaleceniami lekarza weterynarii.</b></p>
@@ -17695,23 +17448,19 @@ function openCurrentA4PrintWindow() {
                 <div class="signatures">
                     <div class="sig-box">
                         <span class="sig-label">Lekarz weterynarii</span>
-                        ${header.podpisLekarzaImg ? `<img src="${header.podpisLekarzaImg}" class="sig-img">` : '<div style="height:40px;"></div>'}
+                        ${header.podpisLekarzaImg ? `<img src="${header.podpisLekarzaImg}" class="sig-img">` : '<div style="height:35px;"></div>'}
                         <span class="sig-name">${header.podpisLekarzaLinia}</span>
                     </div>
                     <div class="sig-box">
                         <span class="sig-label">Podpis posiadacza zwierzęcia</span>
-                        ${header.podpisPosiadaczaImg ? `<img src="${header.podpisPosiadaczaImg}" class="sig-img">` : '<div style="height:40px;"></div>'}
+                        ${header.podpisPosiadaczaImg ? `<img src="${header.podpisPosiadaczaImg}" class="sig-img">` : '<div style="height:35px;"></div>'}
                     </div>
                 </div>
-
                 <p style="margin-top: 5px;"><b>Wyniki badań uzupełniających:</b><br>*W przypadku zwierząt znajdujących się w rejestrze zwierząt gospodarskich oznakowanych</p>
             </div>
         </body>
         </html>
-    `);
-
-    printWindow.document.close();
-    printWindow.focus();
+    `;
 }
 </script> 
 
