@@ -2153,6 +2153,7 @@ table {
     display: block; /* Pokaż aktywną zakładkę */
 }
     /* --- Style dla inteligentnej komórki dat w tabeli --- */
+/* --- Style dla inteligentnej komórki dat w tabeli (Poprawione) --- */
 .karencja-input {
     width: 100%;
     border: none;
@@ -2160,34 +2161,57 @@ table {
     font-family: inherit;
     font-size: inherit;
     outline: none;
+    text-overflow: ellipsis;
 }
 .karencja-input:focus {
     background-color: #fff;
 }
-.table-date-popup {
+
+/* Overlay tła dla popupa w tabeli */
+.table-date-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 10001; /* Bardzo wysoko */
     display: none;
-    position: absolute;
-    right: 0;
-    top: 100%;
+    justify-content: center;
+    align-items: center;
+}
+
+/* Sam popup - teraz na środku ekranu */
+.table-date-popup-centered {
     background: #fff;
-    border: 1px solid #ccc;
-    padding: 8px;
-    z-index: 100;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.2);
-    min-width: 240px;
-    border-radius: 4px;
+    padding: 20px;
+    border-radius: 12px;
+    width: 90%;
+    max-width: 400px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
 }
-.table-date-popup input[type="date"] {
+
+.table-date-popup-centered h4 {
+    margin: 0 0 10px 0;
+    font-size: 18px;
+    text-align: center;
+    color: #2e7d32;
+}
+
+.table-date-popup-centered input {
     width: 100%;
-    margin-bottom: 5px;
-    font-size: 12px;
-    padding: 4px;
+    padding: 10px;
+    font-size: 16px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    box-sizing: border-box;
 }
-.table-date-popup label {
-    font-size: 11px;
+
+.table-date-popup-centered label {
     font-weight: bold;
+    font-size: 14px;
+    margin-bottom: 4px;
     display: block;
-    margin-bottom: 3px;
 }
 </style>
     <div id="calcProductSearchModal" class="product-search-modal" style="display: none; z-index: 10003;">
@@ -2705,7 +2729,7 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
                     </div>
                 </form>
                 
-               <div class="form-row">
+              <div class="form-row">
                     <label for="formKarencja">Okres karencji / uwagi</label>
                     <div class="mic-container" style="display: flex; gap: 8px; align-items: center;">
                         <input type="text" id="formKarencja" placeholder="Okres karencji / uwagi">
@@ -2714,17 +2738,25 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
                     
                     <div id="formDosageDates" style="display: none; background: #e8f5e9; padding: 10px; border-radius: 6px; margin-top: 8px; border: 1px solid #c8e6c9;">
                         <label style="font-size: 14px; color: #2e7d32; font-weight: bold; margin-bottom: 5px; display: block;">📅 Generator zaleceń:</label>
-                        <div style="display: flex; gap: 5px; align-items: center; flex-wrap: wrap;">
-                            <div style="flex: 1;">
-                                <span style="font-size: 12px;">Od:</span>
-                                <input type="date" id="formDosageDateStart" style="font-size: 14px; padding: 5px; width: 100%;">
+                        
+                        <div style="display: flex; gap: 5px; align-items: flex-end; flex-wrap: wrap;">
+                            <div style="flex: 2; min-width: 120px;">
+                                <span style="font-size: 12px; font-weight: 600;">Od:</span>
+                                <input type="date" id="formDosageDateStart" style="font-size: 14px; padding: 5px; width: 100%; box-sizing: border-box;">
                             </div>
-                            <div style="flex: 1;">
-                                <span style="font-size: 12px;">Do:</span>
-                                <input type="date" id="formDosageDateEnd" style="font-size: 14px; padding: 5px; width: 100%;">
+                            <div style="flex: 2; min-width: 120px;">
+                                <span style="font-size: 12px; font-weight: 600;">Do:</span>
+                                <input type="date" id="formDosageDateEnd" style="font-size: 14px; padding: 5px; width: 100%; box-sizing: border-box;">
+                            </div>
+                            <div style="flex: 1; min-width: 80px;">
+                                <span style="font-size: 12px; font-weight: 600;">Po (dawka):</span>
+                                <input type="text" id="formDosageDose" placeholder="np. 25 ml" style="font-size: 14px; padding: 5px; width: 100%; box-sizing: border-box;">
                             </div>
                         </div>
-                        <p style="font-size: 11px; color: #666; margin: 3px 0 0 0;">Automatycznie wpisze: "Stosować od... do... po [dawka]"</p>
+                        
+                        <p style="font-size: 11px; color: #666; margin: 5px 0 0 0;">
+                            Dopisze: "Stosować od... do... po [dawka]" (nie kasując treści z bazy)
+                        </p>
                     </div>
                     </div>
             </div>
@@ -17164,7 +17196,8 @@ function openDirectPrintWindow(card) {
     printWindow.focus();
 }
     /* ======================================================== */
-/* ✅ MODUŁ 8: Generator Zaleceń (Daty w Produktach Pozostawionych) */
+/* ======================================================== */
+/* ✅ MODUŁ 8 (POPRAWIONY v2): Generator Zaleceń (Daty + Dawka + Append) */
 /* ======================================================== */
 
 // 1. Pomocnicza: Formatowanie daty YYYY-MM-DD -> DD.MM.YYYY
@@ -17179,72 +17212,56 @@ function formatDateToPL(dateStr) {
 const formDosageDates = document.getElementById('formDosageDates');
 const formDosageDateStart = document.getElementById('formDosageDateStart');
 const formDosageDateEnd = document.getElementById('formDosageDateEnd');
+const formDosageDose = document.getElementById('formDosageDose'); // Nowe pole
 const formKarencjaInput = document.getElementById('formKarencja');
 
+/**
+ * Funkcja aktualizująca tekst w formularzu.
+ * Nie nadpisuje wszystkiego, lecz szuka zdania "Stosować od..." i je podmienia lub dodaje.
+ */
 function updateKarencjaFromDates() {
     const start = formDosageDateStart.value;
     const end = formDosageDateEnd.value;
-    
-    // Pobierz dawkę z pola formularza
-    let dawka = document.getElementById('formDawkowanie').value.trim();
-    // Jeśli pole jest puste, spróbuj pobrać z mapy
-    if (!dawka && document.getElementById('formLek').value) {
-        dawka = mapaIlosci[document.getElementById('formLek').value] || '';
-    }
-    // Jeśli nadal puste, spróbuj pobrać z pola ilości
-    if (!dawka) {
-         dawka = document.getElementById('formIlosc').value.trim();
-    }
-    
-    if (start && end) {
-        // Generujemy zdanie
-        const text = `Stosować od ${formatDateToPL(start)} do ${formatDateToPL(end)} po ${dawka}`;
-        formKarencjaInput.value = text;
+    const dose = formDosageDose.value.trim(); // Pobierz dawkę z nowego pola
+
+    if (start && end && dose) {
+        const newSentence = ` Stosować od ${formatDateToPL(start)} do ${formatDateToPL(end)} po ${dose}.`;
+        
+        let currentText = formKarencjaInput.value;
+
+        // Regex: Szuka istniejącego zdania "Stosować od X do Y po Z." (z kropką lub bez na końcu)
+        // \d{2}\.\d{2}\.\d{4} to format daty DD.MM.YYYY
+        const regex = / ?Stosować od \d{2}\.\d{2}\.\d{4} do \d{2}\.\d{2}\.\d{4} po .*?(\.|$)/;
+
+        if (regex.test(currentText)) {
+            // Jeśli zdanie już istnieje -> podmień je
+            formKarencjaInput.value = currentText.replace(regex, newSentence);
+        } else {
+            // Jeśli nie istnieje -> dopisz na końcu (zachowując treść z bazy)
+            formKarencjaInput.value = (currentText.trim() + newSentence).trim();
+        }
     }
 }
 
-if (formDosageDateStart && formDosageDateEnd) {
+// Listenery w formularzu
+if (formDosageDateStart && formDosageDateEnd && formDosageDose) {
     formDosageDateStart.addEventListener('input', updateKarencjaFromDates);
     formDosageDateEnd.addEventListener('input', updateKarencjaFromDates);
+    formDosageDose.addEventListener('input', updateKarencjaFromDates);
 }
 
-// Aktualizuj tekst również, gdy zmieni się dawkowanie
-if (document.getElementById('formDawkowanie')) {
-    document.getElementById('formDawkowanie').addEventListener('input', () => {
-        if (formDosageDates.style.display === 'block' && formDosageDateStart.value) {
-            updateKarencjaFromDates();
-        }
-    });
-}
-
-// 3. Pomocnicza: Tworzenie inteligentnej komórki w Tabeli Głównej
+// 3. Pomocnicza: Tworzenie inteligentnej komórki w Tabeli Głównej (Wersja z dużym popupem)
 function createSmartDosageCell(cell, row) {
     cell.innerHTML = '';
     cell.style.position = 'relative';
 
-    // A. Input tekstowy (widoczny)
+    // A. Input tekstowy (widoczny w tabeli)
     const textInput = document.createElement('input');
     textInput.type = 'text';
     textInput.className = 'karencja-input';
     textInput.placeholder = 'Uwagi / Zalecenia...';
-    // Obsługa zapisu do druku (opcjonalna, bo drukarka czyta value)
-    textInput.addEventListener('input', function() { });
-
-    // B. Popup z datami (ukryty)
-    const popup = document.createElement('div');
-    popup.className = 'table-date-popup';
     
-    popup.innerHTML = `
-        <label>Data OD:</label>
-        <input type="date" class="date-start">
-        <label>Data DO:</label>
-        <input type="date" class="date-end">
-        <div style="text-align: right; margin-top: 5px;">
-            <button class="btn small close-popup" style="padding: 2px 6px; font-size: 10px;">Zamknij</button>
-        </div>
-    `;
-
-    // C. Ikonka kalendarza
+    // B. Ikonka kalendarza
     const calIcon = document.createElement('span');
     calIcon.innerHTML = '📅';
     calIcon.style.cursor = 'pointer';
@@ -17252,56 +17269,93 @@ function createSmartDosageCell(cell, row) {
     calIcon.style.right = '2px';
     calIcon.style.top = '50%';
     calIcon.style.transform = 'translateY(-50%)';
-    calIcon.title = 'Wybierz zakres dat';
+    calIcon.style.fontSize = '16px';
+    calIcon.title = 'Generuj zakres dat i dawkę';
 
-    // Logika kliknięcia ikony
+    // Logika kliknięcia ikony (Tworzymy Overlay i Popup dynamicznie)
     calIcon.onclick = (e) => {
-        e.stopPropagation();
-        // Zamknij inne
-        document.querySelectorAll('.table-date-popup').forEach(el => el.style.display = 'none');
-        // Pokaż ten
-        popup.style.display = 'block';
-    };
+        e.stopPropagation(); // Nie aktywuj nawigatora komórek pod spodem
 
-    // Logika aktualizacji tekstu w tabeli
-    const updateTableText = () => {
-        const dStart = popup.querySelector('.date-start').value;
-        const dEnd = popup.querySelector('.date-end').value;
+        // 1. Stwórz Overlay (tło)
+        const overlay = document.createElement('div');
+        overlay.className = 'table-date-overlay';
+        overlay.style.display = 'flex'; // Pokaż od razu
+
+        // 2. Stwórz Popup (okno)
+        const popup = document.createElement('div');
+        popup.className = 'table-date-popup-centered';
         
-        // Pobierz dawkę z komórki obok (index 6)
-        let dawka = '';
-        const cellIlosc = row.cells[6];
-        if (cellIlosc) {
-            // Próbujemy wyciągnąć tekst z inputa lub węzła tekstowego
-            const inp = cellIlosc.querySelector('input');
-            const val = inp ? inp.value : '';
-            const txt = cellIlosc.innerText.replace(val, '').trim();
-            dawka = (val + ' ' + txt).trim();
-        }
+        popup.innerHTML = `
+            <h4>📅 Zalecenia dla klienta</h4>
+            <div>
+                <label>Data OD:</label>
+                <input type="date" class="date-start">
+            </div>
+            <div>
+                <label>Data DO:</label>
+                <input type="date" class="date-end">
+            </div>
+            <div>
+                <label>Dawka (Po ile?):</label>
+                <input type="text" class="dose-input" placeholder="np. 25 ml rano i wieczorem">
+            </div>
+            <div style="display: flex; gap: 10px; margin-top: 10px;">
+                <button class="btn ghost small close-btn" style="flex: 1;">Anuluj</button>
+                <button class="btn primary small save-btn" style="flex: 1;">Zatwierdź</button>
+            </div>
+        `;
 
-        if (dStart && dEnd) {
-            textInput.value = `Stosować od ${formatDateToPL(dStart)} do ${formatDateToPL(dEnd)} po ${dawka}`;
-        }
+        overlay.appendChild(popup);
+        document.body.appendChild(overlay); // Dodaj do body, żeby było na wierzchu
+
+        // --- Logika wewnątrz popupa ---
+        const btnSave = popup.querySelector('.save-btn');
+        const btnClose = popup.querySelector('.close-btn');
+        const inpStart = popup.querySelector('.date-start');
+        const inpEnd = popup.querySelector('.date-end');
+        const inpDose = popup.querySelector('.dose-input');
+
+        // Fokus na dawkę
+        setTimeout(() => inpDose.focus(), 50);
+
+        // Zamknij
+        const closeMe = () => { document.body.removeChild(overlay); };
+        btnClose.onclick = closeMe;
+        overlay.onclick = (ev) => { if(ev.target === overlay) closeMe(); }; // Klik poza oknem zamyka
+
+        // Zapisz
+        btnSave.onclick = () => {
+            const start = inpStart.value;
+            const end = inpEnd.value;
+            const dose = inpDose.value.trim();
+
+            if (start && end && dose) {
+                const newSentence = ` Stosować od ${formatDateToPL(start)} do ${formatDateToPL(end)} po ${dose}.`;
+                
+                let currentText = textInput.value;
+                const regex = / ?Stosować od \d{2}\.\d{2}\.\d{4} do \d{2}\.\d{2}\.\d{4} po .*?(\.|$)/;
+
+                if (regex.test(currentText)) {
+                    // Podmień istniejące zalecenie
+                    textInput.value = currentText.replace(regex, newSentence);
+                } else {
+                    // Dopisz do istniejącego tekstu
+                    textInput.value = (currentText.trim() + newSentence).trim();
+                }
+                
+                // Zapisz do dataset (dla drukowania, jeśli potrzebne)
+                cell.dataset.printValue = textInput.value;
+                
+                // Wyzwól input event na tabeli (dla walidacji/zapisu)
+                textInput.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+            closeMe();
+        };
     };
-
-    popup.querySelector('.date-start').addEventListener('input', updateTableText);
-    popup.querySelector('.date-end').addEventListener('input', updateTableText);
-    popup.querySelector('.close-popup').addEventListener('click', (e) => {
-        e.stopPropagation();
-        popup.style.display = 'none';
-    });
 
     cell.appendChild(textInput);
     cell.appendChild(calIcon);
-    cell.appendChild(popup);
 }
-
-// Zamykanie popupów przy kliknięciu gdziekolwiek
-document.addEventListener('click', (e) => {
-    if (!e.target.closest('.table-date-popup') && !e.target.closest('span[title="Wybierz zakres dat"]')) {
-        document.querySelectorAll('.table-date-popup').forEach(el => el.style.display = 'none');
-    }
-});
 </script> 
 
 <div id="toastContainer" style="position: fixed; top: 20px; right: 20px; z-index: 20000; display: flex; flex-direction: column; gap: 10px;">
