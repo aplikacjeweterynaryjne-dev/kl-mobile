@@ -5771,226 +5771,214 @@ const saveCardToArchiveBtn = document.getElementById('saveCardToArchiveBtn');
  * Pkt 4: Listener dla przycisku "Zapisz w Archiwum"
  */
 /**
- * Pkt 4: Listener dla przycisku "Zapisz w Archiwum"
- * ✅ MODUŁ 8: Przebudowany o walidację duplikatów i transakcyjny zapis stanów.
+ * ✅ MODUŁ 8 (POPRAWIONY): Zapisuje kartę do archiwum.
+ * - FIX: Czyści ikonę kalendarza (zapisuje tylko tekst).
+ * - FIX: Poprawnie pobiera podpis posiadacza.
  */
 if (saveCardToArchiveBtn) {
-    saveCardToArchiveBtn.addEventListener('click', async () => {
-        
-        // --- Krok 1: Podstawowa walidacja (Użytkownik, Puste pola) ---
-        if (!currentUserProfile || !currentUserProfile.uid || !currentUserProfile.id) {
-            alert("Nie można zapisać. Brak danych zalogowanego użytkownika lub ID dokumentu konfiguracji.");
-            return;
-        }
-        const klient = document.getElementById('klientSelect').value;
-        const nrDok = document.getElementById('nrDokumentu').value.trim();
-        if (!klient || !nrDok) {
-            showToast("Wypełnij pola 'Klient' i 'Nr Dokumentu'", 'error');
-            return;
-        }
+    saveCardToArchiveBtn.addEventListener('click', async () => {
+        
+        // Walidacja podstawowa
+        if (!currentUserProfile || !currentUserProfile.uid || !currentUserProfile.id) {
+            alert("Nie można zapisać. Brak danych zalogowanego użytkownika.");
+            return;
+        }
+        const klient = document.getElementById('klientSelect').value;
+        const nrDok = document.getElementById('nrDokumentu').value.trim();
+        if (!klient || !nrDok) {
+            showToast("Wypełnij pola 'Klient' i 'Nr Dokumentu'", 'error');
+            return;
+        }
 
-        // --- Krok 2: Walidacja Stanu Magazynowego (z Modułu 7) ---
-        if (!isCardStockValid) {
-            showToast("Nie można zapisać karty. Wykryto błędy w stanach magazynowych (czerwone pola).", "error", 4000);
-            return;
-        }
+        // Walidacja Stanu Magazynowego
+        if (typeof isCardStockValid !== 'undefined' && !isCardStockValid) {
+            showToast("Nie można zapisać karty. Wykryto błędy w stanach magazynowych.", "error", 4000);
+            return;
+        }
 
-        console.log("Rozpoczynanie zapisu karty (Moduł 8)...");
-        saveCardToArchiveBtn.disabled = true;
-        saveCardToArchiveBtn.textContent = 'Sprawdzanie...';
+        console.log("Rozpoczynanie zapisu karty...");
+        saveCardToArchiveBtn.disabled = true;
+        saveCardToArchiveBtn.textContent = 'Sprawdzanie...';
 
-        try {
-            // --- Krok 3: Walidacja Duplikatów (Twoja prośba) ---
-            const idLecznicy = currentUserProfile['ID lecznicy'];
-            const q = db.collection("archiwumKarty")
-                .where("id_lecznicy", "==", idLecznicy)
-                .where("nrDokumentu", "==", nrDok)
-                .limit(1);
-                
-            const duplicateSnapshot = await q.get();
-            
-            if (!duplicateSnapshot.empty) {
-                // Znaleziono duplikat!
-                showToast(`Błąd: Karta o numerze [${nrDok}] już istnieje w archiwum! Zapis anulowany.`, "error", 5000);
-                saveCardToArchiveBtn.disabled = false;
-                saveCardToArchiveBtn.textContent = '💾 Zapisz w Archiwum';
-            	 return;
-            }
-            
-            console.log("Moduł 8: Nie znaleziono duplikatów. Przetwarzanie transakcji...");
-            saveCardToArchiveBtn.textContent = 'Zapisywanie...';
-            
-            // --- Krok 4: Przygotuj dane do zapisu (Karta, Stany, Logi) ---
-            
-            // 4a. Dane Nagłówka i Podpisów
-            const headerData = {
-                nazwaLecznicy: document.getElementById('nazwaLecznicy').textContent,
-                dataWykonania: document.getElementById('dataWykonania').value,
-                nrStada: document.getElementById('nrStada').textContent,
-                klient: klient,
-                adresKlienta: document.getElementById('adresKlienta').textContent,
-                dataZgloszenia: document.getElementById('dataZgloszenia').value,
-                nrDokumentu: nrDok,
-                podpisLekarzaImg: document.getElementById('doctor-signature').src,
-                podpisLekarzaLinia: document.getElementById('doctor-signature-name').textContent
-            };
-            const podpisPosiadacza = document.getElementById('canvasPosiadacz').toDataURL();
-            
-            // 4b. Dane Tabeli ORAZ Mapa Zużycia Stanów
-            const tableRowsData = [];
-            const productUsageMap = new Map(); // Mapa: ProductID -> Wymagana Ilość
-            const rows = rowsEditable();
+        try {
+            // Walidacja Duplikatów
+            const idLecznicy = currentUserProfile['ID lecznicy'];
+            const q = db.collection("archiwumKarty")
+                .where("id_lecznicy", "==", idLecznicy)
+                .where("nrDokumentu", "==", nrDok)
+                .limit(1);
+                
+            const duplicateSnapshot = await q.get();
+            
+            if (!duplicateSnapshot.empty) {
+                showToast(`Błąd: Karta o numerze [${nrDok}] już istnieje!`, "error", 5000);
+                saveCardToArchiveBtn.disabled = false;
+                saveCardToArchiveBtn.textContent = '💾 Zapisz w Archiwum';
+                return;
+            }
+            
+            saveCardToArchiveBtn.textContent = 'Zapisywanie...';
+            
+            // --- PRZYGOTOWANIE DANYCH ---
+            
+            // 1. Podpis Posiadacza (FIX: Pobranie bezpośrednio z Canvasa)
+            const canvas = document.getElementById('canvasPosiadacz');
+            // Sprawdź, czy canvas nie jest pusty (bardzo prosta weryfikacja długości base64)
+            let podpisData = canvas.toDataURL();
+            if (podpisData.length < 1000) { // Pusty canvas jest krótki
+                 // Spróbuj pobrać z canvasa w formularzu (jeśli tam był podpisany)
+                 const formCanvas = document.getElementById('formCanvasPosiadacz');
+                 if (formCanvas) {
+                     podpisData = formCanvas.toDataURL();
+                 }
+            }
 
-            rows.forEach(tr => {
-                const logicalIndex = rows.indexOf(tr);
-                const lekInput = tr.cells[4].querySelector('input');
-                const iloscInput = tr.cells[6].querySelector('input[type="number"]');
-                
-                const iloscValue = iloscInput ? iloscInput.value : '';
-                let dawkaText = '';
-                if (iloscInput && iloscInput.nextSibling && iloscInput.nextSibling.nodeType === Node.TEXT_NODE) {
-                    dawkaText = iloscInput.nextSibling.textContent;
-                }
-                const iloscDawkaHtml = `<input class="small-input" type="number" value="${iloscValue}"> ${dawkaText}`;
-                
-                const rowData = {
-                    logicalIndex: logicalIndex,
-                    lp: tr.cells[0].textContent,
-                    opis: tr.cells[1].textContent,
-                    liczba: tr.cells[2].querySelector('input') ? tr.cells[2].querySelector('input').value : '',
-                    rozpoznanie: tr.cells[3].querySelector('input') ? tr.cells[3].querySelector('input').value : '',
-                    lek: lekInput ? lekInput.value : '',
-                    seria: tr.cells[5].textContent,
-                    iloscDawka: iloscDawkaHtml,
-                    karencja: tr.cells[7].textContent
-                };
-                
-                // Zapisz wiersz, jeśli ma treść
-                if (rowData.opis || rowData.liczba || rowData.rozpoznanie || rowData.lek) {
-                    tableRowsData.push(rowData);
-                }
-                
-                // Zlicz stany, jeśli magazyn jest włączony
-                if (currentUserProfile.uzywaStanowMagazynowych === true) {
-                	 const productName = rowData.lek.trim();
-                	 const quantity = parseFloat(iloscValue) || 0;
-                	 if (productName && quantity > 0) {
-                		 const productId = produktyGlowneCache.get(productName);
-                		 if (productId) {
-                			 const currentRequired = productUsageMap.get(productId) || 0;
-                			 productUsageMap.set(productId, currentRequired + quantity);
-                		 }
-                	 }
-                }
-            });
-            
-            // 4c. Kompletny Obiekt Karty
-            const cardArchiveData = {
-                // Metadane
-                lekarz_uid: currentUserProfile.uid,
-                lekarz_nazwisko: `${currentUserProfile.Imie} ${currentUserProfile.Nazwisko}`,
-                id_lecznicy: idLecznicy,
-                klient_nazwa: headerData.klient,
-                nrDokumentu: headerData.nrDokumentu,
-                dataWykonania: headerData.dataWykonania,
-                counter: currentCardData.nextCounter,
-                miesiac: currentCardData.currentMonth,
-                rok: currentCardData.currentYear,
-                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                // Pełne dane
-                header: headerData,
-                table: tableRowsData,
-                podpisPosiadacza: podpisPosiadacza
-            };
-            
-            // --- Krok 5: Utwórz Batched Write (Transakcję) ---
-            const batch = db.batch();
-            const userDocId = currentUserProfile.id; // ID dokumentu z 'konfiguracja'
-            
-            // Operacja 1: Zapisz Kartę Leczenia
-            const cardRef = db.collection("archiwumKarty").doc(); // Stwórz nowe ID dla karty
-            batch.set(cardRef, cardArchiveData);
-            
-            const zmianyLog = []; // Tablica dla logu
+            const headerData = {
+                nazwaLecznicy: document.getElementById('nazwaLecznicy').textContent,
+                dataWykonania: document.getElementById('dataWykonania').value,
+                nrStada: document.getElementById('nrStada').textContent,
+                klient: klient,
+                adresKlienta: document.getElementById('adresKlienta').textContent,
+                dataZgloszenia: document.getElementById('dataZgloszenia').value,
+                nrDokumentu: nrDok,
+                podpisLekarzaImg: document.getElementById('doctor-signature').src,
+                podpisLekarzaLinia: document.getElementById('doctor-signature-name').textContent
+            };
+            
+            // 2. Tabela i Mapa Zużycia
+            const tableRowsData = [];
+            const productUsageMap = new Map();
+            const rows = rowsEditable();
 
-            // Operacja 2: Zdejmij ze stanów (tylko jeśli magazyn włączony)
-            if (currentUserProfile.uzywaStanowMagazynowych === true && productUsageMap.size > 0) {
-                console.log("Moduł 8: Dodawanie operacji magazynowych do transakcji...");
-                
-                for (const [productId, usageQty] of productUsageMap.entries()) {
-                	 // Pobierz aktualny stan z cache (Moduł 3)
-                	 const stockData = magazynCache.get(productId);
-                	 const currentStock = stockData ? (stockData.stan || 0) : 0;
-                	 const newStock = currentStock - usageQty;
-                	 
-                	 // Referencja do dokumentu stanu
-                	 const stockRef = db.collection("konfiguracja").doc(userDocId)
-                                      .collection("magazynOsobisty").doc(productId);
-                	 
-                	 // Dodaj operację UPDATE do batcha
-                	 batch.update(stockRef, { stan: newStock });
-                	 
-                	 // Przygotuj wpis do logu
-                	 zmianyLog.push({
-                		 id_produktu: productId,
-                		 nazwa_produktu: productIDtoNameMap.get(productId) || "Błąd nazwy",
-                		 ilosc: -usageQty, // Ujemna, bo to wydanie
-                		 stan_przed: currentStock,
-                		 stan_po: newStock
-                	 });
-                }
-                
-                // Operacja 3: Zapisz Log Wydania
-                const logData = {
-                	 typ: "wydanie_karta",
-                	 data: firebase.firestore.FieldValue.serverTimestamp(),
-                	 kto_uid: currentUserProfile.uid,
-                	 kto_nazwa: `${currentUserProfile.Imie} ${currentUserProfile.Nazwisko}`,
-                	 batch_id_powiazany: nrDok, // Używamy numeru karty jako ID powiązania
-                	 wycofany: false,
-                	 zmiany: zmianyLog
-                };
-                const logRef = db.collection("konfiguracja").doc(userDocId).collection("magazynOsobistyLog").doc();
-                batch.set(logRef, logData);
-            }
+            rows.forEach(tr => {
+                const logicalIndex = rows.indexOf(tr);
+                const lekInput = tr.cells[4].querySelector('input');
+                const iloscInput = tr.cells[6].querySelector('input[type="number"]');
+                const iloscValue = iloscInput ? iloscInput.value : '';
+                
+                // Pobierz HTML dla ilości (input + tekst)
+                let dawkaText = '';
+                if (iloscInput && iloscInput.nextSibling && iloscInput.nextSibling.nodeType === Node.TEXT_NODE) {
+                    dawkaText = iloscInput.nextSibling.textContent;
+                }
+                const iloscDawkaHtml = `<input class="small-input" type="number" value="${iloscValue}"> ${dawkaText}`;
+                
+                // --- FIX KARENCJA: CZYSTY TEKST BEZ IKONY ---
+                let karencjaCzysta = '';
+                const karInput = tr.cells[7].querySelector('input, textarea');
+                if (karInput) {
+                    // Jeśli jest input (Smart Cell), bierzemy value (to zawsze czysty tekst)
+                    karencjaCzysta = karInput.value;
+                } else {
+                    // Jeśli to zwykła komórka, bierzemy textContent, ale usuwamy ikonę 📅
+                    karencjaCzysta = tr.cells[7].textContent.replace('📅', '').trim();
+                }
 
-            // --- Krok 6: Wykonaj Transakcję ---
-            await batch.commit();
+                const rowData = {
+                    logicalIndex: logicalIndex,
+                    lp: tr.cells[0].textContent,
+                    opis: tr.cells[1].textContent,
+                    liczba: tr.cells[2].querySelector('input') ? tr.cells[2].querySelector('input').value : '',
+                    rozpoznanie: tr.cells[3].querySelector('input') ? tr.cells[3].querySelector('input').value : '',
+                    lek: lekInput ? lekInput.value : '',
+                    seria: tr.cells[5].textContent,
+                    iloscDawka: iloscDawkaHtml,
+                    karencja: karencjaCzysta // Zapisujemy wyczyszczony tekst
+                };
+                
+                if (rowData.opis || rowData.liczba || rowData.rozpoznanie || rowData.lek) {
+                    tableRowsData.push(rowData);
+                }
+                
+                // Zliczanie do magazynu
+                if (currentUserProfile.uzywaStanowMagazynowych === true) {
+                     const productName = rowData.lek.trim();
+                     const quantity = parseFloat(iloscValue) || 0;
+                     if (productName && quantity > 0) {
+                         const productId = produktyGlowneCache.get(productName);
+                         if (productId) {
+                             const currentRequired = productUsageMap.get(productId) || 0;
+                             productUsageMap.set(productId, currentRequired + quantity);
+                         }
+                     }
+                }
+            });
+            
+            const cardArchiveData = {
+                lekarz_uid: currentUserProfile.uid,
+                lekarz_nazwisko: `${currentUserProfile.Imie} ${currentUserProfile.Nazwisko}`,
+                id_lecznicy: idLecznicy,
+                klient_nazwa: headerData.klient,
+                nrDokumentu: headerData.nrDokumentu,
+                dataWykonania: headerData.dataWykonania,
+                counter: currentCardData.nextCounter,
+                miesiac: currentCardData.currentMonth,
+                rok: currentCardData.currentYear,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                header: headerData,
+                table: tableRowsData,
+                podpisPosiadacza: podpisData // Zapisujemy podpis
+            };
+            
+            // --- TRANSAKCJA (BATCH) ---
+            const batch = db.batch();
+            const userDocId = currentUserProfile.id;
+            
+            const cardRef = db.collection("archiwumKarty").doc();
+            batch.set(cardRef, cardArchiveData);
+            
+            const zmianyLog = [];
+            if (currentUserProfile.uzywaStanowMagazynowych === true && productUsageMap.size > 0) {
+                for (const [productId, usageQty] of productUsageMap.entries()) {
+                     const stockData = magazynCache.get(productId);
+                     const currentStock = stockData ? (stockData.stan || 0) : 0;
+                     const newStock = currentStock - usageQty;
+                     
+                     const stockRef = db.collection("konfiguracja").doc(userDocId).collection("magazynOsobisty").doc(productId);
+                     batch.update(stockRef, { stan: newStock });
+                     
+                     zmianyLog.push({
+                         id_produktu: productId,
+                         nazwa_produktu: productIDtoNameMap.get(productId) || "Produkt",
+                         ilosc: -usageQty,
+                         stan_przed: currentStock,
+                         stan_po: newStock
+                     });
+                }
+                const logData = {
+                     typ: "wydanie_karta",
+                     data: firebase.firestore.FieldValue.serverTimestamp(),
+                     kto_uid: currentUserProfile.uid,
+                     kto_nazwa: `${currentUserProfile.Imie} ${currentUserProfile.Nazwisko}`,
+                     batch_id_powiazany: nrDok,
+                     wycofany: false,
+                     zmiany: zmianyLog
+                };
+                const logRef = db.collection("konfiguracja").doc(userDocId).collection("magazynOsobistyLog").doc();
+                batch.set(logRef, logData);
+            }
 
-            // --- Krok 7: Zaktualizuj Cache Magazynu (po udanym zapisie) ---
-            if (currentUserProfile.uzywaStanowMagazynowych === true && productUsageMap.size > 0) {
-            	 console.log("Moduł 8: Aktualizowanie lokalnego magazynCache...");
-            	 for (const [productId, usageQty] of productUsageMap.entries()) {
-            		 const stockData = magazynCache.get(productId);
-            		 if (stockData) {
-            			 stockData.stan = stockData.stan - usageQty;
-            		 } else {
-            			 // To nie powinno się zdarzyć, ale na wszelki wypadek
-            			 magazynCache.set(productId, { stan: -usageQty, produkt_nazwa: productIDtoNameMap.get(productId) || 'Brak nazwy' });
-            		 }
-            	 }
-            	 // Możemy też odświeżyć logi, ale szybciej jest dodać wpis na początek
-            	 // (Pomijamy dla prostoty - logi odświeżą się przy następnym wejściu do magazynu)
-            }
+            await batch.commit();
 
-            // --- Krok 8: Sukces ---
-            isCurrentCardSaved = true; // Oznacz kartę jako zapisaną
-            showToast(`Karta (Nr: ${nrDok}) zapisana w archiwum. Stany magazynowe zaktualizowane.`, 'success');
-            saveCardToArchiveBtn.textContent = 'Zapisano ✔️';
+            // Aktualizacja cache
+            if (currentUserProfile.uzywaStanowMagazynowych === true && productUsageMap.size > 0) {
+                 for (const [productId, usageQty] of productUsageMap.entries()) {
+                     const stockData = magazynCache.get(productId);
+                     if (stockData) stockData.stan = stockData.stan - usageQty;
+                 }
+            }
 
-        } catch (error) {
-            console.error("Błąd transakcji zapisu karty:", error);
-            // Sprawdź, czy to błąd indeksu od sprawdzania duplikatów
-            if (error.code === 'failed-precondition' && error.message.includes('archiwumKarty')) {
-            	 alert("BŁĄD BAZY DANYCH: Wymagany jest indeks do sprawdzania duplikatów numerów kart. Sprawdź konsolę (F12), aby zobaczyć szczegóły.");
-            	 console.error("BŁĄD INDEKSU (Moduł 8): Utwórz indeks dla 'archiwumKarty': [id_lecznicy(ASC), nrDokumentu(ASC)]");
-        	 } else {
-        	 	 alert("Wystąpił krytyczny błąd podczas zapisu transakcji. Karta NIE została zapisana, a stany NIE zostały zmienione.");
-        	 }
-            saveCardToArchiveBtn.disabled = false; // Umożliw ponowną próbę
-            saveCardToArchiveBtn.textContent = '💾 Zapisz w Archiwum';
-        }
-    });
+            isCurrentCardSaved = true;
+            showToast(`Karta (Nr: ${nrDok}) zapisana.`, 'success');
+            saveCardToArchiveBtn.textContent = 'Zapisano ✔️';
+
+        } catch (error) {
+            console.error("Błąd zapisu karty:", error);
+            alert("Wystąpił błąd podczas zapisu.");
+            saveCardToArchiveBtn.disabled = false;
+            saveCardToArchiveBtn.textContent = '💾 Zapisz w Archiwum';
+        }
+    });
 }
 
 // Sekcje Archiwum i ich elementy (Pkt 6, 8)
@@ -10421,7 +10409,8 @@ if (archiveCardTableBody) {
  */
 /**
  * ✅ POPRAWIONA FUNKCJA: Buduje podgląd karty w modalu Archiwum.
- * - FIX: Usuwa ikonę kalendarza i wyciąga czysty tekst.
+ * - FIX: Wyświetla podpis klienta.
+ * - FIX: Usuwa ikonę kalendarza z tekstu.
  */
 function buildArchivedCardView(card) {
     const header = card.header;
@@ -10443,29 +10432,23 @@ function buildArchivedCardView(card) {
         return savedRows.find(r => r.logicalIndex === logicalIndex);
     };
     
-    // ✅ FUNKCJA CZYSZCZĄCA (Wyciąga tekst z HTML i usuwa ikonę)
+    // Funkcja czyszcząca (usuwa HTML i ikonę kalendarza)
     const cleanContent = (content) => {
         if (!content) return '';
-        // Jeśli to czysty tekst, zwróć go
-        if (!content.includes('<')) return content;
-        
-        const tempDiv = document.createElement('div');
-        tempDiv.innerHTML = content;
-        
-        // Sprawdź czy jest input
-        const input = tempDiv.querySelector('input, textarea');
-        if (input) {
-            // Jeśli jest input, zwróć jego wartość + ewentualny tekst obok
-            let text = tempDiv.textContent || '';
-            return (input.value + ' ' + text).trim();
+        let text = content;
+        // Jeśli to HTML z inputem
+        if (content.includes('<')) {
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = content;
+            const input = tempDiv.querySelector('input, textarea');
+            text = input ? (input.value + ' ' + (tempDiv.textContent || '')) : tempDiv.textContent;
         }
-        // Jeśli nie ma inputa, bierzemy sam tekst (to usunie ikonę HTML)
-        return tempDiv.textContent.trim();
+        // Usuń ikonę kalendarza
+        return text.replace('📅', '').trim();
     };
     
     const createCell = (htmlContent = '', isCenter = false) => {
         const td = document.createElement('td');
-        // Używamy cleanContent dla KAŻDEJ komórki
         td.textContent = cleanContent(htmlContent);
         if (isCenter) td.style.textAlign = 'center';
         return td;
@@ -10497,15 +10480,25 @@ function buildArchivedCardView(card) {
             tr.appendChild(createCell(rowData.lek));
             tr.appendChild(createCell(rowData.seria, true));
             tr.appendChild(createCell(rowData.iloscDawka));
-            tr.appendChild(createCell(rowData.karencja)); // Tu zadziała cleanContent
+            tr.appendChild(createCell(rowData.karencja));
         } else {
             tr.innerHTML = `<td style="text-align: center;">${displayLp}</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>`;
         }
     }
 
+    // 3. Wypełnij Podpisy
     document.getElementById('archive_doctor-signature').src = header.podpisLekarzaImg || '';
     document.getElementById('archive_doctor-signature-name').textContent = header.podpisLekarzaLinia || '';
-    document.getElementById('archive_podpisPosiadacza').src = card.podpisPosiadacza || '';
+    
+    // ✅ FIX: Ustawienie podpisu posiadacza
+    const imgPosiadacz = document.getElementById('archive_podpisPosiadacza');
+    if (card.podpisPosiadacza && card.podpisPosiadacza.length > 100) {
+        imgPosiadacz.src = card.podpisPosiadacza;
+        imgPosiadacz.style.display = 'block';
+    } else {
+        imgPosiadacz.src = '';
+        imgPosiadacz.style.display = 'none';
+    }
 }
 /* ⬆️ ======================================================= ⬆️ */
 
@@ -17009,34 +17002,33 @@ document.getElementById('formCancelStep3Btn')?.addEventListener('click', handleF
  * ✅ NOWA FUNKCJA (ZAGĘSZCZONA NA 1 STRONĘ A4, BEZ KROPEK NAD PODPISAMI):
  */
 /**
- * ✅ POPRAWIONA FUNKCJA (Archiwum): Druk z Archiwum.
- * - Czyści HTML z danych (usuwa ikonę kalendarza).
- * - Używa szablonu 85% skali.
+ * ✅ POPRAWIONA FUNKCJA: Druk z Archiwum.
+ * - FIX: Czyści ikonę kalendarza z wydruku.
+ * - FIX: Przekazuje podpis posiadacza do szablonu.
  */
 function openDirectPrintWindow(card) {
     const header = card.header || {};
+    // Uzupełniamy header o podpis posiadacza z głównego obiektu karty
+    header.podpisPosiadaczaImg = card.podpisPosiadacza || '';
+    
     const savedRows = card.table || [];
-
     let rowsHTML = '';
     
     const findRowData = (logicalIndex) => {
         return savedRows.find(r => r.logicalIndex === logicalIndex);
     };
 
-    // ✅ Funkcja czyszcząca
+    // Funkcja czyszcząca
     const cleanContent = (content) => {
         if (!content) return '';
-        if (!content.includes('<')) return content;
-        const tempDiv = document.createElement('div');
-        tempDiv.innerHTML = content;
-        
-        const input = tempDiv.querySelector('input, textarea');
-        if (input) {
-            let text = tempDiv.textContent || '';
-            return (input.value + ' ' + text).trim();
+        let text = content;
+        if (content.includes('<')) {
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = content;
+            const input = tempDiv.querySelector('input, textarea');
+            text = input ? (input.value + ' ' + (tempDiv.textContent || '')) : tempDiv.textContent;
         }
-        // Usuwa tagi HTML (w tym ikonę kalendarza)
-        return tempDiv.textContent.trim();
+        return text.replace('📅', '').trim();
     };
 
     for (let i = 1; i <= 13; i++) {
