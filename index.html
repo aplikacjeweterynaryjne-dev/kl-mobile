@@ -14676,6 +14676,7 @@ function isKalkulatorDirty() {
 
 /**
  * Czyści kompletnie formularz Karty Leczenia i przygotowuje do nowej.
+ * ✅ POPRAWKA: Resetuje również wygląd przycisku zapisu.
  */
 function clearKartaLeczenia() {
     console.log("Czyszczenie Karty Leczenia na żądanie użytkownika...");
@@ -14704,8 +14705,16 @@ function clearKartaLeczenia() {
         clearSign.click();
     }
     
-    // 6. Zresetuj stan zapisu
+    // 6. Zresetuj stan zapisu (logiczny)
     isCurrentCardSaved = false;
+    
+    // ⬇️⬇️⬇️ ✅ FIX: RESET PRZYCISKU ZAPISU (WIZUALNY) ⬇️⬇️⬇️
+    const saveBtn = document.getElementById('saveCardToArchiveBtn');
+    if (saveBtn) {
+        saveBtn.disabled = false; // Odblokuj
+        saveBtn.textContent = '💾 Zapisz w Archiwum'; // Przywróć tekst
+    }
+    // ⬆️⬆️⬆️ KONIEC FIXA ⬆️⬆️⬆️
     
     // 7. Wygeneruj nowy numer dokumentu
     if (typeof generateAndSetDocumentNumber === 'function') {
@@ -14714,7 +14723,6 @@ function clearKartaLeczenia() {
     
     showToast('Rozpoczęto nową kartę leczenia.', 'info');
 }
-
 /**
  * Czyści kompletnie formularz Kalkulatora Wizyty.
  */
