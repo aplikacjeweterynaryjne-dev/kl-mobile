@@ -9868,8 +9868,8 @@ navButtonsToCheck.forEach(btn => {
  * Pkt 7: Generuje i wstawia nowy numer dokumentu do pola w Karcie Leczenia.
  */
 /**
- * ✅ FIX 2: Poprawiona numeracja Karty Leczenia.
- * Logika: Szuka najwyższego numeru (counter) w bieżącym miesiącu dla danego lekarza i dodaje 1.
+ * ✅ FIX: Numeracja "Największy + 1" (Metoda Matematyczna)
+ * Pobiera wszystkie karty z miesiąca i szuka MAX numeru w pętli.
  */
 async function generateAndSetDocumentNumber() {
     if (!currentUserProfile || !currentUserProfile.uid) {
@@ -9878,67 +9878,70 @@ async function generateAndSetDocumentNumber() {
     }
 
     const nrDokInput = document.getElementById('nrDokumentu');
-    // Nie generuj, jeśli pole jest już wypełnione przez użytkownika
+    // Jeśli pole jest już wypełnione (nie jest puste), to nie generujemy numeru
     if (nrDokInput.value.trim() !== "") {
         console.log("Auto-numeracja pominięta: pole jest już wypełnione.");
         return;
     }
 
-    // 1. Ustal bieżącą datę
+    // 1. Ustal dane czasowe (Miesiąc i Rok)
     const d = new Date();
     const currentMonth = d.getMonth() + 1; // 1-12
     const currentYear = d.getFullYear();   // np. 2025
-    
-    // Inicjały lekarza
     const initials = currentUserProfile.Inicjaly || 'NN';
 
-    // Aktualizuj globalny obiekt stanu (ważne dla zapisu)
+    // Aktualizuj globalny obiekt stanu (ważne dla późniejszego zapisu)
     currentCardData.currentMonth = currentMonth;
     currentCardData.currentYear = currentYear;
     currentCardData.initials = initials;
 
-    console.log(`Szukanie ostatniego numeru dla: UID=${currentUserProfile.uid}, Miesiąc=${currentMonth}/${currentYear}`);
+    console.log(`Szukanie MAX numeru dla: UID=${currentUserProfile.uid}, ${currentMonth}/${currentYear}`);
 
     try {
-        // 2. Zapytanie do Firestore
-        // Szukamy kart tego lekarza, z tego roku i miesiąca, sortujemy po liczniku malejąco
+        // 2. Pobierz WSZYSTKIE karty z tego miesiąca dla tego lekarza
+        // (Usuwamy limit(1) i orderBy, żeby pobrać wszystko i policzyć samemu)
         const q = db.collection("archiwumKarty")
             .where("lekarz_uid", "==", currentUserProfile.uid)
             .where("rok", "==", currentYear)
-            .where("miesiac", "==", currentMonth)
-            .orderBy("counter", "desc") // Najważniejsze: sortowanie po liczbie
-            .limit(1);
+            .where("miesiac", "==", currentMonth);
 
         const snapshot = await q.get();
 
+        let maxCounter = 0;
+
         if (snapshot.empty) {
-            // Brak kart w tym miesiącu -> Zaczynamy od 1
-            console.log("Brak kart w tym miesiącu. Ustawiam numer 1.");
-            currentCardData.nextCounter = 1;
+            console.log("Brak kart w tym miesiącu. Startujemy od 1.");
+            maxCounter = 0;
         } else {
-            // Znaleziono karty -> Bierzemy najwyższy counter i dodajemy 1
-            const lastDocData = snapshot.docs[0].data();
-            const lastCounter = parseInt(lastDocData.counter, 10) || 0;
-            console.log(`Znaleziono ostatni numer: ${lastCounter}. Ustawiam ${lastCounter + 1}.`);
-            currentCardData.nextCounter = lastCounter + 1;
+            // 3. Przelec przez wszystkie karty i znajdź największą liczbę w polu 'counter'
+            snapshot.docs.forEach(doc => {
+                const data = doc.data();
+                // Upewnij się, że counter jest liczbą
+                const c = parseInt(data.counter, 10);
+                if (!isNaN(c)) {
+                    if (c > maxCounter) {
+                        maxCounter = c;
+                    }
+                }
+            });
+            console.log(`Znaleziono największy numer w bazie: ${maxCounter}`);
         }
 
-        // 3. Złóż numer w całość: NUMER / MIESIĄC / ROK / INICJAŁY
+        // 4. Ustal nowy numer (Największy znaleziony + 1)
+        currentCardData.nextCounter = maxCounter + 1;
+
+        // 5. Złóż string numeru (np. 12/12/2025/AW)
         const newDocNumber = `${currentCardData.nextCounter}/${currentMonth}/${currentYear}/${initials}`;
 
         nrDokInput.value = newDocNumber;
-        isCurrentCardSaved = false; // Nowy numer = karta "brudna"
+        isCurrentCardSaved = false; // Oznaczamy, że karta jest "brudna" (niezapisana)
 
     } catch (error) {
         console.error("Błąd generowania numeru karty:", error);
         
-        // Obsługa błędu braku indeksu (bardzo prawdopodobne przy złożonych zapytaniach)
         if (error.code === 'failed-precondition') {
-            alert("BŁĄD BAZY DANYCH: System numeracji wymaga nowego indeksu w Firestore.\n\nKliknij F12 -> Konsola i otwórz link podany przez Firebase, aby utworzyć indeks.");
-            console.error("KLIKNIJ TEN LINK ABY UTWORZYĆ INDEKS DLA NUMERACJI KART:");
-            // Firebase w konsoli wypisze link do utworzenia indeksu:
-            // Kolekcja: archiwumKarty
-            // Pola: lekarz_uid (Asc), rok (Asc), miesiac (Asc), counter (Desc)
+            alert("BŁĄD: Wymagany indeks Firestore. Kliknij link w konsoli (F12).");
+            console.error("KLIKNIJ LINK ABY UTWORZYĆ INDEKS DLA: archiwumKarty [lekarz_uid, rok, miesiac]");
         }
     }
 }
