@@ -10421,13 +10421,11 @@ if (archiveCardTableBody) {
  */
 /**
  * ✅ POPRAWIONA FUNKCJA: Buduje podgląd karty w modalu Archiwum.
- * - Czyści HTML z komórek (wyciąga tekst z inputów).
- * - Naprawia brak treści w ostatniej kolumnie.
+ * - FIX: Usuwa ikonę kalendarza i wyciąga czysty tekst.
  */
 function buildArchivedCardView(card) {
     const header = card.header;
 
-    // 1. Wypełnij Nagłówek
     document.getElementById('archive_nazwaLecznicy').textContent = header.nazwaLecznicy || '';
     document.getElementById('archive_dataWykonania').textContent = header.dataWykonania || '';
     document.getElementById('archive_nrStada').textContent = header.nrStada || '';
@@ -10436,7 +10434,6 @@ function buildArchivedCardView(card) {
     document.getElementById('archive_dataZgloszenia').textContent = header.dataZgloszenia || '';
     document.getElementById('archive_nrDokumentu').textContent = header.nrDokumentu || '';
 
-    // 2. Wypełnij Tabelę
     const tbody = document.querySelector('#archive_karta tbody');
     tbody.innerHTML = ''; 
 
@@ -10446,7 +10443,7 @@ function buildArchivedCardView(card) {
         return savedRows.find(r => r.logicalIndex === logicalIndex);
     };
     
-    // ✅ Nowa funkcja czyszcząca: wyciąga tekst z HTMLa
+    // ✅ FUNKCJA CZYSZCZĄCA (Wyciąga tekst z HTML i usuwa ikonę)
     const cleanContent = (content) => {
         if (!content) return '';
         // Jeśli to czysty tekst, zwróć go
@@ -10462,13 +10459,13 @@ function buildArchivedCardView(card) {
             let text = tempDiv.textContent || '';
             return (input.value + ' ' + text).trim();
         }
-        // Jeśli to inny HTML, zwróć sam tekst
+        // Jeśli nie ma inputa, bierzemy sam tekst (to usunie ikonę HTML)
         return tempDiv.textContent.trim();
     };
     
     const createCell = (htmlContent = '', isCenter = false) => {
         const td = document.createElement('td');
-        // Używamy wyczyszczonej treści jako tekst (bezpieczniej i czytelniej)
+        // Używamy cleanContent dla KAŻDEJ komórki
         td.textContent = cleanContent(htmlContent);
         if (isCenter) td.style.textAlign = 'center';
         return td;
@@ -10500,14 +10497,12 @@ function buildArchivedCardView(card) {
             tr.appendChild(createCell(rowData.lek));
             tr.appendChild(createCell(rowData.seria, true));
             tr.appendChild(createCell(rowData.iloscDawka));
-            // ✅ Tu używamy czyszczenia, więc "Karencja" pojawi się jako tekst
-            tr.appendChild(createCell(rowData.karencja));
+            tr.appendChild(createCell(rowData.karencja)); // Tu zadziała cleanContent
         } else {
             tr.innerHTML = `<td style="text-align: center;">${displayLp}</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>`;
         }
     }
 
-    // 3. Wypełnij Podpisy
     document.getElementById('archive_doctor-signature').src = header.podpisLekarzaImg || '';
     document.getElementById('archive_doctor-signature-name').textContent = header.podpisLekarzaLinia || '';
     document.getElementById('archive_podpisPosiadacza').src = card.podpisPosiadacza || '';
@@ -17014,9 +17009,9 @@ document.getElementById('formCancelStep3Btn')?.addEventListener('click', handleF
  * ✅ NOWA FUNKCJA (ZAGĘSZCZONA NA 1 STRONĘ A4, BEZ KROPEK NAD PODPISAMI):
  */
 /**
- * ✅ POPRAWIONA FUNKCJA: Druk z Archiwum.
- * - Czyści HTML z danych (naprawia brak treści w kolumnie 8).
- * - Używa szablonu 100% skali.
+ * ✅ POPRAWIONA FUNKCJA (Archiwum): Druk z Archiwum.
+ * - Czyści HTML z danych (usuwa ikonę kalendarza).
+ * - Używa szablonu 85% skali.
  */
 function openDirectPrintWindow(card) {
     const header = card.header || {};
@@ -17028,17 +17023,19 @@ function openDirectPrintWindow(card) {
         return savedRows.find(r => r.logicalIndex === logicalIndex);
     };
 
-    // ✅ Funkcja czyszcząca (taka sama jak w podglądzie)
+    // ✅ Funkcja czyszcząca
     const cleanContent = (content) => {
         if (!content) return '';
         if (!content.includes('<')) return content;
         const tempDiv = document.createElement('div');
         tempDiv.innerHTML = content;
+        
         const input = tempDiv.querySelector('input, textarea');
         if (input) {
             let text = tempDiv.textContent || '';
             return (input.value + ' ' + text).trim();
         }
+        // Usuwa tagi HTML (w tym ikonę kalendarza)
         return tempDiv.textContent.trim();
     };
 
@@ -17059,7 +17056,6 @@ function openDirectPrintWindow(card) {
 
         const rowData = findRowData(logicalIndex);
 
-        // ✅ Czyścimy każde pole przed wstawieniem do HTML
         const opis = rowData ? cleanContent(rowData.opis) : '';
         const liczba = rowData ? cleanContent(rowData.liczba) : '';
         const rozpoznanie = rowData ? cleanContent(rowData.rozpoznanie) : '';
@@ -17353,7 +17349,7 @@ function openCurrentA4PrintWindow() {
 }
 /**
 /**
- * ✅ WSPÓLNY SZABLON HTML (FIX: Skala 100% + Czysty Tekst)
+ * ✅ WSPÓLNY SZABLON HTML (FIX: Skala 85% + Poprawki marginesów)
  */
 function getUnifiedPrintHTML(header, rowsHTML) {
     return `
@@ -17385,12 +17381,11 @@ function getUnifiedPrintHTML(header, rowsHTML) {
                     width: 297mm; min-height: 210mm;
                     padding: 10mm; 
                     box-sizing: border-box;
-                    /* ✅ SKALA 100% (Naturalny rozmiar) */
-                    transform: none; 
+                    /* ✅ SKALA 85% DLA PODGLĄDU NA EKRANIE */
+                    transform: scale(0.85); transform-origin: top center;
                     box-shadow: 0 0 15px rgba(0,0,0,0.2);
                 }
 
-                /* Style tekstowe */
                 h2 { 
                     text-align: center; font-size: 12pt; margin: 0 0 10px 0; 
                     font-weight: 700; color: #000; text-transform: uppercase; line-height: 1.2;
@@ -17412,11 +17407,11 @@ function getUnifiedPrintHTML(header, rowsHTML) {
                 .sig-img { display: block; height: 45px; width: 100%; object-fit: contain; margin-top: 2px; }
                 .sig-name { margin-top: 1px; font-size: 10pt; text-align: center; }
 
-                /* --- USTAWIENIA DRUKARKI (PEŁNY ROZMIAR) --- */
+                /* --- USTAWIENIA DRUKARKI (85%) --- */
                 @media print {
                     html, body {
-                        height: 100%; 
-                        overflow: visible; /* Pozwalamy na naturalny przepływ */
+                        height: 99%; 
+                        overflow: hidden; 
                         background-color: white !important;
                         margin: 0 !important; padding: 0 !important;
                         display: block !important;
@@ -17426,15 +17421,19 @@ function getUnifiedPrintHTML(header, rowsHTML) {
                     .page-sheet {
                         width: 100%; margin: 0; padding: 0; box-shadow: none; border: none;
                         
-                        /* ✅ WYŁĄCZENIE SKALOWANIA (100%) */
-                        transform: none; 
-                        width: 100%; 
+                        /* ✅ SKALA 85% */
+                        transform: scale(0.85); 
+                        transform-origin: top left;
                         
-                        page-break-inside: avoid;
+                        /* ✅ KOMPENSACJA SZEROKOŚCI (100 / 0.85 = 117.6) */
+                        width: 117.6%; 
+                        
+                        page-break-after: avoid !important;
+                        page-break-before: avoid !important;
                     }
                     @page {
                         size: A4 landscape;
-                        margin: 0.5cm; /* Minimalne marginesy */
+                        margin: 0.5cm; 
                     }
                 }
             </style>
@@ -17513,7 +17512,6 @@ function getUnifiedPrintHTML(header, rowsHTML) {
                         ${header.podpisPosiadaczaImg ? `<img src="${header.podpisPosiadaczaImg}" class="sig-img">` : '<div style="height:45px;"></div>'}
                     </div>
                 </div>
-                
                 <p style="margin-top: 10px;"><b>Wyniki badań uzupełniających:</b><br>*W przypadku zwierząt znajdujących się w rejestrze zwierząt gospodarskich oznakowanych</p>
             </div>
         </body>
