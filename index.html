@@ -1197,39 +1197,70 @@ table {
 /* ⬆️ ======================================================= ⬆️ */
 /* ⬇️ KROK 2: WKLEJ TEN BLOK KODU CSS ⬇️ */
 
-/* --- Style dla Nawigatora Komórek --- */
+/* --- Style dla Nawigatora Komórek (D-pad) --- */
 .cell-navigator {
     position: fixed; /* Przyklejony do ekranu */
-    bottom: 33px; /* ⬅️ ZMIANA: 'bottom' na 'top' */
+    bottom: 33px;
     right: 20px;
     z-index: 999; /* Poniżej modali, ale nad treścią */
-    /* display: none; jest ustawiony w HTML-u */
+    /* display: none; jest ustawiony w HTML-u i sterowany przez JS */
+    
+    display: flex; /* Domyślnie flex (JS przełącza display: none/flex) */
     flex-direction: column;
     align-items: center;
-    background: rgba(255, 255, 255, 0.9); /* Lekko przezroczyste tło */
-    border: 1px solid #ccc;
+
+    /* ✅ ZMIANA: Przezroczystość i szkło */
+    background: rgba(255, 255, 255, 0.2); /* Prawie przezroczyste tło */
+    border: 1px solid rgba(0,0,0,0.1); /* Delikatna ramka */
     border-radius: 12px;
     padding: 8px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-    backdrop-filter: blur(4px); /* Efekt "mrożonego szkła" dla wspierających przeglądarek */
+    backdrop-filter: blur(2px); /* Rozmycie tła pod spodem */
+    
+    opacity: 0.3; /* Domyślnie ledwo widoczny */
+    transition: opacity 0.3s ease, background 0.3s ease, box-shadow 0.3s ease;
 }
+
+/* ✅ ZMIANA: Pełna widoczność po najechaniu myszką */
+.cell-navigator:hover {
+    opacity: 1;
+    background: rgba(255, 255, 255, 0.95); /* Prawie białe tło */
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    border-color: #ccc;
+}
+
 .cell-navigator .nav-middle-row {
     display: flex;
     gap: 8px;
     margin: 8px 0;
 }
+
 .cell-navigator button {
-    font-family: Arial, sans-serif; /* Strzałki wyglądają lepiej na tej czcionce */
+    font-family: Arial, sans-serif;
     font-size: 24px;
     font-weight: bold;
     width: 55px; /* Stały rozmiar */
     height: 55px; /* Stały rozmiar */
-    line-height: 1; /* Lepsze centrowanie strzałek */
-    padding: 0; /* Reset paddingu z .btn */
+    line-height: 1;
+    padding: 0;
+    border-radius: 8px; /* Ładniejsze zaokrąglenie przycisków */
+    cursor: pointer;
+
+    /* ✅ ZMIANA: Guziki też lekko przezroczyste */
+    background: rgba(255, 255, 255, 0.5); 
+    border: 1px solid rgba(0,0,0,0.1);
+    transition: background 0.2s;
 }
+
+/* ✅ ZMIANA: Guziki stają się wyraźne po najechaniu na panel */
+.cell-navigator:hover button {
+    background: #f7f7f7; 
+    border-color: #ccc;
+}
+
 .cell-navigator button:active {
-    background: #6A994E; /* Twoja zielona klasa primary */
+    background: #6A994E !important; /* Twoja zieleń (zawsze widoczna przy kliku) */
     color: white;
+    border-color: #5A8443;
 }
 
 /* Styl dla aktywnie wybranej komórki */
@@ -1237,6 +1268,7 @@ table {
     outline: 2px solid #6A994E;
     outline-offset: -2px;
     box-shadow: inset 0 0 8px rgba(106, 153, 78, 0.3);
+    background-color: rgba(106, 153, 78, 0.05); /* Delikatne tło */
 }
 
 /* Ukrywanie nawigatora przy druku */
@@ -1248,6 +1280,7 @@ table {
     #karta tbody td.active-cell-highlight {
         outline: none !important;
         box-shadow: none !important;
+        background-color: transparent !important;
     }
 }
 /* ⬆️ KONIEC BLOKU CSS ⬆️ */
@@ -2214,24 +2247,26 @@ table {
     display: block;
 }
     /* --- POPRAWKI DRUKOWANIA A4 (Karencja i Kalendarz) --- */
+/* --- POPRAWKI DRUKOWANIA A4 (Karencja i Kalendarz) --- */
 @media print {
     /* 1. Ukryj ikonkę kalendarza */
     .cal-icon {
         display: none !important;
     }
 
-    /* 2. Ukryj input w kolumnie karencji (8 kolumna) */
-    #karta tbody tr td:nth-child(8) input {
+    /* 2. Ukryj input ORAZ textarea w kolumnie karencji (8 kolumna) */
+    #karta tbody tr td:nth-child(8) input,
+    #karta tbody tr td:nth-child(8) textarea {
         display: none !important;
     }
 
     /* 3. Pokaż zawartość jako tekst, który się łamie */
     #karta tbody tr td:nth-child(8)::after {
         content: attr(data-print-value); /* Czyta wartość z atrybutu */
-        white-space: normal;
+        white-space: pre-wrap; /* Zachowuje łamanie linii z textarea */
         word-break: break-word;
         display: block;
-        font-size: 8pt; /* Dopasowanie do reszty */
+        font-size: 8pt;
     }
 }
 </style>
@@ -4711,12 +4746,13 @@ function selectRowInForm(logicalIndex){
         tekstDawkowania = iloscInput.nextSibling.textContent.trim();
     }
     if (formDawkowanie) formDawkowanie.value = tekstDawkowania;
-    
-    // ✅ Wczytaj karencję / uwagi (obsługa Smart Cell)
+
+  // ✅ Wczytaj karencję / uwagi (obsługa Smart Cell - Textarea/Input)
     if (formKarencja) {
-        const karencjaCellInput = row.cells[7].querySelector('input.karencja-input');
-        if (karencjaCellInput) {
-            formKarencja.value = karencjaCellInput.value;
+        // Szukamy elementu po klasie, nie po tagu
+        const karencjaCellElement = row.cells[7].querySelector('.karencja-input');
+        if (karencjaCellElement) {
+            formKarencja.value = karencjaCellElement.value;
         } else {
             formKarencja.value = row.cells[7].textContent.trim();
         }
@@ -5073,13 +5109,21 @@ function saveRow(idx){
         cell6.appendChild(document.createTextNode(' ' + dawkowanie));
     }
 
-   // g) Okres karencji / uwagi (Kolumna 8)
-    const karencjaCellInput = row.cells[7].querySelector('input.karencja-input');
-    if (karencjaCellInput) {
-        // 1. Wpisz wartość do inputa
-        karencjaCellInput.value = formKarencjaValue;
-        // 2. ✅ Zaktualizuj atrybut dla druku A4 CSS
+// g) Okres karencji / uwagi (Kolumna 8)
+    // Szukamy elementu po klasie, aby obsłużyć i textarea, i input
+    const karencjaCellElement = row.cells[7].querySelector('.karencja-input');
+    
+    if (karencjaCellElement) {
+        // 1. Wpisz wartość
+        karencjaCellElement.value = formKarencjaValue;
+        // 2. Aktualizuj atrybut dla druku A4
         row.cells[7].dataset.printValue = formKarencjaValue;
+        
+        // 3. Wymuś auto-resize, jeśli to textarea
+        if (karencjaCellElement.tagName === 'TEXTAREA') {
+             karencjaCellElement.style.height = 'auto';
+             karencjaCellElement.style.height = karencjaCellElement.scrollHeight + 'px';
+        }
     } else {
         row.cells[7].textContent = formKarencjaValue;
     }
