@@ -3599,16 +3599,17 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
         </div>
 
         <div id="reportZuzyciaTableContainer" class="table-container" style="margin-top: 15px; display: none;">
-            <table id="reportZuzyciaTable" class="sortable-table">
-                <thead>
-                    <tr>
-                        <th data-sort-key="produkt">Produkt</th>
-                        <th data-sort-key="ilosc" data-sort-type="number">Łączna ilość (suma zużyć)</th>
-                    </tr>
-                </thead>
-                <tbody id="reportZuzyciaTableBody">
-                    </tbody>
-            </table>
+<table id="reportZuzyciaTable" class="sortable-table">
+    <thead>
+        <tr>
+            <th data-sort-key="produkt">Produkt</th>
+            <th data-sort-key="ilosc" data-sort-type="number">Łączna ilość</th>
+            <th>Nr dokumentu (ilość)</th>
+        </tr>
+    </thead>
+    <tbody id="reportZuzyciaTableBody">
+    </tbody>
+</table>
         </div>
 
     </div>
@@ -11712,32 +11713,47 @@ function generateWizytyReport(allReceipts, filters) {
 
 /**
  * Generuje Raport Zużycia Produktów (Typ 4)
+ * ✅ WERSJA ROZSZERZONA: Dodano kolumnę z listą dokumentów i ilościami.
  */
 function generateZuzyciaReport(allReceipts, filters) {
-    console.log("Generowanie raportu zużycia...");
+    console.log("Generowanie raportu zużycia (wersja szczegółowa)...");
 
     // --- 1. Filtrowanie w JavaScript (tylko klient) ---
-   // --- 1. Filtrowanie w JavaScript (tylko klient) ---
     let filteredReceipts = [...allReceipts];
-    if (filters.klient) { // ✅ ZMIANA: Filtruj tylko jeśli pole 'klient' nie jest puste
+    if (filters.klient) {
         filteredReceipts = filteredReceipts.filter(r => r.klient === filters.klient);
     }
     
     // --- 2. Agregacja produktów ---
+    // Mapa: Klucz = Nazwa Produktu, Wartość = { totalQty: number, uses: Array<string> }
     const productMap = new Map();
 
     for (const receipt of filteredReceipts) {
         if (receipt.pozycje && receipt.pozycje.length > 0) {
             for (const item of receipt.pozycje) {
                 const productName = item.name.trim();
+                
                 // Ignorujemy "Wyrównanie"
                 if (productName.toLowerCase() === 'wyrównanie') {
                     continue;
                 }
                 
-                const currentQty = productMap.get(productName) || 0;
                 const itemQty = Number(item.quantity) || 0;
-                productMap.set(productName, currentQty + itemQty);
+                const docNr = receipt.nrDokumentu || 'Brak nr';
+                
+                // Format wpisu: "12/12/2025/AW (5)"
+                const usageEntry = `${docNr} (<strong>${itemQty}</strong>)`;
+
+                if (!productMap.has(productName)) {
+                    productMap.set(productName, { 
+                        totalQty: 0, 
+                        uses: [] 
+                    });
+                }
+
+                const entry = productMap.get(productName);
+                entry.totalQty += itemQty;
+                entry.uses.push(usageEntry);
             }
         }
     }
@@ -11749,17 +11765,26 @@ function generateZuzyciaReport(allReceipts, filters) {
     const sortedProducts = Array.from(productMap.keys()).sort((a, b) => a.localeCompare(b, 'pl'));
 
     for (const productName of sortedProducts) {
-        const totalQty = productMap.get(productName);
+        const data = productMap.get(productName);
+        
+        // Łączymy wszystkie użycia w jeden ciąg tekstowy, oddzielony przecinkami
+        // Używamy <br> co kilka wpisów lub po prostu wrappingu CSS, tutaj damy przecinek i spację
+        // aby tabela mogła się zawijać.
+        const usesList = data.uses.join(', ');
+
         tableHtml += `
-            <tr data-produkt="${productName}" data-ilosc="${totalQty}">
-                <td>${productName}</td>
-                <td style="text-align: center; font-weight: bold;">${totalQty}</td>
+            <tr data-produkt="${productName}" data-ilosc="${data.totalQty}">
+                <td style="font-weight: 600;">${productName}</td>
+                <td style="text-align: center; font-weight: bold; font-size: 1.1em;">${parseFloat(data.totalQty.toFixed(3))}</td>
+                <td style="font-size: 0.9em; color: #333; line-height: 1.4;">
+                    ${usesList}
+                </td>
             </tr>
         `;
     }
 
     // --- 4. Aktualizacja widoku (DOM) ---
-    reportZuzyciaTableBody.innerHTML = tableHtml || '<tr><td colspan="2" style="text-align: center; padding: 20px;">Brak zużytych produktów dla wybranych filtrów.</td></tr>';
+    reportZuzyciaTableBody.innerHTML = tableHtml || '<tr><td colspan="3" style="text-align: center; padding: 20px;">Brak zużytych produktów dla wybranych filtrów.</td></tr>';
     
     // Pokaż/Ukryj tabele
     reportWizytyTableContainer.style.display = 'none';
