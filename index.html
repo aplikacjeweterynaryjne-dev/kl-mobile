@@ -16990,13 +16990,17 @@ document.getElementById('formCancelStep3Btn')?.addEventListener('click', handleF
 
  * ✅ NOWA FUNKCJA (ZAGĘSZCZONA NA 1 STRONĘ A4, BEZ KROPEK NAD PODPISAMI):
  */
+/**
+ * ✅ POPRAWIONA FUNKCJA (Archiwum): Druk z Archiwum.
+ * - Usuwa potencjalną ikonę kalendarza z tekstu.
+ * - Używa powiększonego szablonu.
+ */
 function openDirectPrintWindow(card) {
     const header = card.header || {};
     const savedRows = card.table || [];
 
     let rowsHTML = '';
     
-    // --- KLUCZOWA POPRAWKA LOGIKI WYSZUKIWANIA ---
     const findRowData = (logicalIndex) => {
         return savedRows.find(r => r.logicalIndex === logicalIndex);
     };
@@ -17009,7 +17013,7 @@ function openDirectPrintWindow(card) {
             logicalIndex = i - 1; 
             displayLp = `${i}.`;
         } else if (i === 10) {
-            rowsHTML += `<tr><td colspan="8" style="text-align: left; font-weight: bold; padding: 2px 4px; background-color: #f9f9f9; font-size: 8pt;">Potwierdzenie nabycia produktu leczniczego weterynaryjnego/paszy leczniczej</td></tr>`;
+            rowsHTML += `<tr><td colspan="8" style="text-align: left; font-weight: bold; padding: 2px 4px; background-color: #f9f9f9; font-size: 10pt;">Potwierdzenie nabycia produktu leczniczego weterynaryjnego/paszy leczniczej</td></tr>`;
             continue; 
         } else {
             logicalIndex = i - 2; 
@@ -17024,7 +17028,6 @@ function openDirectPrintWindow(card) {
         const lek = rowData ? rowData.lek : '';
         const seria = rowData ? rowData.seria : '';
         
-        // Czysta ilość bez HTML inputów
         let ilosc = '';
         if (rowData) {
              if (rowData.iloscDawka && rowData.iloscDawka.includes('<input')) {
@@ -17038,7 +17041,12 @@ function openDirectPrintWindow(card) {
              }
         }
         
-        const karencja = rowData ? rowData.karencja : '';
+        // --- FIX IKONY KALENDARZA ---
+        let karencja = rowData ? rowData.karencja : '';
+        // Jeśli tekst zawiera ikonę, usuń ją
+        if (karencja) {
+            karencja = karencja.replace('📅', '').trim();
+        }
 
         rowsHTML += `
             <tr>
@@ -17057,7 +17065,6 @@ function openDirectPrintWindow(card) {
     const printWindow = window.open('', '_blank', 'width=1100,height=850,scrollbars=yes,resizable=yes');
     if (!printWindow) { alert('Zablokowano okno.'); return; }
 
-    // Używamy ujednoliconego szablonu HTML (tego samego co w Generatorze)
     printWindow.document.write(getUnifiedPrintHTML(header, rowsHTML));
     printWindow.document.close();
     printWindow.focus();
@@ -17229,10 +17236,15 @@ function createSmartDosageCell(cell, row) {
  * ✅ NOWA FUNKCJA (COMPACT): Wersja "zagęszczona" pionowo, aby uniknąć drugiej strony.
  * Skala: 80%, Zmniejszone marginesy pionowe.
  */
+/**
+ * ✅ POPRAWIONA FUNKCJA (Generator): Druk bieżącej karty.
+ * - Ignoruje ikonę kalendarza przy pobieraniu danych z tabeli.
+ * - Używa powiększonego szablonu.
+ */
 function openCurrentA4PrintWindow() {
-    console.log("Generowanie podglądu A4 (Generator - Unified)...");
+    console.log("Generowanie podglądu A4 (Generator - Unified Fix)...");
 
-    // 1. Pobieranie danych z inputów
+    // 1. Pobieranie danych
     const header = {
         nazwaLecznicy: document.getElementById('nazwaLecznicy').textContent,
         dataWykonania: document.getElementById('dataWykonania').value,
@@ -17251,7 +17263,7 @@ function openCurrentA4PrintWindow() {
     
     rows.forEach((tr, index) => {
         if (tr.cells.length === 1) {
-            rowsHTML += `<tr><td colspan="8" style="text-align: left; font-weight: bold; padding: 2px 4px; background-color: #f9f9f9; font-size: 8pt;">Potwierdzenie nabycia produktu leczniczego weterynaryjnego/paszy leczniczej</td></tr>`;
+            rowsHTML += `<tr><td colspan="8" style="text-align: left; font-weight: bold; padding: 2px 4px; background-color: #f9f9f9; font-size: 10pt;">Potwierdzenie nabycia produktu leczniczego weterynaryjnego/paszy leczniczej</td></tr>`;
             return;
         }
 
@@ -17284,12 +17296,18 @@ function openCurrentA4PrintWindow() {
         const seria = tr.cells[5].textContent;
         const ilosc = getIlosc();
         
+        // --- FIX IKONY KALENDARZA W GENERATORZE ---
         let karencja = '';
         const karInput = tr.cells[7].querySelector('input, textarea');
         if (karInput) {
+            // Jeśli jest input (smart cell), bierzemy jego wartość (tam nie ma ikony, to czysty tekst)
             karencja = karInput.value;
         } else {
-            karencja = tr.cells[7].textContent;
+            // Jeśli to zwykła komórka, bierzemy tekst, ale klonujemy, żeby usunąć ikonę
+            const clone = tr.cells[7].cloneNode(true);
+            const icon = clone.querySelector('.cal-icon'); // Znajdź ikonę po klasie
+            if (icon) icon.remove(); // Usuń ją z klona
+            karencja = clone.textContent.trim(); // Pobierz czysty tekst
         }
 
         rowsHTML += `
@@ -17309,14 +17327,16 @@ function openCurrentA4PrintWindow() {
     const printWindow = window.open('', '_blank', 'width=1150,height=800,scrollbars=yes,resizable=yes');
     if (!printWindow) { alert('Zablokowano okno.'); return; }
 
-    // UŻYCIE WSPÓLNEGO SZABLONU
     printWindow.document.write(getUnifiedPrintHTML(header, rowsHTML));
     printWindow.document.close();
     printWindow.focus();
 }
-    /* ======================================================== */
-/* ✅ NOWA FUNKCJA POMOCNICZA: WSPÓLNY SZABLON WYDRUKU (FIX) */
-/* ======================================================== */
+/**
+ * ✅ WSPÓLNY SZABLON HTML (FIX: Bez ikony kalendarza + Większy rozmiar)
+ * - Skala: 100% (Brak pomniejszania 0.8).
+ * - Czcionka: Powiększona do 10pt.
+ * - Padding: Zwiększony, aby wypełnić kartkę pionowo.
+ */
 function getUnifiedPrintHTML(header, rowsHTML) {
     return `
         <!DOCTYPE html>
@@ -17341,39 +17361,40 @@ function getUnifiedPrintHTML(header, rowsHTML) {
                 .btn-print { background: #4CAF50; color: white; }
                 .btn-close { background: #f44336; color: white; }
 
-                /* KARTKA A4 */
+                /* KARTKA A4 PODGLĄD */
                 .page-sheet {
                     background: white;
                     width: 297mm; min-height: 210mm;
-                    padding: 8mm; 
+                    padding: 10mm; 
                     box-sizing: border-box;
-                    transform: scale(0.8); transform-origin: top center; /* Podgląd na ekranie */
+                    /* Usunięto scale(0.8) - teraz 100% */
                     box-shadow: 0 0 15px rgba(0,0,0,0.2);
                 }
 
-                h2 { text-align: center; font-size: 11pt; margin: 0 0 5px 0; font-weight: 700; color: #000; text-transform: uppercase; }
+                /* WIĘKSZE CZCIONKI I ODSTĘPY */
+                h2 { text-align: center; font-size: 14pt; margin: 0 0 10px 0; font-weight: 700; color: #000; text-transform: uppercase; }
                 
-                .top-section { display: grid; grid-template-columns: 1fr 1fr 1fr; font-size: 9pt; margin-bottom: 5px; gap: 5px; }
-                .top-section div { padding: 2px; border: 1px solid #000; }
+                .top-section { display: grid; grid-template-columns: 1fr 1fr 1fr; font-size: 11pt; margin-bottom: 10px; gap: 8px; }
+                .top-section div { padding: 4px; border: 1px solid #000; }
                 .bold { font-weight: 700; }
 
-                table { border-collapse: collapse; width: 100%; font-size: 8pt; margin-bottom: 2px; }
-                th, td { border: 1px solid #000; padding: 2px; text-align: left; vertical-align: middle; }
+                table { border-collapse: collapse; width: 100%; font-size: 10pt; margin-bottom: 5px; } /* 8pt -> 10pt */
+                th, td { border: 1px solid #000; padding: 5px; text-align: left; vertical-align: middle; } /* padding 2px -> 5px */
                 th { background-color: #EBF5E6; text-align: center; font-weight: bold; }
                 .center-text { text-align: center; }
-                p { font-size: 9pt; margin: 2px 0; }
+                p { font-size: 10pt; margin: 5px 0; }
 
-                .signatures { display: flex; justify-content: space-between; margin-top: 10px; }
+                .signatures { display: flex; justify-content: space-between; margin-top: 20px; }
                 .sig-box { display: flex; flex-direction: column; align-items: center; width: 45%; }
-                .sig-label { font-weight: bold; margin-bottom: 2px; font-size: 9pt; display: block; text-align: center; width: 100%; }
-                .sig-img { display: block; height: 35px; width: 100%; object-fit: contain; margin-top: 2px; }
-                .sig-name { margin-top: 1px; font-size: 9pt; text-align: center; }
+                .sig-label { font-weight: bold; margin-bottom: 5px; font-size: 10pt; display: block; text-align: center; width: 100%; }
+                .sig-img { display: block; height: 45px; width: 100%; object-fit: contain; margin-top: 2px; }
+                .sig-name { margin-top: 1px; font-size: 10pt; text-align: center; }
 
-                /* --- USTAWIENIA DRUKARKI (Fix Pustej Strony + Skala 80%) --- */
+                /* --- USTAWIENIA DRUKARKI --- */
                 @media print {
                     html, body {
-                        height: 99%; /* Wymuszenie wysokości */
-                        overflow: hidden; /* Ukrycie ewentualnego nadmiaru */
+                        height: 99%; 
+                        overflow: hidden; 
                         background-color: white !important;
                         margin: 0 !important; padding: 0 !important;
                         display: block !important;
@@ -17383,17 +17404,16 @@ function getUnifiedPrintHTML(header, rowsHTML) {
                     .page-sheet {
                         width: 100%; margin: 0; padding: 0; box-shadow: none; border: none;
                         
-                        /* Skalowanie 80% */
-                        transform: scale(0.80); 
-                        transform-origin: top left;
-                        width: 125%; /* 100 / 0.8 = 125% - Kompensacja szerokości */
+                        /* Skalowanie 100% (Naturalny A4) */
+                        transform: none; 
+                        width: 100%;
                         
                         page-break-after: avoid !important;
                         page-break-before: avoid !important;
                     }
                     @page {
                         size: A4 landscape;
-                        margin: 5mm; 
+                        margin: 0.5cm; 
                     }
                 }
             </style>
@@ -17405,22 +17425,22 @@ function getUnifiedPrintHTML(header, rowsHTML) {
             </div>
 
             <div class="page-sheet">
-                <h2>KARTA LECZENIA ZWIERZĄT GOSPODARSKICH ORAZ ZWIERZĄT, Z KTÓRYCH POZYSKANE TKANKI LUB PRODUKTY SĄ PRZEZNACZONE DO SPOŻYCIA PRZEZ LUDZI / EWIDENCJA LECZENIA ZWIERZĄT</h2>
+                <h2>KARTA LECZENIA ZWIERZĄT GOSPODARSKICH ORAZ ZWIERZĄT... / EWIDENCJA LECZENIA</h2>
                 <div class="top-section">
                     <div>
                         Nazwa i adres zakładu leczniczego dla zwierząt:<br>
-                        <span class="bold" style="font-size: 11pt;">${header.nazwaLecznicy}</span><br>
+                        <span class="bold" style="font-size: 12pt;">${header.nazwaLecznicy}</span><br>
                         Wykonanie czynności lekarsko-weterynaryjnych dnia: <span class="bold">${header.dataWykonania}</span><br>
                         Nr stada: <span class="bold">${header.nrStada}</span>
                     </div>
                     <div>
                         Imię, nazwisko i adres albo nazwa siedziby i adres posiadacza zwierzęcia:<br>
-                        <span class="bold" style="font-size: 11pt;">${header.klient}</span><br>
-                        <span class="bold" style="font-size: 11pt;">${header.adresKlienta}</span>
+                        <span class="bold" style="font-size: 12pt;">${header.klient}</span><br>
+                        <span class="bold" style="font-size: 12pt;">${header.adresKlienta}</span>
                     </div>
                     <div>
                         Zgłoszenie: Data: <span class="bold">${header.dataZgloszenia}</span><br>
-                        Nr dokumentu: <span class="bold" style="font-size: 11pt;">${header.nrDokumentu}</span>
+                        Nr dokumentu: <span class="bold" style="font-size: 12pt;">${header.nrDokumentu}</span>
                     </div>
                 </div>
 
@@ -17428,16 +17448,16 @@ function getUnifiedPrintHTML(header, rowsHTML) {
                     <thead>
                         <tr>
                             <th rowspan="2" style="width:30px;">Lp.</th>
-                            <th rowspan="2" class="center-text">Nazwa siedziby stada i opis leczonego zwierzęcia<br>(gatunek, płeć numer identyfikacyjny, sposób oznakowania, wiek, masa ciała)</th>
-                            <th rowspan="2" class="center-text">Liczba leczonych zwierząt</th>
-                            <th rowspan="2" class="center-text">Rozpoznanie albo wstępne rozpoznanie choroby</th>
-                            <th colspan="3">Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posiadacza zwierzęcia produkty lecznicze weterynaryjne lub pasze lecznicze</th>
-                            <th rowspan="2">okres karencji / Zabieg leczniczy lub profilaktyczne zalecenia lekarskie oraz uwagi</th>
+                            <th rowspan="2" class="center-text">Nazwa siedziby stada i opis leczonego zwierzęcia...</th>
+                            <th rowspan="2" class="center-text">Liczba</th>
+                            <th rowspan="2" class="center-text">Rozpoznanie...</th>
+                            <th colspan="3">Zastosowane u poszczególnych zwierząt produkty...</th>
+                            <th rowspan="2">okres karencji / Zabieg...</th>
                         </tr>
                         <tr>
-                            <th>Nazwa produktu leczniczego/ produktu leczniczego weterynaryjnego/ paszy leczniczej</th>
-                            <th>Numer serii produktu leczniczego lub produktu leczniczego weterynaryjnego</th>
-                            <th>Ilość, dawkowanie zastosowanego produktu leczniczego lub ilość, dawkowanie i okres stosowanie nabytego produktu leczniczego, weterynaryjnego/paszy leczniczej</th>
+                            <th>Nazwa produktu...</th>
+                            <th>Numer serii...</th>
+                            <th>Ilość, dawkowanie...</th>
                         </tr>
                     </thead>
                     <tbody>${rowsHTML}</tbody>
@@ -17448,15 +17468,15 @@ function getUnifiedPrintHTML(header, rowsHTML) {
                 <div class="signatures">
                     <div class="sig-box">
                         <span class="sig-label">Lekarz weterynarii</span>
-                        ${header.podpisLekarzaImg ? `<img src="${header.podpisLekarzaImg}" class="sig-img">` : '<div style="height:35px;"></div>'}
+                        ${header.podpisLekarzaImg ? `<img src="${header.podpisLekarzaImg}" class="sig-img">` : '<div style="height:45px;"></div>'}
                         <span class="sig-name">${header.podpisLekarzaLinia}</span>
                     </div>
                     <div class="sig-box">
                         <span class="sig-label">Podpis posiadacza zwierzęcia</span>
-                        ${header.podpisPosiadaczaImg ? `<img src="${header.podpisPosiadaczaImg}" class="sig-img">` : '<div style="height:35px;"></div>'}
+                        ${header.podpisPosiadaczaImg ? `<img src="${header.podpisPosiadaczaImg}" class="sig-img">` : '<div style="height:45px;"></div>'}
                     </div>
                 </div>
-                <p style="margin-top: 5px;"><b>Wyniki badań uzupełniających:</b><br>*W przypadku zwierząt znajdujących się w rejestrze zwierząt gospodarskich oznakowanych</p>
+                <p style="margin-top: 10px;"><b>Wyniki badań uzupełniających:</b><br>*W przypadku zwierząt znajdujących się w rejestrze zwierząt gospodarskich oznakowanych</p>
             </div>
         </body>
         </html>
