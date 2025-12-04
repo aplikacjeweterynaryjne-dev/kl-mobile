@@ -5770,10 +5770,7 @@ const saveCardToArchiveBtn = document.getElementById('saveCardToArchiveBtn');
 /**
  * Pkt 4: Listener dla przycisku "Zapisz w Archiwum"
  */
-/**
-/* ✅ MODUŁ 8 (POPRAWKA KRYTYCZNA): Zapisuje kartę do archiwum */
-/* Naprawia problem pustej kolumny "okres karencji/zalecenia" przy użyciu generatora */
-
+/* ✅ MODUŁ 8 (FIX 3 - NUMERACJA + SMART CELL): Zapisuje kartę do archiwum */
 if (saveCardToArchiveBtn) {
     saveCardToArchiveBtn.addEventListener('click', async () => {
         
@@ -5783,8 +5780,9 @@ if (saveCardToArchiveBtn) {
             return;
         }
         const klient = document.getElementById('klientSelect').value;
-        const nrDok = document.getElementById('nrDokumentu').value.trim();
-        if (!klient || !nrDok) {
+        const nrDokStr = document.getElementById('nrDokumentu').value.trim(); // Pobieramy tekst wpisany przez usera
+        
+        if (!klient || !nrDokStr) {
             showToast("Wypełnij pola 'Klient' i 'Nr Dokumentu'", 'error');
             return;
         }
@@ -5804,13 +5802,13 @@ if (saveCardToArchiveBtn) {
             const idLecznicy = currentUserProfile['ID lecznicy'];
             const q = db.collection("archiwumKarty")
                 .where("id_lecznicy", "==", idLecznicy)
-                .where("nrDokumentu", "==", nrDok)
+                .where("nrDokumentu", "==", nrDokStr)
                 .limit(1);
                 
             const duplicateSnapshot = await q.get();
             
             if (!duplicateSnapshot.empty) {
-                showToast(`Błąd: Karta o numerze [${nrDok}] już istnieje!`, "error", 5000);
+                showToast(`Błąd: Karta o numerze [${nrDokStr}] już istnieje!`, "error", 5000);
                 saveCardToArchiveBtn.disabled = false;
                 saveCardToArchiveBtn.textContent = '💾 Zapisz w Archiwum';
                 return;
@@ -5837,12 +5835,12 @@ if (saveCardToArchiveBtn) {
                 klient: klient,
                 adresKlienta: document.getElementById('adresKlienta').textContent,
                 dataZgloszenia: document.getElementById('dataZgloszenia').value,
-                nrDokumentu: nrDok,
+                nrDokumentu: nrDokStr,
                 podpisLekarzaImg: document.getElementById('doctor-signature').src,
                 podpisLekarzaLinia: document.getElementById('doctor-signature-name').textContent
             };
             
-            // 2. Tabela i Mapa Zużycia
+            // 2. Tabela i Mapa Zużycia (Logika Smart Cell zachowana)
             const tableRowsData = [];
             const productUsageMap = new Map();
             const rows = rowsEditable();
@@ -5853,38 +5851,28 @@ if (saveCardToArchiveBtn) {
                 const iloscInput = tr.cells[6].querySelector('input[type="number"]');
                 const iloscValue = iloscInput ? iloscInput.value : '';
                 
-                // Pobierz HTML dla ilości (input + tekst)
                 let dawkaText = '';
                 if (iloscInput && iloscInput.nextSibling && iloscInput.nextSibling.nodeType === Node.TEXT_NODE) {
                     dawkaText = iloscInput.nextSibling.textContent;
                 }
                 const iloscDawkaHtml = `<input class="small-input" type="number" value="${iloscValue}"> ${dawkaText}`;
                 
-                // --- ⬇️ POPRAWKA: PRAWIDŁOWE POBIERANIE TEKSTU Z INTELIGENTNEJ KOLUMNY ⬇️ ---
+                // Smart Cell Logic
                 let karencjaCzysta = '';
-                
-                // 1. Najpierw szukaj naszego specyficznego inputa/textarea (Smart Cell)
                 const smartInput = tr.cells[7].querySelector('.karencja-input');
-                
                 if (smartInput) {
-                    // Jeśli znaleziono Smart Cell, pobierz jego wartość (to co wpisał generator)
                     karencjaCzysta = smartInput.value;
                 } else {
-                    // 2. Jeśli nie, spróbuj znaleźć jakikolwiek input
                     const anyInput = tr.cells[7].querySelector('input, textarea');
                     if (anyInput) {
                         karencjaCzysta = anyInput.value;
                     } else {
-                        // 3. Jeśli brak inputów, pobierz sam tekst i usuń ikonę kalendarza
                         karencjaCzysta = tr.cells[7].textContent.replace('📅', '').trim();
                     }
                 }
-
-                // 4. Zabezpieczenie: Jeśli puste, sprawdź czy generator nie zapisał tego w atrybucie
                 if (!karencjaCzysta && tr.cells[7].dataset.printValue) {
                     karencjaCzysta = tr.cells[7].dataset.printValue;
                 }
-                // --- ⬆️ KONIEC POPRAWKI ⬆️ ---
 
                 const rowData = {
                     logicalIndex: logicalIndex,
@@ -5895,15 +5883,13 @@ if (saveCardToArchiveBtn) {
                     lek: lekInput ? lekInput.value : '',
                     seria: tr.cells[5].textContent,
                     iloscDawka: iloscDawkaHtml,
-                    karencja: karencjaCzysta // Zapisujemy poprawnie pobrany tekst
+                    karencja: karencjaCzysta
                 };
                 
-                // ✅ ZMIANA: Zapisz wiersz także wtedy, gdy wypełniono TYLKO karencję/uwagi
                 if (rowData.opis || rowData.liczba || rowData.rozpoznanie || rowData.lek || (rowData.karencja && rowData.karencja.trim() !== '')) {
                     tableRowsData.push(rowData);
                 }
                 
-                // Zliczanie do magazynu
                 if (currentUserProfile.uzywaStanowMagazynowych === true) {
                      const productName = rowData.lek.trim();
                      const quantity = parseFloat(iloscValue) || 0;
@@ -5916,6 +5902,25 @@ if (saveCardToArchiveBtn) {
                      }
                 }
             });
+
+            // ⬇️⬇️⬇️ NAPRAWA LICZNIKA (COUNTER) ⬇️⬇️⬇️
+            // Zamiast ufać `currentCardData.nextCounter`, parsujemy to, co wpisał użytkownik.
+            let finalCounter = currentCardData.nextCounter; // Wartość domyślna
+            
+            // Próba wyciągnięcia liczby z formatu "16/12/2025/..."
+            try {
+                const parts = nrDokStr.split('/');
+                if (parts.length > 0) {
+                    const parsedNumber = parseInt(parts[0], 10);
+                    if (!isNaN(parsedNumber)) {
+                        finalCounter = parsedNumber;
+                        console.log(`Zapisywanie z ręcznie wpisanym numerem: ${finalCounter}`);
+                    }
+                }
+            } catch (e) {
+                console.warn("Nie udało się sparsować ręcznego numeru dokumentu, używam automatycznego.");
+            }
+            // ⬆️⬆️⬆️ KONIEC NAPRAWY ⬆️⬆️⬆️
             
             const cardArchiveData = {
                 lekarz_uid: currentUserProfile.uid,
@@ -5924,7 +5929,10 @@ if (saveCardToArchiveBtn) {
                 klient_nazwa: headerData.klient,
                 nrDokumentu: headerData.nrDokumentu,
                 dataWykonania: headerData.dataWykonania,
-                counter: currentCardData.nextCounter,
+                
+                // Zapisujemy POPRAWIONY licznik
+                counter: finalCounter, 
+                
                 miesiac: currentCardData.currentMonth,
                 rok: currentCardData.currentYear,
                 createdAt: firebase.firestore.FieldValue.serverTimestamp(),
@@ -5963,7 +5971,7 @@ if (saveCardToArchiveBtn) {
                      data: firebase.firestore.FieldValue.serverTimestamp(),
                      kto_uid: currentUserProfile.uid,
                      kto_nazwa: `${currentUserProfile.Imie} ${currentUserProfile.Nazwisko}`,
-                     batch_id_powiazany: nrDok,
+                     batch_id_powiazany: nrDokStr,
                      wycofany: false,
                      zmiany: zmianyLog
                 };
@@ -5973,7 +5981,6 @@ if (saveCardToArchiveBtn) {
 
             await batch.commit();
 
-            // Aktualizacja cache
             if (currentUserProfile.uzywaStanowMagazynowych === true && productUsageMap.size > 0) {
                  for (const [productId, usageQty] of productUsageMap.entries()) {
                      const stockData = magazynCache.get(productId);
@@ -5982,7 +5989,7 @@ if (saveCardToArchiveBtn) {
             }
 
             isCurrentCardSaved = true;
-            showToast(`Karta (Nr: ${nrDok}) zapisana.`, 'success');
+            showToast(`Karta (Nr: ${nrDokStr}) zapisana.`, 'success');
             saveCardToArchiveBtn.textContent = 'Zapisano ✔️';
 
         } catch (error) {
