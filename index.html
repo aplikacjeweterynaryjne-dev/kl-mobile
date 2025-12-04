@@ -11515,50 +11515,36 @@ if (generateReportBtn) {
             type: reportTypeSelect.value,
             dateStart: reportDateStart.value,
             dateEnd: reportDateEnd.value,
-            userId: reportUserSelect.value, // Może być "ALL"
+            userId: reportUserSelect.value,
             userName: reportUserSelect.options[reportUserSelect.selectedIndex].text,
-            klient: reportClientInput.value // Może być "ALL"
+            klient: reportClientInput.value
         };
 
-        if (!filters.type) {
-            alert("Wybierz typ raportu.");
-            return;
-        }
-        if (!filters.dateStart || !filters.dateEnd) {
-            alert("Wybierz zakres dat.");
-            return;
-        }
+        if (!filters.type) { alert("Wybierz typ raportu."); return; }
+        if (!filters.dateStart || !filters.dateEnd) { alert("Wybierz zakres dat."); return; }
 
         generateReportBtn.disabled = true;
         generateReportBtn.textContent = 'Generowanie... ⏳';
-        reportPlaceholder.style.display = 'none';
         reportResultArea.style.display = 'none';
-        printReportBtn.style.display = 'none';
 
         try {
-            // Pobierz dane z Firestore
-            // Używamy "bezpiecznego" zapytania (tylko data i lekarz), resztę filtrujemy w JS
-            cachedReportData = await fetchReceiptsForReport(filters.dateStart, filters.dateEnd, filters.userId);
-            
-            // Uruchom odpowiednią funkcję generującą
+            // ✅ ZMIANA LOGIKI POBIERANIA DANYCH
             if (filters.type === 'zuzycia') {
-                generateZuzyciaReport(cachedReportData, filters);
+                // Dla zużycia pobieramy KARTY LECZENIA
+                cachedReportData = await fetchCardsForReport(filters.dateStart, filters.dateEnd, filters.userId);
+                generateZuzyciaReportFromCards(cachedReportData, filters); // Nowa funkcja generująca
             } else {
+                // Dla finansów pobieramy PARAGONY (bez zmian)
+                cachedReportData = await fetchReceiptsForReport(filters.dateStart, filters.dateEnd, filters.userId);
                 generateWizytyReport(cachedReportData, filters);
             }
 
-           // KOREKTA: Pokaż raport na stronie (do podglądu)
-            reportResultArea.style.display = 'block';
-
-            // KOREKTA: Zamiast pokazywać stary przycisk, otwórz nowe okno
-            openReportPrintWindow();
-
-            // printReportBtn.style.display = 'inline-block'; // <-- Tę linię wyłączamy
+            reportResultArea.style.display = 'block';
+            openReportPrintWindow();
 
         } catch (error) {
-            console.error("Błąd podczas generowania raportu:", error);
-            alert("Wystąpił błąd. Sprawdź konsolę.");
-            reportPlaceholder.style.display = 'block';
+            console.error("Błąd generowania raportu:", error);
+            alert("Wystąpił błąd. Sprawdź czy utworzono indeksy w bazie (Konsola F12).");
         } finally {
             generateReportBtn.disabled = false;
             generateReportBtn.textContent = 'Generuj Raport';
@@ -11712,64 +11698,70 @@ function generateWizytyReport(allReceipts, filters) {
 }
 
 /**
- * Generuje Raport Zużycia Produktów (Typ 4)
- * ✅ WERSJA ROZSZERZONA: Dodano kolumnę z listą dokumentów i ilościami.
+/**
+ * ✅ NOWA FUNKCJA: Generuje Raport Zużycia na podstawie KART LECZENIA.
+ * Parsuje HTML z kolumny ilości, aby wydobyć liczbę.
  */
-function generateZuzyciaReport(allReceipts, filters) {
-    console.log("Generowanie raportu zużycia (wersja szczegółowa)...");
+function generateZuzyciaReportFromCards(allCards, filters) {
+    console.log("Generowanie raportu zużycia z KART LECZENIA...");
 
-    // --- 1. Filtrowanie w JavaScript (tylko klient) ---
-    let filteredReceipts = [...allReceipts];
+    // 1. Filtr Klienta (jeśli wpisano)
+    let filteredCards = [...allCards];
     if (filters.klient) {
-        filteredReceipts = filteredReceipts.filter(r => r.klient === filters.klient);
+        // Sprawdzamy pole klient_nazwa w karcie
+        const filterKlientLower = filters.klient.toLowerCase();
+        filteredCards = filteredCards.filter(c => (c.klient_nazwa || '').toLowerCase().includes(filterKlientLower));
     }
     
-    // --- 2. Agregacja produktów ---
-    // Mapa: Klucz = Nazwa Produktu, Wartość = { totalQty: number, uses: Array<string> }
+    // Mapa: Nazwa Produktu -> { totalQty, uses: [] }
     const productMap = new Map();
 
-    for (const receipt of filteredReceipts) {
-        if (receipt.pozycje && receipt.pozycje.length > 0) {
-            for (const item of receipt.pozycje) {
-                const productName = item.name.trim();
-                
-                // Ignorujemy "Wyrównanie"
-                if (productName.toLowerCase() === 'wyrównanie') {
-                    continue;
-                }
-                
-                const itemQty = Number(item.quantity) || 0;
-                const docNr = receipt.nrDokumentu || 'Brak nr';
-                
-                // Format wpisu: "12/12/2025/AW (5)"
-                const usageEntry = `${docNr} (<strong>${itemQty}</strong>)`;
+    // 2. Iteracja po kartach
+    for (const card of filteredCards) {
+        // Iteracja po wierszach tabeli w karcie
+        // (W archiwum wiersze są w tablicy `table`)
+        if (card.table && Array.isArray(card.table)) {
+            for (const row of card.table) {
+                // Szukamy nazwy leku (row.lek)
+                const productName = (row.lek || '').trim();
+                if (!productName) continue;
 
-                if (!productMap.has(productName)) {
-                    productMap.set(productName, { 
-                        totalQty: 0, 
-                        uses: [] 
-                    });
+                // --- PARSOWANIE ILOŚCI ---
+                // W bazie iloscDawka to np: `<input class="..." value="50"> ml`
+                let qty = 0;
+                if (row.iloscDawka) {
+                    // Próba wyciągnięcia liczby z value="..."
+                    const match = row.iloscDawka.match(/value="([\d\.]+)"/);
+                    if (match && match[1]) {
+                        qty = parseFloat(match[1]);
+                    } else {
+                        // Fallback: jeśli to zwykły tekst (np. stare dane), spróbuj sparsować początek
+                        qty = parseFloat(row.iloscDawka) || 0;
+                    }
                 }
 
-                const entry = productMap.get(productName);
-                entry.totalQty += itemQty;
-                entry.uses.push(usageEntry);
+                if (qty > 0) {
+                    const docNr = card.nrDokumentu || 'Brak nr';
+                    // Format: "12/2025/AW (5)"
+                    const usageEntry = `${docNr} (<strong>${qty}</strong>)`;
+
+                    if (!productMap.has(productName)) {
+                        productMap.set(productName, { totalQty: 0, uses: [] });
+                    }
+                    const entry = productMap.get(productName);
+                    entry.totalQty += qty;
+                    entry.uses.push(usageEntry);
+                }
             }
         }
     }
 
-    // --- 3. Budowanie tabeli ---
+    // --- 3. Budowanie HTML tabeli ---
     let tableHtml = '';
-    
-    // Sortowanie alfabetyczne produktów
     const sortedProducts = Array.from(productMap.keys()).sort((a, b) => a.localeCompare(b, 'pl'));
 
     for (const productName of sortedProducts) {
         const data = productMap.get(productName);
-        
-        // Łączymy wszystkie użycia w jeden ciąg tekstowy, oddzielony przecinkami
-        // Używamy <br> co kilka wpisów lub po prostu wrappingu CSS, tutaj damy przecinek i spację
-        // aby tabela mogła się zawijać.
         const usesList = data.uses.join(', ');
 
         tableHtml += `
@@ -11783,24 +11775,25 @@ function generateZuzyciaReport(allReceipts, filters) {
         `;
     }
 
-    // --- 4. Aktualizacja widoku (DOM) ---
-    reportZuzyciaTableBody.innerHTML = tableHtml || '<tr><td colspan="3" style="text-align: center; padding: 20px;">Brak zużytych produktów dla wybranych filtrów.</td></tr>';
+    // --- 4. Aktualizacja widoku ---
+    reportZuzyciaTableBody.innerHTML = tableHtml || '<tr><td colspan="3" style="text-align: center; padding: 20px;">Brak zużytych produktów w kartach dla wybranych kryteriów.</td></tr>';
     
-    // Pokaż/Ukryj tabele
+    // Pokaż odpowiednie kontenery
     reportWizytyTableContainer.style.display = 'none';
     reportZuzyciaTableContainer.style.display = 'block';
-    reportFuelSection.style.display = 'none'; // Ukryj pole paliwa
-    reportNetSumContainer.style.display = 'none'; // Ukryj sumę netto
+    reportFuelSection.style.display = 'none'; 
+    reportNetSumContainer.style.display = 'none';
 
-    // Aktualizuj podsumowanie
-    reportMainTitle.textContent = "Raport Zużycia Produktów";
-    reportDateDisplay.textContent = `Raport zawiera zużycia od: ${filters.dateStart} do: ${filters.dateEnd}`;
-    reportUserDisplay.textContent = `Pracownik: ${filters.userName}`;
-    reportSumTitle.textContent = `Łączna liczba unikalnych produktów:`;
-    reportCalculatedSum.textContent = `${sortedProducts.length}`; // Pokaż liczbę produktów
-    reportNetSum.textContent = ''; // Ukryj sumę netto
+    // Aktualizuj nagłówki
+    reportMainTitle.textContent = "Raport Zużycia (z Kart Leczenia)";
+    reportDateDisplay.textContent = `Okres: ${filters.dateStart} do ${filters.dateEnd}`;
+    reportUserDisplay.textContent = `Lekarz: ${filters.userName}`;
+    reportSumTitle.textContent = `Liczba unikalnych leków:`;
+    reportCalculatedSum.textContent = `${sortedProducts.length}`;
+    reportNetSum.textContent = '';
     reportFuelCost.value = 0;
 }
+
 
 
 // --- 4. Logika obliczania sumy Netto i Drukowania ---
@@ -17451,6 +17444,39 @@ function getUnifiedPrintHTML(header, rowsHTML) {
         </html>
     `;
 }
+    /**
+ * ✅ NOWA FUNKCJA: Pobiera Karty Leczenia do raportu.
+ * Filtruje po dacie (wymaga pola 'createdAt' lub 'dataWykonania').
+ * Używamy 'dataWykonania' bo to jest data wizyty.
+ */
+async function fetchCardsForReport(dateStart, dateEnd, userId) {
+    console.log(`Pobieranie KART LECZENIA dla raportu: UserID: ${userId}, Date: ${dateStart} do ${dateEnd}`);
+    
+    let q = db.collection("archiwumKarty");
+
+    // 1. Filtr Pracownika (Lekarza)
+    if (userId !== "ALL") {
+        q = q.where("lekarz_uid", "==", userId);
+    } else {
+        if (currentUserProfile.Rola !== 'administrator') {
+             const userClinicId = currentUserProfile['ID lecznicy'];
+             if (!userClinicId) throw new Error("Brak ID lecznicy");
+             q = q.where("id_lecznicy", "==", userClinicId);
+        }
+    }
+
+    // 2. Filtr Daty (dataWykonania jest zapisywana jako string "YYYY-MM-DD")
+    q = q.where("dataWykonania", ">=", dateStart)
+         .where("dataWykonania", "<=", dateEnd);
+    
+    try {
+        const snapshot = await q.get();
+        console.log(`Pobrano ${snapshot.size} kart leczenia.`);
+        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    } catch (error) {
+        console.error("Błąd zapytania Firestore (Karty): ", error);
+        if (error.code === 'failed-precondition') {
+            alert("BŁĄD: Wymagany indeks dla
 </script> 
 
 <div id="toastContainer" style="position: fixed; top: 20px; right: 20px; z-index: 20000; display: flex; flex-direction: column; gap: 10px;">
