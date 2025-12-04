@@ -9867,79 +9867,80 @@ navButtonsToCheck.forEach(btn => {
 /**
  * Pkt 7: Generuje i wstawia nowy numer dokumentu do pola w Karcie Leczenia.
  */
+/**
+ * ✅ FIX 2: Poprawiona numeracja Karty Leczenia.
+ * Logika: Szuka najwyższego numeru (counter) w bieżącym miesiącu dla danego lekarza i dodaje 1.
+ */
 async function generateAndSetDocumentNumber() {
-    if (!currentUserProfile || !currentUserProfile.uid) {
-        console.warn("Auto-numeracja wstrzymana: brak profilu użytkownika.");
-        return;
-    }
+    if (!currentUserProfile || !currentUserProfile.uid) {
+        console.warn("Auto-numeracja wstrzymana: brak profilu użytkownika.");
+        return;
+    }
 
-    const nrDokInput = document.getElementById('nrDokumentu');
-    // Nie generuj, jeśli pole jest już wypełnione przez użytkownika
-    if (nrDokInput.value.trim() !== "") {
-        console.log("Auto-numeracja pominięta: pole 'Nr Dokumentu' jest już wypełnione.");
-        // Mimo to, spróbuj sparsować numer, aby uzyskać licznik dla zapisu
-        try {
-            const parts = nrDokInput.value.split('/');
-            if (parts.length === 4) {
-                currentCardData.nextCounter = parseInt(parts[0]) || 1;
-                currentCardData.currentMonth = parseInt(parts[1]) || (new Date().getMonth() + 1);
-                currentCardData.currentYear = parseInt(parts[2]) || (new Date().getFullYear());
-                currentCardData.initials = parts[3] || (currentUserProfile.Inicjaly || 'NN');
-            }
-        } catch(e) {
-            console.warn("Nie udało się sparsować istniejącego numeru dokumentu.");
-        }
-        return;
-    }
+    const nrDokInput = document.getElementById('nrDokumentu');
+    // Nie generuj, jeśli pole jest już wypełnione przez użytkownika
+    if (nrDokInput.value.trim() !== "") {
+        console.log("Auto-numeracja pominięta: pole jest już wypełnione.");
+        return;
+    }
 
-    // Ustaw metadane
-    const d = new Date();
-    currentCardData.currentMonth = d.getMonth() + 1; // JS liczy miesiące 0-11
-    currentCardData.currentYear = d.getFullYear();
-    currentCardData.initials = currentUserProfile.Inicjaly || 'NN';
+    // 1. Ustal bieżącą datę
+    const d = new Date();
+    const currentMonth = d.getMonth() + 1; // 1-12
+    const currentYear = d.getFullYear();   // np. 2025
+    
+    // Inicjały lekarza
+    const initials = currentUserProfile.Inicjaly || 'NN';
 
-    // Jeśli brakuje inicjałów, ostrzeż, ale kontynuuj
-    if (!currentUserProfile.Inicjaly) {
-        console.warn("Brak inicjałów w profilu użytkownika. Używam 'NN'.");
-    }
+    // Aktualizuj globalny obiekt stanu (ważne dla zapisu)
+    currentCardData.currentMonth = currentMonth;
+    currentCardData.currentYear = currentYear;
+    currentCardData.initials = initials;
 
-    console.log(`Pobieranie ostatniego numeru dla: Uid=${currentUserProfile.uid}, Rok=${currentCardData.currentYear}, Miesiąc=${currentCardData.currentMonth}`);
+    console.log(`Szukanie ostatniego numeru dla: UID=${currentUserProfile.uid}, Miesiąc=${currentMonth}/${currentYear}`);
 
-    try {
-        // Zapytanie o ostatni dokument DANEGO LEKARZA w DANYM MIESIĄCU i ROKU
-        const q = db.collection("archiwumKarty")
-            .where("lekarz_uid", "==", currentUserProfile.uid)
-            .where("rok", "==", currentCardData.currentYear)
-            .where("miesiac", "==", currentCardData.currentMonth)
-            .orderBy("counter", "desc") // Sortuj wg licznika malejąco
-            .limit(1);
+    try {
+        // 2. Zapytanie do Firestore
+        // Szukamy kart tego lekarza, z tego roku i miesiąca, sortujemy po liczniku malejąco
+        const q = db.collection("archiwumKarty")
+            .where("lekarz_uid", "==", currentUserProfile.uid)
+            .where("rok", "==", currentYear)
+            .where("miesiac", "==", currentMonth)
+            .orderBy("counter", "desc") // Najważniejsze: sortowanie po liczbie
+            .limit(1);
 
-        const snapshot = await q.get();
+        const snapshot = await q.get();
 
-        if (snapshot.empty) {
-            // To pierwszy dokument w tym miesiącu
-            currentCardData.nextCounter = 1;
-        } else {
-            // Znaleziono poprzedni dokument, pobierz jego licznik i dodaj 1
-            const lastCounter = snapshot.docs[0].data().counter;
-            currentCardData.nextCounter = lastCounter + 1;
-        }
+        if (snapshot.empty) {
+            // Brak kart w tym miesiącu -> Zaczynamy od 1
+            console.log("Brak kart w tym miesiącu. Ustawiam numer 1.");
+            currentCardData.nextCounter = 1;
+        } else {
+            // Znaleziono karty -> Bierzemy najwyższy counter i dodajemy 1
+            const lastDocData = snapshot.docs[0].data();
+            const lastCounter = parseInt(lastDocData.counter, 10) || 0;
+            console.log(`Znaleziono ostatni numer: ${lastCounter}. Ustawiam ${lastCounter + 1}.`);
+            currentCardData.nextCounter = lastCounter + 1;
+        }
 
-        // Zbuduj finalny numer dokumentu
-        const newDocNumber = `${currentCardData.nextCounter}/${currentCardData.currentMonth}/${currentCardData.currentYear}/${currentCardData.initials}`;
+        // 3. Złóż numer w całość: NUMER / MIESIĄC / ROK / INICJAŁY
+        const newDocNumber = `${currentCardData.nextCounter}/${currentMonth}/${currentYear}/${initials}`;
 
-        nrDokInput.value = newDocNumber; // Wstaw do pola
-        console.log(`Wygenerowano nowy numer dokumentu: ${newDocNumber}`);
-        isCurrentCardSaved = false; // Nowy numer = "brudna" karta
+        nrDokInput.value = newDocNumber;
+        isCurrentCardSaved = false; // Nowy numer = karta "brudna"
 
-    } catch (error) {
-        console.error("Błąd podczas generowania numeru dokumentu:", error);
-        // Błąd indeksu Firestore?
-        if (error.code === 'failed-precondition') {
-             alert("BŁĄD KRYTYCZNY: Aby archiwum działało, administrator musi utworzyć indeks w bazie danych Firestore.\n\n(Kolekcja: 'archiwumKarty', Pola: 'lekarz_uid' ASC, 'rok' ASC, 'miesiac' ASC, 'counter' DESC)");
-             console.error("BŁĄD INDEKSU: Wejdź w konsolę Firebase i utwórz indeks kompozytowy dla 'archiwumKarty': [lekarz_uid(ASC), rok(ASC), miesiac(ASC), counter(DESC)]");
-        }
-    }
+    } catch (error) {
+        console.error("Błąd generowania numeru karty:", error);
+        
+        // Obsługa błędu braku indeksu (bardzo prawdopodobne przy złożonych zapytaniach)
+        if (error.code === 'failed-precondition') {
+            alert("BŁĄD BAZY DANYCH: System numeracji wymaga nowego indeksu w Firestore.\n\nKliknij F12 -> Konsola i otwórz link podany przez Firebase, aby utworzyć indeks.");
+            console.error("KLIKNIJ TEN LINK ABY UTWORZYĆ INDEKS DLA NUMERACJI KART:");
+            // Firebase w konsoli wypisze link do utworzenia indeksu:
+            // Kolekcja: archiwumKarty
+            // Pola: lekarz_uid (Asc), rok (Asc), miesiac (Asc), counter (Desc)
+        }
+    }
 }
 // ⬆️ (tutaj kończy się funkcja generateAndSetDocumentNumber) ⬆️
 
@@ -13851,13 +13852,16 @@ function checkSchemaFit(schema, startingIndex) {
  * ZAKTUALIZOWANA LOGIKA applySchema (Moduł 4.2)
  * NAPRAWIONY BŁĄD: Zapobiega czyszczeniu pól Opis i Liczba w wierszu kontrolującym schemat.
  */
+/* ======================================================== */
+/* ✅ ZAKTUALIZOWANA LOGIKA applySchema (FIX: Smart Cell)   */
+/* ======================================================== */
 function applySchema(event) {
     const input = event.target;
-    // Zapiszmy oryginalną nazwę schematu
     const oryginalnaNazwaRozpoznania = input.value.trim();
     const rozpoznanieKey = oryginalnaNazwaRozpoznania.toLowerCase();
 
     // 1. Sprawdź checkbox
+    const schemaCheckbox = document.getElementById('schemaCheckbox');
     if (!schemaCheckbox || !schemaCheckbox.checked) {
         return;
     }
@@ -13872,13 +13876,12 @@ function applySchema(event) {
     const logicalRows = rowsEditable();
     if (logicalRows.length === 0) return;
 
-    // --- LOGIKA WYSZUKIWANIA MIEJSCA ---
-
-    // 3. Ustal, od którego wiersza zacząć szukanie
+    // 3. Ustal startowy wiersz
     let currentIndex = 0;
     const inFormModal = (input.id === 'formRozpoznanie');
 
     if (inFormModal) {
+        const formRowSelect = document.getElementById('formRowSelect');
         currentIndex = parseInt(formRowSelect.value, 10);
     } else {
         const currentRow = input.closest('tr');
@@ -13886,196 +13889,90 @@ function applySchema(event) {
     }
     if (currentIndex === -1) currentIndex = 0;
 
-    // 4. Znajdź następny dostępny "slot" (Bez zmian)
+    // 4. Znajdź wolne miejsce (Logika bez zmian)
     let actualStartingIndex = -1;
-
-    // Pętla szuka pierwszego wolnego wiersza 'i', który może być początkiem schematu
     for (let i = currentIndex; i < logicalRows.length; i++) {
-        // A. Sprawdź, czy sam wiersz 'i' jest pusty
         if (i === currentIndex || isRowEmpty(logicalRows[i])) {
-
-            // B. Sprawdź, czy wszystkie wiersze docelowe DLA TEGO SCHEMATU są wolne
             let canFit = true;
             for (const p of schema.produkty) {
                 const targetIndex = i + p.wierszDocelowy;
-
-                // Sprawdź granice tabeli
-                if (targetIndex >= logicalRows.length) {
-                    canFit = false;
-                    break; // Schemat wychodzi poza tabelę
-                }
-
-                // Sprawdź, czy wiersz docelowy jest pusty
-                if (targetIndex !== i && !isRowEmpty(logicalRows[targetIndex])) {
-                    canFit = false;
-                    break; // Wiersz docelowy (np. "Pozostawione 1") jest już zajęty
-                }
+                if (targetIndex >= logicalRows.length) { canFit = false; break; }
+                if (targetIndex !== i && !isRowEmpty(logicalRows[targetIndex])) { canFit = false; break; }
             }
-
-            // Jeśli 'canFit' jest nadal true, znaleźliśmy idealne miejsce!
-            if (canFit) {
-                actualStartingIndex = i;
-                break; // Przerwij pętlę szukania 'i'
-            }
+            if (canFit) { actualStartingIndex = i; break; }
         }
     }
 
-    // 5. Sprawdź, czy znaleziono miejsce
     if (actualStartingIndex === -1) {
-        showToast("Za mało miejsca w tabeli lub wiersze są zajęte. Schemat zablokowany!", "error");
-        input.value = ''; // Wyczyść pole
+        showToast("Za mało miejsca w tabeli. Schemat zablokowany!", "error");
+        input.value = ''; 
         return;
     }
-    // --- POPRAWIONA LOGIKA (v2): Pobranie Mnożnika i podpięcie listenera ---
 
-    // 1. Znajdź wiersz KONTROLUJĄCY (ten, w którym wpisano rozpoznanie)
+    // 5. Pobierz mnożnik zwierząt
     const controllerRow = logicalRows[currentIndex];
-    if (!controllerRow) {
-        console.error("Błąd krytyczny: Nie można znaleźć wiersza kontrolującego schemat.");
-        return;
-    }
-
     const liczbaInput = controllerRow.cells[2].querySelector('input[type="number"]');
-    let liczbaZwierzaDlaSchematu = 1; // Domyślnie 1
-
-    // 2. Odczytaj aktualną wartość mnożnika
+    let liczbaZwierzaDlaSchematu = 1;
     if (liczbaInput && liczbaInput.value.trim() !== '') {
-        const parsedLiczba = parseInt(liczbaInput.value, 10);
-        if (!isNaN(parsedLiczba) && parsedLiczba > 0) {
-            liczbaZwierzaDlaSchematu = parsedLiczba;
-        }
+        const parsed = parseInt(liczbaInput.value, 10);
+        if (!isNaN(parsed) && parsed > 0) liczbaZwierzaDlaSchematu = parsed;
     }
-    console.log(`Mnożnik schematu (liczba zwierząt): ${liczbaZwierzaDlaSchematu}`);
-
-    // 3. Nadaj unikalne ID polu "Liczba" (na podstawie wiersza, w którym jest)
-    const liczbaInputId = 'liczba-zwierzat-' + currentIndex; // Użyj 'currentIndex'
+    
+    // Obsługa ID dla dynamicznego przeliczania (Bez zmian)
+    const liczbaInputId = 'liczba-zwierzat-' + currentIndex;
     if (liczbaInput) {
         liczbaInput.id = liczbaInputId;
-
-        // 4. Podepnij listener do WŁAŚCIWEGO pola "Liczba"
         liczbaInput.removeEventListener('input', handleLiczbaChange);
         liczbaInput.addEventListener('input', handleLiczbaChange);
-        console.log(`Podpięto listener 'handleLiczbaChange' do ${liczbaInputId}`);
     }
-    // --- KONIEC POPRAWIONEJ LOGIKI (v2) ---
-    // --- KONIEC LOGIKI WYSZUKIWANIA MIEJSCA ---
 
+    // 6. Wpisz diagnozę (Bez zmian logicznych)
+    const firstLeczenieProduct = schema.produkty.filter(p => p.wierszDocelowy < 9).sort((a, b) => a.wierszDocelowy - b.wierszDocelowy)[0];
+    const firstPozostawioneProduct = schema.produkty.filter(p => p.wierszDocelowy >= 9).sort((a, b) => a.wierszDocelowy - b.wierszDocelowy)[0];
 
-    // 6. Wypełnij pole Rozpoznanie (NOWA, INTELIGENTNA LOGIKA)
-
-    // Znajdź pierwszy wiersz "Leczenie" (0-8), którego wymaga schemat
-    const firstLeczenieProduct = schema.produkty
-        .filter(p => p.wierszDocelowy < 9)
-        .sort((a, b) => a.wierszDocelowy - b.wierszDocelowy)[0];
-
-    // Znajdź pierwszy wiersz "Pozostawione" (9-11), którego wymaga schemat
-    const firstPozostawioneProduct = schema.produkty
-        .filter(p => p.wierszDocelowy >= 9)
-        .sort((a, b) => a.wierszDocelowy - b.wierszDocelowy)[0];
-
-    // **********************************************
-    // ************ P O P R A W K A *****************
-    // **********************************************
-
-    // Wiersz kontrolujący to ten, w którym piszemy (controllerRow / currentIndex)
-
-    // A. Wpisz diagnozę w wierszu Leczenie (jeśli go używasz jako startowego)
     if (firstLeczenieProduct) {
-        // Jeśli schemat używa wierszy "Leczenie", wpisz diagnozę w pierwszym z nich.
         const targetIndex = actualStartingIndex + firstLeczenieProduct.wierszDocelowy;
-        if (targetIndex < logicalRows.length) {
-            const diagInput = logicalRows[targetIndex].cells[3].querySelector('input');
-            if (diagInput) {
-                diagInput.value = schema.rozpoznanie;
-            }
-        }
-    } else {
-        // Jeśli schemat NIE MA wierszy "Leczenie" (jest tylko dla "Pozostawione"),
-        // usuwamy tylko rozpoznanie w tym wierszu, jeśli nie jest wierszem startowym
-        const diagInput = controllerRow.cells[3].querySelector('input');
-        if (diagInput) {
-            // FIX: Pozwól diagnozie pozostać w wierszu, w którym wpisano schemat,
-            // nawet jeśli nie jest wierszem docelowym dla produktów.
-            // Błąd polegał na czyszczeniu diagnozy, gdy schemat trafiał do wierszy "Pozostawione".
-            // Nie ruszamy go, bo użytkownik już go wpisał.
-        }
+        if (targetIndex < logicalRows.length) logicalRows[targetIndex].cells[3].querySelector('input').value = schema.rozpoznanie;
     }
-
-
-    // B. Wpisz diagnozę w wierszu "Pozostawione"
     if (firstPozostawioneProduct) {
-        // Jeśli schemat używa wierszy "Pozostawione", wpisz diagnozę w pierwszym z nich.
         const targetIndex = actualStartingIndex + firstPozostawioneProduct.wierszDocelowy;
-        if (targetIndex < logicalRows.length) {
-            const diagInput = logicalRows[targetIndex].cells[3].querySelector('input');
-            if (diagInput) {
-                diagInput.value = schema.rozpoznanie;
-            }
-        }
+        if (targetIndex < logicalRows.length) logicalRows[targetIndex].cells[3].querySelector('input').value = schema.rozpoznanie;
     }
 
-    // **********************************************
-    // ********** KONIEC POPRAWKI *******************
-    // **********************************************
-
-    // 7. Wypełnij wiersze produktów (BEZ ZMIAN)
+    // 7. Wypełnij produkty (TU JEST ZMIANA)
     schema.produkty.forEach(p => {
         const targetRowIndex = actualStartingIndex + p.wierszDocelowy;
 
         if (targetRowIndex >= 0 && targetRowIndex < logicalRows.length) {
             const row = logicalRows[targetRowIndex];
             try {
+                // Nazwa leku
                 const produktInput = row.cells[4].querySelector('input');
-
                 produktInput.value = p.produkt;
                 produktInput.dispatchEvent(new Event('input', { bubbles: true }));
 
-                const iloscInput = row.cells[6].querySelector('input[type="number"]');
-
+                // Seria
                 row.cells[5].textContent = p.seria || '';
 
-                // --- START ZMODYFIKOWANEJ LOGIKI (Mnożenie ilości) ---
-
-                // 1. Pobierz ilość ze schematu (obsługuje "0.5" i "0,5")
+                // Ilość (Przeliczanie)
+                const iloscInput = row.cells[6].querySelector('input[type="number"]');
                 let schemaIlosc = 0;
-                if (p.ilosc && String(p.ilosc).trim() !== '') {
-                    const parsedSchemaIlosc = parseFloat(String(p.ilosc).replace(',', '.'));
-                    if (!isNaN(parsedSchemaIlosc)) {
-                        schemaIlosc = parsedSchemaIlosc;
-                    }
-                }
-
-                // 2. Oblicz końcową ilość (Ilość * Liczba Zwierząt)
+                if (p.ilosc) schemaIlosc = parseFloat(String(p.ilosc).replace(',', '.')) || 0;
                 const finalIlosc = schemaIlosc * liczbaZwierzaDlaSchematu;
 
-                // 3. Wstaw obliczoną wartość do pola i OTAGUJ POLE
                 if (iloscInput) {
                     let finalValue = finalIlosc;
-
-                    if (finalIlosc % 1 !== 0) {
-                        finalValue = finalIlosc.toFixed(2);
-                    }
-
+                    if (finalIlosc % 1 !== 0) finalValue = finalIlosc.toFixed(2);
                     iloscInput.value = finalValue > 0 ? String(finalValue) : '';
-
-                    // --- START TAGOWANIA ---
-                    // Zapisz w polu "Ilość", jaka jest jego bazowa ilość na 1 szt.
+                    
+                    // Tagowanie dla dynamicznych zmian
                     iloscInput.dataset.schemaBaseQty = String(schemaIlosc);
-
-                    // Zapisz w polu "Ilość", które pole "Liczba" je kontroluje
                     iloscInput.dataset.schemaControllerId = liczbaInputId;
-
-                    // Dodaj listener, który zerwie to połączenie, jeśli użytkownik zacznie pisać
                     iloscInput.removeEventListener('keydown', handleIloscOverride);
                     iloscInput.addEventListener('keydown', handleIloscOverride);
-                    // --- KONIEC TAGOWANIA ---
-
-                } else {
-                    console.warn("Nie znaleziono pola input ilości w wierszu " + targetRowIndex);
                 }
 
-                // --- KONIEC ZMODYFIKOWANEJ LOGIKI ---
-
+                // Dawkowanie (tekst)
                 const dawkaText = p.dawkowanie || '';
                 const textNode = row.cells[6].childNodes[1];
                 if (textNode && textNode.nodeType === Node.TEXT_NODE) {
@@ -14084,9 +13981,23 @@ function applySchema(event) {
                     row.cells[6].appendChild(document.createTextNode(' ' + dawkaText));
                 }
 
-                row.cells[7].textContent = p.karencja || '';
-                row.cells[4].dataset.printValue = p.produkt;
+                // ⬇️⬇️⬇️ ✅ FIX 1: OBSŁUGA SMART CELL (IKONA KALENDARZA) ⬇️⬇️⬇️
+                // Sprawdzamy czy w kolumnie 8 (index 7) jest nasz specjalny input
+                const smartInput = row.cells[7].querySelector('input.karencja-input');
+                
+                if (smartInput) {
+                    // Jeśli to Smart Cell (Pozostawione), wpisujemy wartość do inputa
+                    // Dzięki temu NIE nadpisujemy HTML-a komórki i ikona zostaje!
+                    smartInput.value = p.karencja || '';
+                    // Aktualizujemy też atrybut dla druku
+                    row.cells[7].dataset.printValue = p.karencja || '';
+                } else {
+                    // Jeśli to zwykła komórka (Leczenie na miejscu), wpisujemy tekst
+                    row.cells[7].textContent = p.karencja || '';
+                }
+                // ⬆️⬆️⬆️ KONIEC FIXA ⬆️⬆️⬆️
 
+                row.cells[4].dataset.printValue = p.produkt;
                 row.classList.add('highlight-row');
                 setTimeout(() => row.classList.remove('highlight-row'), 2000);
 
@@ -14096,48 +14007,22 @@ function applySchema(event) {
         }
     });
 
- /* Plik: index.html (ZASTĄP fragment wewnątrz applySchema, ok. linii 6125) */
-
- /* Plik: index.html (ZASTĄP fragment wewnątrz applySchema, ok. linii 6125) */
-
-    // 8. Odśwież formularz (jeśli był używany)
+    // 8. Odśwież formularz (jeśli otwarty)
     if (inFormModal) {
-        // **********************************************
-        // ******* KLUCZOWA POPRAWKA: RĘCZNY ZAPIS OPISU I LICZBY *
-        // **********************************************
-        
-        // Zapisz wartości Opis, Liczba i Rozpoznanie z formularza modalnego 
-        // do wiersza w tabeli, ZANIM odświeżymy formularz (co wyczyści pola).
-        
         const currentRow = logicalRows[currentIndex];
-        
-        // 1. Nazwa siedziby stada i opis zwierzęcia (Kolumna 2 / cells[1])
         currentRow.cells[1].textContent = document.getElementById('formOpis').value; 
-        
-        // 2. Liczba leczonych zwierząt (Kolumna 3 / cells[2] -> input)
         const inpLiczba = currentRow.cells[2].querySelector('input');
         if (inpLiczba) inpLiczba.value = document.getElementById('formLiczba').value;
-
-        // 3. Rozpoznanie (Kolumna 4 / cells[3] -> input)
         const inpRozpoznanie = currentRow.cells[3].querySelector('input');
-        if (inpRozpoznanie) inpRozpoznanie.value = input.value; // input.value to nazwa schematu
+        if (inpRozpoznanie) inpRozpoznanie.value = input.value;
 
-        // Teraz, gdy dane są zapisane w tabeli, bezpiecznie odświeżamy formularz:
         setTimeout(() => {
             selectRowInForm(currentIndex); 
-            // selectRowInForm odczyta teraz zapisane wartości z tabeli.
         }, 0);
-        
-        // **********************************************
-        // ******* KONIEC POPRAWKI *******************
-        // **********************************************
     } else {
-        // W trybie tabeli (BEZ ZMIAN)
-        // Wymuś załadowanie wartości wiersza startowego do formularza, aby zaktualizować podgląd
         const formRowSelect = document.getElementById('formRowSelect');
         if(formRowSelect) {
             formRowSelect.value = currentIndex;
-            // Wywołanie 'change' odpali saveRow(prev) i selectRowInForm(current)
             formRowSelect.dispatchEvent(new Event('change'));
         }
     }
