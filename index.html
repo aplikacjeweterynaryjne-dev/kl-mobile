@@ -17332,10 +17332,10 @@ function openCurrentA4PrintWindow() {
     printWindow.focus();
 }
 /**
- * ✅ WSPÓLNY SZABLON HTML (FIX: Bez ikony kalendarza + Większy rozmiar)
- * - Skala: 100% (Brak pomniejszania 0.8).
- * - Czcionka: Powiększona do 10pt.
- * - Padding: Zwiększony, aby wypełnić kartkę pionowo.
+/**
+ * ✅ WSPÓLNY SZABLON HTML (WERSJA FINALNA: Pełne teksty prawne)
+ * - Przywrócono oryginalne, długie nazwy kolumn i sekcji.
+ * - Zachowano skalowanie i układ zapobiegający pustej stronie.
  */
 function getUnifiedPrintHTML(header, rowsHTML) {
     return `
@@ -17361,34 +17361,40 @@ function getUnifiedPrintHTML(header, rowsHTML) {
                 .btn-print { background: #4CAF50; color: white; }
                 .btn-close { background: #f44336; color: white; }
 
-                /* KARTKA A4 PODGLĄD */
+                /* KARTKA A4 */
                 .page-sheet {
                     background: white;
                     width: 297mm; min-height: 210mm;
-                    padding: 10mm; 
+                    padding: 8mm; 
                     box-sizing: border-box;
-                    /* Usunięto scale(0.8) - teraz 100% */
+                    transform: scale(0.8); transform-origin: top center;
                     box-shadow: 0 0 15px rgba(0,0,0,0.2);
                 }
 
-                /* WIĘKSZE CZCIONKI I ODSTĘPY */
-                h2 { text-align: center; font-size: 14pt; margin: 0 0 10px 0; font-weight: 700; color: #000; text-transform: uppercase; }
+                /* NAGŁÓWEK TYTUŁOWY */
+                h2 { 
+                    text-align: center; font-size: 11pt; margin: 0 0 8px 0; 
+                    font-weight: 700; color: #000; text-transform: uppercase; line-height: 1.2;
+                }
                 
-                .top-section { display: grid; grid-template-columns: 1fr 1fr 1fr; font-size: 11pt; margin-bottom: 10px; gap: 8px; }
-                .top-section div { padding: 4px; border: 1px solid #000; }
+                /* SEKCJA GÓRNA (DANE) */
+                .top-section { display: grid; grid-template-columns: 1fr 1fr 1fr; font-size: 9pt; margin-bottom: 8px; gap: 5px; }
+                .top-section div { padding: 3px; border: 1px solid #000; }
                 .bold { font-weight: 700; }
 
-                table { border-collapse: collapse; width: 100%; font-size: 10pt; margin-bottom: 5px; } /* 8pt -> 10pt */
-                th, td { border: 1px solid #000; padding: 5px; text-align: left; vertical-align: middle; } /* padding 2px -> 5px */
-                th { background-color: #EBF5E6; text-align: center; font-weight: bold; }
+                /* TABELA */
+                table { border-collapse: collapse; width: 100%; font-size: 8pt; margin-bottom: 5px; }
+                th, td { border: 1px solid #000; padding: 2px; text-align: left; vertical-align: middle; }
+                th { background-color: #EBF5E6; text-align: center; font-weight: bold; vertical-align: middle; }
                 .center-text { text-align: center; }
-                p { font-size: 10pt; margin: 5px 0; }
-
-                .signatures { display: flex; justify-content: space-between; margin-top: 20px; }
+                
+                /* Stopka i Podpisy */
+                p { font-size: 9pt; margin: 2px 0; }
+                .signatures { display: flex; justify-content: space-between; margin-top: 15px; }
                 .sig-box { display: flex; flex-direction: column; align-items: center; width: 45%; }
-                .sig-label { font-weight: bold; margin-bottom: 5px; font-size: 10pt; display: block; text-align: center; width: 100%; }
-                .sig-img { display: block; height: 45px; width: 100%; object-fit: contain; margin-top: 2px; }
-                .sig-name { margin-top: 1px; font-size: 10pt; text-align: center; }
+                .sig-label { font-weight: bold; margin-bottom: 2px; font-size: 9pt; display: block; text-align: center; width: 100%; }
+                .sig-img { display: block; height: 40px; width: 100%; object-fit: contain; margin-top: 2px; }
+                .sig-name { margin-top: 1px; font-size: 9pt; text-align: center; }
 
                 /* --- USTAWIENIA DRUKARKI --- */
                 @media print {
@@ -17403,17 +17409,15 @@ function getUnifiedPrintHTML(header, rowsHTML) {
                     
                     .page-sheet {
                         width: 100%; margin: 0; padding: 0; box-shadow: none; border: none;
-                        
-                        /* Skalowanie 100% (Naturalny A4) */
-                        transform: none; 
-                        width: 100%;
-                        
+                        transform: scale(0.80); 
+                        transform-origin: top left;
+                        width: 125%; 
                         page-break-after: avoid !important;
                         page-break-before: avoid !important;
                     }
                     @page {
                         size: A4 landscape;
-                        margin: 0.5cm; 
+                        margin: 5mm; 
                     }
                 }
             </style>
@@ -17425,39 +17429,55 @@ function getUnifiedPrintHTML(header, rowsHTML) {
             </div>
 
             <div class="page-sheet">
-                <h2>KARTA LECZENIA ZWIERZĄT GOSPODARSKICH ORAZ ZWIERZĄT... / EWIDENCJA LECZENIA</h2>
+                <h2>KARTA LECZENIA ZWIERZĄT GOSPODARSKICH ORAZ ZWIERZĄT, Z KTÓRYCH POZYSKANE TKANKI LUB PRODUKTY SĄ PRZEZNACZONE DO SPOŻYCIA PRZEZ LUDZI / EWIDENCJA LECZENIA ZWIERZĄT</h2>
+                
                 <div class="top-section">
                     <div>
                         Nazwa i adres zakładu leczniczego dla zwierząt:<br>
-                        <span class="bold" style="font-size: 12pt;">${header.nazwaLecznicy}</span><br>
+                        <span class="bold" style="font-size: 11pt;">${header.nazwaLecznicy}</span><br>
                         Wykonanie czynności lekarsko-weterynaryjnych dnia: <span class="bold">${header.dataWykonania}</span><br>
                         Nr stada: <span class="bold">${header.nrStada}</span>
                     </div>
                     <div>
                         Imię, nazwisko i adres albo nazwa siedziby i adres posiadacza zwierzęcia:<br>
-                        <span class="bold" style="font-size: 12pt;">${header.klient}</span><br>
-                        <span class="bold" style="font-size: 12pt;">${header.adresKlienta}</span>
+                        <span class="bold" style="font-size: 11pt;">${header.klient}</span><br>
+                        <span class="bold" style="font-size: 11pt;">${header.adresKlienta}</span>
                     </div>
                     <div>
                         Zgłoszenie: Data: <span class="bold">${header.dataZgloszenia}</span><br>
-                        Nr dokumentu: <span class="bold" style="font-size: 12pt;">${header.nrDokumentu}</span>
+                        Nr dokumentu: <span class="bold" style="font-size: 11pt;">${header.nrDokumentu}</span>
                     </div>
                 </div>
 
                 <table>
+                    <colgroup>
+                        <col style="width: 30px;">
+                        <col style="width: 20%;">
+                        <col style="width: 50px;">
+                        <col style="width: 15%;">
+                        <col style="width: 18%;">
+                        <col style="width: 8%;">
+                        <col style="width: 12%;">
+                        <col>
+                    </colgroup>
                     <thead>
                         <tr>
-                            <th rowspan="2" style="width:30px;">Lp.</th>
-                            <th rowspan="2" class="center-text">Nazwa siedziby stada i opis leczonego zwierzęcia...</th>
-                            <th rowspan="2" class="center-text">Liczba</th>
-                            <th rowspan="2" class="center-text">Rozpoznanie...</th>
-                            <th colspan="3">Zastosowane u poszczególnych zwierząt produkty...</th>
-                            <th rowspan="2">okres karencji / Zabieg...</th>
+                            <th rowspan="2">Lp.</th>
+                            <th rowspan="2" class="center-text">
+                                Nazwa siedziby stada i opis leczonego zwierzęcia<br>
+                                (gatunek, płeć numer identyfikacyjny, sposób oznakowania, wiek, masa ciała)
+                            </th>
+                            <th rowspan="2" class="center-text">Liczba leczonych zwierząt</th>
+                            <th rowspan="2" class="center-text">Rozpoznanie albo wstępne rozpoznanie choroby</th>
+                            <th colspan="3">
+                                Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posiadacza zwierzęcia produkty lecznicze weterynaryjne lub pasze lecznicze
+                            </th>
+                            <th rowspan="2">okres karencji / Zabieg leczniczy lub profilaktyczne zalecenia lekarskie oraz uwagi</th>
                         </tr>
                         <tr>
-                            <th>Nazwa produktu...</th>
-                            <th>Numer serii...</th>
-                            <th>Ilość, dawkowanie...</th>
+                            <th>Nazwa produktu leczniczego/ produktu leczniczego weterynaryjnego/ paszy leczniczej</th>
+                            <th>Numer serii produktu leczniczego lub produktu leczniczego weterynaryjnego</th>
+                            <th>Ilość, dawkowanie zastosowanego produktu leczniczego lub ilość, dawkowanie i okres stosowanie nabytego produktu leczniczego, weterynaryjnego/paszy leczniczej</th>
                         </tr>
                     </thead>
                     <tbody>${rowsHTML}</tbody>
@@ -17468,14 +17488,15 @@ function getUnifiedPrintHTML(header, rowsHTML) {
                 <div class="signatures">
                     <div class="sig-box">
                         <span class="sig-label">Lekarz weterynarii</span>
-                        ${header.podpisLekarzaImg ? `<img src="${header.podpisLekarzaImg}" class="sig-img">` : '<div style="height:45px;"></div>'}
+                        ${header.podpisLekarzaImg ? `<img src="${header.podpisLekarzaImg}" class="sig-img">` : '<div style="height:40px;"></div>'}
                         <span class="sig-name">${header.podpisLekarzaLinia}</span>
                     </div>
                     <div class="sig-box">
                         <span class="sig-label">Podpis posiadacza zwierzęcia</span>
-                        ${header.podpisPosiadaczaImg ? `<img src="${header.podpisPosiadaczaImg}" class="sig-img">` : '<div style="height:45px;"></div>'}
+                        ${header.podpisPosiadaczaImg ? `<img src="${header.podpisPosiadaczaImg}" class="sig-img">` : '<div style="height:40px;"></div>'}
                     </div>
                 </div>
+                
                 <p style="margin-top: 10px;"><b>Wyniki badań uzupełniających:</b><br>*W przypadku zwierząt znajdujących się w rejestrze zwierząt gospodarskich oznakowanych</p>
             </div>
         </body>
