@@ -16994,6 +16994,11 @@ document.getElementById('formCancelStep3Btn')?.addEventListener('click', handleF
 
  * ✅ NOWA FUNKCJA (ZAGĘSZCZONA NA 1 STRONĘ A4, BEZ KROPEK NAD PODPISAMI):
  */
+/**
+ * ✅ NOWA FUNKCJA (SKALOWANIE AUTOMATYCZNE):
+ * Zmniejsza marginesy i skaluje zawartość do ~92% przy druku, 
+ * aby ZAWSZE mieściła się na jednej stronie A4.
+ */
 function openDirectPrintWindow(card) {
     const header = card.header || {};
     const savedRows = card.table || [];
@@ -17067,7 +17072,7 @@ function openDirectPrintWindow(card) {
         return;
     }
 
-    // --- 3. Budowanie HTML ---
+    // --- 3. Budowanie HTML (ZE SKALOWANIEM CSS) ---
     printWindow.document.write(`
         <!DOCTYPE html>
         <html lang="pl">
@@ -17076,7 +17081,7 @@ function openDirectPrintWindow(card) {
             <title>Karta Leczenia - ${header.nrDokumentu || 'Podgląd'}</title>
             <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
             <style>
-                /* Tło i kontrolki */
+                /* Tło i kontrolki (Widoczne tylko na ekranie) */
                 body { 
                     font-family: 'Nunito', sans-serif; 
                     margin: 0; padding: 0; 
@@ -17099,22 +17104,26 @@ function openDirectPrintWindow(card) {
                 .btn-print { background-color: #4CAF50; border-color: #388E3C; }
                 .btn-close { background-color: #f44336; border-color: #D32F2F; }
 
-                /* Kartka A4 - Kompaktowa */
+                /* --- WIZUALIZACJA A4 NA EKRANIE --- */
                 .page-preview {
                     background-color: white;
                     width: 297mm; /* A4 Landscape */
                     min-height: 210mm; 
-                    padding: 0.5cm; 
+                    padding: 10mm; /* Margines wizualny */
                     margin: 20px auto;
                     box-shadow: 0 10px 30px rgba(0,0,0,0.5);
                     box-sizing: border-box;
                     color: #000;
+                    
+                    /* Domyślne skalowanie na ekranie (żeby się mieściło) */
+                    transform: scale(0.9); 
+                    transform-origin: top center;
                 }
 
-                /* --- Kompaktowe Style Wewnętrzne --- */
+                /* --- STYLE WEWNĘTRZNE (KOMPAKTOWE) --- */
                 
                 h2 { 
-                    text-align: center; font-size: 12pt; 
+                    text-align: center; font-size: 11pt; /* Mniejszy nagłówek */
                     text-transform: uppercase; 
                     margin-bottom: 5px; margin-top: 0;
                     font-weight: 800; color: #000;
@@ -17126,27 +17135,27 @@ function openDirectPrintWindow(card) {
                     margin-bottom: 5px; gap: 5px; 
                 }
                 .top-section div { 
-                    border: 1px solid #ddd; padding: 4px; border-radius: 4px; 
+                    border: 1px solid #ddd; padding: 3px; border-radius: 4px; 
                 }
                 
-                .top-data-bold { font-size: 10pt; font-weight: bold; }
+                .top-data-bold { font-size: 9pt; font-weight: bold; }
 
-                /* Tabela */
+                /* Kompaktowa Tabela */
                 table { 
                     border-collapse: collapse; width: 100%; 
-                    font-size: 8pt; 
+                    font-size: 8pt; /* Mała czcionka w tabeli */
                     margin-bottom: 5px; 
                 }
                 th, td { 
                     border: 1px solid #000; 
-                    padding: 1px 3px; 
+                    padding: 1px 2px; /* Minimalny padding */
                     text-align: left; vertical-align: middle; 
-                    height: 18px; 
+                    line-height: 1.1; /* Gęstsze linie tekstu */
                 }
                 th { 
                     background: #EBF5E6 !important; 
                     text-align: center; font-weight: bold; 
-                    padding: 3px;
+                    padding: 2px;
                 }
                 
                 p { 
@@ -17154,43 +17163,54 @@ function openDirectPrintWindow(card) {
                     font-size: 8pt; 
                 }
 
-                /* Podpisy - POPRAWKA: Usunięto border-top (kropki) */
+                /* Podpisy */
                 .signatures { 
                     display: flex; justify-content: space-between; 
-                    margin-top: 10px; 
+                    margin-top: 5px; /* Minimalny odstęp */
                 }
                 .signature-box { 
                     display: flex; flex-direction: column; align-items: center; width: 45%; 
                 }
                 .signature-label { 
-                    font-weight: bold; font-size: 9pt; 
-                    border-top: none; /* ✅ USUNIĘTO KROPKI */
-                    padding-top: 2px; 
+                    font-weight: bold; font-size: 8pt; 
+                    border-top: none;
+                    padding-top: 0; 
                     width: 90%; text-align: center; 
                 }
                 .signature-img { 
-                    display: block; height: 45px; 
-                    max-width: 100%; object-fit: contain; margin-bottom: 2px; 
+                    display: block; height: 40px; /* Mniejsze podpisy */
+                    max-width: 100%; object-fit: contain; margin-bottom: 0; 
                 }
-                .signature-name { font-size: 8pt; }
+                .signature-name { font-size: 8pt; margin-top: 0; }
 
-                /* Styl dla druku */
+                /* --- LOGIKA DRUKOWANIA (SKALOWANIE) --- */
                 @media print {
                     body { 
-                        background-color: white !important; margin: 0 !important; padding: 0 !important;
+                        background-color: white !important; 
+                        margin: 0 !important; padding: 0 !important;
                         display: block !important; 
+                        
+                        /* ✅ MAGIA SKALOWANIA: Zmniejsz wszystko do 92% */
+                        /* To sprawia, że "wirtualna kartka" jest mniejsza niż fizyczna A4 */
+                        transform: scale(0.92); 
+                        transform-origin: top left; 
+                        width: 108%; /* Kompensacja zmniejszenia szerokości */
                     }
                     .print-controls { display: none !important; }
+                    
                     .page-preview { 
                         width: 100% !important; 
                         margin: 0 !important; 
                         padding: 0 !important; 
                         box-shadow: none !important; 
                         border: none !important;
+                        transform: none !important; /* Reset transformacji podglądu */
                     }
+                    
+                    /* Ustawienia strony */
                     @page { 
                         size: A4 landscape; 
-                        margin: 0.5cm; 
+                        margin: 0.5cm; /* Małe marginesy fizyczne */
                     }
                 }
             </style>
@@ -17263,12 +17283,12 @@ function openDirectPrintWindow(card) {
                 <div class="signatures">
                     <div class="signature-box">
                         <span class="signature-label">Lekarz weterynarii</span>
-                        ${header.podpisLekarzaImg ? `<img src="${header.podpisLekarzaImg}" class="signature-img">` : '<div style="height:45px;"></div>'}
+                        ${header.podpisLekarzaImg ? `<img src="${header.podpisLekarzaImg}" class="signature-img">` : '<div style="height:40px;"></div>'}
                         <span class="signature-name">${header.podpisLekarzaLinia || ''}</span>
                     </div>
                     <div class="signature-box">
                         <span class="signature-label">Podpis posiadacza zwierzęcia</span>
-                        ${card.podpisPosiadacza ? `<img src="${card.podpisPosiadacza}" class="signature-img">` : '<div style="height:45px;"></div>'}
+                        ${card.podpisPosiadacza ? `<img src="${card.podpisPosiadacza}" class="signature-img">` : '<div style="height:40px;"></div>'}
                     </div>
                 </div>
 
@@ -17281,8 +17301,6 @@ function openDirectPrintWindow(card) {
     printWindow.document.close();
     printWindow.focus();
 }
-    /* ======================================================== */
-/* ======================================================== */
 /* ✅ MODUŁ 8 (POPRAWIONY v2): Generator Zaleceń (Daty + Dawka + Append) */
 /* ======================================================== */
 
