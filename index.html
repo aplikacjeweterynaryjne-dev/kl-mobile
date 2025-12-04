@@ -2213,6 +2213,27 @@ table {
     margin-bottom: 4px;
     display: block;
 }
+    /* --- POPRAWKI DRUKOWANIA A4 (Karencja i Kalendarz) --- */
+@media print {
+    /* 1. Ukryj ikonkę kalendarza */
+    .cal-icon {
+        display: none !important;
+    }
+
+    /* 2. Ukryj input w kolumnie karencji (8 kolumna) */
+    #karta tbody tr td:nth-child(8) input {
+        display: none !important;
+    }
+
+    /* 3. Pokaż zawartość jako tekst, który się łamie */
+    #karta tbody tr td:nth-child(8)::after {
+        content: attr(data-print-value); /* Czyta wartość z atrybutu */
+        white-space: normal;
+        word-break: break-word;
+        display: block;
+        font-size: 8pt; /* Dopasowanie do reszty */
+    }
+}
 </style>
     <div id="calcProductSearchModal" class="product-search-modal" style="display: none; z-index: 10003;">
     <div class="product-search-card">
@@ -5052,13 +5073,14 @@ function saveRow(idx){
         cell6.appendChild(document.createTextNode(' ' + dawkowanie));
     }
 
-    // g) Okres karencji / uwagi (Kolumna 8) - ✅ KLUCZOWA ZMIANA
+   // g) Okres karencji / uwagi (Kolumna 8)
     const karencjaCellInput = row.cells[7].querySelector('input.karencja-input');
     if (karencjaCellInput) {
-        // Jeśli to Smart Cell (input), wpisujemy do value
+        // 1. Wpisz wartość do inputa
         karencjaCellInput.value = formKarencjaValue;
+        // 2. ✅ Zaktualizuj atrybut dla druku A4 CSS
+        row.cells[7].dataset.printValue = formKarencjaValue;
     } else {
-        // Jeśli to zwykła komórka, wpisujemy jako tekst
         row.cells[7].textContent = formKarencjaValue;
     }
 
@@ -5354,6 +5376,10 @@ function generate110mmReceiptHTML() {
      * Pobiera informacje o produkcie z danego wiersza <tr> tabeli.
      * POPRAWKA: Zmieniono 'B/N' na 'Brak danych'.
      */
+   /**
+     * Pobiera informacje o produkcie z danego wiersza <tr> tabeli.
+     * POPRAWKA: Prawidłowe odczytywanie Karencji/Zaleceń (Smart Cell).
+     */
     const getProductInfo = (row) => {
         try {
             const produkt = row.cells[4]?.querySelector('input')?.value.trim() || '';
@@ -5362,6 +5388,7 @@ function generate110mmReceiptHTML() {
             }
 
             const seria = row.cells[5]?.textContent.trim() || 'Brak danych';
+            
             const iloscInput = row.cells[6]?.querySelector('input[type="number"]');
             const ilosc = iloscInput?.value.trim() || '';
             let dawkaText = '';
@@ -5369,7 +5396,22 @@ function generate110mmReceiptHTML() {
                 dawkaText = iloscInput.nextSibling.textContent.trim();
             }
             const iloscDawka = [ilosc, dawkaText].filter(Boolean).join(' ') || 'Brak danych';
-            const karencja = row.cells[7]?.textContent.trim() || 'Brak danych';
+            
+            // ✅ POPRAWKA DLA KARENCJI / ZALECEŃ (Kolumna 8)
+            // Sprawdzamy, czy jest tam input (nasz Smart Cell)
+            const karencjaInput = row.cells[7]?.querySelector('input');
+            let karencja = '';
+            
+            if (karencjaInput) {
+                // Jeśli jest input, bierzemy jego wartość
+                karencja = karencjaInput.value.trim();
+            } else {
+                // Jeśli to zwykły tekst, bierzemy textContent
+                karencja = row.cells[7]?.textContent.trim();
+            }
+            
+            if (!karencja) karencja = 'Brak danych';
+
             return { produkt, seria, iloscDawka, karencja };
         } catch (e) {
             console.error("Błąd w getProductInfo dla wiersza:", row, e);
@@ -17251,19 +17293,29 @@ if (formDosageDateStart && formDosageDateEnd && formDosageDose) {
 }
 
 // 3. Pomocnicza: Tworzenie inteligentnej komórki w Tabeli Głównej (Wersja z dużym popupem)
+// 3. Pomocnicza: Tworzenie inteligentnej komórki w Tabeli Głównej (Wersja Poprawiona: Druk + Style)
 function createSmartDosageCell(cell, row) {
     cell.innerHTML = '';
     cell.style.position = 'relative';
 
-    // A. Input tekstowy (widoczny w tabeli)
+    // A. Input tekstowy
     const textInput = document.createElement('input');
     textInput.type = 'text';
     textInput.className = 'karencja-input';
     textInput.placeholder = 'Uwagi / Zalecenia...';
     
-    // B. Ikonka kalendarza
+    // Funkcja synchronizująca wartość z atrybutem dla druku A4
+    const syncPrintValue = () => {
+        cell.dataset.printValue = textInput.value;
+    };
+
+    // Synchronizuj przy wpisywaniu ręcznym
+    textInput.addEventListener('input', syncPrintValue);
+
+    // B. Ikonka kalendarza (Dodano klasę 'cal-icon')
     const calIcon = document.createElement('span');
     calIcon.innerHTML = '📅';
+    calIcon.className = 'cal-icon'; // ✅ KLUCZOWE DLA DRUKU
     calIcon.style.cursor = 'pointer';
     calIcon.style.position = 'absolute';
     calIcon.style.right = '2px';
@@ -17272,16 +17324,14 @@ function createSmartDosageCell(cell, row) {
     calIcon.style.fontSize = '16px';
     calIcon.title = 'Generuj zakres dat i dawkę';
 
-    // Logika kliknięcia ikony (Tworzymy Overlay i Popup dynamicznie)
+    // Logika kliknięcia ikony (Popup)
     calIcon.onclick = (e) => {
-        e.stopPropagation(); // Nie aktywuj nawigatora komórek pod spodem
+        e.stopPropagation(); 
 
-        // 1. Stwórz Overlay (tło)
         const overlay = document.createElement('div');
         overlay.className = 'table-date-overlay';
-        overlay.style.display = 'flex'; // Pokaż od razu
+        overlay.style.display = 'flex'; 
 
-        // 2. Stwórz Popup (okno)
         const popup = document.createElement('div');
         popup.className = 'table-date-popup-centered';
         
@@ -17306,24 +17356,20 @@ function createSmartDosageCell(cell, row) {
         `;
 
         overlay.appendChild(popup);
-        document.body.appendChild(overlay); // Dodaj do body, żeby było na wierzchu
+        document.body.appendChild(overlay); 
 
-        // --- Logika wewnątrz popupa ---
         const btnSave = popup.querySelector('.save-btn');
         const btnClose = popup.querySelector('.close-btn');
         const inpStart = popup.querySelector('.date-start');
         const inpEnd = popup.querySelector('.date-end');
         const inpDose = popup.querySelector('.dose-input');
 
-        // Fokus na dawkę
         setTimeout(() => inpDose.focus(), 50);
 
-        // Zamknij
         const closeMe = () => { document.body.removeChild(overlay); };
         btnClose.onclick = closeMe;
-        overlay.onclick = (ev) => { if(ev.target === overlay) closeMe(); }; // Klik poza oknem zamyka
+        overlay.onclick = (ev) => { if(ev.target === overlay) closeMe(); }; 
 
-        // Zapisz
         btnSave.onclick = () => {
             const start = inpStart.value;
             const end = inpEnd.value;
@@ -17336,17 +17382,12 @@ function createSmartDosageCell(cell, row) {
                 const regex = / ?Stosować od \d{2}\.\d{2}\.\d{4} do \d{2}\.\d{2}\.\d{4} po .*?(\.|$)/;
 
                 if (regex.test(currentText)) {
-                    // Podmień istniejące zalecenie
                     textInput.value = currentText.replace(regex, newSentence);
                 } else {
-                    // Dopisz do istniejącego tekstu
                     textInput.value = (currentText.trim() + newSentence).trim();
                 }
                 
-                // Zapisz do dataset (dla drukowania, jeśli potrzebne)
-                cell.dataset.printValue = textInput.value;
-                
-                // Wyzwól input event na tabeli (dla walidacji/zapisu)
+                // Wyzwól input event (dla walidacji i synchronizacji druku A4)
                 textInput.dispatchEvent(new Event('input', { bubbles: true }));
             }
             closeMe();
