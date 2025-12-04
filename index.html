@@ -5771,10 +5771,9 @@ const saveCardToArchiveBtn = document.getElementById('saveCardToArchiveBtn');
  * Pkt 4: Listener dla przycisku "Zapisz w Archiwum"
  */
 /**
- * ✅ MODUŁ 8 (POPRAWIONY): Zapisuje kartę do archiwum.
- * - FIX: Czyści ikonę kalendarza (zapisuje tylko tekst).
- * - FIX: Poprawnie pobiera podpis posiadacza.
- */
+/* ✅ MODUŁ 8 (POPRAWKA KRYTYCZNA): Zapisuje kartę do archiwum */
+/* Naprawia problem pustej kolumny "okres karencji/zalecenia" przy użyciu generatora */
+
 if (saveCardToArchiveBtn) {
     saveCardToArchiveBtn.addEventListener('click', async () => {
         
@@ -5821,12 +5820,10 @@ if (saveCardToArchiveBtn) {
             
             // --- PRZYGOTOWANIE DANYCH ---
             
-            // 1. Podpis Posiadacza (FIX: Pobranie bezpośrednio z Canvasa)
+            // 1. Podpis Posiadacza
             const canvas = document.getElementById('canvasPosiadacz');
-            // Sprawdź, czy canvas nie jest pusty (bardzo prosta weryfikacja długości base64)
             let podpisData = canvas.toDataURL();
-            if (podpisData.length < 1000) { // Pusty canvas jest krótki
-                 // Spróbuj pobrać z canvasa w formularzu (jeśli tam był podpisany)
+            if (podpisData.length < 1000) { 
                  const formCanvas = document.getElementById('formCanvasPosiadacz');
                  if (formCanvas) {
                      podpisData = formCanvas.toDataURL();
@@ -5863,16 +5860,31 @@ if (saveCardToArchiveBtn) {
                 }
                 const iloscDawkaHtml = `<input class="small-input" type="number" value="${iloscValue}"> ${dawkaText}`;
                 
-                // --- FIX KARENCJA: CZYSTY TEKST BEZ IKONY ---
+                // --- ⬇️ POPRAWKA: PRAWIDŁOWE POBIERANIE TEKSTU Z INTELIGENTNEJ KOLUMNY ⬇️ ---
                 let karencjaCzysta = '';
-                const karInput = tr.cells[7].querySelector('input, textarea');
-                if (karInput) {
-                    // Jeśli jest input (Smart Cell), bierzemy value (to zawsze czysty tekst)
-                    karencjaCzysta = karInput.value;
+                
+                // 1. Najpierw szukaj naszego specyficznego inputa/textarea (Smart Cell)
+                const smartInput = tr.cells[7].querySelector('.karencja-input');
+                
+                if (smartInput) {
+                    // Jeśli znaleziono Smart Cell, pobierz jego wartość (to co wpisał generator)
+                    karencjaCzysta = smartInput.value;
                 } else {
-                    // Jeśli to zwykła komórka, bierzemy textContent, ale usuwamy ikonę 📅
-                    karencjaCzysta = tr.cells[7].textContent.replace('📅', '').trim();
+                    // 2. Jeśli nie, spróbuj znaleźć jakikolwiek input
+                    const anyInput = tr.cells[7].querySelector('input, textarea');
+                    if (anyInput) {
+                        karencjaCzysta = anyInput.value;
+                    } else {
+                        // 3. Jeśli brak inputów, pobierz sam tekst i usuń ikonę kalendarza
+                        karencjaCzysta = tr.cells[7].textContent.replace('📅', '').trim();
+                    }
                 }
+
+                // 4. Zabezpieczenie: Jeśli puste, sprawdź czy generator nie zapisał tego w atrybucie
+                if (!karencjaCzysta && tr.cells[7].dataset.printValue) {
+                    karencjaCzysta = tr.cells[7].dataset.printValue;
+                }
+                // --- ⬆️ KONIEC POPRAWKI ⬆️ ---
 
                 const rowData = {
                     logicalIndex: logicalIndex,
@@ -5883,10 +5895,11 @@ if (saveCardToArchiveBtn) {
                     lek: lekInput ? lekInput.value : '',
                     seria: tr.cells[5].textContent,
                     iloscDawka: iloscDawkaHtml,
-                    karencja: karencjaCzysta // Zapisujemy wyczyszczony tekst
+                    karencja: karencjaCzysta // Zapisujemy poprawnie pobrany tekst
                 };
                 
-                if (rowData.opis || rowData.liczba || rowData.rozpoznanie || rowData.lek) {
+                // ✅ ZMIANA: Zapisz wiersz także wtedy, gdy wypełniono TYLKO karencję/uwagi
+                if (rowData.opis || rowData.liczba || rowData.rozpoznanie || rowData.lek || (rowData.karencja && rowData.karencja.trim() !== '')) {
                     tableRowsData.push(rowData);
                 }
                 
@@ -5917,7 +5930,7 @@ if (saveCardToArchiveBtn) {
                 createdAt: firebase.firestore.FieldValue.serverTimestamp(),
                 header: headerData,
                 table: tableRowsData,
-                podpisPosiadacza: podpisData // Zapisujemy podpis
+                podpisPosiadacza: podpisData
             };
             
             // --- TRANSAKCJA (BATCH) ---
