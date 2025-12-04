@@ -5227,23 +5227,21 @@ if (printFormatCancel) {
 }
 
 // 3. Listener dla przycisku "A4" (uruchamia starą logikę)
+// 3. Listener dla przycisku "A4" (NOWA LOGIKA: Osobne okno podglądu)
 if (printFormatA4) {
-    printFormatA4.addEventListener('click', () => {
-        // ✅ POCZĄTEK MODUŁU 7: Blokada druku
-        if (!isCardStockValid) {
-            showToast("Nie można drukować karty. Wykryto błędy w stanach magazynowych (czerwone pola).", "error", 4000);
-            printFormatModal.style.display = 'none'; // Ukryj modal wyboru
-            return;
-        }
-        // ✅ KONIEC MODUŁU 7
-
-        printFormatModal.style.display = 'none'; // Ukryj modal
+    printFormatA4.addEventListener('click', () => {
         
-        console.log("Drukowanie w formacie A4...");
-        // Uruchom starą logikę drukowania A4
-        document.body.classList.add('print-mode-karta');
-        setTimeout(() => { window.print(); }, 100);
-        setTimeout(() => { document.body.classList.remove('print-mode-karta'); }, 1000);
+        // Walidacja stanów (Moduł 7)
+        if (typeof isCardStockValid !== 'undefined' && !isCardStockValid) {
+            showToast("Nie można drukować karty. Wykryto błędy w stanach magazynowych (czerwone pola).", "error", 4000);
+            printFormatModal.style.display = 'none';
+            return;
+        }
+
+        printFormatModal.style.display = 'none'; // Ukryj modal wyboru
+        
+        // Wywołaj nową funkcję otwierającą podgląd
+        openCurrentA4PrintWindow();
     });
 }
 
@@ -17445,6 +17443,255 @@ function createSmartDosageCell(cell, row) {
 
     cell.appendChild(textInput);
     cell.appendChild(calIcon);
+}
+    /**
+ * ✅ NOWA FUNKCJA: Generuje podgląd A4 (Poziomo, 90%) z aktualnych danych na ekranie.
+ */
+function openCurrentA4PrintWindow() {
+    console.log("Generowanie podglądu A4 (Live)...");
+
+    // --- 1. POBIERANIE DANYCH Z EKRANU ---
+    const header = {
+        nazwaLecznicy: document.getElementById('nazwaLecznicy').textContent,
+        dataWykonania: document.getElementById('dataWykonania').value,
+        nrStada: document.getElementById('nrStada').textContent,
+        klient: document.getElementById('klientSelect').value,
+        adresKlienta: document.getElementById('adresKlienta').textContent,
+        dataZgloszenia: document.getElementById('dataZgloszenia').value,
+        nrDokumentu: document.getElementById('nrDokumentu').value,
+        podpisLekarzaImg: document.getElementById('doctor-signature').src,
+        podpisLekarzaLinia: document.getElementById('doctor-signature-name').textContent,
+        podpisPosiadaczaImg: document.getElementById('canvasPosiadacz').toDataURL()
+    };
+
+    // Pobieranie wierszy z tabeli
+    let rowsHTML = '';
+    const rows = document.querySelectorAll('#karta tbody tr');
+    
+    rows.forEach((tr, index) => {
+        // Obsługa wiersza separatora (Wiersz 10)
+        if (tr.cells.length === 1) {
+            rowsHTML += `<tr><td colspan="8" style="text-align: left; font-weight: bold; padding: 4px; background-color: #f9f9f9; font-size: 10pt;">Potwierdzenie nabycia produktu leczniczego weterynaryjnego/paszy leczniczej</td></tr>`;
+            return;
+        }
+
+        // Pobieranie wartości z inputów lub tekstu
+        const getVal = (cellIndex, isInput = false) => {
+            const cell = tr.cells[cellIndex];
+            if (!cell) return '';
+            if (isInput) {
+                const input = cell.querySelector('input');
+                return input ? input.value : '';
+            }
+            return cell.textContent;
+        };
+
+        // Specjalna obsługa kolumny Ilość (może mieć input + tekst dawkowania)
+        const getIlosc = () => {
+            const cell = tr.cells[6];
+            const input = cell.querySelector('input');
+            const val = input ? input.value : '';
+            // Pobierz tekst (dawkowanie) znajdujący się obok inputa
+            let text = '';
+            cell.childNodes.forEach(node => {
+                if (node.nodeType === Node.TEXT_NODE) text += node.textContent;
+            });
+            return val + ' ' + text;
+        };
+
+        const lp = tr.cells[0].textContent.replace('➡️', '').trim(); // Usuń strzałkę edycji
+        const opis = tr.cells[1].textContent;
+        const liczba = getVal(2, true); // Input
+        const rozpoznanie = getVal(3, true); // Input
+        const lek = getVal(4, true); // Input
+        const seria = tr.cells[5].textContent;
+        const ilosc = getIlosc();
+        
+        // Karencja (Input lub Textarea - Smart Cell)
+        let karencja = '';
+        const karInput = tr.cells[7].querySelector('input, textarea');
+        if (karInput) {
+            karencja = karInput.value;
+        } else {
+            karencja = tr.cells[7].textContent;
+        }
+
+        rowsHTML += `
+            <tr>
+                <td style="text-align: center;">${lp}</td>
+                <td>${opis}</td>
+                <td style="text-align: center;">${liczba}</td>
+                <td style="text-align: center;">${rozpoznanie}</td>
+                <td>${lek}</td>
+                <td style="text-align: center;">${seria}</td>
+                <td>${ilosc}</td>
+                <td>${karencja}</td>
+            </tr>
+        `;
+    });
+
+    // --- 2. OTWARCIE OKNA I WSTRZYKNIĘCIE HTML ---
+    const printWindow = window.open('', '_blank', 'width=1150,height=800,scrollbars=yes,resizable=yes');
+    if (!printWindow) {
+        alert('Nie udało się otworzyć okna druku. Wyłącz blokowanie wyskakujących okienek.');
+        return;
+    }
+
+    printWindow.document.write(`
+        <!DOCTYPE html>
+        <html lang="pl">
+        <head>
+            <meta charset="utf-8">
+            <title>Wydruk Karty Leczenia</title>
+            <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
+            <style>
+                body { 
+                    font-family: 'Nunito', sans-serif; 
+                    background-color: #525659; /* Tło podglądu */
+                    margin: 0; padding: 20px; 
+                    display: flex; flex-direction: column; align-items: center;
+                }
+
+                /* Pasek narzędzi (nie drukuje się) */
+                .print-controls {
+                    position: sticky; top: 0; z-index: 1000;
+                    background: #333; color: #fff;
+                    padding: 10px; border-radius: 8px;
+                    margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+                    display: flex; gap: 15px;
+                }
+                .btn {
+                    padding: 8px 20px; font-size: 16px; cursor: pointer;
+                    border: none; border-radius: 4px; font-weight: bold;
+                }
+                .btn-print { background: #4CAF50; color: white; }
+                .btn-close { background: #f44336; color: white; }
+
+                /* KARTKA PAPIERU A4 */
+                .page-sheet {
+                    background: white;
+                    width: 297mm; /* A4 Poziomo */
+                    min-height: 210mm;
+                    padding: 10mm; /* Margines wewnętrzny */
+                    box-shadow: 0 0 15px rgba(0,0,0,0.2);
+                    box-sizing: border-box;
+                    
+                    /* ✅ SKALOWANIE DO 90% (Dla widoku na ekranie) */
+                    transform: scale(0.9);
+                    transform-origin: top center;
+                }
+
+                /* STYLE WEWNĘTRZNE KARTY */
+                h2 { text-align: center; font-size: 14pt; margin: 0 0 10px 0; text-transform: uppercase; }
+                
+                .top-section { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; font-size: 10pt; margin-bottom: 10px; }
+                .top-section div { border: 1px solid #ccc; padding: 5px; }
+                .bold { font-weight: 700; }
+
+                table { width: 100%; border-collapse: collapse; font-size: 9pt; margin-bottom: 10px; }
+                th, td { border: 1px solid #000; padding: 2px 4px; vertical-align: middle; }
+                th { background-color: #EBF5E6; text-align: center; font-weight: bold; }
+                
+                .signatures { display: flex; justify-content: space-between; margin-top: 20px; }
+                .sig-box { width: 40%; text-align: center; display: flex; flex-direction: column; align-items: center; }
+                .sig-label { border-top: 1px dashed #000; width: 100%; display: block; font-weight: bold; font-size: 10pt; }
+                .sig-img { height: 50px; object-fit: contain; margin-bottom: 2px; }
+
+                /* --- USTAWIENIA DRUKARKI --- */
+                @media print {
+                    body { 
+                        background: none; margin: 0; padding: 0; 
+                        display: block; /* Reset flexa */
+                    }
+                    .print-controls { display: none; }
+                    
+                    .page-sheet {
+                        width: 100%;
+                        margin: 0;
+                        padding: 0; /* Marginesy przejmuje @page */
+                        box-shadow: none;
+                        
+                        /* ✅ KLUCZOWE: SKALOWANIE PODCZAS DRUKU */
+                        transform: scale(0.90); 
+                        transform-origin: top left;
+                        width: 111%; /* Rozciągnij, aby skompensować zmniejszenie (100 / 0.9 = 111.11) */
+                    }
+
+                    @page {
+                        size: A4 landscape; /* ✅ WYMUSZENIE POZIOME */
+                        margin: 0.5cm;      /* Małe marginesy */
+                    }
+                }
+            </style>
+        </head>
+        <body>
+            <div class="print-controls">
+                <button class="btn btn-print" onclick="window.print()">🖨️ Drukuj (A4 Poziomo)</button>
+                <button class="btn btn-close" onclick="window.close()">❌ Zamknij</button>
+            </div>
+
+            <div class="page-sheet">
+                <h2>KARTA LECZENIA ZWIERZĄT GOSPODARSKICH ORAZ ZWIERZĄT... / EWIDENCJA LECZENIA</h2>
+                
+                <div class="top-section">
+                    <div>
+                        Nazwa i adres zakładu:<br>
+                        <span class="bold">${header.nazwaLecznicy}</span><br>
+                        Wykonanie czynności: <span class="bold">${header.dataWykonania}</span><br>
+                        Nr stada: <span class="bold">${header.nrStada}</span>
+                    </div>
+                    <div>
+                        Posiadacz zwierzęcia:<br>
+                        <span class="bold">${header.klient}</span><br>
+                        <span class="bold">${header.adresKlienta}</span>
+                    </div>
+                    <div>
+                        Zgłoszenie: <span class="bold">${header.dataZgloszenia}</span><br>
+                        Nr dokumentu: <span class="bold">${header.nrDokumentu}</span>
+                    </div>
+                </div>
+
+                <table>
+                    <thead>
+                        <tr>
+                            <th rowspan="2" style="width:30px;">Lp.</th>
+                            <th rowspan="2">Nazwa siedziby stada i opis zwierzęcia</th>
+                            <th rowspan="2" style="width:50px;">Liczba</th>
+                            <th rowspan="2">Rozpoznanie</th>
+                            <th colspan="3">Produkty lecznicze / Pasze</th>
+                            <th rowspan="2">Karencja / Uwagi</th>
+                        </tr>
+                        <tr>
+                            <th>Nazwa</th>
+                            <th>Seria</th>
+                            <th>Ilość/Dawkowanie</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${rowsHTML}
+                    </tbody>
+                </table>
+
+                <p style="font-size: 9pt; margin: 5px 0;"><b>Oświadczam, że nabyte produkty lecznicze weterynaryjne/pasze lecznicze zostaną zastosowane zgodnie z zaleceniami lekarza weterynarii.</b></p>
+
+                <div class="signatures">
+                    <div class="sig-box">
+                        <span class="sig-label">Lekarz weterynarii</span>
+                        ${header.podpisLekarzaImg ? `<img src="${header.podpisLekarzaImg}" class="sig-img">` : '<div style="height:50px;"></div>'}
+                        <span style="font-size: 9pt;">${header.podpisLekarzaLinia}</span>
+                    </div>
+                    <div class="sig-box">
+                        <span class="sig-label">Podpis posiadacza zwierzęcia</span>
+                        ${header.podpisPosiadaczaImg ? `<img src="${header.podpisPosiadaczaImg}" class="sig-img">` : '<div style="height:50px;"></div>'}
+                    </div>
+                </div>
+            </div>
+        </body>
+        </html>
+    `);
+
+    printWindow.document.close();
+    printWindow.focus();
 }
 </script> 
 
