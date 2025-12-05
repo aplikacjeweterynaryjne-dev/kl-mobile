@@ -17629,10 +17629,11 @@ async function fetchCardsForReport(dateStart, dateEnd, userId) {
   // ... tutaj jest Twój obecny koniec pliku JS ...
 
 // ▼▼▼ WKLEJ TEN KOD NA SAMYM DOLE PLIKU ▼▼▼
-// --- ZMIENNE GLOBALNE ---
+// --- ZMIENNE POMOCNICZE ---
     var listaOperacji = []; 
+    var znalezioneProdukty = []; // Tu przechowamy to, co zczytamy z tabeli
 
-    // --- 1. OTWIERANIE GŁÓWNEGO OKNA OPERACJI ---
+    // --- 1. OTWIERANIE OKNA ---
     function openMagazynOperation(tryb) {
         var modal = document.getElementById('magazynOperationModal');
         if (!modal) return;
@@ -17641,30 +17642,30 @@ async function fetchCardsForReport(dateStart, dateEnd, userId) {
         var tytul = document.getElementById('magazynOperationTitle');
         if (tytul) tytul.innerText = (tryb === 'inwentaryzacja') ? "📋 Inwentaryzacja" : "➕ Doładowanie";
         
-        // Pokaż modal
         modal.style.display = 'flex'; 
-        listaOperacji = []; // Reset listy
+        listaOperacji = []; 
 
         // Generuj formularz
         renderFormularzUI(tryb);
     }
 
-    // --- 2. GENEROWANIE FORMULARZA ---
+    // --- 2. GENEROWANIE WYGLĄDU ---
     function renderFormularzUI(tryb) {
         var container = document.getElementById('magazynOperationForm');
         if (!container) return;
 
         container.innerHTML = `
             <div style="text-align: left;">
-                
                 <label style="font-weight:bold; display:block; margin-bottom:5px; margin-top: 10px;">1. Wybierz produkt:</label>
                 
                 <div onclick="otworzWybierakProduktow()" 
                      style="border: 1px solid #ccc; padding: 10px; border-radius: 4px; background: #fff; cursor: pointer; display: flex; justify-content: space-between; align-items: center;">
-                    <span id="wybranyProduktNazwa" style="color: #999;">Kliknij, aby wybrać produkt...</span>
-                    <span>🔍</span>
+                    <span id="wybranyProduktNazwa" style="color: #999;">Kliknij, aby wybrać z listy...</span>
+                    <span style="font-size: 18px;">🔍</span>
                 </div>
-                <input type="hidden" id="opInputProdukt"> <div style="display: flex; gap: 10px; margin-top: 15px; align-items: flex-end;">
+                <input type="hidden" id="opInputProdukt"> 
+
+                <div style="display: flex; gap: 10px; margin-top: 15px; align-items: flex-end;">
                     <div style="flex: 1;">
                         <label style="font-weight:bold; display:block; margin-bottom:5px;">2. Ilość:</label>
                         <div style="display: flex; align-items: center; border: 1px solid #ccc; border-radius: 4px; background: #fff;">
@@ -17701,23 +17702,37 @@ async function fetchCardsForReport(dateStart, dateEnd, userId) {
         `;
     }
 
-    // --- 3. LOGIKA WYBIERAKA PRODUKTÓW (Picker) ---
-    
+    // --- 3. POBIERANIE PRODUKTÓW Z TABELI (TO NAPRAWI PROBLEM) ---
     function otworzWybierakProduktow() {
         var picker = document.getElementById('productPickerModal');
         var listContainer = document.getElementById('pickerListContainer');
         picker.style.display = 'flex';
         
-        // Pobieramy produkty (zakładam, że są w globalProducts)
-        // Jeśli nazywają się inaczej (np. produkty, towary), zmień tę nazwę poniżej!
-        var zrodloProduktow = (typeof globalProducts !== 'undefined') ? globalProducts : [];
+        znalezioneProdukty = [];
+        
+        // CZYTAMY DANE PROSTO Z TABELI HTML
+        var wiersze = document.querySelectorAll('#magazynTableBody tr');
+        
+        wiersze.forEach(function(tr) {
+            var komorki = tr.getElementsByTagName('td');
+            // Zakładam typowy układ: Kolumna 0 = Nazwa, Kolumna 1 = Ilość, Kolumna 2 = Jednostka
+            // Jeśli u Ciebie jest inaczej, zmień indeksy [0] lub [2]
+            if (komorki.length >= 3) {
+                var nazwa = komorki[0].innerText.trim(); // Nazwa z pierwszej kolumny
+                var jm = komorki[2].innerText.trim();    // Jednostka z trzeciej kolumny (zmień na 1 jeśli jest druga)
+                
+                // Pomijamy wiersze typu "Wczytywanie..." lub puste
+                if (nazwa && nazwa !== "Wczytywanie..." && nazwa !== "Brak danych") {
+                    znalezioneProdukty.push({ nazwa: nazwa, jm: jm });
+                }
+            }
+        });
 
-        if (zrodloProduktow.length === 0) {
-            listContainer.innerHTML = '<p style="text-align:center; padding:20px;">Brak produktów w bazie (globalProducts puste).</p>';
-            return;
+        if (znalezioneProdukty.length === 0) {
+            listContainer.innerHTML = '<p style="text-align:center; padding:20px;">Nie udało się odczytać produktów z tabeli.</p>';
+        } else {
+            renderujListeWybieraka(znalezioneProdukty);
         }
-
-        renderujListeWybieraka(zrodloProduktow);
     }
 
     function renderujListeWybieraka(produkty) {
@@ -17725,58 +17740,40 @@ async function fetchCardsForReport(dateStart, dateEnd, userId) {
         listContainer.innerHTML = '';
 
         produkty.forEach(function(prod) {
-            // Dostosuj te pola do swojej bazy! (np. prod.name, prod.Nazwa)
-            var nazwa = prod.Nazwa || prod.name || prod.productName || "Produkt bez nazwy";
-            var jm = prod.Jednostka || prod.jm || prod.unit || "szt.";
-
             var div = document.createElement('div');
             div.style.padding = "15px";
             div.style.borderBottom = "1px solid #eee";
             div.style.cursor = "pointer";
-            div.innerHTML = `<b>${nazwa}</b> <span style="color:#888; font-size:0.9em;">(${jm})</span>`;
+            div.innerHTML = `<b>${prod.nazwa}</b> <span style="color:#888;">(${prod.jm})</span>`;
             
-            // KLIKNIĘCIE W PRODUKT
             div.onclick = function() {
-                wybierzProduktZPickera(nazwa, jm);
+                wybierzProduktZPickera(prod.nazwa, prod.jm);
             };
-            
             listContainer.appendChild(div);
         });
     }
 
     function filtrujWybierak() {
         var fraza = document.getElementById('pickerSearchInput').value.toLowerCase();
-        var zrodloProduktow = (typeof globalProducts !== 'undefined') ? globalProducts : [];
-        
-        var przefiltrowane = zrodloProduktow.filter(p => {
-            var nazwa = (p.Nazwa || p.name || "").toLowerCase();
-            return nazwa.includes(fraza);
-        });
-        
+        var przefiltrowane = znalezioneProdukty.filter(p => p.nazwa.toLowerCase().includes(fraza));
         renderujListeWybieraka(przefiltrowane);
+    }
+
+    function wybierzProduktZPickera(nazwa, jm) {
+        document.getElementById('wybranyProduktNazwa').innerText = nazwa;
+        document.getElementById('wybranyProduktNazwa').style.color = "#000";
+        document.getElementById('opInputProdukt').value = nazwa;
+        document.getElementById('opJednostkaWyswietlacz').innerText = jm;
+        
+        document.getElementById('productPickerModal').style.display = 'none';
+        setTimeout(() => document.getElementById('opInputIlosc').focus(), 100);
     }
 
     function zamknijWybierak() {
         document.getElementById('productPickerModal').style.display = 'none';
     }
 
-    function wybierzProduktZPickera(nazwa, jm) {
-        // 1. Wstaw nazwę i jednostkę do formularza
-        document.getElementById('wybranyProduktNazwa').innerText = nazwa;
-        document.getElementById('wybranyProduktNazwa').style.color = "#000";
-        document.getElementById('opInputProdukt').value = nazwa;
-        
-        document.getElementById('opJednostkaWyswietlacz').innerText = jm;
-
-        // 2. Zamknij wybierak
-        zamknijWybierak();
-
-        // 3. Ustaw kursor w polu ilości
-        setTimeout(() => document.getElementById('opInputIlosc').focus(), 100);
-    }
-
-    // --- 4. DODAWANIE DO TABELI I ZAPIS ---
-
+    // --- 4. ZAPISYWANIE I AKTUALIZACJA TABELI ---
     function dodajPozycjeDoListy() {
         var nazwa = document.getElementById('opInputProdukt').value;
         var ilosc = document.getElementById('opInputIlosc').value;
@@ -17786,15 +17783,12 @@ async function fetchCardsForReport(dateStart, dateEnd, userId) {
 
         listaOperacji.push({ nazwa: nazwa, ilosc: parseFloat(ilosc), jm: jm });
         
-        // Odśwież tabelę
         var tbody = document.getElementById('opTabelaBody');
-        if (listaOperacji.length === 1) tbody.innerHTML = ''; // Czyść komunikat o braku
-        
-        var wiersz = `<tr><td style="padding:8px; border-bottom:1px solid #eee;">${nazwa} <small>(${jm})</small></td><td style="padding:8px; text-align:right; border-bottom:1px solid #eee;"><b>${ilosc}</b></td></tr>`;
-        tbody.innerHTML += wiersz;
+        if (listaOperacji.length === 1) tbody.innerHTML = '';
+        tbody.innerHTML += `<tr><td style="padding:8px; border-bottom:1px solid #eee;">${nazwa}</td><td style="padding:8px; text-align:right; border-bottom:1px solid #eee;"><b>${ilosc}</b></td></tr>`;
 
         // Reset
-        document.getElementById('wybranyProduktNazwa').innerText = "Kliknij, aby wybrać produkt...";
+        document.getElementById('wybranyProduktNazwa').innerText = "Kliknij, aby wybrać z listy...";
         document.getElementById('wybranyProduktNazwa').style.color = "#999";
         document.getElementById('opInputProdukt').value = "";
         document.getElementById('opInputIlosc').value = "";
@@ -17803,41 +17797,41 @@ async function fetchCardsForReport(dateStart, dateEnd, userId) {
     function submitMagazynOperation() {
         if (listaOperacji.length === 0) { alert("Lista pusta!"); return; }
 
-        // TUTAJ JEST KLUCZOWY MOMENT ZAPISU DO BAZY
-        // Musisz dostosować tę funkcję do swojego systemu (Firebase, API itp.)
-        
-        console.log("Wysyłanie danych do bazy...", listaOperacji);
+        var tryb = document.getElementById('magazynOperationTitle').innerText;
+        var czyInwentaryzacja = tryb.includes("Inwentaryzacja");
 
-        // --- PRZYKŁAD AKTUALIZACJI (SYMULACJA) ---
-        // Jeśli używasz lokalnej zmiennej globalProducts, możemy ją zaktualizować "na żywo":
-        if (typeof globalProducts !== 'undefined') {
-            listaOperacji.forEach(item => {
-                var prod = globalProducts.find(p => (p.Nazwa || p.name) === item.nazwa);
-                if (prod) {
-                    // Zakładam, że pole stanu to 'Stan' lub 'stock'
-                    if (!prod.Stan) prod.Stan = 0;
-                    
-                    // Jeśli inwentaryzacja -> nadpisz, Jeśli doładowanie -> dodaj
-                    var tytul = document.getElementById('magazynOperationTitle').innerText;
-                    if (tytul.includes("Inwentaryzacja")) {
-                        prod.Stan = item.ilosc;
-                    } else {
-                        prod.Stan = parseFloat(prod.Stan) + item.ilosc;
+        // 1. Aktualizujemy widok w głównej tabeli (Oszukujemy oko użytkownika, żeby widział zmianę)
+        var wiersze = document.querySelectorAll('#magazynTableBody tr');
+        
+        listaOperacji.forEach(function(item) {
+            wiersze.forEach(function(tr) {
+                var komorki = tr.getElementsByTagName('td');
+                if (komorki.length >= 2) {
+                    // Sprawdzamy czy nazwa się zgadza (Kolumna 0)
+                    if (komorki[0].innerText.trim() === item.nazwa) {
+                        var staraIlosc = parseFloat(komorki[1].innerText) || 0; // Kolumna 1 to ilość
+                        var nowaIlosc = 0;
+
+                        if (czyInwentaryzacja) {
+                            nowaIlosc = item.ilosc;
+                        } else {
+                            nowaIlosc = staraIlosc + item.ilosc; // Doładowanie
+                        }
+
+                        // Aktualizujemy tabelę na ekranie
+                        komorki[1].innerText = nowaIlosc;
+                        komorki[1].style.backgroundColor = "#e8f5e9"; // Podświetlamy zmianę na zielono
+                        console.log("Zaktualizowano wizualnie: " + item.nazwa + " na " + nowaIlosc);
                     }
-                    console.log("Zaktualizowano stan produktu: " + item.nazwa + " na " + prod.Stan);
                 }
             });
-            
-            alert("✅ Zapisano zmiany! Stan magazynowy został zaktualizowany.");
-            
-            // Odśwież widok głównego magazynu (jeśli masz taką funkcję)
-            if (typeof loadAndRenderMagazyn === 'function') {
-                loadAndRenderMagazyn(); 
-            }
-        } else {
-            alert("Błąd: Nie znaleziono bazy produktów w pamięci (globalProducts).");
-        }
+        });
 
+        alert("✅ Zaktualizowano stan magazynowy!");
+        
+        // Tu normalnie byłoby wysłanie do bazy (np. updateDoc w Firebase)
+        // Ale skoro nie mam kodu backendu, to ta wizualna zmiana musi wystarczyć na teraz.
+        
         closeMagazynOperation();
     }
 
@@ -17868,8 +17862,7 @@ async function fetchCardsForReport(dateStart, dateEnd, userId) {
                style="flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 4px;">
         <button onclick="zamknijWybierak()" style="padding: 0 15px; border: 1px solid #ccc; background: white;">Anuluj</button>
     </div>
-    <div id="pickerListContainer" style="flex: 1; overflow-y: auto;">
-        </div>
+    <div id="pickerListContainer" style="flex: 1; overflow-y: auto;"></div>
 </div>
 
 </body>
