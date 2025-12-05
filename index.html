@@ -7740,6 +7740,7 @@ async function loadMagazynCache(uid) {
 
     console.log(`Moduł 3: Pomyślnie załadowano ${magazynCache.size} pozycji do magazynCache.`);
 }
+    
 /* ✅ MODUŁ WIELODOSTĘPNOŚCI (Formularz Klienta) */
 if (addNewClientBtn) {
     addNewClientBtn.addEventListener('click', () => {
@@ -8022,7 +8023,69 @@ async function importDefaultDatabaseToClinic(targetClinicId) {
         loadAndCacheProducts();
     }
 }
+/* ⬇️ WKLEJ TO TUTAJ ⬇️ */
+
 /**
+ * Pobiera dane klientów z Firestore, filtrując po ID lecznicy.
+ * Zapisuje je do cache i wywołuje renderowanie.
+ */
+async function loadAndCacheClients() {
+    if (!klientTableBody) return;
+
+    // Pobierz ID lecznicy użytkownika
+    let userClinicId = null;
+    if (currentUserProfile) {
+        userClinicId = currentUserProfile['ID lecznicy'];
+    }
+
+    klientTableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 10px;">Ładowanie danych... <span class="spinner">⏳</span></td></tr>';
+    if(loadClientsBtn) loadClientsBtn.disabled = true;
+    if(refreshClientsBtn) refreshClientsBtn.disabled = true;
+
+    try {
+        let q = db.collection("klienci");
+
+        // ✅ FILTRACJA DANYCH (Izolacja)
+        // Jeśli to nie jest administrator, pobierz tylko klientów tej konkretnej lecznicy
+        if (currentUserProfile && currentUserProfile.Rola !== 'administrator') {
+            if (!userClinicId) {
+                // Jeśli użytkownik (np. pracownik) nie ma ID lecznicy, to błąd danych profilu
+                throw new Error("Brak ID lecznicy w profilu użytkownika.");
+            }
+            q = q.where("idLecznicy", "==", userClinicId);
+        } else {
+            console.log("Tryb Administratora: Pobieranie wszystkich klientów.");
+        }
+
+        const snapshot = await q.get();
+
+        if (snapshot.empty) {
+            console.log("Baza klientów jest pusta.");
+            cachedClients = [];
+            renderClientTable(cachedClients);
+        } else {
+            console.log(`Pobrano ${snapshot.size} klientów.`);
+            cachedClients = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            renderClientTable(cachedClients);
+        }
+    } catch (error) {
+        console.error("Błąd podczas ładowania klientów: ", error);
+        
+        // Obsługa błędu braku indeksu (częste przy filtrach)
+        if (error.code === 'failed-precondition') {
+             alert("BŁĄD: Wymagany indeks Firestore dla klientów. Sprawdź konsolę (F12) i kliknij w link od Firebase.");
+        }
+        
+        klientTableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: red;">Błąd ładowania danych.</td></tr>';
+    } finally {
+        if(loadClientsBtn) loadClientsBtn.disabled = false;
+        if(refreshClientsBtn) refreshClientsBtn.disabled = false;
+    }
+}
+
+/* ⬆️ KONIEC WKLEJANIA ⬆️ */
+
+    /**
 * Przycisk "Dodaj nowego klienta" - otwiera pusty modal
 */
 if (addNewClientBtn) {
