@@ -2500,6 +2500,53 @@ z-index: 1;
 margin-top: 20px; /* ✅ Dodany odstęp od góry (od logo) */
 margin-bottom: 20px; /* ✅ Dodany mały odstęp od dołu */
 }
+/* --- Styl przycisku pomocy --- */
+#helpFloatingBtn {
+    position: fixed;
+    top: 15px;
+    right: 15px;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background-color: #2b74e4; /* Niebieski kolor */
+    color: white;
+    font-size: 22px;
+    font-weight: bold;
+    border: 2px solid white;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+    z-index: 20002; /* Powyżej wszystkiego, nawet powyżej toastów */
+    cursor: pointer;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    transition: transform 0.2s, background-color 0.2s;
+}
+
+#helpFloatingBtn:hover {
+    background-color: #1a5bb8;
+    transform: scale(1.1);
+}
+
+/* Styl treści w modalu pomocy */
+.help-content h4 {
+    margin-top: 20px;
+    margin-bottom: 10px;
+    font-size: 18px;
+}
+.help-content ul {
+    padding-left: 20px;
+    margin-top: 5px;
+}
+.help-content li {
+    margin-bottom: 6px;
+}
+
+/* Ukryj przycisk pomocy podczas drukowania */
+@media print {
+    #helpFloatingBtn, #helpModal {
+        display: none !important;
+    }
+}
 </style>
 <style>
 .slogan {
@@ -4165,6 +4212,84 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
         <div class="form-actions" style="justify-content: space-between; margin-top: 15px;">
             <button id="btnUseNewActivity" class="btn primary small">➕ Użyj wpisanej</button>
             <button id="activitiesSearchCloseBtn" class="btn ghost">Anuluj</button>
+        </div>
+    </div>
+</div>
+    <button id="helpFloatingBtn" title="Instrukcja obsługi">?</button>
+
+<div id="helpModal" class="product-search-modal" style="display: none; z-index: 20001;">
+    <div class="form-card" style="width: 95vw; max-width: 800px; height: 90vh; display: flex; flex-direction: column;">
+        
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 10px;">
+            <h3 style="margin: 0; color: #2b74e4;">📖 Instrukcja Obsługi</h3>
+            <button id="helpCloseTopBtn" class="btn ghost small" style="font-size: 20px; padding: 0 10px;">✕</button>
+        </div>
+
+        <div class="help-content" style="flex: 1; overflow-y: auto; padding-right: 5px; font-size: 15px; line-height: 1.6; color: #333;">
+            
+            <h4 style="color: #333; border-bottom: 2px solid #6A994E; display: inline-block; margin-top: 0;">1. Menu Główne</h4>
+            <p>Aplikacja służy do kompleksowej obsługi wizyt weterynaryjnych. Z poziomu menu głównego masz dostęp do wszystkich modułów. Aplikacja działa w trybie offline/online i synchronizuje dane z bazą.</p>
+
+            <h4 style="color: #333; border-bottom: 2px solid #6A994E; display: inline-block;">2. Kalendarz Wizyt 🗓️</h4>
+            <ul>
+                <li>Służy do planowania wizyt.</li>
+                <li><strong>Dodawanie:</strong> Kliknij duży "Plus" (+), aby dodać wizytę.</li>
+                <li><strong>Kolory:</strong> Wizyty "Pilne" są oznaczone czerwonym paskiem, "Obojętne" zielonym.</li>
+                <li><strong>Statusy:</strong> Możesz szybko zmienić status wizyty na "Zrealizowana" klikając przycisk na kafelku wizyty.</li>
+                <li><strong>Auto-czyszczenie:</strong> Stare wizyty zrealizowane (powyżej 7 dni) są usuwane automatycznie.</li>
+            </ul>
+
+            <h4 style="color: #333; border-bottom: 2px solid #6A994E; display: inline-block;">3. Karta Leczenia 📝 (Serce systemu)</h4>
+            <p>Tworzenie oficjalnej dokumentacji leczenia.</p>
+            <ul>
+                <li><strong>Nagłówek:</strong> Wybierz klienta (dane uzupełnią się same). Numer dokumentu generuje się automatycznie (Format: Nr/Miesiąc/Rok/Inicjały).</li>
+                <li><strong>Wiersze 1-9 (Leczenie na miejscu):</strong> Wpisujesz leki podane zwierzęciu.</li>
+                <li><strong>Wiersze 10-12 (Produkty pozostawione):</strong> Leki wydane właścicielowi.</li>
+                <li><strong>Smart Cells (Komórka Karencji/Uwag):</strong> Kliknij ikonę 📅 w ostatniej kolumnie, aby otworzyć generator zaleceń (Data Od/Do + Dawkowanie).</li>
+                <li><strong>Schematy:</strong> Wpisując nazwę choroby w polu "Rozpoznanie", system może automatycznie wypełnić leki (jeśli zdefiniowałeś schemat w Bazie).</li>
+                <li><strong>Kopiowanie:</strong> Przycisk "Przepisz dane..." kopiuje opis zwierzęcia i diagnozę z górnych wierszy do sekcji produktów pozostawionych.</li>
+                <li><strong>Podpis:</strong> Lekarz podpisuje się automatycznie (z Konfiguracji), posiadacz podpisuje się na ekranie (pole dotykowe).</li>
+            </ul>
+
+            <h4 style="color: #333; border-bottom: 2px solid #6A994E; display: inline-block;">4. Kalkulator Wizyty 🧮</h4>
+            <p>Szybkie wystawianie paragonów niefiskalnych (Druk Wewnętrzny).</p>
+            <ul>
+                <li><strong>Dodawanie produktów:</strong> Wybierz z listy. System podpowie jednostkę miary. Możesz też wpisać kod PLU.</li>
+                <li><strong>Własny produkt:</strong> Możesz dodać pozycję spoza bazy (usługę jednorazową) używając przycisku "Dodaj własny produkt".</li>
+                <li><strong>Korekty:</strong> Jeśli zaznaczysz "Tryb Korekty", możesz wybrać stary paragon z archiwum i go edytować/nadpisać.</li>
+                <li><strong>Płatność:</strong> Wybierz "Zapłacone" lub "Dług". To ważne dla Raportów.</li>
+            </ul>
+
+            <h4 style="color: #333; border-bottom: 2px solid #6A994E; display: inline-block;">5. Magazyn 📦</h4>
+            <ul>
+                <li><strong>Mój Magazyn:</strong> Twoje osobiste stany leków.</li>
+                <li><strong>Doładowanie:</strong> Użyj przycisku "Szybkie Doładowanie", aby dodać towar (np. pobrany z hurtowni). Działa jak koszyk.</li>
+                <li><strong>Inwentaryzacja (Pomarańczowy guzik):</strong> Służy do ustalania stanu faktycznego. Wpisana ilość <strong>nadpisuje</strong> obecny stan (nie dodaje!).</li>
+                <li><strong>Logi:</strong> Każda operacja (wydanie w karcie, doładowanie) jest zapisywana w historii na dole strony.</li>
+                <li><strong>Zarządzanie (Dla Admina):</strong> Właściciel może podglądać i edytować stany magazynowe pracowników.</li>
+            </ul>
+
+            <h4 style="color: #333; border-bottom: 2px solid #6A994E; display: inline-block;">6. Bazy Danych 🗃️</h4>
+            <ul>
+                <li><strong>Klienci:</strong> Dodawanie i edycja danych posiadaczy zwierząt.</li>
+                <li><strong>Produkty:</strong> Baza leków (Cena, PLU, Karencja). Tylko administrator może edytować globalną bazę.</li>
+                <li><strong>Schematy:</strong> Tu możesz stworzyć gotowe zestawy leków dla danych chorób, aby przyspieszyć wypełnianie Karty.</li>
+            </ul>
+
+            <h4 style="color: #333; border-bottom: 2px solid #6A994E; display: inline-block;">7. Archiwum i Raporty 📊</h4>
+            <ul>
+                <li><strong>Archiwum:</strong> Przeglądaj stare Karty i Paragony. Możesz je drukować lub usuwać.</li>
+                <li><strong>Raporty:</strong> Generuj zestawienia finansowe (Dłużnicy, Gotówka) oraz Raporty Zużycia leków (na podstawie Kart Leczenia) za wybrany okres.</li>
+            </ul>
+            
+             <div style="margin-top: 30px; padding: 15px; background-color: #f9f9f9; border-radius: 8px; text-align: center; font-size: 13px; color: #777;">
+                Aplikacja KL-Mobile v2.0<br>
+                W razie problemów skontaktuj się z administratorem.
+            </div>
+        </div>
+
+        <div class="form-actions" style="justify-content: center; border-top: 1px solid #eee; padding-top: 10px;">
+            <button id="helpCloseBtn" class="btn primary" style="width: 100%;">Rozumiem, zamknij</button>
         </div>
     </div>
 </div>
@@ -18433,6 +18558,41 @@ if (btnInvAdmin) {
             nazwa: zarzadzanieWybranyUser.nazwa
         };
         openInventoryModal(target);
+    });
+}
+/* ======================================================== */
+/* ======================================================== */
+/* ✅ NOWY MODUŁ: System Pomocy (Tutorial)                 */
+/* ======================================================== */
+
+const helpFloatingBtn = document.getElementById('helpFloatingBtn');
+const helpModal = document.getElementById('helpModal');
+const helpCloseBtn = document.getElementById('helpCloseBtn');
+const helpCloseTopBtn = document.getElementById('helpCloseTopBtn');
+
+if (helpFloatingBtn) {
+    helpFloatingBtn.addEventListener('click', () => {
+        if (helpModal) {
+            helpModal.style.display = 'flex';
+        }
+    });
+}
+
+function closeHelp() {
+    if (helpModal) {
+        helpModal.style.display = 'none';
+    }
+}
+
+if (helpCloseBtn) helpCloseBtn.addEventListener('click', closeHelp);
+if (helpCloseTopBtn) helpCloseTopBtn.addEventListener('click', closeHelp);
+
+// Zamknij po kliknięciu w tło
+if (helpModal) {
+    helpModal.addEventListener('click', (e) => {
+        if (e.target === helpModal) {
+            closeHelp();
+        }
     });
 }
 /* ======================================================== */
