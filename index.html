@@ -6421,6 +6421,7 @@ loadArchiveReceiptUsers();
       if (tabSchematyLeczeniaBtn) tabSchematyLeczeniaBtn.classList.add('primary');
       onShowBazaLeczenia(); // Wywołaj funkcję startową
   }
+        
   // ⬆️ ⬆️ ⬆️ KONIEC NOWEGO BLOKU ⬆️ ⬆️ ⬆️
 // ✅ POCZĄTEK MODUŁU 4: Dodaj ten blok
   else if (sectionToShow === 'mojMagazyn' && mojMagazynSection) {
@@ -15195,6 +15196,271 @@ function printReceiptSummary(receiptData) { // receiptData nie jest już aktywni
 /* ✅ KONIEC: MODUŁ 3.2/3.3 - POPRAWIONA Funkcja */
 /* ======================================================== */
 /* ======================================================== */
+/* ✅ NOWY MODUŁ: Szybkie Doładowanie (Modal/Koszyk)       */
+/* ======================================================== */
+
+// Zmienne Modala Doładowania
+const topUpModal = document.getElementById('topUpModal');
+const topUpTitle = document.getElementById('topUpModalTitle');
+const topUpSubtitle = document.getElementById('topUpModalSubtitle');
+const topUpProductInput = document.getElementById('topUpProductInput');
+const topUpQuantityInput = document.getElementById('topUpQuantityInput');
+const topUpUnitDisplay = document.getElementById('topUpUnitDisplay');
+const topUpAddBtn = document.getElementById('topUpAddBtn');
+const topUpListBody = document.getElementById('topUpListBody');
+const topUpEmptyMsg = document.getElementById('topUpEmptyMsg');
+const topUpCancelBtn = document.getElementById('topUpCancelBtn');
+const topUpConfirmBtn = document.getElementById('topUpConfirmBtn');
+
+let topUpBasket = []; // Tablica obiektów { id, nazwa, ilosc }
+let topUpTargetUser = null; // Obiekt { docId, uid, nazwa } - kogo doładowujemy
+
+// 1. Funkcja otwierająca Modal
+function openTopUpModal(targetUser) {
+    topUpTargetUser = targetUser;
+    topUpBasket = []; // Reset koszyka
+    
+    // Ustaw tytuły
+    if (currentUserProfile.uid === targetUser.uid) {
+        topUpTitle.textContent = "Twoje Doładowanie";
+        topUpSubtitle.textContent = "Dodaj produkty do swojego magazynu";
+    } else {
+        topUpTitle.textContent = "Doładowanie Pracownika";
+        topUpSubtitle.textContent = `Magazyn użytkownika: ${targetUser.nazwa}`;
+    }
+
+    renderTopUpList();
+    
+    // Wyczyść pola
+    topUpProductInput.value = '';
+    topUpQuantityInput.value = '';
+    topUpUnitDisplay.textContent = '';
+
+    topUpModal.style.display = 'flex';
+    setTimeout(() => topUpProductInput.focus(), 50);
+}
+
+// 2. Obsługa wyboru produktu (wyświetlanie jednostki)
+if (topUpProductInput) {
+    topUpProductInput.addEventListener('input', function() {
+        const val = this.value;
+        // Używamy globalnej mapyIlosci (zdefiniowanej w kodzie głównym)
+        if (typeof mapaIlosci !== 'undefined' && mapaIlosci[val]) {
+            // Wyciągnij jednostkę z "100 ml" -> "ml" (prosta heurystyka)
+            const parts = mapaIlosci[val].split(' ');
+            if (parts.length > 1) {
+                topUpUnitDisplay.textContent = parts[1]; 
+            } else {
+                topUpUnitDisplay.textContent = mapaIlosci[val];
+            }
+        } else {
+            topUpUnitDisplay.textContent = '';
+        }
+    });
+}
+
+// 3. Dodawanie do listy (Koszyka)
+if (topUpAddBtn) {
+    topUpAddBtn.addEventListener('click', () => {
+        const name = topUpProductInput.value.trim();
+        const qty = parseFloat(topUpQuantityInput.value);
+
+        if (!name) {
+            showToast("Wybierz produkt z listy.", "error");
+            return;
+        }
+        if (!qty || qty <= 0) {
+            showToast("Podaj poprawną ilość.", "error");
+            return;
+        }
+
+        // Znajdź ID produktu w globalnym cache
+        let productId = null;
+        if (typeof produktyGlowneCache !== 'undefined') {
+            productId = produktyGlowneCache.get(name);
+        }
+
+        // Jeśli nie znaleziono ID po nazwie, spróbuj znaleźć w cachedProducts
+        if (!productId && typeof cachedProducts !== 'undefined') {
+            const found = cachedProducts.find(p => p.nazwa === name);
+            if (found) productId = found.id;
+        }
+
+        if (!productId) {
+            showToast("Nie znaleziono produktu w bazie głównej. Sprawdź nazwę.", "error");
+            return;
+        }
+
+        // Dodaj do koszyka (lub zaktualizuj jeśli już jest)
+        const existing = topUpBasket.find(x => x.id === productId);
+        if (existing) {
+            existing.ilosc += qty;
+        } else {
+            topUpBasket.push({ id: productId, nazwa: name, ilosc: qty });
+        }
+
+        // Reset pól
+        topUpProductInput.value = '';
+        topUpQuantityInput.value = '';
+        topUpUnitDisplay.textContent = '';
+        topUpProductInput.focus();
+
+        renderTopUpList();
+    });
+}
+
+// 4. Renderowanie listy w modalu
+function renderTopUpList() {
+    topUpListBody.innerHTML = '';
+    
+    if (topUpBasket.length === 0) {
+        topUpEmptyMsg.style.display = 'block';
+        topUpConfirmBtn.disabled = true;
+        topUpConfirmBtn.style.opacity = '0.5';
+    } else {
+        topUpEmptyMsg.style.display = 'none';
+        topUpConfirmBtn.disabled = false;
+        topUpConfirmBtn.style.opacity = '1';
+
+        topUpBasket.forEach((item, index) => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td style="padding:8px; border-bottom:1px solid #eee;">
+                    <strong>${item.nazwa}</strong>
+                </td>
+                <td style="padding:8px; border-bottom:1px solid #eee; text-align:center; font-size:16px;">
+                    ${item.ilosc}
+                </td>
+                <td style="padding:8px; border-bottom:1px solid #eee; text-align:center;">
+                    <button class="btn warn small" onclick="removeTopUpItem(${index})" style="padding: 2px 6px;">🗑</button>
+                </td>
+            `;
+            topUpListBody.appendChild(tr);
+        });
+    }
+}
+
+// 5. Usuwanie z koszyka
+window.removeTopUpItem = function(index) {
+    topUpBasket.splice(index, 1);
+    renderTopUpList();
+}
+
+// 6. Anuluj / Zamknij
+if (topUpCancelBtn) {
+    topUpCancelBtn.addEventListener('click', () => {
+        topUpModal.style.display = 'none';
+    });
+}
+
+// 7. ZATWIERDŹ DOŁADOWANIE (Główna logika zapisu)
+if (topUpConfirmBtn) {
+    topUpConfirmBtn.addEventListener('click', async () => {
+        if (topUpBasket.length === 0) return;
+        if (!topUpTargetUser || !topUpTargetUser.docId) {
+            alert("Błąd krytyczny: Brak danych użytkownika docelowego.");
+            return;
+        }
+
+        if (!confirm(`Czy na pewno chcesz doładować ${topUpBasket.length} pozycji do magazynu?`)) return;
+
+        topUpConfirmBtn.disabled = true;
+        topUpConfirmBtn.textContent = 'Zapisywanie...';
+
+        try {
+            const batch = db.batch();
+            const zmianyLog = [];
+
+            // Pętla po produktach w koszyku
+            for (const item of topUpBasket) {
+                // A. Pobierz aktualny stan (musimy go znać, żeby zaktualizować log)
+                // W przypadku "Mój Magazyn" mamy to w magazynCache. 
+                // W przypadku "Zarządzanie" mamy to w zarzadzanieMagazynCache.
+                // Dla bezpieczeństwa pobierzemy stan bezpośrednio lub założymy 0 jeśli nie ma w cache.
+                
+                let stanPrzed = 0;
+                
+                // Sprawdzamy czy to "ja" czy "inny"
+                if (topUpTargetUser.uid === currentUserProfile.uid) {
+                    // Mój magazyn
+                    const cached = typeof magazynCache !== 'undefined' ? magazynCache.get(item.id) : null;
+                    stanPrzed = cached ? (cached.stan || 0) : 0;
+                } else {
+                    // Zarządzanie
+                    const cached = typeof zarzadzanieMagazynCache !== 'undefined' ? zarzadzanieMagazynCache.get(item.id) : null;
+                    stanPrzed = cached ? (cached.stan || 0) : 0;
+                }
+
+                const stanPo = stanPrzed + item.ilosc;
+
+                // B. Referencja do stanu magazynowego
+                const stanRef = db.collection("konfiguracja")
+                                  .doc(topUpTargetUser.docId)
+                                  .collection("magazynOsobisty")
+                                  .doc(item.id);
+                
+                // C. Operacja aktualizacji stanu
+                batch.set(stanRef, { 
+                    stan: stanPo, 
+                    produkt_nazwa: item.nazwa 
+                }, { merge: true });
+
+                // D. Dodaj do tablicy zmian dla logu
+                zmianyLog.push({
+                    id_produktu: item.id,
+                    nazwa_produktu: item.nazwa,
+                    ilosc: item.ilosc,
+                    stan_przed: stanPrzed,
+                    stan_po: stanPo
+                });
+            }
+
+            // E. Utwórz wpis w logu (Dziennik operacji)
+            const logData = {
+                typ: "doładowanie",
+                data: firebase.firestore.FieldValue.serverTimestamp(),
+                kto_uid: currentUserProfile.uid,
+                kto_nazwa: `${currentUserProfile.Imie} ${currentUserProfile.Nazwisko}`,
+                batch_id: "batch_" + new Date().getTime(),
+                wycofany: false,
+                zmiany: zmianyLog
+            };
+
+            const logRef = db.collection("konfiguracja")
+                             .doc(topUpTargetUser.docId)
+                             .collection("magazynOsobistyLog")
+                             .doc();
+            batch.set(logRef, logData);
+
+            // F. Wyślij wszystko do Firebase
+            await batch.commit();
+
+            showToast("Doładowanie zakończone sukcesem!", "success");
+            topUpModal.style.display = 'none';
+
+            // G. Odśwież widok w zależności od tego gdzie jesteśmy
+            if (topUpTargetUser.uid === currentUserProfile.uid) {
+                // Odśwież Mój Magazyn
+                if (typeof loadMagazynCache === 'function') await loadMagazynCache(currentUserProfile.uid);
+                if (typeof loadAndRenderMagazyn === 'function') await loadAndRenderMagazyn();
+            } else {
+                // Odśwież Panel Zarządzania
+                if (typeof loadAndRenderWybranyMagazyn === 'function') await loadAndRenderWybranyMagazyn();
+            }
+
+        } catch (err) {
+            console.error("Błąd zapisu doładowania:", err);
+            alert("Wystąpił błąd podczas zapisu. Sprawdź konsolę.");
+        } finally {
+            topUpConfirmBtn.disabled = false;
+            topUpConfirmBtn.textContent = '✅ DOŁADUJ STANY';
+        }
+    });
+}
+/* ======================================================== */
+/* ✅ KONIEC NOWEGO MODUŁU                                 */
+/* ======================================================== */
+/* ======================================================== */
 /* ✅ POCZĄTEK: MODUŁ 4 - Logika "Mój Magazyn" */
 /* ======================================================== */
 
@@ -15725,7 +15991,15 @@ function handleMagazynPaste(event) {
 // --- Podpięcie Listenerów ---
 
 if (magazynBtnSzybkieDoladowanie) {
-    magazynBtnSzybkieDoladowanie.addEventListener('click', () => toggleQuickTopUpMode(true));
+    magazynBtnSzybkieDoladowanie.addEventListener('click', () => {
+        // Przygotuj obiekt użytkownika dla samego siebie
+        const me = {
+            docId: currentUserProfile.id,
+            uid: currentUserProfile.uid,
+            nazwa: "Twój Magazyn"
+        };
+        openTopUpModal(me);
+    });
 }
 if (magazynBtnAnulujDoladowanie) {
     magazynBtnAnulujDoladowanie.addEventListener('click', () => toggleQuickTopUpMode(false));
@@ -16290,7 +16564,20 @@ if (zarzadzanieSearchInput) {
     zarzadzanieSearchInput.addEventListener('input', renderZarzadzanieMagazynTable);
 }
 if (zarzadzanieBtnSzybkieDoladowanie) {
-    zarzadzanieBtnSzybkieDoladowanie.addEventListener('click', () => toggleZarzadzanieTopUpMode(true));
+    zarzadzanieBtnSzybkieDoladowanie.addEventListener('click', () => {
+        if (!zarzadzanieWybranyUser) {
+            showToast("Najpierw wybierz pracownika z listy.", "error");
+            return;
+        }
+        
+        // Przygotuj obiekt wybranego pracownika
+        const target = {
+            docId: zarzadzanieWybranyUser.docId,
+            uid: zarzadzanieWybranyUser.uid, // Może być undefined jeśli nie połączone, ale docId jest kluczowe
+            nazwa: zarzadzanieWybranyUser.nazwa
+        };
+        openTopUpModal(target);
+    });
 }
 if (zarzadzanieBtnAnulujDoladowanie) {
     zarzadzanieBtnAnulujDoladowanie.addEventListener('click', () => toggleZarzadzanieTopUpMode(false));
@@ -17631,6 +17918,52 @@ async function fetchCardsForReport(dateStart, dateEnd, userId) {
 
 <div id="toastContainer" style="position: fixed; top: 20px; right: 20px; z-index: 20000; display: flex; flex-direction: column; gap: 10px;">
     </div>
+<div id="topUpModal" class="product-search-modal" style="display: none; z-index: 10010;">
+    <div class="form-card" style="max-width: 600px; height: 90vh; display: flex; flex-direction: column;">
+        
+        <h3 id="topUpModalTitle" style="text-align: center; margin-top: 0;">Doładowanie Magazynu</h3>
+        <p id="topUpModalSubtitle" style="text-align: center; color: #666; font-size: 14px; margin-bottom: 15px;"></p>
 
+        <div style="background: #f0f8ff; padding: 15px; border-radius: 8px; border: 1px solid #bcd; margin-bottom: 15px;">
+            <div class="form-row">
+                <label for="topUpProductInput">Wybierz produkt:</label>
+                <input type="text" id="topUpProductInput" list="listaLekow" placeholder="Wpisz nazwę produktu..." style="width: 100%; font-size: 16px; padding: 8px;">
+            </div>
+            
+            <div style="display: flex; gap: 10px; align-items: flex-end; margin-top: 10px;">
+                <div style="flex: 1;">
+                    <label for="topUpQuantityInput">Ilość do dodania:</label>
+                    <input type="number" id="topUpQuantityInput" placeholder="0" min="0.01" step="any" style="width: 100%; font-size: 18px; padding: 8px;">
+                </div>
+                <div style="width: 60px; padding-bottom: 10px;">
+                    <span id="topUpUnitDisplay" style="font-weight: bold; color: #555; font-size: 16px;"></span>
+                </div>
+                <div>
+                    <button id="topUpAddBtn" class="btn primary" style="padding: 10px 20px;">⬇ Dodaj</button>
+                </div>
+            </div>
+        </div>
+
+        <div style="flex: 1; overflow-y: auto; border: 1px solid #eee; border-radius: 6px; padding: 0;">
+            <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+                <thead style="background: #f9f9f9; position: sticky; top: 0;">
+                    <tr>
+                        <th style="padding: 8px; border-bottom: 1px solid #ddd; text-align: left;">Produkt</th>
+                        <th style="padding: 8px; border-bottom: 1px solid #ddd; text-align: center;">Ilość</th>
+                        <th style="padding: 8px; border-bottom: 1px solid #ddd; text-align: center;">Akcja</th>
+                    </tr>
+                </thead>
+                <tbody id="topUpListBody">
+                    </tbody>
+            </table>
+            <p id="topUpEmptyMsg" style="text-align: center; color: #999; padding: 20px;">Lista doładowania jest pusta.</p>
+        </div>
+
+        <div class="form-actions" style="margin-top: 15px; justify-content: space-between; border-top: 1px solid #eee; padding-top: 15px;">
+            <button id="topUpCancelBtn" class="btn ghost">Anuluj</button>
+            <button id="topUpConfirmBtn" class="btn primary" style="background-color: #27ae60; border-color: #229954; font-size: 18px;">✅ DOŁADUJ STANY</button>
+        </div>
+    </div>
+</div>
 </body>
 </html>
