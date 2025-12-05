@@ -17632,40 +17632,136 @@ async function fetchCardsForReport(dateStart, dateEnd, userId) {
 function openMagazynOperation(tryb) {
         console.log("Otwieranie operacji: " + tryb);
         
-        // Pobieramy element modala
         var modal = document.getElementById('magazynOperationModal');
-        
-        // ZABEZPIECZENIE: Jeśli modala nie ma, przerwij (zamiast błędu w konsoli)
-        if (!modal) {
-            console.error("Błąd krytyczny: Nie znaleziono elementu o ID 'magazynOperationModal'. Sprawdź HTML.");
-            alert("Błąd: Brak okna operacji. Odśwież stronę.");
-            return;
-        }
+        if (!modal) return;
 
-        // Ustawiamy tytuł
+        // Ustawiamy tytuł okna
         var tytul = document.getElementById('magazynOperationTitle');
         if (tytul) {
-            if (tryb === 'inwentaryzacja') {
-                tytul.innerText = "📋 Inwentaryzacja";
-            } else {
-                tytul.innerText = "➕ Doładowanie";
-            }
+            tytul.innerText = (tryb === 'inwentaryzacja') ? "📋 Inwentaryzacja" : "➕ Doładowanie";
         }
 
         // Pokazujemy okno
         modal.style.display = 'flex'; 
 
-        // Generujemy prosty formularz (żeby nie było pusto)
-        var formContainer = document.getElementById('magazynOperationForm');
-        if (formContainer) {
-            // Tutaj normalnie byłaby logika budowania formularza.
-            // Na razie wstawiamy prosty tekst, żebyś widział, że działa.
-            formContainer.innerHTML = '<div style="text-align:center; padding: 20px;">Tryb: <b>' + tryb + '</b><br><br>(Tu pojawi się formularz)</div>';
-        }
+        // Czyścimy listę przy nowym otwarciu
+        listaOperacji = [];
+
+        // Generujemy formularz (pola input i tabelę)
+        renderFormularzUI(tryb);
     }
 
     /**
-     * 2. Funkcja Zamykająca
+     * 2. Funkcja budująca wygląd formularza
+     * Zastępuje prosty tekst polami do wpisywania
+     */
+    function renderFormularzUI(tryb) {
+        var container = document.getElementById('magazynOperationForm');
+        if (!container) return;
+
+        var html = `
+            <div style="text-align: left;">
+                
+                <label style="font-weight:bold; display:block; margin-bottom:5px; margin-top: 10px;">1. Wybierz produkt:</label>
+                <input type="text" id="opInputProdukt" list="opListaProduktow" placeholder="Wpisz nazwę produktu..." 
+                       style="width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;">
+                
+                <datalist id="opListaProduktow">
+                    <option value="Produkt A">
+                    <option value="Produkt B">
+                </datalist>
+
+                <div style="display: flex; gap: 10px; margin-bottom: 20px; align-items: flex-end;">
+                    <div style="flex: 1;">
+                        <label style="font-weight:bold; display:block; margin-bottom:5px;">2. Ilość:</label>
+                        <input type="number" id="opInputIlosc" placeholder="0" 
+                               style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;">
+                    </div>
+                    <button type="button" onclick="dodajPozycjeDoListy()" 
+                            style="padding: 10px 15px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; height: 40px; font-weight: bold;">
+                        ⬇ Dodaj
+                    </button>
+                </div>
+
+                <hr style="border: 0; border-top: 1px solid #eee; margin: 15px 0;">
+
+                <h4 style="margin: 0 0 10px 0;">Lista do zapisania:</h4>
+                <div style="border: 1px solid #ddd; height: 150px; overflow-y: auto; background: #f9f9f9;">
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <thead style="background: #eee; position: sticky; top: 0;">
+                            <tr>
+                                <th style="padding: 8px; text-align: left; border-bottom: 1px solid #ccc;">Nazwa</th>
+                                <th style="padding: 8px; text-align: right; border-bottom: 1px solid #ccc;">Ilość</th>
+                            </tr>
+                        </thead>
+                        <tbody id="opTabelaBody" style="background: #fff;">
+                            <tr><td colspan="2" style="text-align:center; padding:20px; color:#999;">Brak pozycji. Dodaj coś powyżej.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+            </div>
+        `;
+
+        container.innerHTML = html;
+        
+        // Ustaw focus na pierwszym polu
+        setTimeout(() => document.getElementById('opInputProdukt').focus(), 100);
+    }
+
+    /**
+     * 3. Funkcja obsługująca przycisk "Dodaj" (niebieski)
+     */
+    function dodajPozycjeDoListy() {
+        var inputProd = document.getElementById('opInputProdukt');
+        var inputIlosc = document.getElementById('opInputIlosc');
+        
+        var nazwa = inputProd.value;
+        var ilosc = inputIlosc.value;
+
+        if (!nazwa || !ilosc) {
+            alert("Uzupełnij nazwę produktu i ilość!");
+            return;
+        }
+
+        // Dodaj do tablicy (logika)
+        listaOperacji.push({ nazwa: nazwa, ilosc: ilosc });
+
+        // Odśwież widok tabeli
+        odswiezTabeleOperacji();
+
+        // Wyczyść pola
+        inputProd.value = '';
+        inputIlosc.value = '';
+        inputProd.focus();
+    }
+
+    /**
+     * 4. Pomocnicza funkcja rysująca tabelę na nowo
+     */
+    function odswiezTabeleOperacji() {
+        var tbody = document.getElementById('opTabelaBody');
+        tbody.innerHTML = '';
+
+        if (listaOperacji.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="2" style="text-align:center; padding:20px; color:#999;">Lista pusta</td></tr>';
+            return;
+        }
+
+        // Pętla po wszystkich dodanych elementach
+        listaOperacji.forEach(function(item) {
+            var wiersz = `
+                <tr>
+                    <td style="padding: 8px; border-bottom: 1px solid #eee;">${item.nazwa}</td>
+                    <td style="padding: 8px; text-align: right; border-bottom: 1px solid #eee;"><b>${item.ilosc}</b></td>
+                </tr>
+            `;
+            tbody.innerHTML += wiersz;
+        });
+    }
+
+    /**
+     * 5. Funkcja Zamykająca
      */
     function closeMagazynOperation() {
         var modal = document.getElementById('magazynOperationModal');
@@ -17675,10 +17771,18 @@ function openMagazynOperation(tryb) {
     }
 
     /**
-     * 3. Funkcja Zapisująca (Placeholder, żeby nie było błędu przy kliknięciu Zapisz)
+     * 6. Funkcja Zapisująca (Zielony przycisk)
      */
     function submitMagazynOperation() {
-        alert("Funkcja zapisu zostanie dodana później.");
+        if (listaOperacji.length === 0) {
+            alert("Lista jest pusta! Nie ma co zapisywać.");
+            return;
+        }
+        
+        // Tu później dodamy kod wysyłający dane do bazy
+        console.log("Zapisywanie danych:", listaOperacji);
+        alert("Zapisano " + listaOperacji.length + " pozycji! (Symulacja)");
+        
         closeMagazynOperation();
     }
 </script>
