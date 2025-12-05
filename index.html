@@ -2330,20 +2330,22 @@ table {
         <h3 id="topUpModalTitle" style="text-align: center; margin-top: 0;">Doładowanie Magazynu</h3>
         <p id="topUpModalSubtitle" style="text-align: center; color: #666; font-size: 14px; margin-bottom: 15px;"></p>
 
-        <div style="background: #f0f8ff; padding: 15px; border-radius: 8px; border: 1px solid #bcd; margin-bottom: 15px;">
+       <div style="background: #f0f8ff; padding: 15px; border-radius: 8px; border: 1px solid #bcd; margin-bottom: 15px;">
             <div class="form-row">
                 <label for="topUpProductInput">Wybierz produkt:</label>
-                <input type="text" id="topUpProductInput" list="listaLekow" placeholder="Wpisz nazwę produktu..." style="width: 100%; font-size: 16px; padding: 8px;">
+                <input type="text" id="topUpProductInput" placeholder="Kliknij, aby wyszukać produkt..." readonly style="width: 100%; font-size: 16px; padding: 8px; cursor: pointer; background-color: #fff;">
             </div>
             
             <div style="display: flex; gap: 10px; align-items: flex-end; margin-top: 10px;">
-                <div style="flex: 1;">
+                <div style="width: 140px;"> 
                     <label for="topUpQuantityInput">Ilość do dodania:</label>
                     <input type="number" id="topUpQuantityInput" placeholder="0" min="0.01" step="any" style="width: 100%; font-size: 18px; padding: 8px;">
                 </div>
-                <div style="width: 60px; padding-bottom: 10px;">
+                
+                <div style="flex: 1; padding-bottom: 10px;">
                     <span id="topUpUnitDisplay" style="font-weight: bold; color: #555; font-size: 16px;"></span>
                 </div>
+                
                 <div>
                     <button id="topUpAddBtn" class="btn primary" style="padding: 10px 20px;">⬇ Dodaj</button>
                 </div>
@@ -2369,7 +2371,20 @@ table {
             <button id="topUpConfirmBtn" class="btn primary" style="background-color: #27ae60; border-color: #229954; font-size: 18px;">✅ DOŁADUJ STANY</button>
         </div>
     </div>
-</div>    
+</div>   
+ <div id="topUpProductSearchModal" class="product-search-modal" style="display: none; z-index: 10011;">
+    <div class="product-search-card">
+        <h3>Wyszukaj produkt (Magazyn)</h3>
+        <input type="search" id="topUpProductSearchInput" placeholder="Wpisz nazwę produktu..." style="width: 100%; padding: 10px; font-size: 16px; margin-bottom: 10px; box-sizing: border-box;">
+        
+        <div id="topUpProductSearchList" class="product-search-list" style="flex: 1; overflow-y: auto; border: 1px solid #eee;">
+            </div>
+        
+        <div class="form-actions" style="justify-content: flex-end; margin-top: 10px;">
+            <button id="topUpProductSearchCloseBtn" class="btn ghost">Anuluj</button>
+        </div>
+    </div>
+</div>   
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
@@ -15503,6 +15518,108 @@ if (topUpConfirmBtn) {
         }
     });
 }
+  /* ======================================================== */
+/* ✅ NOWY MODUŁ: Obsługa Wyszukiwarki Produktów (Doładowanie) */
+/* ======================================================== */
+
+// Zmienne dla nowego modala wyszukiwania
+const topUpProductSearchModal = document.getElementById('topUpProductSearchModal');
+const topUpProductSearchInput = document.getElementById('topUpProductSearchInput');
+const topUpProductSearchList = document.getElementById('topUpProductSearchList');
+const topUpProductSearchCloseBtn = document.getElementById('topUpProductSearchCloseBtn');
+
+// 1. Otwieranie Modala Wyszukiwania
+if (topUpProductInput) {
+    topUpProductInput.addEventListener('click', (e) => {
+        e.preventDefault(); // Zapobiegaj domyślnym akcjom
+        
+        // Wyczyść pole wyszukiwania lub ustaw obecną wartość
+        topUpProductSearchInput.value = (topUpProductInput.value !== "Kliknij, aby wyszukać produkt...") ? topUpProductInput.value : "";
+        
+        // Wypełnij listę
+        populateTopUpSearchList();
+        
+        // Pokaż modal
+        if (topUpProductSearchModal) {
+            topUpProductSearchModal.style.display = 'flex';
+            setTimeout(() => topUpProductSearchInput.focus(), 50);
+        }
+    });
+}
+
+// 2. Zamykanie Modala
+if (topUpProductSearchCloseBtn) {
+    topUpProductSearchCloseBtn.addEventListener('click', () => {
+        if (topUpProductSearchModal) topUpProductSearchModal.style.display = 'none';
+    });
+}
+
+// 3. Wypełnianie i Filtrowanie Listy
+function populateTopUpSearchList() {
+    if (!topUpProductSearchList) return;
+    
+    // Sprawdź czy mamy bazę leków
+    if (typeof nazwyLekow === 'undefined' || nazwyLekow.length === 0) {
+        topUpProductSearchList.innerHTML = '<div class="product-search-item">Błąd: Brak bazy leków.</div>';
+        return;
+    }
+
+    const filterText = topUpProductSearchInput.value.toLowerCase().trim();
+    topUpProductSearchList.innerHTML = '';
+    let foundItems = 0;
+
+    nazwyLekow.forEach(lekName => {
+        if (filterText === '' || lekName.toLowerCase().includes(filterText)) {
+            const itemDiv = document.createElement('div');
+            itemDiv.className = 'product-search-item'; // Używamy istniejącej klasy stylów
+            // Dodaj style inline, jeśli klasa nie jest dostępna globalnie
+            itemDiv.style.padding = "10px";
+            itemDiv.style.borderBottom = "1px solid #eee";
+            itemDiv.style.cursor = "pointer";
+            
+            itemDiv.textContent = lekName;
+            
+            // Kliknięcie w produkt
+            itemDiv.addEventListener('click', () => {
+                selectTopUpProduct(lekName);
+            });
+            
+            topUpProductSearchList.appendChild(itemDiv);
+            foundItems++;
+        }
+    });
+
+    if (foundItems === 0) {
+        topUpProductSearchList.innerHTML = '<div class="product-search-item" style="padding:10px; color:#999;">Brak pasujących produktów.</div>';
+    }
+}
+
+// 4. Obsługa wpisywania w wyszukiwarce (filtrowanie na żywo)
+if (topUpProductSearchInput) {
+    topUpProductSearchInput.addEventListener('input', populateTopUpSearchList);
+}
+
+// 5. Wybór produktu z listy
+function selectTopUpProduct(name) {
+    // Wpisz nazwę do głównego inputa
+    if (topUpProductInput) {
+        topUpProductInput.value = name;
+        
+        // Wyzwól event 'input', aby zadziałała logika wyświetlania jednostki miary
+        // (którą masz już w kodzie z poprzedniego modułu)
+        topUpProductInput.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+
+    // Zamknij modal wyszukiwania
+    if (topUpProductSearchModal) topUpProductSearchModal.style.display = 'none';
+
+    // Przesuń fokus na pole ilości
+    if (topUpQuantityInput) {
+        topUpQuantityInput.focus();
+        topUpQuantityInput.select();
+    }
+}
+/* ======================================================== */
 /* ======================================================== */
 /* ✅ KONIEC NOWEGO MODUŁU                                 */
 /* ======================================================== */
