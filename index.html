@@ -8088,19 +8088,45 @@ async function loadAndCacheClients() {
     /**
 * Przycisk "Dodaj nowego klienta" - otwiera pusty modal
 */
+/**
+ * Przycisk "Dodaj nowego klienta" - otwiera pusty modal
+ * ✅ POPRAWKA: Automatycznie wpisuje ID lecznicy i BLOKUJE pole.
+ */
 if (addNewClientBtn) {
-addNewClientBtn.addEventListener('click', () => {
-clientFormTitle.textContent = 'Dodaj nowego klienta';
-clientFormDocId.value = ''; // Wyczyść ID - to oznacza "dodawanie"
-clientFormNazwa.value = '';
-clientFormAdres.value = '';
-clientFormNrStada.value = '';
-clientFormTelefon.value = '';
-        clientFormEmail.value = '';
-        clientFormIdLecznicy.value = '';
-clientFormModal.style.display = 'flex';
-clientFormNazwa.focus();
-});
+    addNewClientBtn.addEventListener('click', () => {
+        clientFormTitle.textContent = 'Dodaj nowego klienta';
+        clientFormDocId.value = ''; 
+        
+        clientFormNazwa.value = '';
+        clientFormAdres.value = '';
+        clientFormNrStada.value = '';
+        clientFormTelefon.value = '';
+        clientFormEmail.value = '';
+        
+        // Debugowanie: Zobaczmy co widzi system
+        console.log("Mój profil:", currentUserProfile);
+
+        // --- 1. AUTOMATYCZNE UZUPEŁNIENIE ID LECZNICY ---
+        if (currentUserProfile && currentUserProfile['ID lecznicy']) {
+            console.log("Wstawiam ID:", currentUserProfile['ID lecznicy']);
+            clientFormIdLecznicy.value = currentUserProfile['ID lecznicy'];
+        } else {
+            console.warn("Brak ID lecznicy w profilu!");
+            clientFormIdLecznicy.value = '';
+        }
+
+        // --- 2. BLOKADA POLA (Dla wszystkich poza Administratorem) ---
+        if (currentUserProfile && currentUserProfile.Rola === 'administrator') {
+            clientFormIdLecznicy.readOnly = false;
+            clientFormIdLecznicy.style.backgroundColor = '#fff';
+        } else {
+            clientFormIdLecznicy.readOnly = true;
+            clientFormIdLecznicy.style.backgroundColor = '#eee'; 
+        }
+
+        clientFormModal.style.display = 'flex';
+        clientFormNazwa.focus();
+    });
 }
 
 /**
