@@ -2280,6 +2280,38 @@ table {
         font-size: 8pt;
     }
 }
+/* --- STYLE DASHBOARDU --- */
+.dashboard-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    width: 90%;
+    max-width: 400px;
+    margin-bottom: 20px;
+    justify-content: space-between;
+}
+
+.dash-card {
+    flex: 1 1 30%; /* Trzy kafelki w rzędzie lub zawijanie */
+    min-width: 100px;
+    background: #fff;
+    border-radius: 10px;
+    padding: 10px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    border-bottom: 3px solid #ccc;
+}
+
+.dash-card.green { border-bottom-color: #27ae60; }
+.dash-card.orange { border-bottom-color: #f39c12; }
+.dash-card.red { border-bottom-color: #c0392b; }
+
+.dash-icon { font-size: 24px; margin-bottom: 5px; }
+.dash-label { font-size: 11px; color: #666; display: block; margin-bottom: 2px; }
+.dash-value { font-size: 18px; color: #333; font-weight: 800; }
 </style>
     <div id="calcProductSearchModal" class="product-search-modal" style="display: none; z-index: 10003;">
     <div class="product-search-card">
@@ -2695,6 +2727,31 @@ background-color: #eef;
 </div>
 <div id="mainMenuSection" style="display: none; flex-direction: column; align-items: center; justify-content: flex-start; padding-top: 30px; width: 100%; box-sizing: border-box;">
   <h2 style="font-size: 24px; color: #333; margin-bottom: 25px;">Menu Główne</h2>
+ <div id="dashboardStats" class="dashboard-container" style="display: none;">
+    <div class="dash-card green">
+        <span class="dash-icon">📅</span>
+        <div class="dash-info">
+            <span class="dash-label">Wizyty dzisiaj</span>
+            <strong id="dashVisitsCount" class="dash-value">0</strong>
+        </div>
+    </div>
+    
+    <div class="dash-card orange">
+        <span class="dash-icon">📦</span>
+        <div class="dash-info">
+            <span class="dash-label">Niski stan leków</span>
+            <strong id="dashStockCount" class="dash-value">0</strong>
+        </div>
+    </div>
+
+    <div class="dash-card red">
+        <span class="dash-icon">💰</span>
+        <div class="dash-info">
+            <span class="dash-label">Niespłacone długi</span>
+            <strong id="dashDebtCount" class="dash-value">0 zł</strong>
+        </div>
+    </div>
+</div>
   <button id="menuKalendarzBtn" class="menu-btn">🗓️ Kalendarz wizyt</button>
   <button id="menuKartaBtn" class="menu-btn">📝 Generator kart leczenia</button>
   <button id="menuKalkulatorBtn" class="menu-btn">🧮 Kalkulator wizyty</button>
@@ -4307,8 +4364,19 @@ appId: "1:420035668375:web:712c93f1765729b39bbcd2"
 
 // Inicjalizuj Firebase tylko raz
 if (!firebase.apps.length) {
-firebase.initializeApp(firebaseConfig);
+    firebase.initializeApp(firebaseConfig);
 }
+
+// ✅ WŁĄCZENIE TRYBU OFFLINE (PERSISTENCE)
+firebase.firestore().enablePersistence()
+    .catch((err) => {
+        if (err.code == 'failed-precondition') {
+            console.warn('Tryb offline nie zadziałał: Otwarto aplikację w wielu kartach.');
+        } else if (err.code == 'unimplemented') {
+            console.warn('Twoja przeglądarka nie obsługuje trybu offline.');
+        }
+    });
+
 const db = firebase.firestore();
 const auth = firebase.auth();
 console.log("Firebase gotowy do działania.");
@@ -18605,6 +18673,75 @@ if (helpModal) {
     });
 }
 /* ======================================================== */
+/* ======================================================== */
+/* ✅ LOGIKA DASHBOARDU (Pulpit Sterowania)                 */
+/* ======================================================== */
+
+async function updateDashboard() {
+    console.log("Aktualizacja Dashboardu...");
+    const dashboardStats = document.getElementById('dashboardStats');
+    if (!dashboardStats || !currentUserProfile) return;
+
+    // Pokaż dashboard
+    dashboardStats.style.display = 'flex';
+
+    // 1. WIZYTY DZISIAJ
+    // Pobieramy z kolekcji wizyt, jeśli nie mamy ich w cache
+    try {
+        const todayISO = new Date().toISOString().split('T')[0];
+        let countToday = 0;
+        
+        // Jeśli mamy załadowany kalendarz, użyj cache, jeśli nie - szybkie zapytanie
+        if (allFetchedVisits && allFetchedVisits.length > 0) {
+             countToday = allFetchedVisits.filter(v => v.dataWizyty === todayISO && v.status === 'Nowa').length;
+        } else {
+             const q = db.collection("wizyty")
+                .where("lekarz_uid", "==", currentUserProfile.uid)
+                .where("dataWizyty", "==", todayISO)
+                .where("status", "==", "Nowa");
+             const snap = await q.get();
+             countToday = snap.size;
+        }
+        document.getElementById('dashVisitsCount').textContent = countToday;
+    } catch (e) { console.error("Błąd dash wizyty:", e); }
+
+    // 2. NISKI STAN LEKÓW (z cache magazynu)
+    try {
+        let lowStockCount = 0;
+        // Sprawdzamy czy magazyn jest załadowany
+        if (magazynCache.size === 0 && currentUserProfile.uzywaStanowMagazynowych) {
+             // Spróbuj załadować po cichu
+             await loadMagazynCache(currentUserProfile.uid);
+        }
+        
+        magazynCache.forEach(item => {
+            // Uznajemy stan < 5 za niski (możesz to zmienić)
+            if (item.stan <= 5) lowStockCount++;
+        });
+        document.getElementById('dashStockCount').textContent = lowStockCount;
+    } catch (e) { console.error("Błąd dash stan:", e); }
+
+    // 3. NIESPŁACONE DŁUGI (Suma)
+    try {
+        // Proste zapytanie o status "Dług" dla danego lekarza
+        const qDebt = db.collection("archiwumParagony")
+            .where("lekarz_uid", "==", currentUserProfile.uid)
+            .where("status", "==", "Dług");
+            
+        const snapDebt = await qDebt.get();
+        let totalDebt = 0;
+        snapDebt.forEach(doc => {
+            totalDebt += parseFloat(doc.data().suma) || 0;
+        });
+        
+        // Formatowanie kwoty
+        document.getElementById('dashDebtCount').textContent = totalDebt.toFixed(0) + " zł";
+    } catch (e) { 
+        console.error("Błąd dash długi:", e); 
+        // Jeśli błąd indeksu, pokaż myślnik
+        document.getElementById('dashDebtCount').textContent = "-";
+    }
+}
 </script> 
 </body>
 </html>
