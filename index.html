@@ -4215,7 +4215,7 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
         </div>
     </div>
 </div>
-    <button id="helpFloatingBtn" title="Instrukcja obsługi">?</button>
+    <button id="helpFloatingBtn" title="Instrukcja obsługi" style="display: none;">?</button>
 
 <div id="helpModal" class="product-search-modal" style="display: none; z-index: 20001;">
     <div class="form-card" style="width: 95vw; max-width: 800px; height: 90vh; display: flex; flex-direction: column;">
@@ -6498,6 +6498,11 @@ function showMainMenu() {
     if (archiwumKartySection) archiwumKartySection.style.display = 'none';
     if (archiwumParagonySection) archiwumParagonySection.style.display = 'none';
     if (raportySection) raportySection.style.display = 'none';
+    // Ukryj sekcje dodane w modułach (Kalendarz, Schematy, Magazyn, Zarządzanie)
+    if (typeof kalendarzWizytSection !== 'undefined' && kalendarzWizytSection) kalendarzWizytSection.style.display = 'none';
+    if (typeof bazaSchematowSection !== 'undefined' && bazaSchematowSection) bazaSchematowSection.style.display = 'none';
+    if (typeof mojMagazynSection !== 'undefined' && mojMagazynSection) mojMagazynSection.style.display = 'none';
+    if (typeof zarzadzanieMagazynamiSection !== 'undefined' && zarzadzanieMagazynamiSection) zarzadzanieMagazynamiSection.style.display = 'none';
 
     // 2. Pokaż menu, ukryj pasek zakładek
     if (mainTabBar) mainTabBar.style.display = 'none';
@@ -6507,11 +6512,14 @@ function showMainMenu() {
     if (bazaSubMenu) bazaSubMenu.style.display = 'none';
     if (archiwumSubMenu) archiwumSubMenu.style.display = 'none';
 
-    // 4. ✅ KLUCZOWY KROK: Ustaw pułapkę
+    // ✅ 4. POKAŻ PRZYCISK POMOCY (Tylko w menu)
+    const helpBtn = document.getElementById('helpFloatingBtn');
+    if (helpBtn) helpBtn.style.display = 'flex';
+
+    // 5. Ustaw pułapkę przycisku wstecz
     console.log("Ustawianie pułapki 'back' na menu głównym.");
-    // Wypychamy nowy, fałszywy stan do historii
     history.pushState({ page: 'mainMenu' }, 'Menu Główne', '#menu'); 
-    isMainMenuTrapActive = true; // Aktywujemy nasz listener z Kroku 1
+    isMainMenuTrapActive = true; 
 }
 // ⬆️ ⬆️ ⬆️ KONIEC KODU Z PUNKTU 2 ⬆️ ⬆️ ⬆️
 /* Plik: index.html (zastąp całą funkcję showSection, ok. linii 1170) */
@@ -6523,7 +6531,9 @@ function showMainMenu() {
 /* ⬇️ WKLEJ TEN KOD ⬇️ */
 
 function showSection(sectionToShow) {
-    // ✅ POCZĄTEK ZABEZPIECZENIA
+  const helpBtn = document.getElementById('helpFloatingBtn');
+if (helpBtn) helpBtn.style.display = 'none';
+    // ✅ POCZĄTEK ZABEZPIECZENIA
   // ... (linia isMainMenuTrapActive = false; jeśli ją dodałeś) ...
   // ✅ KONIEC ZABEZPIECZENIA
 
@@ -9090,11 +9100,10 @@ if (zapisanyPodpisBase64) {
     konfigPreviewImg.style.display = 'none';
 }
 // --- Koniec wczytywania podpisu ---
-    
-    konfiguracjaFormInicjaly.value = ''; 
-        // ✅ MODYFIKACJA: Dynamicznie wypełnij role PRZED ustawieniem wartości
-        populateRolaSelect();
-        konfiguracjaFormRola.value = data.Rola || 'pracownik';
+
+            // ✅ MODYFIKACJA: Dynamicznie wypełnij role PRZED ustawieniem wartości
+            populateRolaSelect();
+            konfiguracjaFormRola.value = data.Rola || 'pracownik';
         // ✅ POCZĄTEK MODUŁU 2: Wczytywanie stanu checkboxów
         document.getElementById('konfigFormUzywaMagazynu').checked = data.uzywaStanowMagazynowych || false;
         document.getElementById('konfigFormMozeDoladowac').checked = data.mozeDoladowacWlasnyMagazyn || false;
