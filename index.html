@@ -6557,35 +6557,41 @@ if (mainTabBar) mainTabBar.style.display = 'none';
  * Pokazuje menu główne i AKTYWUJE pułapkę przycisku "wstecz".
  */
 function showMainMenu() {
-    // 1. Ukryj wszystkie inne sekcje
-    if (kartaSection) kartaSection.style.display = 'none';
-    if (kalkulatorSection) kalkulatorSection.style.display = 'none';
-    if (bazaKlientowSection) bazaKlientowSection.style.display = 'none'; 
-    if (bazaProduktowSection) bazaProduktowSection.style.display = 'none';
-    if (konfiguracjaSection) konfiguracjaSection.style.display = 'none';
-    if (archiwumKartySection) archiwumKartySection.style.display = 'none';
-    if (archiwumParagonySection) archiwumParagonySection.style.display = 'none';
-    if (raportySection) raportySection.style.display = 'none';
-    // Ukryj sekcje dodane w modułach (Kalendarz, Schematy, Magazyn, Zarządzanie)
-    if (typeof kalendarzWizytSection !== 'undefined' && kalendarzWizytSection) kalendarzWizytSection.style.display = 'none';
-    if (typeof bazaSchematowSection !== 'undefined' && bazaSchematowSection) bazaSchematowSection.style.display = 'none';
-    if (typeof mojMagazynSection !== 'undefined' && mojMagazynSection) mojMagazynSection.style.display = 'none';
-    if (typeof zarzadzanieMagazynamiSection !== 'undefined' && zarzadzanieMagazynamiSection) zarzadzanieMagazynamiSection.style.display = 'none';
+    // 1. Ukryj wszystkie inne sekcje (Reset widoku)
+    const sectionsToHide = [
+        kartaSection, kalkulatorSection, bazaKlientowSection, 
+        bazaProduktowSection, konfiguracjaSection, archiwumKartySection, 
+        archiwumParagonySection, raportySection, 
+        // Sprawdzamy czy zmienne istnieją zanim je ukryjemy (dla bezpieczeństwa)
+        (typeof kalendarzWizytSection !== 'undefined' ? kalendarzWizytSection : null),
+        (typeof bazaSchematowSection !== 'undefined' ? bazaSchematowSection : null),
+        (typeof mojMagazynSection !== 'undefined' ? mojMagazynSection : null),
+        (typeof zarzadzanieMagazynamiSection !== 'undefined' ? zarzadzanieMagazynamiSection : null)
+    ];
+
+    sectionsToHide.forEach(sec => {
+        if (sec) sec.style.display = 'none';
+    });
 
     // 2. Pokaż menu, ukryj pasek zakładek
     if (mainTabBar) mainTabBar.style.display = 'none';
     if (mainMenuSection) mainMenuSection.style.display = 'flex';
 
-    // 3. Ukryj podmenu (na wszelki wypadek)
+    // 3. Ukryj podmenu
     if (bazaSubMenu) bazaSubMenu.style.display = 'none';
     if (archiwumSubMenu) archiwumSubMenu.style.display = 'none';
 
-    // ✅ 4. POKAŻ PRZYCISK POMOCY (Tylko w menu)
+    // 4. POKAŻ PRZYCISK POMOCY (Tylko w menu)
     const helpBtn = document.getElementById('helpFloatingBtn');
     if (helpBtn) helpBtn.style.display = 'flex';
 
-    // 5. Ustaw pułapkę przycisku wstecz
-    console.log("Ustawianie pułapki 'back' na menu głównym.");
+    // ✅ 5. URUCHOM KAFELKI (DASHBOARD)
+    // To jest ta linijka, której brakowało!
+    if (typeof updateDashboard === 'function') {
+        updateDashboard(); 
+    }
+
+    // 6. Ustaw pułapkę przycisku wstecz
     history.pushState({ page: 'mainMenu' }, 'Menu Główne', '#menu'); 
     isMainMenuTrapActive = true; 
 }
@@ -18739,6 +18745,73 @@ async function updateDashboard() {
     } catch (e) { 
         console.error("Błąd dash długi:", e); 
         // Jeśli błąd indeksu, pokaż myślnik
+        document.getElementById('dashDebtCount').textContent = "-";
+    }
+}
+    /* ======================================================== */
+/* ✅ LOGIKA DASHBOARDU (Pulpit Sterowania)                 */
+/* ======================================================== */
+
+async function updateDashboard() {
+    console.log("Aktualizacja Dashboardu...");
+    const dashboardStats = document.getElementById('dashboardStats');
+    
+    // Zabezpieczenie: jeśli nie ma elementu lub usera, nie rób nic
+    if (!dashboardStats || !currentUserProfile) return;
+
+    // 1. ✅ KLUCZOWE: Pokaż dashboard (zmień display: none na flex)
+    dashboardStats.style.display = 'flex';
+
+    // 2. Oblicz WIZYTY DZISIAJ
+    try {
+        const todayISO = new Date().toISOString().split('T')[0];
+        let countToday = 0;
+        
+        // Sprawdź czy mamy wizyty w pamięci, jak nie to pobierz z bazy
+        if (typeof allFetchedVisits !== 'undefined' && allFetchedVisits.length > 0) {
+             countToday = allFetchedVisits.filter(v => v.dataWizyty === todayISO && v.status === 'Nowa').length;
+        } else {
+             const q = db.collection("wizyty")
+                .where("lekarz_uid", "==", currentUserProfile.uid)
+                .where("dataWizyty", "==", todayISO)
+                .where("status", "==", "Nowa");
+             const snap = await q.get();
+             countToday = snap.size;
+        }
+        document.getElementById('dashVisitsCount').textContent = countToday;
+    } catch (e) { console.error("Błąd dash wizyty:", e); }
+
+    // 3. Oblicz NISKI STAN LEKÓW
+    try {
+        let lowStockCount = 0;
+        if (currentUserProfile.uzywaStanowMagazynowych) {
+            // Jeśli cache jest pusty, spróbuj go załadować
+            if (typeof magazynCache !== 'undefined' && magazynCache.size === 0) {
+                 await loadMagazynCache(currentUserProfile.uid);
+            }
+            if (typeof magazynCache !== 'undefined') {
+                magazynCache.forEach(item => {
+                    if (item.stan <= 5) lowStockCount++;
+                });
+            }
+        }
+        document.getElementById('dashStockCount').textContent = lowStockCount;
+    } catch (e) { console.error("Błąd dash stan:", e); }
+
+    // 4. Oblicz NIESPŁACONE DŁUGI
+    try {
+        const qDebt = db.collection("archiwumParagony")
+            .where("lekarz_uid", "==", currentUserProfile.uid)
+            .where("status", "==", "Dług");
+            
+        const snapDebt = await qDebt.get();
+        let totalDebt = 0;
+        snapDebt.forEach(doc => {
+            totalDebt += parseFloat(doc.data().suma) || 0;
+        });
+        document.getElementById('dashDebtCount').textContent = totalDebt.toFixed(0) + " zł";
+    } catch (e) { 
+        console.error("Błąd dash długi:", e); 
         document.getElementById('dashDebtCount').textContent = "-";
     }
 }
