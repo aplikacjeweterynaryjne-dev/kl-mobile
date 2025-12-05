@@ -7740,44 +7740,36 @@ async function loadMagazynCache(uid) {
 
     console.log(`Moduł 3: Pomyślnie załadowano ${magazynCache.size} pozycji do magazynCache.`);
 }
-async function loadAndCacheClients() {
-if (!klientTableBody) return;
+/* ✅ MODUŁ WIELODOSTĘPNOŚCI (Formularz Klienta) */
+if (addNewClientBtn) {
+    addNewClientBtn.addEventListener('click', () => {
+        clientFormTitle.textContent = 'Dodaj nowego klienta';
+        clientFormDocId.value = ''; 
+        clientFormNazwa.value = '';
+        clientFormAdres.value = '';
+        clientFormNrStada.value = '';
+        clientFormTelefon.value = '';
+        clientFormEmail.value = '';
+        
+        // 1. Automatyczne ID Lecznicy
+        if (currentUserProfile && currentUserProfile['ID lecznicy']) {
+            clientFormIdLecznicy.value = currentUserProfile['ID lecznicy'];
+        } else {
+            clientFormIdLecznicy.value = '';
+        }
 
-// Pokaż komunikat ładowania
-klientTableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 10px;">Ładowanie danych z bazy... <span class="spinner">⏳</span></td></tr>';
-// Opcjonalnie: Zablokuj przyciski podczas ładowania
-if(loadClientsBtn) loadClientsBtn.disabled = true;
-if(refreshClientsBtn) refreshClientsBtn.disabled = true;
+        // 2. Blokada pola (chyba że admin)
+        if (currentUserProfile && currentUserProfile.Rola === 'administrator') {
+            clientFormIdLecznicy.readOnly = false;
+            clientFormIdLecznicy.style.backgroundColor = '#fff';
+        } else {
+            clientFormIdLecznicy.readOnly = true;
+            clientFormIdLecznicy.style.backgroundColor = '#eee'; // Szare tło = zablokowane
+        }
 
-try {
-console.log("Pobieranie klientów z Firestore...");
-const snapshot = await db.collection("klienci").get();
-
-if (snapshot.empty) {
-console.log("Baza klientów jest pusta.");
-cachedClients = []; // Zapisz pustą tablicę do cache
-renderClientTable(cachedClients); // Wyrenderuj komunikat o braku danych
-} else {
-console.log(`Pobrano ${snapshot.size} klientów.`);
-// Przekształć dokumenty i zapisz do cache
-cachedClients = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-console.log("Dane klientów zapisane w cache.");
-renderClientTable(cachedClients); // Wyrenderuj tabelę z nowymi danymi
-}
-} catch (error) {
-console.error("Błąd podczas ładowania klientów z Firestore: ", error);
-klientTableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 10px; color: red;">Wystąpił błąd podczas ładowania danych. Spróbuj ponownie lub sprawdź konsolę (F12).</td></tr>';
-cachedClients = null; // Wyczyść cache w razie błędu
-// Pokaż przycisk Wczytaj, ukryj resztę w razie błędu
-if(clientSearchRow) clientSearchRow.style.display = 'none';
-if(importActionsContainer) importActionsContainer.style.display = 'none';
-if(loadClientsBtn) loadClientsBtn.style.display = 'inline-block';
-if(refreshClientsBtn) refreshClientsBtn.style.display = 'none';
-} finally {
-// Odblokuj przyciski po zakończeniu (sukcesie lub błędzie)
-if(loadClientsBtn) loadClientsBtn.disabled = false;
-if(refreshClientsBtn) refreshClientsBtn.disabled = false;
-}
+        clientFormModal.style.display = 'flex';
+        clientFormNazwa.focus();
+    });
 }
 /**
 * Odświeża globalne listy i mapy produktów (używane w Karcie Leczenia i Kalkulatorze).
@@ -7891,59 +7883,144 @@ if(refreshProductsBtn) refreshProductsBtn.style.display = 'inline-block';
 /**
 * Pobiera dane produktów ('leki') z Firestore, zapisuje do cache i wywołuje renderowanie.
 */
+/* ✅ MODUŁ WIELODOSTĘPNOŚCI (Produkty) */
 async function loadAndCacheProducts() {
-if (!produktTableBody) return;
+    if (!produktTableBody || !currentUserProfile) return;
 
-produktTableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 10px;">Ładowanie danych produktów... <span class="spinner">⏳</span></td></tr>';
-if(loadProductsBtn) loadProductsBtn.disabled = true;
-if(refreshProductsBtn) refreshProductsBtn.disabled = true;
+    // Pobierz ID lecznicy
+    let userClinicId = currentUserProfile['ID lecznicy'];
+    // Jeśli to nie admin i brak ID lecznicy - błąd
+    if (!userClinicId && currentUserProfile.Rola !== 'administrator') {
+        console.error("Brak ID lecznicy w profilu. Nie można wczytać produktów.");
+        return;
+    }
 
-try {
-console.log("Pobieranie produktów (leków) z Firestore...");
-const snapshot = await db.collection("leki").get(); // Pobierz z kolekcji 'leki'
+    produktTableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 10px;">Ładowanie produktów... <span class="spinner">⏳</span></td></tr>';
+    if(loadProductsBtn) loadProductsBtn.disabled = true;
+    if(refreshProductsBtn) refreshProductsBtn.disabled = true;
 
-if (snapshot.empty) {
-console.log("Baza produktów (leków) jest pusta.");
-cachedProducts = [];
-renderProductTable(cachedProducts);
-} else {
-console.log(`Pobrano ${snapshot.size} produktów.`);
-cachedProducts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-console.log("Dane produktów zapisane w cache.");
-renderProductTable(cachedProducts);
+    try {
+        console.log(`Pobieranie produktów dla ID Lecznicy: ${userClinicId || 'ADMIN'}`);
+        
+        let q = db.collection("leki");
+        
+        // 1. FILTRACJA: Jeśli nie admin, pobierz tylko "swoje" leki
+        if (currentUserProfile.Rola !== 'administrator') {
+            q = q.where("id_lecznicy", "==", userClinicId);
+        }
+
+        const snapshot = await q.get();
+
+        if (snapshot.empty) {
+            console.log("Twoja baza produktów jest pusta.");
+            cachedProducts = [];
+            renderProductTable(cachedProducts);
+            
+            // 2. LOGIKA IMPORTU BAZY WZORCOWEJ
+            // Jeśli to właściciel i baza jest pusta -> Zaproponuj import
+            if (currentUserProfile.Rola === 'właściciel' || currentUserProfile.Rola === 'administrator') {
+                if (confirm("Twoja baza produktów jest pusta.\n\nCzy chcesz załadować domyślną bazę leków (Bazę Wzorcową)?\n\nOperacja skopiuje około 2000 produktów do Twojej prywatnej bazy.")) {
+                    await importDefaultDatabaseToClinic(userClinicId);
+                    return; // Funkcja importująca wywoła ponownie to ładowanie
+                }
+            }
+
+        } else {
+            console.log(`Pobrano ${snapshot.size} produktów.`);
+            cachedProducts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            renderProductTable(cachedProducts);
+        }
+
+        // 3. Budowanie map (dla walidacji i magazynu)
+        produktyGlowneCache.clear();
+        productIDtoNameMap.clear();
+        if (cachedProducts) {
+            cachedProducts.forEach(p => {
+                if (p.id && p.nazwa) {
+                    produktyGlowneCache.set(p.nazwa, p.id);
+                    productIDtoNameMap.set(p.id, p.nazwa);
+                }
+            });
+        }
+        
+        refreshProductDataLists();
+
+    } catch (error) {
+        console.error("Błąd podczas ładowania produktów:", error);
+        if (error.code === 'failed-precondition') {
+             alert("BŁĄD: Wymagany indeks Firestore dla produktów. Sprawdź konsolę (F12).");
+        }
+        produktTableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: red;">Błąd ładowania danych.</td></tr>';
+    } finally {
+        if(loadProductsBtn) loadProductsBtn.disabled = false;
+        if(refreshProductsBtn) refreshProductsBtn.disabled = false;
+    }
 }
-// Po udanym załadowaniu i renderowaniu, odśwież globalne listy
-// ✅ POCZĄTEK MODUŁU 7: Budowanie map ID <-> Nazwa
-        produktyGlowneCache.clear();
-        productIDtoNameMap.clear();
-        if (cachedProducts) {
-            cachedProducts.forEach(p => {
-                if (p.id && p.nazwa) {
-                    produktyGlowneCache.set(p.nazwa, p.id); // Mapa Nazwa -> ID
-                    productIDtoNameMap.set(p.id, p.nazwa); // Mapa ID -> Nazwa
-                }
-            });
-        }
-        console.log(`Moduł 7: Zbudowano mapy produktów (ID <-> Nazwa): ${produktyGlowneCache.size} pozycji.`);
-        // ✅ KONIEC MODUŁU 7
 
-// Po udanym załadowaniu i renderowaniu, odśwież globalne listy
-refreshProductDataLists();
+/**
+ * ✅ NOWA FUNKCJA POMOCNICZA: Kopiuje produkty z 'leki_wzorcowe' do 'leki'
+ */
+async function importDefaultDatabaseToClinic(targetClinicId) {
+    if (!targetClinicId) {
+        alert("Błąd: Brak ID Twojej lecznicy. Nie można przypisać produktów.");
+        return;
+    }
+    
+    produktTableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 20px;">Kopiowanie bazy wzorcowej... To może potrwać do minuty. ⏳</td></tr>';
+    
+    try {
+        // Pobierz bazę wzorcową
+        const sourceSnapshot = await db.collection("leki_wzorcowe").get();
+        
+        if (sourceSnapshot.empty) {
+            alert("Błąd krytyczny: Baza wzorcowa ('leki_wzorcowe') nie istnieje w systemie!");
+            loadAndCacheProducts(); 
+            return;
+        }
 
-} catch (error) {
-console.error("Błąd podczas ładowania produktów z Firestore: ", error);
-produktTableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 10px; color: red;">Wystąpił błąd podczas ładowania danych. Spróbuj ponownie lub sprawdź konsolę (F12).</td></tr>';
-cachedProducts = null;
-// Pokaż przycisk Wczytaj, ukryj resztę w razie błędu
-if(productSearchRow) productSearchRow.style.display = 'none';
-if(addNewProductBtn) addNewProductBtn.style.display = 'none';
-if(productImportActionsContainer) productImportActionsContainer.style.display = 'none';
-if(loadProductsBtn) loadProductsBtn.style.display = 'inline-block';
-if(refreshProductsBtn) refreshProductsBtn.style.display = 'none';
-} finally {
-if(loadProductsBtn) loadProductsBtn.disabled = false;
-if(refreshProductsBtn) refreshProductsBtn.disabled = false;
-}
+        console.log(`Rozpoczynam kopiowanie ${sourceSnapshot.size} produktów...`);
+        
+        const batchSize = 450; 
+        let batch = db.batch();
+        let counter = 0;
+        let totalCopied = 0;
+
+        for (const doc of sourceSnapshot.docs) {
+            const data = doc.data();
+            
+            // Stwórz kopię produktu z TWOIM id_lecznicy
+            const newProductData = {
+                ...data,
+                id_lecznicy: targetClinicId,
+                stanMagazynowy: 0 // Reset stanu na start
+            };
+            
+            const newDocRef = db.collection("leki").doc();
+            batch.set(newDocRef, newProductData);
+            
+            counter++;
+            totalCopied++;
+
+            if (counter >= batchSize) {
+                await batch.commit();
+                batch = db.batch();
+                counter = 0;
+                console.log(`Zapisano partię ${totalCopied} produktów...`);
+            }
+        }
+
+        if (counter > 0) {
+            await batch.commit();
+        }
+
+        alert(`Sukces! Skopiowano ${totalCopied} produktów. Twoja baza jest gotowa.`);
+        loadAndCacheProducts(); // Odśwież widok
+
+    } catch (error) {
+        console.error("Błąd podczas importu bazy wzorcowej:", error);
+        alert("Wystąpił błąd podczas kopiowania bazy.");
+        loadAndCacheProducts();
+    }
 }
 /**
 * Przycisk "Dodaj nowego klienta" - otwiera pusty modal
@@ -8530,86 +8607,96 @@ console.log("Anulowano edycję/dodawanie produktu.");
 /**
 * Przycisk "Zapisz" w modalu produktu (obsługuje Dodawanie i Aktualizację)
 */
+
 if (saveProductBtn) {
-saveProductBtn.addEventListener('click', async () => {
-const nazwa = productFormNazwa.value.trim();
-const plu = productFormPlu.value.trim();
-// Przekształć cenę i stan na liczby, domyślnie 0 jeśli puste lub błędne
-const cena = parseFloat(productFormCena.value) || 0;
-const dawkowanie = productFormDawkowanie.value.trim();
-const karencja = productFormKarencja.value.trim();
-const stanMagazynowy = parseInt(productFormStan.value) || 0;
+    saveProductBtn.addEventListener('click', async () => {
+        const nazwa = productFormNazwa.value.trim();
+        const plu = productFormPlu.value.trim();
+        // Przekształć cenę i stan na liczby, domyślnie 0 jeśli puste lub błędne
+        const cena = parseFloat(productFormCena.value) || 0;
+        const dawkowanie = productFormDawkowanie.value.trim();
+        const karencja = productFormKarencja.value.trim();
+        const stanMagazynowy = parseInt(productFormStan.value) || 0;
 
-const docId = productFormDocId.value; // ID edytowanego produktu lub pusty
+        const docId = productFormDocId.value; // ID edytowanego produktu lub pusty
 
-if (!nazwa) {
-alert('Nazwa produktu jest wymagana.');
-productFormNazwa.focus();
-return;
-}
+        if (!nazwa) {
+            alert('Nazwa produktu jest wymagana.');
+            productFormNazwa.focus();
+            return;
+        }
 
-const productData = {
-nazwa: nazwa,
-plu: plu,
-cena: cena, // Zapisz jako liczbę
-dawkowanie: dawkowanie,
-karencja: karencja,
-stanMagazynowy: stanMagazynowy // Zapisz jako liczbę
-// nrSerii nie jest częścią tej kolekcji
-};
+        // ✅ KROK D (NOWOŚĆ): Pobieramy ID lecznicy zalogowanego użytkownika
+        const userClinicId = currentUserProfile['ID lecznicy'];
+        
+        // Zabezpieczenie: Jeśli to nie administrator i brakuje ID, blokujemy zapis
+        if (!userClinicId && currentUserProfile.Rola !== 'administrator') {
+            alert("Błąd: Nie można zapisać produktu bez przypisanej lecznicy.");
+            return;
+        }
 
-console.log(`Próba zapisu produktu. ID: ${docId || '(nowy)'}`, productData);
-saveProductBtn.disabled = true;
-saveProductBtn.textContent = 'Zapisywanie...';
+        const productData = {
+            id_lecznicy: userClinicId, // <--- TO JEST KLUCZOWA ZMIANA
+            nazwa: nazwa,
+            plu: plu,
+            cena: cena, 
+            dawkowanie: dawkowanie,
+            karencja: karencja,
+            stanMagazynowy: stanMagazynowy 
+        };
 
-try {
-let savedDocId = docId; // Zmienna do przechowywania ID po zapisie
-if (docId) {
-// --- Tryb Aktualizacji (UPDATE) ---
-console.log(`Aktualizowanie produktu ${docId}...`);
-await db.collection("leki").doc(docId).update(productData);
-showToast('Produkt zaktualizowany.', 'success');
-console.log(`Produkt ${docId} zaktualizowany.`);
-// Zaktualizuj wpis w cache
-if (cachedProducts) {
-const index = cachedProducts.findIndex(p => p.id === docId);
-if (index !== -1) {
-cachedProducts[index] = { id: docId, ...productData };
-}
-}
-} else {
-// --- Tryb Dodawania (CREATE) ---
-console.log("Dodawanie nowego produktu...");
-const docRef = await db.collection("leki").add(productData);
-savedDocId = docRef.id; // Pobierz ID nowo dodanego dokumentu
-showToast('Nowy produkt dodany.', 'success');
-console.log(`Produkt dodany z ID: ${savedDocId}.`);
-// Dodaj nowy wpis do cache
-if (cachedProducts) {
-cachedProducts.push({ id: savedDocId, ...productData });
-} else {
-cachedProducts = [{ id: savedDocId, ...productData }]; // Zainicjuj cache jeśli był pusty
-}
-}
+        console.log(`Próba zapisu produktu. ID: ${docId || '(nowy)'}`, productData);
+        saveProductBtn.disabled = true;
+        saveProductBtn.textContent = 'Zapisywanie...';
 
-productFormModal.style.display = 'none'; // Zamknij modal
+        try {
+            let savedDocId = docId; // Zmienna do przechowywania ID po zapisie
+            if (docId) {
+                // --- Tryb Aktualizacji (UPDATE) ---
+                console.log(`Aktualizowanie produktu ${docId}...`);
+                await db.collection("leki").doc(docId).update(productData);
+                showToast('Produkt zaktualizowany.', 'success');
+                console.log(`Produkt ${docId} zaktualizowany.`);
+                // Zaktualizuj wpis w cache
+                if (cachedProducts) {
+                    const index = cachedProducts.findIndex(p => p.id === docId);
+                    if (index !== -1) {
+                        cachedProducts[index] = { id: docId, ...productData };
+                    }
+                }
+            } else {
+                // --- Tryb Dodawania (CREATE) ---
+                console.log("Dodawanie nowego produktu...");
+                const docRef = await db.collection("leki").add(productData);
+                savedDocId = docRef.id; // Pobierz ID nowo dodanego dokumentu
+                showToast('Nowy produkt dodany.', 'success');
+                console.log(`Produkt dodany z ID: ${savedDocId}.`);
+                // Dodaj nowy wpis do cache
+                if (cachedProducts) {
+                    cachedProducts.push({ id: savedDocId, ...productData });
+                } else {
+                    cachedProducts = [{ id: savedDocId, ...productData }]; // Zainicjuj cache jeśli był pusty
+                }
+            }
 
-// Odśwież tabelę z danych w cache i odśwież globalne listy
-if (cachedProducts) {
-renderProductTable(cachedProducts);
-refreshProductDataLists();
-} else {
-loadAndCacheProducts(); // Jeśli cache był pusty, załaduj wszystko
-}
+            // Zamknij modal i odśwież widok
+            productFormModal.style.display = 'none'; 
+            
+            if (cachedProducts) {
+                renderProductTable(cachedProducts);
+                refreshProductDataLists();
+            } else {
+                loadAndCacheProducts(); 
+            }
 
-} catch (error) {
-console.error('Błąd zapisu produktu: ', error);
-alert('Wystąpił błąd podczas zapisu danych produktu.');
-} finally {
-saveProductBtn.disabled = false;
-saveProductBtn.textContent = 'Zapisz';
-}
-});
+        } catch (error) {
+            console.error('Błąd zapisu produktu: ', error);
+            alert('Wystąpił błąd podczas zapisu danych produktu.');
+        } finally {
+            saveProductBtn.disabled = false;
+            saveProductBtn.textContent = 'Zapisz';
+        }
+    });
 }
 // ✅ KONIEC: LOGIKA CRUD DLA BAZY PRODUKTÓW
 // ========================================================
