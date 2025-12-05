@@ -3809,10 +3809,9 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
             <label for="magazynSearchInput">Filtruj produkty:</label>
             <input type="search" id="magazynSearchInput" placeholder="Wpisz nazwę produktu...">
         </div>
-        <div id="magazynActionButtons" style="display: flex; gap: 8px;">
-    <button id="magazynBtnSzybkieDoladowanie" class="btn primary small">⚡ Tryb Szybkiego Doładowania</button>
-    <button id="magazynBtnZapiszDoladowanie" class="btn primary small" style="display: none; background-color: #27ae60; border-color: #229954;">💾 Zapisz Doładowanie</button>
-    <button id="magazynBtnAnulujDoladowanie" class="btn ghost small" style="display: none;">❌ Anuluj</button>
+    <div id="magazynActionButtons" style="display: flex; gap: 8px;">
+    <button id="btnOpenDoladowanie" class="btn primary small" style="background-color: #27ae60; border-color: #229954;">➕ Doładowanie</button>
+    <button id="btnOpenInwentaryzacja" class="btn small" style="background-color: #f39c12; border-color: #e67e22; color: white;">📋 Inwentaryzacja</button>
 </div>
     </div>
 
@@ -3878,10 +3877,10 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
                 <input type="search" id="zarzadzanieSearchInput" placeholder="Wpisz nazwę produktu...">
             </div>
             <div id="zarzadzanieActionButtons" style="display: flex; gap: 8px;">
-                <button id="zarzadzanieBtnSzybkieDoladowanie" class="btn primary small">⚡ Tryb Szybkiego Doładowania</button>
-                <button id="zarzadzanieBtnZapiszDoladowanie" class="btn primary small" style="display: none; background-color: #27ae60; border-color: #229954;">💾 Zapisz Doładowanie</button>
-                <button id="zarzadzanieBtnAnulujDoladowanie" class="btn ghost small" style="display: none;">❌ Anuluj</button>
-            </div>
+    <button id="btnAdminOpenDoladowanie" class="btn primary small" style="background-color: #27ae60; border-color: #229954;">➕ Doładowanie</button>
+    <button id="btnAdminOpenInwentaryzacja" class="btn small" style="background-color: #f39c12; border-color: #e67e22; color: white;">📋 Inwentaryzacja</button>
+    <button id="zarzadzanieBtnWyczyscLogi" class="btn warn small">🗑️ Wyczyść Logi</button>
+</div>
         </div>
 
         <div class="table-container">
@@ -11464,6 +11463,30 @@ const magazynTableBody = document.getElementById('magazynTableBody');
 const magazynLogTableBody = document.getElementById('magazynLogTableBody');
 let magazynLogCache = []; // Cache dla pełnej historii (logów)
 let produktyGlowneCache = new Map(); // Cache dla głównej listy produktów (Nazwa -> ID)
+// --- Zmienne dla Modala Operacji Magazynowych ---
+const magazynOperationModal = document.getElementById('magazynOperationModal');
+const magazynOpTitle = document.getElementById('magazynOpTitle');
+const magazynOpSubtitle = document.getElementById('magazynOpSubtitle');
+const magazynOpProductInput = document.getElementById('magazynOpProductInput');
+const magazynOpProductDatalist = document.getElementById('magazynOpProductDatalist');
+const magazynOpQuantity = document.getElementById('magazynOpQuantity');
+const magazynOpUnit = document.getElementById('magazynOpUnit');
+const magazynOpAddBtn = document.getElementById('magazynOpAddBtn');
+const magazynOpListBody = document.getElementById('magazynOpListBody');
+const magazynOpEmptyMsg = document.getElementById('magazynOpEmptyMsg');
+const magazynOpCancelBtn = document.getElementById('magazynOpCancelBtn');
+const magazynOpConfirmBtn = document.getElementById('magazynOpConfirmBtn');
+
+// Przyciski otwierające
+const btnOpenDoladowanie = document.getElementById('btnOpenDoladowanie');
+const btnOpenInwentaryzacja = document.getElementById('btnOpenInwentaryzacja');
+const btnAdminOpenDoladowanie = document.getElementById('btnAdminOpenDoladowanie');
+const btnAdminOpenInwentaryzacja = document.getElementById('btnAdminOpenInwentaryzacja');
+
+// Stan operacji
+let currentOpMode = ''; // 'doladowanie' lub 'inwentaryzacja'
+let currentOpTargetUser = null; // Obiekt użytkownika (dla admina) lub null (dla siebie)
+let currentOpList = []; // Tablica obiektów { productId, name, quantity, unit }
 // ✅ POCZĄTEK MODUŁU 5: Zmienne Magazynu (Akcje)
 const magazynBtnSzybkieDoladowanie = document.getElementById('magazynBtnSzybkieDoladowanie');
 const magazynBtnZapiszDoladowanie = document.getElementById('magazynBtnZapiszDoladowanie');
@@ -15445,304 +15468,278 @@ document.querySelectorAll('#mojMagazynSection .sortable-table th[data-sort-key]'
 /* ✅ KONIEC: MODUŁ 4 - Logika "Mój Magazyn" */
 /* ======================================================== */
 /* ======================================================== */
-/* ✅ POCZĄTEK: MODUŁ 5 - Logika Akcji Magazynu */
+/* ✅ MODUŁ 5 (NOWY): Modal Operacji Magazynowych (Logic)   */
 /* ======================================================== */
 
-/**
- * Przełącza widok magazynu w tryb szybkiego doładowania (importu).
- */
-function toggleQuickTopUpMode(enable) {
-    console.log(`Moduł 5: Przełączanie trybu szybkiego doładowania na: ${enable}`);
-    isQuickTopUpMode = enable; // Ustaw flagę globalną
+// 1. Otwieranie Modala
+function openMagazynOperation(mode, targetUser = null) {
+    currentOpMode = mode;
+    currentOpTargetUser = targetUser;
+    currentOpList = []; // Reset listy
 
-    if (!magazynTable) return;
-
-    if (enable) {
-        // --- WŁĄCZ TRYB EDYCJI ---
-        magazynTable.classList.add('import-mode');
-        
-        // Pokaż/ukryj przyciski
-        magazynBtnSzybkieDoladowanie.style.display = 'none';
-        magazynBtnZapiszDoladowanie.style.display = 'inline-block';
-        magazynBtnAnulujDoladowanie.style.display = 'inline-block';
-        
-        // Ukryj tabelę logów, aby zrobić miejsce
-        document.getElementById('magazynLogTable').closest('.table-container').style.display = 'none';
-        document.querySelector('#mojMagazynSection h3').style.display = 'none'; // Ukryj tytuł "Historia"
-        document.getElementById('magazynBtnCofnijDoladowanie').style.display = 'none';
-
+    // Ustaw tytuły
+    const targetName = targetUser ? targetUser.nazwa : "Twój Magazyn";
+    
+    // Reset stylów przycisków
+    magazynOpConfirmBtn.classList.remove('warn');
+    
+    if (mode === 'doladowanie') {
+        magazynOpTitle.textContent = "➕ Doładowanie Magazynu";
+        magazynOpConfirmBtn.style.backgroundColor = "#27ae60";
+        magazynOpConfirmBtn.style.borderColor = "#229954";
+        magazynOpConfirmBtn.textContent = "Zatwierdź Doładowanie";
     } else {
-        // --- WYŁĄCZ TRYB EDYCJI ---
-        magazynTable.classList.remove('import-mode');
-
-        // Pokaż/ukryj przyciski
-        magazynBtnSzybkieDoladowanie.style.display = 'inline-block';
-        magazynBtnZapiszDoladowanie.style.display = 'none';
-        magazynBtnAnulujDoladowanie.style.display = 'none';
-        
-        // Pokaż tabelę logów
-        document.getElementById('magazynLogTable').closest('.table-container').style.display = 'block';
-        document.querySelector('#mojMagazynSection h3').style.display = 'block';
-        document.getElementById('magazynBtnCofnijDoladowanie').style.display = 'inline-block';
+        magazynOpTitle.textContent = "📋 Inwentaryzacja (Korekta)";
+        magazynOpConfirmBtn.style.backgroundColor = "#f39c12";
+        magazynOpConfirmBtn.style.borderColor = "#e67e22";
+        magazynOpConfirmBtn.textContent = "Zatwierdź Inwentaryzację";
     }
+    magazynOpSubtitle.textContent = `Operacja dla: ${targetName}`;
+
+    // Wyczyść formularz
+    if(magazynOpProductInput) magazynOpProductInput.value = '';
+    if(magazynOpQuantity) magazynOpQuantity.value = '';
+    if(magazynOpUnit) magazynOpUnit.textContent = '';
     
-    // Przerenderuj tabelę, aby pokazać/ukryć odpowiednie kolumny i inputy
-    renderMagazynTable();
+    // Wypełnij datalist produktami
+    populateOpDatalist();
+    renderOpList();
+
+    if(magazynOperationModal) magazynOperationModal.style.display = 'flex';
+    setTimeout(() => { if(magazynOpProductInput) magazynOpProductInput.focus(); }, 50);
 }
 
-/**
- * Logika przycisku "Zapisz Doładowanie".
- * Zbiera dane z inputów i zapisuje jako jeden log (batch).
- */
-async function handleSaveTopUp() {
-    console.log("Moduł 5: Rozpoczynanie zapisu doładowania...");
+// 2. Wypełnianie listy produktów do wyboru
+function populateOpDatalist() {
+    if(!magazynOpProductDatalist) return;
+    magazynOpProductDatalist.innerHTML = '';
+    if (!cachedProducts) return;
     
-    // 1. Sprawdź uprawnienia
-    if (!currentUserProfile || !currentUserProfile.mozeDoladowacWlasnyMagazyn) {
-         // Sprawdźmy, czy admin/właściciel nie edytuje czyjegoś magazynu (Moduł 6)
-         // Na razie zakładamy, że edytuje tylko swój.
-         alert("Błąd: Nie masz uprawnień do doładowywania magazynu.");
-         return;
-    }
+    // Sortuj kopię tablicy
+    let sorted = [...cachedProducts];
+    sorted.sort((a, b) => (a.nazwa || '').localeCompare(b.nazwa || '', 'pl'));
     
-    magazynBtnZapiszDoladowanie.disabled = true;
-    magazynBtnZapiszDoladowanie.textContent = 'Zapisywanie... ⏳';
+    sorted.forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = p.nazwa;
+        magazynOpProductDatalist.appendChild(opt);
+    });
+}
 
-    const zmianyBatch = []; // Tablica na zmiany do logu
-    const firestoreBatch = db.batch(); // Batch Firestore do zapisu stanów
-    
-    const inputyDoDoladowania = magazynTableBody.querySelectorAll('input.topup-input');
-    
-    // 2. Zbierz wszystkie zmiany
-    inputyDoDoladowania.forEach(input => {
-        const iloscDoDodania = parseFloat(input.value) || 0;
-        if (iloscDoDodania > 0) {
-            const row = input.closest('tr');
-            const productId = row.dataset.productId;
-            const productName = row.dataset.nazwa;
-            const stanPrzed = parseFloat(row.dataset.stan) || 0;
-            const stanPo = stanPrzed + iloscDoDodania;
-            
-            console.log(`Doładowanie: ${productName} (ID: ${productId}), Ilość: ${iloscDoDodania}, Stan przed: ${stanPrzed}, Stan po: ${stanPo}`);
-            
-            // A. Przygotuj zmianę do logu
-            zmianyBatch.push({
-                id_produktu: productId,
-                nazwa_produktu: productName,
-                ilosc: iloscDoDodania,
-                stan_przed: stanPrzed,
-                stan_po: stanPo
-            });
-            
-            // B. Przygotuj aktualizację stanu w magazynOsobisty
-            const stanRef = db.collection("konfiguracja").doc(currentUserProfile.id)
-                              .collection("magazynOsobisty").doc(productId);
-            
-            // Użyj 'set' z 'merge: true', aby utworzyć dokument, jeśli nie istnieje, lub zaktualizować 'stan', jeśli istnieje.
-            firestoreBatch.set(stanRef, { 
-                stan: stanPo,
-                produkt_nazwa: productName // Zawsze aktualizuj nazwę na wszelki wypadek
-            }, { merge: true });
+// 3. Obsługa wyboru produktu (wyświetlenie jednostki)
+if(magazynOpProductInput) {
+    magazynOpProductInput.addEventListener('input', () => {
+        const val = magazynOpProductInput.value;
+        const product = cachedProducts.find(p => p.nazwa === val);
+        if (product && magazynOpUnit) {
+            magazynOpUnit.textContent = product.dawkowanie || '(szt.)'; 
+            // Opcjonalnie auto-focus na ilość
+            // magazynOpQuantity.focus(); 
+        } else if (magazynOpUnit) {
+            magazynOpUnit.textContent = '';
         }
     });
-
-    if (zmianyBatch.length === 0) {
-        showToast("Nie wprowadzono żadnych ilości do doładowania.", "info");
-        magazynBtnZapiszDoladowanie.disabled = false;
-        magazynBtnZapiszDoladowanie.textContent = '💾 Zapisz Doładowanie';
-        toggleQuickTopUpMode(false); // Wyjdź z trybu edycji
-        return;
-    }
-
-    // 3. Przygotuj dokument logu
-    const logData = {
-        typ: "doładowanie",
-        data: firebase.firestore.FieldValue.serverTimestamp(),
-        kto_uid: currentUserProfile.uid,
-        kto_nazwa: `${currentUserProfile.Imie} ${currentUserProfile.Nazwisko}`,
-        batch_id: "batch_" + new Date().getTime() + "_" + Math.random().toString(36).substring(2, 9), // Unikalne ID operacji
-        wycofany: false,
-        zmiany: zmianyBatch
-    };
-    
-    const logRef = db.collection("konfiguracja").doc(currentUserProfile.id).collection("magazynOsobistyLog").doc();
-    firestoreBatch.set(logRef, logData);
-    
-    // 4. Wykonaj całą operację (zapis stanów + zapis logu)
-    try {
-        await firestoreBatch.commit();
-        showToast(`Pomyślnie doładowano ${zmianyBatch.length} pozycji.`, "success");
-        
-        // 5. Odśwież dane
-        // Wymuś ponowne załadowanie cache magazynu i logów
-        await loadMagazynCache(currentUserProfile.uid); 
-        await loadAndRenderMagazyn(); // Przeładuj całą sekcję
-
-    } catch (error) {
-        console.error("Błąd zapisu doładowania:", error);
-        showToast("Wystąpił błąd podczas zapisu doładowania.", "error");
-    } finally {
-        magazynBtnZapiszDoladowanie.disabled = false;
-        magazynBtnZapiszDoladowanie.textContent = '💾 Zapisz Doładowanie';
-        toggleQuickTopUpMode(false); // Wyjdź z trybu edycji
-    }
 }
 
-/**
- * Logika przycisku "Cofnij ostatnie doładowanie".
- */
-async function handleUndoLastTopUp() {
-    console.log("Moduł 5: Próba wycofania ostatniego doładowania...");
-    
-    // 1. Znajdź ostatnią operację "doładowanie", która NIE jest wycofana
-    const ostatnieDoladowanie = magazynLogCache.find(log => log.typ === "doładowanie" && log.wycofany === false);
-    
-    if (!ostatnieDoladowanie) {
-        showToast("Nie znaleziono żadnej operacji doładowania do wycofania.", "info");
-        return;
-    }
+// 4. Dodawanie pozycji do listy roboczej
+if(magazynOpAddBtn) {
+    magazynOpAddBtn.addEventListener('click', () => {
+        const name = magazynOpProductInput.value.trim();
+        const qty = parseFloat(magazynOpQuantity.value);
 
-    const dataLogu = ostatnieDoladowanie.data.toDate().toLocaleString('pl-PL');
-    const ktoLogu = ostatnieDoladowanie.kto_nazwa;
-    
-    if (!confirm(`Czy na pewno chcesz wycofać operację doładowania z dnia:\n${dataLogu} (wykonaną przez: ${ktoLogu})?\n\nStany ${ostatnieDoladowanie.zmiany.length} produktów zostaną przywrócone.`)) {
-        return;
-    }
+        if (!name || !cachedProducts.find(p => p.nazwa === name)) {
+            showToast("Wybierz poprawny produkt z listy.", "error");
+            return;
+        }
+        if (isNaN(qty)) {
+            showToast("Podaj poprawną ilość.", "error");
+            return;
+        }
 
-    magazynBtnCofnijDoladowanie.disabled = true;
-    magazynBtnCofnijDoladowanie.textContent = 'Wycofywanie... ⏳';
-
-    const firestoreBatch = db.batch();
-    const zmianyBatchLog = []; // Zmiany dla nowego logu "wycofanie"
-
-    // 2. Przejdź przez zmiany i przygotuj cofnięcie
-    for (const zmiana of ostatnieDoladowanie.zmiany) {
-        const productId = zmiana.id_produktu;
-        const stanPrzed = zmiana.stan_przed; // Stan, do którego wracamy
-        const stanPoWycofaniu = stanPrzed; // Dla jasności
-        const stanAktualny = magazynCache.get(productId)?.stan || zmiana.stan_po; // Obecny stan z cache
+        const product = cachedProducts.find(p => p.nazwa === name);
         
-        console.log(`Cofanie: ${zmiana.nazwa_produktu} (ID: ${productId}), przywracanie stanu do: ${stanPrzed}`);
-        
-        // A. Przygotuj zmianę do nowego logu
-        zmianyBatchLog.push({
-            id_produktu: productId,
-            nazwa_produktu: zmiana.nazwa_produktu,
-            ilosc: -zmiana.ilosc, // Zapisujemy ujemną ilość
-            stan_przed: stanAktualny,
-            stan_po: stanPoWycofaniu
+        // Dodaj do listy
+        currentOpList.push({
+            id: product.id,
+            name: product.nazwa,
+            quantity: qty,
+            unit: magazynOpUnit.textContent
         });
-        
-        // B. Przygotuj aktualizację stanu w magazynOsobisty
-        const stanRef = db.collection("konfiguracja").doc(currentUserProfile.id)
-                          .collection("magazynOsobisty").doc(productId);
-        
-        // Używamy 'update', aby nie nadpisać nazwy (chociaż 'set z merge' też by działało)
-        firestoreBatch.update(stanRef, { stan: stanPoWycofaniu });
-    }
 
-    // 3. Oznacz stary log jako "wycofany"
-    const staryLogRef = db.collection("konfiguracja").doc(currentUserProfile.id)
-                         .collection("magazynOsobistyLog").doc(ostatnieDoladowanie.id);
-    firestoreBatch.update(staryLogRef, { wycofany: true });
+        // Resetuj pola
+        magazynOpProductInput.value = '';
+        magazynOpQuantity.value = '';
+        magazynOpUnit.textContent = '';
+        magazynOpProductInput.focus();
+
+        renderOpList();
+    });
+}
+
+// 5. Renderowanie listy roboczej
+function renderOpList() {
+    if(!magazynOpListBody) return;
+    magazynOpListBody.innerHTML = '';
     
-    // 4. Stwórz nowy log "wycofanie"
-    const nowyLogData = {
-        typ: "wycofanie",
-        data: firebase.firestore.FieldValue.serverTimestamp(),
-        kto_uid: currentUserProfile.uid,
-        kto_nazwa: `${currentUserProfile.Imie} ${currentUserProfile.Nazwisko}`,
-        batch_id_powiazany: ostatnieDoladowanie.batch_id, // Link do starej operacji
-        wycofany: false, // Tego logu nie da się wycofać
-        zmiany: zmianyBatchLog
-    };
-    const nowyLogRef = db.collection("konfiguracja").doc(currentUserProfile.id).collection("magazynOsobistyLog").doc();
-    firestoreBatch.set(nowyLogRef, nowyLogData);
-
-    // 5. Wykonaj operację
-    try {
-        await firestoreBatch.commit();
-        showToast("Pomyślnie wycofano ostatnie doładowanie.", "success");
+    if (currentOpList.length === 0) {
+        if(magazynOpEmptyMsg) magazynOpEmptyMsg.style.display = 'block';
+    } else {
+        if(magazynOpEmptyMsg) magazynOpEmptyMsg.style.display = 'none';
         
-        // 6. Odśwież dane
-        await loadMagazynCache(currentUserProfile.uid);
-        await loadAndRenderMagazyn();
-
-    } catch (error) {
-        console.error("Błąd wycofywania doładowania:", error);
-        showToast("Wystąpił błąd podczas wycofywania operacji.", "error");
-    } finally {
-        magazynBtnCofnijDoladowanie.disabled = false;
-        magazynBtnCofnijDoladowanie.textContent = '↩️ Wycofaj ostatnie doładowanie';
+        currentOpList.forEach((item, index) => {
+            const tr = document.createElement('tr');
+            tr.style.borderBottom = "1px solid #eee";
+            tr.innerHTML = `
+                <td style="padding: 8px;">${item.name}</td>
+                <td style="padding: 8px; text-align: center; font-weight: bold;">${item.quantity} ${item.unit}</td>
+                <td style="padding: 8px; text-align: center;">
+                    <button class="btn ghost small" onclick="window.removeOpItem(${index})" style="color: red; border: none; padding: 2px; cursor: pointer;">❌</button>
+                </td>
+            `;
+            magazynOpListBody.appendChild(tr);
+        });
     }
 }
 
-/**
- * Logika wklejania z arkusza do tabeli magazynu.
- */
-function handleMagazynPaste(event) {
-    const targetCell = event.target.closest('td');
-    
-    // Sprawdź, czy jesteśmy w trybie importu i czy wklejamy do komórki tabeli
-    if (!isQuickTopUpMode || !targetCell) {
-        return; // Pozwól na domyślne wklejanie
-    }
-    
-    // Sprawdź, czy wklejamy do właściwej kolumny (tej z inputami)
-    const input = targetCell.querySelector('input.topup-input');
-    if (!input) {
-         // Użytkownik próbuje wkleić do innej kolumny (np. Nazwa Produktu) - zablokuj to
-         event.preventDefault();
-         showToast("Proszę wklejać dane tylko do kolumny 'Ilość do Doładowania'.", "error");
-         return;
-    }
+// Funkcja usuwania z listy (globalna, żeby działała w onclick)
+window.removeOpItem = function(index) {
+    currentOpList.splice(index, 1);
+    renderOpList();
+};
 
-    event.preventDefault(); // Zatrzymaj domyślne wklejanie
+// 6. Zatwierdzanie operacji (Zapis do Firebase)
+if(magazynOpConfirmBtn) {
+    magazynOpConfirmBtn.addEventListener('click', async () => {
+        if (currentOpList.length === 0) {
+            showToast("Lista jest pusta.", "info");
+            return;
+        }
+        
+        if (!confirm(`Czy na pewno chcesz zatwierdzić operację: ${currentOpMode.toUpperCase()} dla ${currentOpList.length} pozycji?`)) {
+            return;
+        }
 
-    const clipboardData = event.clipboardData || window.clipboardData;
-    const pastedText = clipboardData.getData('text/plain');
-    const lines = pastedText.split(/\r?\n/).filter(line => line.trim() !== ''); // Podziel na linie i usuń puste
+        magazynOpConfirmBtn.disabled = true;
+        magazynOpConfirmBtn.textContent = "Zapisywanie...";
 
-    const startRow = targetCell.closest('tr');
-    const allRows = Array.from(magazynTableBody.querySelectorAll('tr'));
-    const startRowIndex = allRows.indexOf(startRow);
+        const batch = db.batch();
+        const zmianyLog = [];
+        
+        // Ustal, dla kogo robimy operację
+        const targetUserId = currentOpTargetUser ? currentOpTargetUser.docId : currentUserProfile.id;
+        
+        // Cache, który aktualizujemy (zależy od trybu)
+        const cacheToUpdate = currentOpTargetUser ? zarzadzanieMagazynCache : magazynCache;
 
-    lines.forEach((lineContent, lineIndex) => {
-        const currentRowIndex = startRowIndex + lineIndex;
-        if (currentRowIndex < allRows.length) {
-            const targetRow = allRows[currentRowIndex];
-            const targetInput = targetRow.querySelector('input.topup-input');
-            if (targetInput) {
-                // Wyczyść i wstaw nową wartość
-                targetInput.value = lineContent.trim().replace(',', '.'); // Zamień przecinki na kropki
+        for (const item of currentOpList) {
+            const productId = item.id;
+            
+            // Pobierz aktualny stan (jeśli istnieje)
+            let currentStock = 0;
+            if (cacheToUpdate.has(productId)) {
+                currentStock = cacheToUpdate.get(productId).stan || 0;
+            } else if (!currentOpTargetUser) {
+                 // Dla siebie, jeśli nie ma w cache
+                 const stockData = magazynCache.get(productId);
+                 currentStock = stockData ? stockData.stan : 0;
             }
+
+            let newStock = 0;
+            
+            if (currentOpMode === 'doladowanie') {
+                newStock = currentStock + item.quantity;
+            } else {
+                // INWENTARYZACJA: Nowy stan NADPISUJE stary
+                newStock = item.quantity;
+            }
+
+            // 1. Aktualizacja stanu w Firestore
+            const stockRef = db.collection("konfiguracja").doc(targetUserId).collection("magazynOsobisty").doc(productId);
+            batch.set(stockRef, { 
+                stan: newStock, 
+                produkt_nazwa: item.name 
+            }, { merge: true });
+
+            // 2. Dodanie do logu
+            zmianyLog.push({
+                id_produktu: productId,
+                nazwa_produktu: item.name,
+                ilosc: item.quantity, 
+                stan_przed: currentStock,
+                stan_po: newStock
+            });
+        }
+
+        // 3. Zapisz dokument logu
+        const logData = {
+            typ: currentOpMode, // 'doladowanie' lub 'inwentaryzacja'
+            data: firebase.firestore.FieldValue.serverTimestamp(),
+            kto_uid: currentUserProfile.uid, 
+            kto_nazwa: `${currentUserProfile.Imie} ${currentUserProfile.Nazwisko}` + (currentOpTargetUser ? " (Admin)" : ""),
+            batch_id: "op_" + new Date().getTime(),
+            wycofany: false,
+            zmiany: zmianyLog
+        };
+        
+        const logRef = db.collection("konfiguracja").doc(targetUserId).collection("magazynOsobistyLog").doc();
+        batch.set(logRef, logData);
+
+        try {
+            await batch.commit();
+            showToast("Operacja zakończona sukcesem!", "success");
+            if(magazynOperationModal) magazynOperationModal.style.display = 'none';
+
+            // Odśwież odpowiedni widok
+            if (currentOpTargetUser) {
+                if(typeof loadAndRenderWybranyMagazyn === 'function') await loadAndRenderWybranyMagazyn(); 
+            } else {
+                if(typeof loadMagazynCache === 'function') await loadMagazynCache(currentUserProfile.uid); 
+                if(typeof loadAndRenderMagazyn === 'function') await loadAndRenderMagazyn(); 
+            }
+
+        } catch (error) {
+            console.error("Błąd zapisu operacji magazynowej:", error);
+            showToast("Wystąpił błąd podczas zapisu.", "error");
+        } finally {
+            magazynOpConfirmBtn.disabled = false;
         }
     });
-    
-    console.log(`Moduł 5: Wklejono ${lines.length} linii do tabeli doładowań.`);
 }
 
-// --- Podpięcie Listenerów ---
-
-if (magazynBtnSzybkieDoladowanie) {
-    magazynBtnSzybkieDoladowanie.addEventListener('click', () => toggleQuickTopUpMode(true));
-}
-if (magazynBtnAnulujDoladowanie) {
-    magazynBtnAnulujDoladowanie.addEventListener('click', () => toggleQuickTopUpMode(false));
-}
-if (magazynBtnZapiszDoladowanie) {
-    magazynBtnZapiszDoladowanie.addEventListener('click', handleSaveTopUp);
-}
-if (magazynBtnCofnijDoladowanie) {
-    magazynBtnCofnijDoladowanie.addEventListener('click', handleUndoLastTopUp);
-}
-if (magazynTableBody) {
-    magazynTableBody.addEventListener('paste', handleMagazynPaste);
+// Zamknij modal
+if(magazynOpCancelBtn) {
+    magazynOpCancelBtn.addEventListener('click', () => {
+        if(magazynOperationModal) magazynOperationModal.style.display = 'none';
+    });
 }
 
-/* ======================================================== */
-/* ✅ KONIEC: MODUŁ 5 - Logika Akcji Magazynu */
-/* ======================================================== */
+// --- Listenery dla Użytkownika (NOWE PRZYCISKI) ---
+if (btnOpenDoladowanie) {
+    btnOpenDoladowanie.addEventListener('click', () => openMagazynOperation('doladowanie'));
+}
+if (btnOpenInwentaryzacja) {
+    btnOpenInwentaryzacja.addEventListener('click', () => openMagazynOperation('inwentaryzacja'));
+}
+
+// --- Listenery dla Admina (NOWE PRZYCISKI) ---
+if (btnAdminOpenDoladowanie) {
+    btnAdminOpenDoladowanie.addEventListener('click', () => {
+        if (zarzadzanieWybranyUser) {
+            openMagazynOperation('doladowanie', zarzadzanieWybranyUser);
+        } else {
+            alert("Najpierw wybierz użytkownika z listy.");
+        }
+    });
+}
+if (btnAdminOpenInwentaryzacja) {
+    btnAdminOpenInwentaryzacja.addEventListener('click', () => {
+        if (zarzadzanieWybranyUser) {
+            openMagazynOperation('inwentaryzacja', zarzadzanieWybranyUser);
+        } else {
+            alert("Najpierw wybierz użytkownika z listy.");
+        }
+    });
+}
 /* ======================================================== */
 /* ✅ POCZĄTEK: MODUŁ 6 - Logika Zarządzania Magazynami */
 /* ======================================================== */
@@ -17627,6 +17624,52 @@ async function fetchCardsForReport(dateStart, dateEnd, userId) {
         throw error;
     }
 }
+    <div id="magazynOperationModal" class="product-search-modal" style="display: none; z-index: 10010;">
+    <div class="form-card" style="max-width: 600px; height: 90vh;">
+        <h3 id="magazynOpTitle" style="margin-top: 0; text-align: center;">Operacja Magazynowa</h3>
+        <p id="magazynOpSubtitle" style="text-align: center; color: #666; margin-bottom: 15px; font-size: 14px;">...</p>
+
+        <div style="background: #f9f9f9; padding: 15px; border-radius: 8px; border: 1px solid #eee; margin-bottom: 15px;">
+            <div class="form-row">
+                <label>Wybierz produkt:</label>
+                <input type="text" id="magazynOpProductInput" list="magazynOpProductDatalist" placeholder="Wpisz nazwę produktu..." style="width: 100%;">
+                <datalist id="magazynOpProductDatalist"></datalist>
+            </div>
+            
+            <div style="display: flex; gap: 10px; align-items: flex-end;">
+                <div style="flex: 1;">
+                    <label>Ilość:</label>
+                    <input type="number" id="magazynOpQuantity" placeholder="0" step="any" style="width: 100%;">
+                </div>
+                <div style="flex: 1; padding-bottom: 10px;">
+                    <span id="magazynOpUnit" style="font-weight: bold; color: #555;">(j.m.)</span>
+                </div>
+                <button id="magazynOpAddBtn" class="btn small" style="height: 42px;">⬇️ Dodaj do listy</button>
+            </div>
+        </div>
+
+        <h4 style="margin: 0 0 10px 0;">Lista zmian do zatwierdzenia:</h4>
+        <div style="flex: 1; overflow-y: auto; border: 1px solid #ccc; border-radius: 6px; padding: 0;">
+            <table style="width: 100%; border-collapse: collapse;">
+                <thead style="background: #eee; position: sticky; top: 0;">
+                    <tr>
+                        <th style="padding: 8px; text-align: left;">Produkt</th>
+                        <th style="padding: 8px; text-align: center; width: 80px;">Ilość</th>
+                        <th style="padding: 8px; width: 40px;"></th>
+                    </tr>
+                </thead>
+                <tbody id="magazynOpListBody">
+                    </tbody>
+            </table>
+        </div>
+        <p id="magazynOpEmptyMsg" style="text-align: center; color: #999; margin-top: 10px;">Lista jest pusta.</p>
+
+        <div class="form-actions" style="margin-top: 20px;">
+            <button id="magazynOpCancelBtn" class="btn ghost">Anuluj</button>
+            <button id="magazynOpConfirmBtn" class="btn primary" style="font-size: 18px; width: 60%;">ZATWIERDŹ</button>
+        </div>
+    </div>
+</div>
 </script> 
 
 <div id="toastContainer" style="position: fixed; top: 20px; right: 20px; z-index: 20000; display: flex; flex-direction: column; gap: 10px;">
