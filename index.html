@@ -17677,5 +17677,57 @@ async function fetchCardsForReport(dateStart, dateEnd, userId) {
         </div>
     </div>
 </div>
+function openMagazynOperation(mode) {
+    console.log("Otwieranie operacji magazynowej, tryb:", mode);
+
+    // 1. Znajdź modal (sprawdź czy ID w HTML to na pewno 'magazynOperationModal')
+    const modal = document.getElementById('magazynOperationModal');
+    
+    // 2. Znajdź tytuł modala
+    const modalTitle = document.getElementById('magazynOperationTitle');
+    
+    // 3. Znajdź kontener na formularz
+    const formContainer = document.getElementById('magazynOperationForm');
+
+    // --- ZABEZPIECZENIE (To naprawi błąd krytyczny) ---
+    if (!modal) {
+        console.error("BŁĄD KRYTYCZNY: Nie znaleziono elementu o ID 'magazynOperationModal' w HTML!");
+        alert("Błąd: Brak okna operacji w kodzie strony. Skontaktuj się z administratorem.");
+        return; // Zatrzymujemy funkcję, żeby nie było błędu w konsoli
+    }
+    // --------------------------------------------------
+
+    // Resetowanie klas i wyświetlanie
+    modal.classList.remove('hidden'); // <-- Tutaj był Twój błąd, jeśli modal był null
+    modal.style.display = 'flex';     // Dla pewności, jeśli używasz display zamiast klas
+
+    // Ustawianie tytułu (jeśli element istnieje)
+    if (modalTitle) {
+        if (mode === 'inwentaryzacja') {
+            modalTitle.innerText = '📋 Inwentaryzacja';
+        } else if (mode === 'doladowanie') {
+            modalTitle.innerText = '➕ Doładowanie Stanu';
+        }
+    }
+    
+    // Zapisz tryb w data-atrybucie modala, żeby wiedzieć co robić przy zapisie
+    modal.dataset.mode = mode;
+
+    // Ewentualnie wyczyść formularz
+    if (formContainer) {
+        formContainer.innerHTML = ''; // Czyścimy stare pola
+        renderOperationForm(mode);    // Funkcja renderująca pola (jeśli taką masz)
+    }
+}
+        function closeMagazynOperation() {
+    const modal = document.getElementById('magazynOperationModal');
+    if (modal) {
+        modal.style.display = 'none'; // Ukryj okno
+        
+        // Opcjonalnie: wyczyść formularz, żeby przy ponownym otwarciu był pusty
+        const form = document.getElementById('magazynOperationForm');
+        if (form) form.innerHTML = ''; 
+    }
+}
 </body>
 </html>
