@@ -17635,25 +17635,21 @@ function openMagazynOperation(tryb) {
         var modal = document.getElementById('magazynOperationModal');
         if (!modal) return;
 
-        // Ustawiamy tytuł okna
+        // Tytuł okna
         var tytul = document.getElementById('magazynOperationTitle');
         if (tytul) {
             tytul.innerText = (tryb === 'inwentaryzacja') ? "📋 Inwentaryzacja" : "➕ Doładowanie";
         }
 
-        // Pokazujemy okno
         modal.style.display = 'flex'; 
+        listaOperacji = []; // Reset listy
 
-        // Czyścimy listę przy nowym otwarciu
-        listaOperacji = [];
-
-        // Generujemy formularz (pola input i tabelę)
+        // Generuj formularz
         renderFormularzUI(tryb);
     }
 
     /**
-     * 2. Funkcja budująca wygląd formularza
-     * Zastępuje prosty tekst polami do wpisywania
+     * 2. Budowanie formularza (Z dynamiczną listą produktów)
      */
     function renderFormularzUI(tryb) {
         var container = document.getElementById('magazynOperationForm');
@@ -17663,19 +17659,25 @@ function openMagazynOperation(tryb) {
             <div style="text-align: left;">
                 
                 <label style="font-weight:bold; display:block; margin-bottom:5px; margin-top: 10px;">1. Wybierz produkt:</label>
-                <input type="text" id="opInputProdukt" list="opListaProduktow" placeholder="Wpisz nazwę produktu..." 
-                       style="width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;">
                 
-                <datalist id="opListaProduktow">
-                    <option value="Produkt A">
-                    <option value="Produkt B">
-                </datalist>
+                <input type="text" id="opInputProdukt" list="opListaProduktow" 
+                       placeholder="Zacznij wpisywać nazwę..." 
+                       onchange="zaktualizujJednostke()"
+                       oninput="zaktualizujJednostke()"
+                       style="width: 100%; padding: 10px; margin-bottom: 5px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;">
+                
+                <datalist id="opListaProduktow"></datalist>
 
                 <div style="display: flex; gap: 10px; margin-bottom: 20px; align-items: flex-end;">
                     <div style="flex: 1;">
                         <label style="font-weight:bold; display:block; margin-bottom:5px;">2. Ilość:</label>
-                        <input type="number" id="opInputIlosc" placeholder="0" 
-                               style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;">
+                        <div style="display: flex; align-items: center; border: 1px solid #ccc; border-radius: 4px; background: #fff;">
+                            <input type="number" id="opInputIlosc" placeholder="0" step="any"
+                                   style="flex: 1; padding: 10px; border: none; background: transparent; box-sizing: border-box;">
+                            <span id="opJednostkaWyswietlacz" style="padding: 0 10px; color: #666; font-weight: bold; background: #eee; height: 100%; display: flex; align-items: center; border-left: 1px solid #ccc;">
+                                j.m.
+                            </span>
+                        </div>
                     </div>
                     <button type="button" onclick="dodajPozycjeDoListy()" 
                             style="padding: 10px 15px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; height: 40px; font-weight: bold;">
@@ -17695,50 +17697,94 @@ function openMagazynOperation(tryb) {
                             </tr>
                         </thead>
                         <tbody id="opTabelaBody" style="background: #fff;">
-                            <tr><td colspan="2" style="text-align:center; padding:20px; color:#999;">Brak pozycji. Dodaj coś powyżej.</td></tr>
+                            <tr><td colspan="2" style="text-align:center; padding:20px; color:#999;">Brak pozycji.</td></tr>
                         </tbody>
                     </table>
                 </div>
-
             </div>
         `;
 
         container.innerHTML = html;
         
-        // Ustaw focus na pierwszym polu
+        // Wypełnij listę produktów danymi z bazy
+        zaladujProduktyDoListy();
+
         setTimeout(() => document.getElementById('opInputProdukt').focus(), 100);
     }
 
     /**
-     * 3. Funkcja obsługująca przycisk "Dodaj" (niebieski)
+     * 3. Wypełnia <datalist> produktami z globalProducts
+     */
+    function zaladujProduktyDoListy() {
+        var datalist = document.getElementById('opListaProduktow');
+        if (!datalist) return;
+
+        datalist.innerHTML = ''; // Czyścimy
+
+        // Sprawdzamy czy zmienna globalProducts istnieje
+        if (typeof globalProducts !== 'undefined' && Array.isArray(globalProducts)) {
+            globalProducts.forEach(function(prod) {
+                var option = document.createElement('option');
+                // Zakładam, że pole z nazwą to 'Nazwa' lub 'name'
+                option.value = prod.Nazwa || prod.name || prod.productName; 
+                datalist.appendChild(option);
+            });
+        } else {
+            console.warn("Nie znaleziono zmiennej 'globalProducts'. Lista jest pusta.");
+            // Opcjonalnie: Spróbuj pobrać z localStorage jeśli tam są
+            // var stored = JSON.parse(localStorage.getItem('products') || '[]');
+        }
+    }
+
+    /**
+     * 4. Wykrywa zmianę produktu i pokazuje odpowiednią JEDNOSTKĘ
+     */
+    function zaktualizujJednostke() {
+        var inputVal = document.getElementById('opInputProdukt').value;
+        var unitDisplay = document.getElementById('opJednostkaWyswietlacz');
+        
+        if (!inputVal) {
+            unitDisplay.innerText = "j.m.";
+            return;
+        }
+
+        // Szukamy produktu w bazie
+        if (typeof globalProducts !== 'undefined') {
+            var produkt = globalProducts.find(p => (p.Nazwa || p.name) === inputVal);
+            
+            if (produkt) {
+                // Zakładam, że jednostka to 'Jednostka', 'Unit' lub 'jm'
+                var jm = produkt.Jednostka || produkt.Unit || produkt.jm || "szt.";
+                unitDisplay.innerText = jm;
+            } else {
+                unitDisplay.innerText = "j.m.";
+            }
+        }
+    }
+
+    /**
+     * 5. Dodawanie do tabelki
      */
     function dodajPozycjeDoListy() {
-        var inputProd = document.getElementById('opInputProdukt');
-        var inputIlosc = document.getElementById('opInputIlosc');
-        
-        var nazwa = inputProd.value;
-        var ilosc = inputIlosc.value;
+        var nazwa = document.getElementById('opInputProdukt').value;
+        var ilosc = document.getElementById('opInputIlosc').value;
+        var jednostka = document.getElementById('opJednostkaWyswietlacz').innerText;
 
         if (!nazwa || !ilosc) {
             alert("Uzupełnij nazwę produktu i ilość!");
             return;
         }
 
-        // Dodaj do tablicy (logika)
-        listaOperacji.push({ nazwa: nazwa, ilosc: ilosc });
-
-        // Odśwież widok tabeli
+        listaOperacji.push({ nazwa: nazwa, ilosc: ilosc, jm: jednostka });
         odswiezTabeleOperacji();
 
-        // Wyczyść pola
-        inputProd.value = '';
-        inputIlosc.value = '';
-        inputProd.focus();
+        // Reset pól
+        document.getElementById('opInputProdukt').value = '';
+        document.getElementById('opInputIlosc').value = '';
+        document.getElementById('opJednostkaWyswietlacz').innerText = 'j.m.';
+        document.getElementById('opInputProdukt').focus();
     }
 
-    /**
-     * 4. Pomocnicza funkcja rysująca tabelę na nowo
-     */
     function odswiezTabeleOperacji() {
         var tbody = document.getElementById('opTabelaBody');
         tbody.innerHTML = '';
@@ -17748,11 +17794,10 @@ function openMagazynOperation(tryb) {
             return;
         }
 
-        // Pętla po wszystkich dodanych elementach
         listaOperacji.forEach(function(item) {
             var wiersz = `
                 <tr>
-                    <td style="padding: 8px; border-bottom: 1px solid #eee;">${item.nazwa}</td>
+                    <td style="padding: 8px; border-bottom: 1px solid #eee;">${item.nazwa} <small style="color:#888;">(${item.jm})</small></td>
                     <td style="padding: 8px; text-align: right; border-bottom: 1px solid #eee;"><b>${item.ilosc}</b></td>
                 </tr>
             `;
@@ -17760,29 +17805,17 @@ function openMagazynOperation(tryb) {
         });
     }
 
-    /**
-     * 5. Funkcja Zamykająca
-     */
     function closeMagazynOperation() {
         var modal = document.getElementById('magazynOperationModal');
-        if (modal) {
-            modal.style.display = 'none';
-        }
+        if (modal) modal.style.display = 'none';
     }
 
-    /**
-     * 6. Funkcja Zapisująca (Zielony przycisk)
-     */
     function submitMagazynOperation() {
         if (listaOperacji.length === 0) {
-            alert("Lista jest pusta! Nie ma co zapisywać.");
+            alert("Lista jest pusta!");
             return;
         }
-        
-        // Tu później dodamy kod wysyłający dane do bazy
-        console.log("Zapisywanie danych:", listaOperacji);
-        alert("Zapisano " + listaOperacji.length + " pozycji! (Symulacja)");
-        
+        alert("Zapisywanie: " + listaOperacji.length + " pozycji.");
         closeMagazynOperation();
     }
 </script>
