@@ -3035,7 +3035,13 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
             <div id="formRowDetailsContainer" style="display: block;">
                 <div class="form-row"><label for="formOpis">Nazwa siedziby stada i opis zwierzęcia</label><input type="text" id="formOpis" placeholder="Opis zwierzęcia"></div>
                 <div class="form-row"><label for="formLiczba">Liczba leczonych zwierząt</label><input type="number" id="formLiczba" min="0" placeholder="0"></div>
-                <div class="form-row"><label for="formRozpoznanie">Rozpoznanie / wstępne rozpoznanie</label><input type="text" id="formRozpoznanie" list="listaRozpoznan" placeholder="Wpisz lub wybierz schemat..."></div>
+                <div class="form-row">
+    <label for="formRozpoznanie">Rozpoznanie / wstępne rozpoznanie</label>
+    <div style="display: flex; gap: 5px;">
+        <input type="text" id="formRozpoznanie" list="listaRozpoznan" placeholder="Wpisz lub wybierz schemat..." style="flex: 1;">
+        <button type="button" id="btnOpenSchemaList" class="btn small" title="Otwórz listę schematów" style="background: #e3f2fd; border: 1px solid #90caf9;">📁 Wybierz</button>
+    </div>
+</div>
             </div>
         </div>
 
@@ -4390,7 +4396,18 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
                 <li><strong>Archiwum:</strong> Przeglądaj stare Karty i Paragony. Możesz je drukować lub usuwać.</li>
                 <li><strong>Raporty:</strong> Generuj zestawienia finansowe (Dłużnicy, Gotówka) oraz Raporty Zużycia leków (na podstawie Kart Leczenia) za wybrany okres.</li>
             </ul>
-            
+            <h4 style="color: #333; border-bottom: 2px solid #6A994E; display: inline-block;">8. Społeczność i Komunikacja 💬</h4>
+            <ul>
+                <li><strong>Czat Zespołu:</strong> Wewnętrzny komunikator dla Twojej lecznicy. Wiadomości widzą tylko Twoi współpracownicy.</li>
+                <li><strong>Baza Wiedzy:</strong> Globalna baza schematów leczenia tworzona przez społeczność. Możesz pobierać schematy innych lekarzy do swojej bazy lub udostępniać własne.</li>
+                <li><strong>Powiadomienia:</strong> Jeśli masz otwartą aplikację w tle, otrzymasz powiadomienie o nowej wiadomości.</li>
+            </ul>
+
+            <h4 style="color: #333; border-bottom: 2px solid #6A994E; display: inline-block;">💡 Wskazówki (Triki)</h4>
+            <ul>
+                <li><strong>Szybkie Schematy:</strong> Jeśli zaznaczysz "Użyj schematów", możesz kliknąć <strong>dwa razy</strong> (Double-Click) na polu "Rozpoznanie" w tabeli lub formularzu, aby otworzyć wyszukiwarkę.</li>
+                <li><strong>Inteligentna Karencja:</strong> Kliknij ikonę 📅 w kolumnie Karencji, aby otworzyć generator zaleceń.</li>
+            </ul>
              <div style="margin-top: 30px; padding: 15px; background-color: #f9f9f9; border-radius: 8px; text-align: center; font-size: 13px; color: #777;">
                 Aplikacja KL-Mobile v2.0<br>
                 W razie problemów skontaktuj się z administratorem.
@@ -19177,6 +19194,15 @@ if (menuSpolecznoscBtn) {
     menuSpolecznoscBtn.addEventListener('click', () => {
         if (mainMenuSection) mainMenuSection.style.display = 'none';
         spolecznoscSection.style.display = 'flex';
+        
+        // ✅ UKRYJ PRZYCISK POMOCY
+        const helpBtn = document.getElementById('helpFloatingBtn');
+        if (helpBtn) helpBtn.style.display = 'none';
+        
+        // ✅ UKRYJ PRZYCISK INSTALACJI (jeśli jest)
+        const installBtn = document.getElementById('installFloatingBtn');
+        if (installBtn) installBtn.style.display = 'none';
+
         openChatTab(); 
     });
 }
@@ -19533,6 +19559,62 @@ if (confirmShareSchemaBtn) {
         finally { confirmShareSchemaBtn.disabled = false; }
     });
 }
+    /* ======================================================== */
+/* ✅ UI: PODPOWIEDZI DLA SCHEMATÓW (Hinty)                 */
+/* ======================================================== */
+
+// 1. Obsługa przycisku "📁 Wybierz" w formularzu
+const btnOpenSchemaList = document.getElementById('btnOpenSchemaList');
+if (btnOpenSchemaList) {
+    btnOpenSchemaList.addEventListener('click', (e) => {
+        // Wymuś otwarcie modala wyszukiwania schematów dla pola formularza
+        // Symulujemy event, wskazując na input 'formRozpoznanie'
+        const formInput = document.getElementById('formRozpoznanie');
+        if (formInput) {
+            // Upewnij się, że funkcja otwierania modala jest dostępna
+            if (typeof openSchemaSearch === 'function') {
+                // Wywołujemy funkcję przekazując sztuczny event, w którym target to nasz input
+                openSchemaSearch({ target: formInput });
+            } else {
+                alert("Błąd: Funkcja wyszukiwania schematów nie została załadowana.");
+            }
+        }
+    });
+}
+
+// 2. Dynamiczna zmiana Placeholdera w Tabeli (Hint o dwukliku)
+const schemaCheckboxHint = document.getElementById('schemaCheckbox');
+
+function updateTablePlaceholders() {
+    const isEnabled = schemaCheckboxHint ? schemaCheckboxHint.checked : false;
+    const placeholderText = isEnabled ? "Wpisz lub 2xKlik (Lista)" : "Rozpoznanie...";
+    
+    // Znajdź wszystkie inputy w kolumnie Rozpoznanie (index 3, czyli 4 kolumna)
+    // Pamiętaj, że w kodzie input jest tworzony dynamicznie w generateRows
+    const inputs = document.querySelectorAll('#karta tbody tr td:nth-child(4) input');
+    
+    inputs.forEach(inp => {
+        inp.placeholder = placeholderText;
+        // Opcjonalnie: Dodaj wizualną wskazówkę (np. inny kursor lub ikonkę w tle)
+        if (isEnabled) {
+            inp.style.backgroundColor = "#f0f8ff"; // Delikatny błękit
+            inp.title = "Kliknij dwukrotnie, aby otworzyć listę schematów";
+        } else {
+            inp.style.backgroundColor = "#fefefe";
+            inp.title = "";
+        }
+    });
+}
+
+// Podepnij pod zmianę checkboxa
+if (schemaCheckboxHint) {
+    schemaCheckboxHint.addEventListener('change', updateTablePlaceholders);
+    // Wywołaj raz na starcie (z opóźnieniem, żeby tabela zdążyła się wygenerować)
+    setTimeout(updateTablePlaceholders, 1000);
+}
+
+// Podepnij pod generowanie wierszy (jeśli generujesz je dynamicznie)
+// Najlepiej wywołać `updateTablePlaceholders()` na końcu funkcji `generateRows()`
 </script> 
 </body>
 </html>
