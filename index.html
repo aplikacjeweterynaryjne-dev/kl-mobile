@@ -2786,7 +2786,7 @@ background-color: #eef;
     <button id="menuArchiwumParagonyBtn" class="submenu-btn">🧾 Paragony</button>
   </div>
   <button id="menuKonfiguracjaBtn" class="menu-btn">⚙️ Konfiguracja programu</button>
-  
+  <button id="menuSpolecznoscBtn" class="menu-btn" style="background-color: #e3f2fd; border-color: #bbdefb;">💬 Komunikator & Baza Wiedzy</button>
   <button id="menuLogoutBtn" class="menu-btn" style="background-color: #fdf2f2; border-color: #e6b8b3; color: #c0392b; font-weight: bold;">➡️ Wyloguj</button>
 
  <div id="dashboardStats" class="dashboard-container" style="display: none;">
@@ -4395,6 +4395,60 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
         </div>
     </div>
 </div>
+    <div id="spolecznoscSection" style="display: none; height: 100vh; flex-direction: column;">
+    
+    <div style="padding: 10px; background: #fff; border-bottom: 1px solid #ccc; display: flex; justify-content: space-between; align-items: center;">
+        <button id="spolecznoscBackBtn" class="btn ghost small">⬅ Menu</button>
+        <div style="display: flex; gap: 10px;">
+            <button id="tabChatBtn" class="btn primary small">💬 Czat Zespołu</button>
+            <button id="tabWiedzaBtn" class="btn small">📚 Baza Wiedzy</button>
+        </div>
+    </div>
+
+    <div id="chatContainer" style="display: flex; flex-direction: column; flex: 1; overflow: hidden;">
+        <div id="chatMessagesArea" style="flex: 1; overflow-y: auto; padding: 15px; background-color: #f0f2f5; display: flex; flex-direction: column; gap: 10px;">
+            <p style="text-align: center; color: #999;">Ładowanie rozmów...</p>
+        </div>
+        
+        <div style="padding: 10px; background: #fff; border-top: 1px solid #ddd; display: flex; gap: 10px;">
+            <input type="text" id="chatInput" placeholder="Napisz wiadomość do zespołu..." style="flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 20px;">
+            <button id="chatSendBtn" class="btn primary" style="border-radius: 50%; width: 45px; height: 45px; padding: 0;">➤</button>
+        </div>
+    </div>
+
+    <div id="wiedzaContainer" style="display: none; flex-direction: column; flex: 1; overflow-y: auto; padding: 15px; background-color: #fff8e1;">
+        <div style="text-align: center; margin-bottom: 15px;">
+            <h3>Globalna Baza Schematów</h3>
+            <p style="font-size: 14px; color: #666;">Udostępniaj swoje skuteczne metody leczenia i pobieraj schematy od innych lekarzy.</p>
+            <button id="shareSchemaBtn" class="btn primary" style="background-color: #f39c12; border-color: #e67e22;">➕ Udostępnij swój schemat</button>
+        </div>
+        
+        <div id="wiedzaListArea">
+            <p style="text-align: center; color: #999;">Ładowanie bazy wiedzy...</p>
+        </div>
+    </div>
+
+</div>
+
+<div id="shareSchemaModal" class="product-search-modal" style="display: none; z-index: 10050;">
+    <div class="form-card">
+        <h3>Udostępnij Schemat Społeczności</h3>
+        <div class="form-row">
+            <label>Wybierz schemat z Twojej bazy:</label>
+            <select id="shareSchemaSelect" style="width: 100%; padding: 8px;">
+                <option value="">-- Wybierz --</option>
+            </select>
+        </div>
+        <div class="form-row">
+            <label>Opis / Komentarz (Dla innych lekarzy):</label>
+            <textarea id="shareSchemaComment" placeholder="Np. Skuteczne przy ostrym przebiegu..." style="width: 100%; height: 80px;"></textarea>
+        </div>
+        <div class="form-actions" style="justify-content: space-between;">
+            <button id="closeShareSchemaBtn" class="btn ghost">Anuluj</button>
+            <button id="confirmShareSchemaBtn" class="btn primary">🌍 Opublikuj</button>
+        </div>
+    </div>
+</div>
     <script>
 /* ----- Inicjalizacja Firebase (Uruchamia się na starcie) ----- */
 // ... reszta kodu pierwszego bloku script ...
@@ -5753,6 +5807,64 @@ if (printFormat110 && receiptPrintContainer) {
                                 orientation: portrait;
                             }
                         }
+                        /* --- STYLE SPOŁECZNOŚCI --- */
+
+/* Dymki czatu */
+.chat-msg {
+    max-width: 75%;
+    padding: 10px 15px;
+    border-radius: 18px;
+    font-size: 15px;
+    line-height: 1.4;
+    position: relative;
+    word-wrap: break-word;
+}
+.chat-msg-me {
+    align-self: flex-end;
+    background-color: #0084ff; /* Niebieski (Ja) */
+    color: white;
+    border-bottom-right-radius: 4px;
+}
+.chat-msg-other {
+    align-self: flex-start;
+    background-color: #e4e6eb; /* Szary (Inni) */
+    color: #050505;
+    border-bottom-left-radius: 4px;
+}
+.chat-author {
+    font-size: 11px;
+    color: #666;
+    margin-bottom: 2px;
+    margin-left: 5px;
+}
+.chat-time {
+    font-size: 10px;
+    opacity: 0.7;
+    text-align: right;
+    margin-top: 4px;
+}
+
+/* Kafelki Bazy Wiedzy */
+.knowledge-card {
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 15px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+.knowledge-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 8px;
+    margin-bottom: 8px;
+}
+.knowledge-title { font-size: 18px; font-weight: bold; color: #2c3e50; }
+.knowledge-author { font-size: 12px; color: #777; }
+.knowledge-products { font-size: 13px; color: #444; margin-bottom: 10px; }
+.knowledge-likes { font-weight: bold; color: #e67e22; }
                     </style>
                 </head>
                 <body>
@@ -18980,6 +19092,303 @@ window.addEventListener('appinstalled', () => {
     if (installBtn) installBtn.style.display = 'none';
     deferredPrompt = null;
 });
+    /* ======================================================== */
+/* ✅ MODUŁ SPOŁECZNOŚCI (Czat + Powiadomienia + Baza Wiedzy) */
+/* ======================================================== */
+
+const spolecznoscSection = document.getElementById('spolecznoscSection');
+const menuSpolecznoscBtn = document.getElementById('menuSpolecznoscBtn');
+const spolecznoscBackBtn = document.getElementById('spolecznoscBackBtn');
+const tabChatBtn = document.getElementById('tabChatBtn');
+const tabWiedzaBtn = document.getElementById('tabWiedzaBtn');
+const chatContainer = document.getElementById('chatContainer');
+const wiedzaContainer = document.getElementById('wiedzaContainer');
+
+// --- ZMIENNE CZATU ---
+const chatMessagesArea = document.getElementById('chatMessagesArea');
+const chatInput = document.getElementById('chatInput');
+const chatSendBtn = document.getElementById('chatSendBtn');
+let chatListenerUnsubscribe = null;
+
+// --- ZMIENNE BAZY WIEDZY ---
+const wiedzaListArea = document.getElementById('wiedzaListArea');
+const shareSchemaBtn = document.getElementById('shareSchemaBtn');
+const shareSchemaModal = document.getElementById('shareSchemaModal');
+const shareSchemaSelect = document.getElementById('shareSchemaSelect');
+const shareSchemaComment = document.getElementById('shareSchemaComment');
+const confirmShareSchemaBtn = document.getElementById('confirmShareSchemaBtn');
+const closeShareSchemaBtn = document.getElementById('closeShareSchemaBtn');
+
+// 1. NAWIGACJA
+if (menuSpolecznoscBtn) {
+    menuSpolecznoscBtn.addEventListener('click', () => {
+        if (mainMenuSection) mainMenuSection.style.display = 'none';
+        spolecznoscSection.style.display = 'flex';
+        openChatTab(); // Domyślnie otwórz czat
+    });
+}
+if (spolecznoscBackBtn) {
+    spolecznoscBackBtn.addEventListener('click', () => {
+        spolecznoscSection.style.display = 'none';
+        if (chatListenerUnsubscribe) chatListenerUnsubscribe(); // Wyłącz nasłuch
+        showMainMenu();
+    });
+}
+
+function openChatTab() {
+    chatContainer.style.display = 'flex';
+    wiedzaContainer.style.display = 'none';
+    tabChatBtn.classList.add('primary');
+    tabWiedzaBtn.classList.remove('primary');
+    initChat();
+}
+
+function openWiedzaTab() {
+    chatContainer.style.display = 'none';
+    wiedzaContainer.style.display = 'flex';
+    tabWiedzaBtn.classList.add('primary');
+    tabChatBtn.classList.remove('primary');
+    loadKnowledgeBase();
+}
+
+if (tabChatBtn) tabChatBtn.addEventListener('click', openChatTab);
+if (tabWiedzaBtn) tabWiedzaBtn.addEventListener('click', openWiedzaTab);
+
+// --- 2. LOGIKA CZATU + POWIADOMIENIA ---
+
+function initChat() {
+    if (!currentUserProfile || !currentUserProfile['ID lecznicy']) {
+        chatMessagesArea.innerHTML = '<p>Błąd: Brak przypisanej lecznicy.</p>';
+        return;
+    }
+    
+    const clinicId = currentUserProfile['ID lecznicy'];
+    console.log("Inicjalizacja czatu dla lecznicy:", clinicId);
+
+    // ✅ PROŚBA O POWIADOMIENIA (BROWSER NOTIFICATIONS)
+    if ("Notification" in window && Notification.permission !== "granted") {
+        Notification.requestPermission();
+    }
+
+    if (chatListenerUnsubscribe) chatListenerUnsubscribe();
+
+    const q = db.collection('czat_wiadomosci')
+        .where('id_lecznicy', '==', clinicId)
+        .orderBy('timestamp', 'asc')
+        .limitToLast(50);
+
+    let initialLoad = true; // Flaga, żeby nie powiadamiać o starych wiadomościach
+
+    chatListenerUnsubscribe = q.onSnapshot(snapshot => {
+        // Renderowanie wiadomości
+        chatMessagesArea.innerHTML = ''; 
+        
+        snapshot.forEach(doc => {
+            const msg = doc.data();
+            renderMessage(msg);
+        });
+
+        // ✅ LOGIKA POWIADOMIEŃ
+        // Sprawdzamy tylko "nowo dodane" dokumenty w tym snapshocie
+        snapshot.docChanges().forEach(change => {
+            if (change.type === "added" && !initialLoad) {
+                const msg = change.doc.data();
+                // Wyślij powiadomienie tylko jeśli to NIE ja napisałem i aplikacja jest w tle
+                if (msg.uid !== currentUserProfile.uid) {
+                    if (document.hidden && Notification.permission === "granted") {
+                        new Notification(`Nowa wiadomość od ${msg.autor}`, {
+                            body: msg.tresc,
+                            icon: 'logo.jpg' // Upewnij się, że masz taki plik
+                        });
+                    }
+                }
+            }
+        });
+        
+        initialLoad = false; // Koniec pierwszego ładowania
+        chatMessagesArea.scrollTop = chatMessagesArea.scrollHeight; // Przewiń na dół
+
+    }, error => {
+        console.error("Błąd czatu:", error);
+        if (error.code === 'failed-precondition') {
+             alert("Administrator musi utworzyć indeks dla czatu. Link w konsoli (F12).");
+             console.error("LINK DO INDEKSU: Skopiuj go z komunikatu błędu w konsoli.");
+        }
+    });
+}
+
+function renderMessage(msg) {
+    const isMe = msg.uid === currentUserProfile.uid;
+    const div = document.createElement('div');
+    div.style.display = 'flex';
+    div.style.flexDirection = 'column';
+    
+    let timeStr = '';
+    if (msg.timestamp) {
+        const date = msg.timestamp.toDate();
+        timeStr = date.getHours() + ':' + String(date.getMinutes()).padStart(2, '0');
+    }
+
+    let authorLabel = '';
+    if (!isMe) {
+        authorLabel = `<span class="chat-author">${msg.autor}</span>`;
+    }
+
+    div.innerHTML = `
+        ${authorLabel}
+        <div class="chat-msg ${isMe ? 'chat-msg-me' : 'chat-msg-other'}">
+            ${msg.tresc}
+            <div class="chat-time">${timeStr}</div>
+        </div>
+    `;
+    chatMessagesArea.appendChild(div);
+}
+
+async function sendMessage() {
+    const text = chatInput.value.trim();
+    if (!text) return;
+
+    try {
+        await db.collection('czat_wiadomosci').add({
+            id_lecznicy: currentUserProfile['ID lecznicy'],
+            uid: currentUserProfile.uid,
+            autor: currentUserProfile.Imie,
+            tresc: text,
+            timestamp: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        chatInput.value = ''; 
+    } catch (e) {
+        console.error("Błąd wysyłania:", e);
+        alert("Nie udało się wysłać wiadomości.");
+    }
+}
+
+if (chatSendBtn) chatSendBtn.addEventListener('click', sendMessage);
+if (chatInput) chatInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') sendMessage();
+});
+
+// --- 3. LOGIKA BAZY WIEDZY ---
+
+async function loadKnowledgeBase() {
+    wiedzaListArea.innerHTML = '<p style="text-align:center;">Pobieranie bazy wiedzy...</p>';
+    
+    try {
+        const q = db.collection('baza_wiedzy_schematy').orderBy('likes', 'desc').limit(20);
+        const snapshot = await q.get();
+        
+        wiedzaListArea.innerHTML = '';
+        
+        if (snapshot.empty) {
+            wiedzaListArea.innerHTML = '<p style="text-align:center;">Baza jest pusta. Bądź pierwszy!</p>';
+            return;
+        }
+
+        snapshot.forEach(doc => {
+            const schema = { id: doc.id, ...doc.data() };
+            renderSchemaCard(schema);
+        });
+    } catch (e) {
+        console.error("Błąd bazy wiedzy:", e);
+        wiedzaListArea.innerHTML = '<p style="text-align:center; color:red;">Błąd pobierania (Brak indeksu likes desc?).</p>';
+    }
+}
+
+function renderSchemaCard(schema) {
+    const card = document.createElement('div');
+    card.className = 'knowledge-card';
+    const productsList = (schema.produkty || []).map(p => `• ${p.produkt} (${p.ilosc || ''} ${p.dawkowanie || ''})`).join('<br>');
+
+    card.innerHTML = `
+        <div class="knowledge-header">
+            <span class="knowledge-title">${schema.rozpoznanie}</span>
+            <span class="knowledge-likes">👍 ${schema.likes || 0}</span>
+        </div>
+        <div class="knowledge-author">Autor: ${schema.autor_nazwa} | ${new Date(schema.timestamp?.toDate()).toLocaleDateString()}</div>
+        <div style="margin: 10px 0; font-style: italic; color: #555;">"${schema.komentarz || 'Brak opisu'}"</div>
+        <div class="knowledge-products">
+            <strong>Leki:</strong><br>
+            ${productsList}
+        </div>
+        <div style="text-align: right;">
+            <button class="btn small primary" onclick="copySharedSchema('${schema.id}')">📥 Pobierz</button>
+        </div>
+    `;
+    wiedzaListArea.appendChild(card);
+}
+
+window.copySharedSchema = async function(schemaId) {
+    if(!confirm("Czy chcesz skopiować ten schemat do swojej bazy?")) return;
+    
+    try {
+        const doc = await db.collection('baza_wiedzy_schematy').doc(schemaId).get();
+        const data = doc.data();
+        
+        const mySchema = {
+            lekarz_uid: currentUserProfile.uid,
+            id_lecznicy: currentUserProfile['ID lecznicy'],
+            rozpoznanie: data.rozpoznanie + " (Społeczność)",
+            produkty: data.produkty
+        };
+        
+        await db.collection('schematyLeczenia').add(mySchema);
+        await db.collection('baza_wiedzy_schematy').doc(schemaId).update({
+            likes: firebase.firestore.FieldValue.increment(1)
+        });
+        
+        showToast("Schemat pobrany!", "success");
+        cachedSchemas = []; // Wymuś przeładowanie
+    } catch (e) {
+        console.error("Błąd kopiowania:", e);
+        showToast("Błąd kopiowania.", "error");
+    }
+};
+
+// --- 4. UDOSTĘPNIANIE ---
+
+if (shareSchemaBtn) {
+    shareSchemaBtn.addEventListener('click', async () => {
+        if (cachedSchemas.length === 0) {
+            alert("Najpierw wejdź w 'Baza Leczenia', aby załadować swoje schematy.");
+            return;
+        }
+        shareSchemaSelect.innerHTML = '<option value="">-- Wybierz schemat --</option>';
+        cachedSchemas.forEach(s => {
+            shareSchemaSelect.add(new Option(s.rozpoznanie, s.id));
+        });
+        shareSchemaModal.style.display = 'flex';
+    });
+}
+
+if (closeShareSchemaBtn) closeShareSchemaBtn.addEventListener('click', () => shareSchemaModal.style.display = 'none');
+
+if (confirmShareSchemaBtn) {
+    confirmShareSchemaBtn.addEventListener('click', async () => {
+        const selectedId = shareSchemaSelect.value;
+        const comment = shareSchemaComment.value;
+        if (!selectedId) { alert("Wybierz schemat."); return; }
+        
+        const mySchema = cachedSchemas.find(s => s.id === selectedId);
+        if (!mySchema) return;
+        
+        confirmShareSchemaBtn.disabled = true;
+        try {
+            await db.collection('baza_wiedzy_schematy').add({
+                rozpoznanie: mySchema.rozpoznanie,
+                produkty: mySchema.produkty,
+                autor_uid: currentUserProfile.uid,
+                autor_nazwa: `${currentUserProfile.Imie} ${currentUserProfile.Nazwisko}`,
+                komentarz: comment,
+                likes: 0,
+                timestamp: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            showToast("Opublikowano!", "success");
+            shareSchemaModal.style.display = 'none';
+            loadKnowledgeBase();
+        } catch (e) { alert("Błąd publikacji."); } 
+        finally { confirmShareSchemaBtn.disabled = false; }
+    });
+}
 </script> 
 </body>
 </html>
