@@ -2769,7 +2769,7 @@ background-color: #eef;
     
     <div id="cardRevenueToday" class="dash-card blue">
         <span class="dash-icon">💵</span> <div class="dash-info">
-            <span class="dash-label">Dzisiejszy utarg</span>
+            <span class="dash-label">Wszystkie / Gotówka</span>
             <strong id="dashRevenueCount" class="dash-value">0,00 zł</strong>
         </div>
     </div>
@@ -18790,32 +18790,43 @@ async function updateDashboard() {
         document.getElementById('dashVisitsCount').textContent = countToday;
     } catch (e) { console.error("Błąd dash wizyty:", e); }
 
-    // 3. ✅ NOWOŚĆ: Oblicz DZISIEJSZY UTARG (Zastępuje magazyn)
+// 3. ✅ DZISIEJSZY UTARG (Wszystkie / Gotówka)
     try {
-        // Pobieramy paragony z dzisiaj dla zalogowanego lekarza
         const qRev = db.collection("archiwumParagony")
             .where("lekarz_uid", "==", currentUserProfile.uid)
-            .where("data", "==", todayISO); // data jest zapisana jako string YYYY-MM-DD
+            .where("data", "==", todayISO);
             
         const snapRev = await qRev.get();
-        let totalRevenue = 0;
+        let totalSum = 0; // Suma wszystkich wizyt (brutto)
+        let cashSum = 0;  // To co wpłynęło (bez długów)
         
         snapRev.forEach(doc => {
             const data = doc.data();
-            // Zliczamy tylko jeśli nie ma statusu "Dług" (czyli opłacone)
-            // LUB zliczamy wszystko - zależy jak wolisz. 
-            // Zazwyczaj "Utarg" to pieniądze w kasie, więc pomijamy "Dług".
+            const amount = parseFloat(data.suma) || 0;
+            
+            // 1. Dodajemy do ogólnej sumy (niezależnie od statusu)
+            totalSum += amount;
+
+            // 2. Dodajemy do gotówki tylko jeśli to NIE jest dług
             if (data.status !== "Dług") {
-                totalRevenue += parseFloat(data.suma) || 0;
+                cashSum += amount;
             }
         });
 
-        document.getElementById('dashRevenueCount').textContent = totalRevenue.toFixed(2).replace('.', ',') + " zł";
+        // Formatowanie
+        const totalStr = totalSum.toFixed(2).replace('.', ',') + " zł";
+        const cashStr = cashSum.toFixed(2).replace('.', ',') + " zł";
+
+        // Wyświetlamy w formacie: CAŁOŚĆ / GOTÓWKA
+        // Używamy HTML żeby pokolorować gotówkę na zielono dla lepszej czytelności
+        const htmlContent = `${totalStr} <span style="color:#ccc">/</span> <span style="color:#27ae60">${cashStr}</span>`;
+        
+        document.getElementById('dashRevenueCount').innerHTML = htmlContent;
+
     } catch (e) { 
         console.error("Błąd dash utarg:", e); 
         document.getElementById('dashRevenueCount').textContent = "0,00 zł";
     }
-
     // 4. Oblicz NIESPŁACONE DŁUGI (Bez zmian)
     try {
         const qDebt = db.collection("archiwumParagony")
@@ -18846,7 +18857,7 @@ document.getElementById('cardVisits').addEventListener('click', () => {
     showToast("Przełączono na dzisiejsze wizyty.", "success");
 });
 
-// 2. ✅ UTARG (Niebieski - NOWOŚĆ) -> Idź do Raportów (Gotówka, Dziś)
+// 2. ✅ UTARG (Niebieski) -> Idź do Raportu OGÓLNEGO (Dziś)
 document.getElementById('cardRevenueToday').addEventListener('click', () => {
     showSection('raporty');
     
@@ -18856,14 +18867,16 @@ document.getElementById('cardRevenueToday').addEventListener('click', () => {
     const dateStart = document.getElementById('reportDateStart');
     const dateEnd = document.getElementById('reportDateEnd');
 
-    if (typeSelect) typeSelect.value = 'gotowka';
+    // ✅ ZMIANA: Wybieramy raport "ogolny" zamiast "gotowka"
+    if (typeSelect) typeSelect.value = 'ogolny'; 
+    
     if (dateStart) dateStart.value = todayISO;
     if (dateEnd) dateEnd.value = todayISO;
 
-    // Opcjonalnie: od razu kliknij "Generuj"
+    // Automatyczne generowanie
     const genBtn = document.getElementById('generateReportBtn');
     if (genBtn) {
-        showToast("Generowanie raportu dziennego...", "info");
+        showToast("Generowanie raportu ogólnego z dzisiaj...", "info");
         genBtn.click();
     }
 });
