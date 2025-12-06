@@ -2812,6 +2812,13 @@ background-color: #eef;
             <strong id="dashDebtCount" class="dash-value">0 zł</strong>
         </div>
     </div>
+     <div id="cardUnreadMsg" class="dash-card purple">
+        <span class="dash-icon">💬</span>
+        <div class="dash-info">
+            <span class="dash-label">Nieprzeczytane</span>
+            <strong id="dashUnreadCount" class="dash-value">0</strong>
+        </div>
+    </div>
 </div>
   <img src="logo.jpg" alt="KL-Mobile Logo" class="slogan-logo">
   <p class="footer-info">
@@ -5865,6 +5872,23 @@ if (printFormat110 && receiptPrintContainer) {
 .knowledge-author { font-size: 12px; color: #777; }
 .knowledge-products { font-size: 13px; color: #444; margin-bottom: 10px; }
 .knowledge-likes { font-weight: bold; color: #e67e22; }
+                    /* Kolor fioletowy dla dashboardu */
+.dash-card.purple { border-bottom-color: #9b59b6; }
+
+/* Przycisk usuwania wiadomości (mały krzyżyk) */
+.btn-delete-msg {
+    background: none;
+    border: none;
+    color: #999;
+    font-size: 12px;
+    cursor: pointer;
+    margin-left: 5px;
+    padding: 0 4px;
+}
+.btn-delete-msg:hover {
+    color: #c0392b;
+    font-weight: bold;
+}
                     </style>
                 </head>
                 <body>
@@ -8198,6 +8222,10 @@ async function fetchUserProfile(uid) {
         tabKonfiguracjaBtn.style.display = 'none'; // Ukryj w zakładkach
       }
     }
+      // ✅ Uruchom czat w tle (dla licznika wiadomości)
+    initChat();
+    // ✅ Uruchom czyszczenie starych wiadomości
+    runAutoCleanupChat();
     // === KONIEC KONTROLI DOSTĘPU ===
 // ✅ NAPRAWA: Po załadowaniu profilu, uruchom Menu Główne (to odświeży dashboard)
     showMainMenu();
@@ -19092,8 +19120,8 @@ window.addEventListener('appinstalled', () => {
     if (installBtn) installBtn.style.display = 'none';
     deferredPrompt = null;
 });
-    /* ======================================================== */
-/* ✅ MODUŁ SPOŁECZNOŚCI (Czat + Powiadomienia + Baza Wiedzy) */
+ /* ======================================================== */
+/* ✅ MODUŁ SPOŁECZNOŚCI (Czat v2.0 - Pełna wersja)         */
 /* ======================================================== */
 
 const spolecznoscSection = document.getElementById('spolecznoscSection');
@@ -19110,6 +19138,10 @@ const chatInput = document.getElementById('chatInput');
 const chatSendBtn = document.getElementById('chatSendBtn');
 let chatListenerUnsubscribe = null;
 
+// Zmienne licznika
+let unreadMessagesCount = 0;
+let isChatTabActive = false; // Flaga: czy użytkownik patrzy na czat?
+
 // --- ZMIENNE BAZY WIEDZY ---
 const wiedzaListArea = document.getElementById('wiedzaListArea');
 const shareSchemaBtn = document.getElementById('shareSchemaBtn');
@@ -19119,19 +19151,40 @@ const shareSchemaComment = document.getElementById('shareSchemaComment');
 const confirmShareSchemaBtn = document.getElementById('confirmShareSchemaBtn');
 const closeShareSchemaBtn = document.getElementById('closeShareSchemaBtn');
 
-// 1. NAWIGACJA
+// 1. NAWIGACJA I ZLICZANIE
+
+// Funkcja aktualizująca kafelek w dashboardzie
+function updateUnreadDashboard() {
+    const badge = document.getElementById('dashUnreadCount');
+    if (badge) {
+        badge.textContent = unreadMessagesCount;
+        // Opcjonalnie: zmień kolor tekstu jeśli są nowe
+        badge.style.color = unreadMessagesCount > 0 ? '#9b59b6' : '#333';
+    }
+}
+
+// Kliknięcie w kafelek przenosi do czatu
+const cardUnreadMsg = document.getElementById('cardUnreadMsg');
+if (cardUnreadMsg) {
+    cardUnreadMsg.addEventListener('click', () => {
+        if (mainMenuSection) mainMenuSection.style.display = 'none';
+        spolecznoscSection.style.display = 'flex';
+        openChatTab();
+    });
+}
+
 if (menuSpolecznoscBtn) {
     menuSpolecznoscBtn.addEventListener('click', () => {
         if (mainMenuSection) mainMenuSection.style.display = 'none';
         spolecznoscSection.style.display = 'flex';
-        openChatTab(); // Domyślnie otwórz czat
+        openChatTab(); 
     });
 }
 if (spolecznoscBackBtn) {
     spolecznoscBackBtn.addEventListener('click', () => {
         spolecznoscSection.style.display = 'none';
-        if (chatListenerUnsubscribe) chatListenerUnsubscribe(); // Wyłącz nasłuch
-        showMainMenu();
+        isChatTabActive = false; // Wychodzimy z czatu
+        showMainMenu(); // Dashboard zaktualizuje się sam w showMainMenu
     });
 }
 
@@ -19140,7 +19193,16 @@ function openChatTab() {
     wiedzaContainer.style.display = 'none';
     tabChatBtn.classList.add('primary');
     tabWiedzaBtn.classList.remove('primary');
-    initChat();
+    
+    // Reset licznika przy wejściu
+    isChatTabActive = true;
+    unreadMessagesCount = 0;
+    updateUnreadDashboard();
+
+    // Uruchom nasłuchiwanie (jeśli jeszcze nie działa)
+    // UWAGA: W tej wersji nasłuchujemy CAŁY CZAS w tle (inicjowane w onShowKalendarz lub przy starcie), 
+    // ale tutaj upewniamy się, że działa.
+    initChat(); 
 }
 
 function openWiedzaTab() {
@@ -19148,80 +19210,87 @@ function openWiedzaTab() {
     wiedzaContainer.style.display = 'flex';
     tabWiedzaBtn.classList.add('primary');
     tabChatBtn.classList.remove('primary');
+    
+    isChatTabActive = false; // Nie patrzymy na czat
     loadKnowledgeBase();
 }
 
 if (tabChatBtn) tabChatBtn.addEventListener('click', openChatTab);
 if (tabWiedzaBtn) tabWiedzaBtn.addEventListener('click', openWiedzaTab);
 
-// --- 2. LOGIKA CZATU + POWIADOMIENIA ---
+
+// --- 2. LOGIKA CZATU (CORE) ---
 
 function initChat() {
-    if (!currentUserProfile || !currentUserProfile['ID lecznicy']) {
-        chatMessagesArea.innerHTML = '<p>Błąd: Brak przypisanej lecznicy.</p>';
-        return;
-    }
+    // Zapobiegamy podwójnemu nasłuchiwaniu
+    if (chatListenerUnsubscribe) return; 
+
+    if (!currentUserProfile || !currentUserProfile['ID lecznicy']) return;
     
     const clinicId = currentUserProfile['ID lecznicy'];
-    console.log("Inicjalizacja czatu dla lecznicy:", clinicId);
+    console.log("Uruchamianie nasłuchu czatu...");
 
-    // ✅ PROŚBA O POWIADOMIENIA (BROWSER NOTIFICATIONS)
+    // Prośba o powiadomienia
     if ("Notification" in window && Notification.permission !== "granted") {
         Notification.requestPermission();
     }
 
-    if (chatListenerUnsubscribe) chatListenerUnsubscribe();
-
     const q = db.collection('czat_wiadomosci')
         .where('id_lecznicy', '==', clinicId)
         .orderBy('timestamp', 'asc')
-        .limitToLast(50);
+        .limitToLast(50); // Ostatnie 50 wiadomości
 
-    let initialLoad = true; // Flaga, żeby nie powiadamiać o starych wiadomościach
+    let initialLoad = true; 
 
     chatListenerUnsubscribe = q.onSnapshot(snapshot => {
-        // Renderowanie wiadomości
         chatMessagesArea.innerHTML = ''; 
         
         snapshot.forEach(doc => {
-            const msg = doc.data();
+            const msg = { id: doc.id, ...doc.data() };
             renderMessage(msg);
         });
 
-        // ✅ LOGIKA POWIADOMIEŃ
-        // Sprawdzamy tylko "nowo dodane" dokumenty w tym snapshocie
+        // LOGIKA POWIADOMIEŃ I LICZNIKA
         snapshot.docChanges().forEach(change => {
             if (change.type === "added" && !initialLoad) {
                 const msg = change.doc.data();
-                // Wyślij powiadomienie tylko jeśli to NIE ja napisałem i aplikacja jest w tle
+                
+                // Jeśli wiadomość nie jest ode mnie
                 if (msg.uid !== currentUserProfile.uid) {
-                    if (document.hidden && Notification.permission === "granted") {
-                        new Notification(`Nowa wiadomość od ${msg.autor}`, {
-                            body: msg.tresc,
-                            icon: 'logo.jpg' // Upewnij się, że masz taki plik
-                        });
+                    
+                    // Jeśli NIE jestem w zakładce czatu -> zwiększ licznik
+                    if (!isChatTabActive || spolecznoscSection.style.display === 'none') {
+                        unreadMessagesCount++;
+                        updateUnreadDashboard();
+                        
+                        // Wyślij powiadomienie przeglądarkowe
+                        if (Notification.permission === "granted") {
+                            new Notification(`Wiadomość od: ${msg.autor}`, {
+                                body: msg.tresc,
+                                icon: 'logo.jpg'
+                            });
+                        }
                     }
                 }
             }
         });
         
-        initialLoad = false; // Koniec pierwszego ładowania
+        initialLoad = false;
         chatMessagesArea.scrollTop = chatMessagesArea.scrollHeight; // Przewiń na dół
 
     }, error => {
         console.error("Błąd czatu:", error);
-        if (error.code === 'failed-precondition') {
-             alert("Administrator musi utworzyć indeks dla czatu. Link w konsoli (F12).");
-             console.error("LINK DO INDEKSU: Skopiuj go z komunikatu błędu w konsoli.");
-        }
     });
 }
 
 function renderMessage(msg) {
     const isMe = msg.uid === currentUserProfile.uid;
+    const isAdmin = currentUserProfile.Rola === 'administrator' || currentUserProfile.Rola === 'właściciel';
+    
     const div = document.createElement('div');
     div.style.display = 'flex';
     div.style.flexDirection = 'column';
+    div.id = `msg-${msg.id}`; // ID elementu DOM
     
     let timeStr = '';
     if (msg.timestamp) {
@@ -19234,14 +19303,63 @@ function renderMessage(msg) {
         authorLabel = `<span class="chat-author">${msg.autor}</span>`;
     }
 
+    // Przycisk usuwania (Kosz) - widoczny dla autora LUB Admina/Właściciela
+    let deleteBtnHtml = '';
+    if (isMe || isAdmin) {
+        deleteBtnHtml = `<button class="btn-delete-msg" onclick="deleteChatMessage('${msg.id}')" title="Usuń wiadomość">✕</button>`;
+    }
+
     div.innerHTML = `
         ${authorLabel}
         <div class="chat-msg ${isMe ? 'chat-msg-me' : 'chat-msg-other'}">
             ${msg.tresc}
+            ${deleteBtnHtml} 
             <div class="chat-time">${timeStr}</div>
         </div>
     `;
     chatMessagesArea.appendChild(div);
+}
+
+// Funkcja usuwania wiadomości
+window.deleteChatMessage = async function(docId) {
+    if(!confirm("Usunąć tę wiadomość?")) return;
+    
+    try {
+        await db.collection('czat_wiadomosci').doc(docId).delete();
+        // Snapshot listener sam odświeży widok (usunie wiadomość z ekranu)
+    } catch (e) {
+        console.error("Błąd usuwania:", e);
+        alert("Nie udało się usunąć wiadomości (brak uprawnień?).");
+    }
+};
+
+// Samo-czyszczenie (Auto-Cleanup) > 7 dni
+async function runAutoCleanupChat() {
+    if (!currentUserProfile || !currentUserProfile['ID lecznicy']) return;
+    
+    // Tylko administrator/właściciel czyści czat, żeby nie obciążać bazy przez każdego pracownika
+    if (currentUserProfile.Rola !== 'administrator' && currentUserProfile.Rola !== 'właściciel') return;
+
+    console.log("Sprawdzanie starych wiadomości czatu...");
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - 7); // 7 dni temu
+
+    try {
+        const q = db.collection('czat_wiadomosci')
+            .where('id_lecznicy', '==', currentUserProfile['ID lecznicy'])
+            .where('timestamp', '<', cutoffDate);
+
+        const snapshot = await q.get();
+        if (snapshot.empty) return;
+
+        const batch = db.batch();
+        snapshot.docs.forEach(doc => batch.delete(doc.ref));
+        await batch.commit();
+        console.log(`Usunięto ${snapshot.size} starych wiadomości z czatu.`);
+    } catch (e) {
+        console.error("Auto-czyszczenie czatu błąd:", e);
+        // Może wymagać indeksu [id_lecznicy + timestamp]
+    }
 }
 
 async function sendMessage() {
@@ -19268,7 +19386,8 @@ if (chatInput) chatInput.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') sendMessage();
 });
 
-// --- 3. LOGIKA BAZY WIEDZY ---
+// --- 3. LOGIKA BAZY WIEDZY (Globalna) ---
+// (Bez większych zmian w stosunku do poprzedniej wersji)
 
 async function loadKnowledgeBase() {
     wiedzaListArea.innerHTML = '<p style="text-align:center;">Pobieranie bazy wiedzy...</p>';
