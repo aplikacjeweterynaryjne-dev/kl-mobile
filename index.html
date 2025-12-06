@@ -2547,6 +2547,37 @@ margin-bottom: 20px; /* ✅ Dodany mały odstęp od dołu */
         display: none !important;
     }
 }
+        /* Styl przycisku instalacji */
+#installFloatingBtn {
+    position: fixed;
+    top: 65px; /* 15px (górny) + 40px (wysokość) + 10px (odstęp) */
+    right: 15px;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background-color: #27ae60; /* Zielony kolor zachęcający do akcji */
+    color: white;
+    font-size: 20px;
+    font-weight: bold;
+    border: 2px solid white;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+    z-index: 20002;
+    cursor: pointer;
+    display: flex; /* Domyślnie flex, ale JS steruje widocznością */
+    justify-content: center;
+    align-items: center;
+    transition: transform 0.2s, background-color 0.2s;
+}
+
+#installFloatingBtn:hover {
+    background-color: #219150;
+    transform: scale(1.1);
+}
+
+/* Ukryj przy druku */
+@media print {
+    #installFloatingBtn { display: none !important; }
+}
 </style>
 <style>
 .slogan {
@@ -4284,6 +4315,9 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
     </div>
 </div>
     <button id="helpFloatingBtn" title="Instrukcja obsługi" style="display: none;">?</button>
+
+<button id="installFloatingBtn" title="Zainstaluj aplikację" style="display: none;">
+    <i class="bi bi-download"></i> </button>
 
 <div id="helpModal" class="product-search-modal" style="display: none; z-index: 20001;">
     <div class="form-card" style="width: 95vw; max-width: 800px; height: 90vh; display: flex; flex-direction: column;">
@@ -6595,7 +6629,10 @@ function showMainMenu() {
     // 4. POKAŻ PRZYCISK POMOCY (Tylko w menu)
     const helpBtn = document.getElementById('helpFloatingBtn');
     if (helpBtn) helpBtn.style.display = 'flex';
-
+    // ✅ POKAŻ PRZYCISK INSTALACJI (jeśli dostępny)
+    if (installBtn && deferredPrompt) {
+        installBtn.style.display = 'flex';
+    }
     // ✅ 5. URUCHOM KAFELKI (DASHBOARD)
     // To jest ta linijka, której brakowało!
     if (typeof updateDashboard === 'function') {
@@ -6618,6 +6655,9 @@ function showMainMenu() {
 function showSection(sectionToShow) {
   const helpBtn = document.getElementById('helpFloatingBtn');
 if (helpBtn) helpBtn.style.display = 'none';
+// ✅ UKRYJ PRZYCISK INSTALACJI (bo wyszliśmy z menu)
+    const installBtn = document.getElementById('installFloatingBtn');
+    if (installBtn) installBtn.style.display = 'none';
     // ✅ POCZĄTEK ZABEZPIECZENIA
   // ... (linia isMainMenuTrapActive = false; jeśli ją dodałeś) ...
   // ✅ KONIEC ZABEZPIECZENIA
@@ -18891,6 +18931,54 @@ document.getElementById('cardDebt').addEventListener('click', async () => {
         await loadReceiptsForUser(currentUserProfile.uid);
         if (typeof applyReceiptFilters === 'function') applyReceiptFilters();
     }
+});
+    /* ======================================================== */
+/* ✅ LOGIKA INSTALACJI PWA (Przycisk "Zainstaluj")         */
+/* ======================================================== */
+
+let deferredPrompt; // Zmienna do przechowywania zdarzenia instalacji
+const installBtn = document.getElementById('installFloatingBtn');
+
+// 1. Nasłuchuj, czy przeglądarka pozwala na instalację
+window.addEventListener('beforeinstallprompt', (e) => {
+    // Zapobiegaj automatycznemu paskowi Chrome (mini-infobar)
+    e.preventDefault();
+    // Zapisz zdarzenie na później
+    deferredPrompt = e;
+    console.log("Możliwość instalacji PWA wykryta.");
+    
+    // Jeśli jesteśmy w Menu Głównym, pokaż przycisk od razu
+    const mainMenuSection = document.getElementById('mainMenuSection');
+    if (mainMenuSection && mainMenuSection.style.display !== 'none') {
+        if (installBtn) installBtn.style.display = 'flex';
+    }
+});
+
+// 2. Obsługa kliknięcia w przycisk
+if (installBtn) {
+    installBtn.addEventListener('click', async () => {
+        if (!deferredPrompt) return;
+
+        // Pokaż natywne okno instalacji
+        deferredPrompt.prompt();
+
+        // Czekaj na decyzję użytkownika
+        const { outcome } = await deferredPrompt.userChoice;
+        console.log(`Decyzja użytkownika: ${outcome}`);
+
+        // Resetuj zmienną (można użyć tylko raz)
+        deferredPrompt = null;
+        
+        // Ukryj przycisk po kliknięciu
+        installBtn.style.display = 'none';
+    });
+}
+
+// 3. Ukryj przycisk, jeśli aplikacja została zainstalowana
+window.addEventListener('appinstalled', () => {
+    console.log('Aplikacja została zainstalowana.');
+    if (installBtn) installBtn.style.display = 'none';
+    deferredPrompt = null;
 });
 </script> 
 </body>
