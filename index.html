@@ -19418,6 +19418,17 @@ function renderSchemaCard(schema) {
     card.className = 'knowledge-card';
     const productsList = (schema.produkty || []).map(p => `• ${p.produkt} (${p.ilosc || ''} ${p.dawkowanie || ''})`).join('<br>');
 
+    // ✅ NOWA LOGIKA: Sprawdź uprawnienia (Autor lub Admin/Właściciel)
+    const isMe = currentUserProfile && schema.autor_uid === currentUserProfile.uid;
+    const isAdmin = currentUserProfile && (currentUserProfile.Rola === 'administrator' || currentUserProfile.Rola === 'właściciel');
+
+    // Przygotuj przycisk usuwania (widoczny tylko dla uprawnionych)
+    let deleteBtnHtml = '';
+    if (isMe || isAdmin) {
+        // Dodajemy onclick wskazujący na nową funkcję deleteSharedSchema
+        deleteBtnHtml = `<button class="btn warn small" onclick="deleteSharedSchema('${schema.id}')" style="margin-right: 5px;">🗑️ Usuń</button>`;
+    }
+
     card.innerHTML = `
         <div class="knowledge-header">
             <span class="knowledge-title">${schema.rozpoznanie}</span>
@@ -19429,12 +19440,26 @@ function renderSchemaCard(schema) {
             <strong>Leki:</strong><br>
             ${productsList}
         </div>
-        <div style="text-align: right;">
-            <button class="btn small primary" onclick="copySharedSchema('${schema.id}')">📥 Pobierz</button>
+        <div style="text-align: right; margin-top: 10px;">
+            ${deleteBtnHtml} <button class="btn small primary" onclick="copySharedSchema('${schema.id}')">📥 Pobierz</button>
         </div>
     `;
     wiedzaListArea.appendChild(card);
 }
+
+// ✅ NOWA FUNKCJA: Usuwanie schematu ze społeczności
+window.deleteSharedSchema = async function(schemaId) {
+    if(!confirm("Czy na pewno chcesz usunąć ten schemat z Bazy Wiedzy?")) return;
+    
+    try {
+        await db.collection('baza_wiedzy_schematy').doc(schemaId).delete();
+        showToast("Schemat został usunięty.", "success");
+        loadKnowledgeBase(); // Odśwież listę, aby zniknął z ekranu
+    } catch (e) {
+        console.error("Błąd usuwania schematu:", e);
+        alert("Nie udało się usunąć schematu (brak uprawnień?).");
+    }
+};
 
 window.copySharedSchema = async function(schemaId) {
     if(!confirm("Czy chcesz skopiować ten schemat do swojej bazy?")) return;
