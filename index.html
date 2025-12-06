@@ -2611,7 +2611,7 @@ z-index: 1;
 .dash-card.green { border-bottom-color: #27ae60; }
 .dash-card.orange { border-bottom-color: #f39c12; }
 .dash-card.red { border-bottom-color: #c0392b; }
-
+.dash-card.blue { border-bottom-color: #2980b9; } /* Ładny niebieski */
 .dash-icon { font-size: 24px; margin-bottom: 5px; }
 .dash-label { font-size: 11px; color: #666; display: block; margin-bottom: 2px; }
 .dash-value { font-size: 18px; color: #333; font-weight: 800; }
@@ -2767,11 +2767,10 @@ background-color: #eef;
         </div>
     </div>
     
-    <div id="cardStock" class="dash-card orange">
-        <span class="dash-icon">📦</span>
-        <div class="dash-info">
-            <span class="dash-label">Niski stan leków</span>
-            <strong id="dashStockCount" class="dash-value">0</strong>
+    <div id="cardRevenueToday" class="dash-card blue">
+        <span class="dash-icon">💵</span> <div class="dash-info">
+            <span class="dash-label">Dzisiejszy utarg</span>
+            <strong id="dashRevenueCount" class="dash-value">0,00 zł</strong>
         </div>
     </div>
 
@@ -8048,7 +8047,8 @@ async function fetchUserProfile(uid) {
       }
     }
     // === KONIEC KONTROLI DOSTĘPU ===
-
+// ✅ NAPRAWA: Po załadowaniu profilu, uruchom Menu Główne (to odświeży dashboard)
+    showMainMenu();
   } catch (error) {
     console.error("Krytyczny błąd podczas pobierania profilu użytkownika:", error);
     alert("Wystąpił błąd podczas ładowania danych użytkownika. Logowanie przerwane.");
@@ -18760,26 +18760,23 @@ async function updateDashboard() {
         document.getElementById('dashDebtCount').textContent = "-";
     }
 }
-    /* ======================================================== */
-/* ✅ LOGIKA DASHBOARDU (Pulpit Sterowania)                 */
+/* ======================================================== */
+/* ✅ LOGIKA DASHBOARDU (Zaktualizowana v2)                 */
 /* ======================================================== */
 
 async function updateDashboard() {
     console.log("Aktualizacja Dashboardu...");
     const dashboardStats = document.getElementById('dashboardStats');
-    
-    // Zabezpieczenie: jeśli nie ma elementu lub usera, nie rób nic
     if (!dashboardStats || !currentUserProfile) return;
 
-    // 1. ✅ KLUCZOWE: Pokaż dashboard (zmień display: none na flex)
+    // 1. Pokaż dashboard
     dashboardStats.style.display = 'flex';
 
-    // 2. Oblicz WIZYTY DZISIAJ
+    const todayISO = new Date().toISOString().split('T')[0];
+
+    // 2. Oblicz WIZYTY DZISIAJ (Bez zmian)
     try {
-        const todayISO = new Date().toISOString().split('T')[0];
         let countToday = 0;
-        
-        // Sprawdź czy mamy wizyty w pamięci, jak nie to pobierz z bazy
         if (typeof allFetchedVisits !== 'undefined' && allFetchedVisits.length > 0) {
              countToday = allFetchedVisits.filter(v => v.dataWizyty === todayISO && v.status === 'Nowa').length;
         } else {
@@ -18793,24 +18790,33 @@ async function updateDashboard() {
         document.getElementById('dashVisitsCount').textContent = countToday;
     } catch (e) { console.error("Błąd dash wizyty:", e); }
 
-    // 3. Oblicz NISKI STAN LEKÓW
+    // 3. ✅ NOWOŚĆ: Oblicz DZISIEJSZY UTARG (Zastępuje magazyn)
     try {
-        let lowStockCount = 0;
-        if (currentUserProfile.uzywaStanowMagazynowych) {
-            // Jeśli cache jest pusty, spróbuj go załadować
-            if (typeof magazynCache !== 'undefined' && magazynCache.size === 0) {
-                 await loadMagazynCache(currentUserProfile.uid);
+        // Pobieramy paragony z dzisiaj dla zalogowanego lekarza
+        const qRev = db.collection("archiwumParagony")
+            .where("lekarz_uid", "==", currentUserProfile.uid)
+            .where("data", "==", todayISO); // data jest zapisana jako string YYYY-MM-DD
+            
+        const snapRev = await qRev.get();
+        let totalRevenue = 0;
+        
+        snapRev.forEach(doc => {
+            const data = doc.data();
+            // Zliczamy tylko jeśli nie ma statusu "Dług" (czyli opłacone)
+            // LUB zliczamy wszystko - zależy jak wolisz. 
+            // Zazwyczaj "Utarg" to pieniądze w kasie, więc pomijamy "Dług".
+            if (data.status !== "Dług") {
+                totalRevenue += parseFloat(data.suma) || 0;
             }
-            if (typeof magazynCache !== 'undefined') {
-                magazynCache.forEach(item => {
-                    if (item.stan <= 5) lowStockCount++;
-                });
-            }
-        }
-        document.getElementById('dashStockCount').textContent = lowStockCount;
-    } catch (e) { console.error("Błąd dash stan:", e); }
+        });
 
-    // 4. Oblicz NIESPŁACONE DŁUGI
+        document.getElementById('dashRevenueCount').textContent = totalRevenue.toFixed(2).replace('.', ',') + " zł";
+    } catch (e) { 
+        console.error("Błąd dash utarg:", e); 
+        document.getElementById('dashRevenueCount').textContent = "0,00 zł";
+    }
+
+    // 4. Oblicz NIESPŁACONE DŁUGI (Bez zmian)
     try {
         const qDebt = db.collection("archiwumParagony")
             .where("lekarz_uid", "==", currentUserProfile.uid)
@@ -18824,19 +18830,15 @@ async function updateDashboard() {
         document.getElementById('dashDebtCount').textContent = totalDebt.toFixed(0) + " zł";
     } catch (e) { 
         console.error("Błąd dash długi:", e); 
-        document.getElementById('dashDebtCount').textContent = "-";
     }
 }
-    /* ======================================================== */
-/* ✅ INTERAKCJE DASHBOARDU (Klikanie w kafelki)            */
+   /* ======================================================== */
+/* ✅ INTERAKCJE DASHBOARDU (Klikanie w kafelki v2)         */
 /* ======================================================== */
 
-// 1. Kliknięcie w WIZYTY (Zielony) -> Idź do Kalendarza na DZIŚ
+// 1. WIZYTY (Zielony)
 document.getElementById('cardVisits').addEventListener('click', () => {
-    // Przejdź do sekcji kalendarza
     showSection('kalendarz');
-    
-    // Wymuś widok "Dzień" na dzisiaj
     const todayISO = new Date().toISOString().split('T')[0];
     if (typeof switchToDayView === 'function') {
         switchToDayView(todayISO);
@@ -18844,45 +18846,40 @@ document.getElementById('cardVisits').addEventListener('click', () => {
     showToast("Przełączono na dzisiejsze wizyty.", "success");
 });
 
-// 2. Kliknięcie w NISKI STAN (Pomarańczowy) -> Idź do Mojego Magazynu
-document.getElementById('cardStock').addEventListener('click', () => {
-    // Przejdź do magazynu
-    showSection('mojMagazyn');
+// 2. ✅ UTARG (Niebieski - NOWOŚĆ) -> Idź do Raportów (Gotówka, Dziś)
+document.getElementById('cardRevenueToday').addEventListener('click', () => {
+    showSection('raporty');
     
-    // Opcjonalnie: Możemy tu dodać sortowanie, żeby niskie stany były na górze
-    // Ale samo wejście do magazynu już wystarczy, bo stany widać.
-    showToast("Otwarto Twój magazyn.", "info");
+    // Ustaw filtry w sekcji raportów
+    const todayISO = new Date().toISOString().split('T')[0];
+    const typeSelect = document.getElementById('reportTypeSelect');
+    const dateStart = document.getElementById('reportDateStart');
+    const dateEnd = document.getElementById('reportDateEnd');
+
+    if (typeSelect) typeSelect.value = 'gotowka';
+    if (dateStart) dateStart.value = todayISO;
+    if (dateEnd) dateEnd.value = todayISO;
+
+    // Opcjonalnie: od razu kliknij "Generuj"
+    const genBtn = document.getElementById('generateReportBtn');
+    if (genBtn) {
+        showToast("Generowanie raportu dziennego...", "info");
+        genBtn.click();
+    }
 });
 
-// 3. Kliknięcie w DŁUGI (Czerwony) -> Idź do Archiwum Paragonów i filtruj "Dług"
+// 3. DŁUGI (Czerwony)
 document.getElementById('cardDebt').addEventListener('click', async () => {
-    // Przejdź do sekcji archiwum paragonów
     showSection('archiwumParagony');
-
-    // Ustaw filtr użytkownika na "MNIE" (jeśli nie jest wybrany)
     const userSelect = document.getElementById('archiveReceiptUserSelect');
-    if (userSelect && currentUserProfile) {
-        userSelect.value = currentUserProfile.uid;
-    }
-
-    // Ustaw filtr statusu na "Dług"
+    if (userSelect && currentUserProfile) userSelect.value = currentUserProfile.uid;
     const statusSelect = document.getElementById('arcReceiptStatus');
-    if (statusSelect) {
-        statusSelect.value = 'Dług';
-    }
+    if (statusSelect) statusSelect.value = 'Dług';
 
-    // Załaduj dane i zastosuj filtr
     if (typeof loadReceiptsForUser === 'function') {
-        // Pokaż toast
         showToast("Filtrowanie dłużników...", "info");
-        
-        // Załaduj dane dla zalogowanego lekarza
         await loadReceiptsForUser(currentUserProfile.uid);
-        
-        // Zastosuj filtr statusu (funkcja którą masz w kodzie)
-        if (typeof applyReceiptFilters === 'function') {
-            applyReceiptFilters();
-        }
+        if (typeof applyReceiptFilters === 'function') applyReceiptFilters();
     }
 });
 </script> 
