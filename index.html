@@ -4510,32 +4510,55 @@ let mapaCen = {};
 let receiptTotal = 0;
 let magazynCache = new Map(); // ✅ MODUŁ 3: Cache dla stanów magazynowych
 // 🌐 Pobieramy dane dynamicznie z Firestore
+// 🌐 Pobieramy dane dynamicznie z Firestore (ZABEZPIECZONE FILTREM)
 async function fetchDataFromFirebase() {
-try {
-console.log("Pobieranie danych z Firestore...");
+    try {
+        console.log("Pobieranie danych z Firestore...");
 
-// 1. Pobierz dane lecznicy (jeśli masz je w bazie, na razie pomijamy)
+        if (!currentUserProfile) return;
 
-// 2. Pobierz klientów
-const klienciSnapshot = await db.collection("klienci").get();
-const klienci = klienciSnapshot.docs.map(doc => doc.data());
-console.log(`Pobrano ${klienci.length} klientów.`);
+        let qKlienci = db.collection("klienci");
+        let qLeki = db.collection("leki");
 
-// 3. Pobierz leki
-const lekiSnapshot = await db.collection("leki").get();
-const leki = lekiSnapshot.docs.map(doc => doc.data());
-console.log(`Pobrano ${leki.length} leków.`);
+        // ✅ FILTRACJA: Jeśli nie jesteś administratorem, pobierz tylko SWOJE dane
+        if (currentUserProfile.Rola !== 'administrator') {
+            const userClinicId = currentUserProfile['ID lecznicy'];
+            if (!userClinicId) {
+                console.log("Nowe konto - brak ID lecznicy. Pomijam pobieranie danych.");
+                // Przekazujemy puste tablice, żeby wyczyścić widok
+                initData({ klienci: [], leki: [] });
+                return;
+            }
+            qKlienci = qKlienci.where("idLecznicy", "==", userClinicId);
+            qLeki = qLeki.where("id_lecznicy", "==", userClinicId);
+        } else {
+            console.log("Tryb Administratora: Pobieranie pełnej bazy.");
+        }
 
-// ...
-// 4. Złóż obiekt danych i przekaż do initData
-const data = { klienci, leki }; // <-- TAK MA WYGLĄDAĆ TA LINIA
-console.log('✅ Dane pobrane z Firestore:', data);
-initData(data); // Wywołaj starą funkcję z nowymi danymi
+        // 2. Pobierz klientów
+        const klienciSnapshot = await qKlienci.get();
+        const klienci = klienciSnapshot.docs.map(doc => doc.data());
+        console.log(`Pobrano ${klienci.length} klientów.`);
 
-} catch (error) {
-console.error('❌ Błąd pobierania danych z Firestore:', error);
-alert('Nie udało się pobrać danych z bazy. Sprawdź połączenie internetowe.');
-}
+        // 3. Pobierz leki
+        const lekiSnapshot = await qLeki.get();
+        const leki = lekiSnapshot.docs.map(doc => doc.data());
+        console.log(`Pobrano ${leki.length} leków.`);
+
+        // 4. Złóż obiekt danych i przekaż do initData
+        const data = { klienci, leki }; 
+        console.log('✅ Dane pobrane z Firestore:', data);
+        initData(data); 
+
+    } catch (error) {
+        console.error('❌ Błąd pobierania danych z Firestore:', error);
+        
+        if (error.code === 'failed-precondition') {
+             // Jeśli brakuje indeksu (bo dodaliśmy .where), to alert nie jest konieczny dla usera, ale info w konsoli tak
+             console.warn("Wymagany indeks Firestore dla zapytań filtrowanych.");
+        }
+        // Nie blokujemy aplikacji alertem przy błędzie sieci, cache zadziała
+    }
 }
 
 function initData(data) {
@@ -8002,26 +8025,50 @@ alert("Wystąpił krytyczny błąd podczas importu. Sprawdź konsolę (F12).");
 * Funkcja do odświeżania list <datalist> w całej aplikacji.
 * Kluczowe, aby nowi klienci pojawiali się na listach wyboru.
 */
+/**
+ * Funkcja do odświeżania list <datalist> w całej aplikacji.
+ * WERSJA POPRAWIONA: Filtruje po ID Lecznicy.
+ */
 async function refreshClientDataLists() {
-try {
-const klienciSnapshot = await db.collection("klienci").orderBy("nazwa").get();
-const klienci = klienciSnapshot.docs.map(doc => doc.data());
+    try {
+        if (!currentUserProfile) return;
 
-const klientList = document.getElementById('klientList'); // Główna datalist
-if (!klientList) return;
+        let q = db.collection("klienci");
 
-klientList.innerHTML = ''; // Wyczyść
-klienci.forEach(k => {
-const opt = document.createElement('option');
-opt.value = k.nazwa;
-opt.dataset.adres = k.adres || '';
-opt.dataset.nrstada = k.nrStada || '';
-klientList.appendChild(opt);
-});
-console.log('Datalisty klientów zostały zaktualizowane.');
-} catch (error) {
-console.error('Błąd odświeżania datalist klientów:', error);
-}
+        // ✅ FILTRACJA
+        if (currentUserProfile.Rola !== 'administrator') {
+            const userClinicId = currentUserProfile['ID lecznicy'];
+            if (userClinicId) {
+                q = q.where("idLecznicy", "==", userClinicId);
+            } else {
+                // Jeśli brak ID (nowe konto), czyścimy listę i wychodzimy
+                const klientList = document.getElementById('klientList');
+                if (klientList) klientList.innerHTML = '';
+                return;
+            }
+        }
+        
+        // Sortowanie dodajemy po filtrze (wymaga indeksu, ale Firestore sam o to poprosi w konsoli jeśli trzeba)
+        q = q.orderBy("nazwa");
+
+        const klienciSnapshot = await q.get();
+        const klienci = klienciSnapshot.docs.map(doc => doc.data());
+
+        const klientList = document.getElementById('klientList'); // Główna datalist
+        if (!klientList) return;
+
+        klientList.innerHTML = ''; // Wyczyść
+        klienci.forEach(k => {
+            const opt = document.createElement('option');
+            opt.value = k.nazwa;
+            opt.dataset.adres = k.adres || '';
+            opt.dataset.nrstada = k.nrStada || '';
+            klientList.appendChild(opt);
+        });
+        console.log('Datalisty klientów zostały zaktualizowane (przefiltrowane).');
+    } catch (error) {
+        console.error('Błąd odświeżania datalist klientów:', error);
+    }
 }
 
 
@@ -8409,81 +8456,100 @@ if(refreshProductsBtn) refreshProductsBtn.style.display = 'inline-block';
 * Pobiera dane produktów ('leki') z Firestore, zapisuje do cache i wywołuje renderowanie.
 */
 /* ✅ MODUŁ WIELODOSTĘPNOŚCI (Produkty) */
+/**
+ * Pobiera dane produktów ('leki') z Firestore, zapisuje do cache i wywołuje renderowanie.
+ * WERSJA OSTATECZNA: Filtruje po ID Lecznicy i CZYŚCI listy, jeśli ID brak.
+ */
 async function loadAndCacheProducts() {
     if (!produktTableBody || !currentUserProfile) return;
 
     // Pobierz ID lecznicy
     let userClinicId = currentUserProfile['ID lecznicy'];
 
-    // ✅ ZABEZPIECZENIE: Jeśli to nie admin i brak ID lecznicy (np. nowa rejestracja), przerwij po cichu.
-    if (!userClinicId && currentUserProfile.Rola !== 'administrator') {
-        console.log("Wstrzymano ładowanie produktów: Brak ID lecznicy (nowe konto?).");
-        return; 
-    }
-
-    produktTableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 10px;">Ładowanie produktów... <span class="spinner">⏳</span></td></tr>';
-    // ... (reszta funkcji bez zmian)
+    // 1. Zablokuj przyciski i pokaż ładowanie
     if(loadProductsBtn) loadProductsBtn.disabled = true;
     if(refreshProductsBtn) refreshProductsBtn.disabled = true;
+    produktTableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 10px;">Ładowanie produktów... <span class="spinner">⏳</span></td></tr>';
 
     try {
-        console.log(`Pobieranie produktów dla ID Lecznicy: ${userClinicId || 'ADMIN'}`);
-        
         let q = db.collection("leki");
         
-        // 1. FILTRACJA: Jeśli nie admin, pobierz tylko "swoje" leki
+        // ✅ 2. FILTRACJA I CZYSZCZENIE
         if (currentUserProfile.Rola !== 'administrator') {
-            q = q.where("id_lecznicy", "==", userClinicId);
+            if (userClinicId) {
+                // SCENARIUSZ A: Jest ID -> Pobierz tylko leki tej lecznicy
+                q = q.where("id_lecznicy", "==", userClinicId);
+            } else {
+                // SCENARIUSZ B: Nowe konto (brak ID) -> WYCZYŚĆ WSZYSTKO i PRZERWIJ
+                console.log("Brak ID lecznicy (nowe konto). Czyszczenie listy produktów.");
+                
+                // Wyczyść cache tabeli
+                cachedProducts = [];
+                renderProductTable(cachedProducts);
+                
+                // Wyczyść mapy pomocnicze (ważne dla walidacji)
+                if (typeof produktyGlowneCache !== 'undefined') produktyGlowneCache.clear();
+                if (typeof productIDtoNameMap !== 'undefined') productIDtoNameMap.clear();
+
+                // ⚠️ KLUCZOWE: To wyczyści listę w KALKULATORZE
+                refreshProductDataLists(); 
+                
+                return; // Kończymy funkcję tutaj, nie pobieramy nic z bazy
+            }
+        } else {
+             // SCENARIUSZ C: Administrator -> Pobiera wszystko
+             console.log("Tryb Administratora: Pobieranie wszystkich produktów.");
         }
 
+        // 3. Pobieranie z bazy (tylko dla Scenariusza A i C)
         const snapshot = await q.get();
 
         if (snapshot.empty) {
-            console.log("Twoja baza produktów jest pusta.");
+            console.log("Baza produktów jest pusta.");
             cachedProducts = [];
             renderProductTable(cachedProducts);
             
-            // 2. LOGIKA IMPORTU BAZY WZORCOWEJ
-            // Jeśli to właściciel i baza jest pusta -> Zaproponuj import
+            // Logika importu bazy wzorcowej (dla właściciela)
             if (currentUserProfile.Rola === 'właściciel' || currentUserProfile.Rola === 'administrator') {
-                if (confirm("Twoja baza produktów jest pusta.\n\nCzy chcesz załadować domyślną bazę leków (Bazę Wzorcową)?\n\nOperacja skopiuje około 2000 produktów do Twojej prywatnej bazy.")) {
+                 if (confirm("Twoja baza produktów jest pusta.\n\nCzy chcesz załadować domyślną bazę leków (Bazę Wzorcową)?\n\nOperacja skopiuje około 2000 produktów do Twojej prywatnej bazy.")) {
                     await importDefaultDatabaseToClinic(userClinicId);
-                    return; // Funkcja importująca wywoła ponownie to ładowanie
-                }
+                    return; 
+                 }
             }
-
         } else {
             console.log(`Pobrano ${snapshot.size} produktów.`);
             cachedProducts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             renderProductTable(cachedProducts);
         }
 
-        // 3. Budowanie map (dla walidacji i magazynu)
-        produktyGlowneCache.clear();
-        productIDtoNameMap.clear();
+        // 4. Budowanie map (dla walidacji i magazynu)
+        if (typeof produktyGlowneCache !== 'undefined') produktyGlowneCache.clear();
+        if (typeof productIDtoNameMap !== 'undefined') productIDtoNameMap.clear();
+        
         if (cachedProducts) {
             cachedProducts.forEach(p => {
                 if (p.id && p.nazwa) {
-                    produktyGlowneCache.set(p.nazwa, p.id);
-                    productIDtoNameMap.set(p.id, p.nazwa);
+                    if (typeof produktyGlowneCache !== 'undefined') produktyGlowneCache.set(p.nazwa, p.id);
+                    if (typeof productIDtoNameMap !== 'undefined') productIDtoNameMap.set(p.id, p.nazwa);
                 }
             });
         }
         
+        // 5. Odśwież <datalist> w Kalkulatorze
         refreshProductDataLists();
 
     } catch (error) {
         console.error("Błąd podczas ładowania produktów:", error);
         if (error.code === 'failed-precondition') {
-             alert("BŁĄD: Wymagany indeks Firestore dla produktów. Sprawdź konsolę (F12).");
+             console.warn("BŁĄD: Wymagany indeks Firestore dla filtrowania produktów.");
         }
         produktTableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: red;">Błąd ładowania danych.</td></tr>';
     } finally {
+        // Zawsze odblokuj przyciski na końcu
         if(loadProductsBtn) loadProductsBtn.disabled = false;
         if(refreshProductsBtn) refreshProductsBtn.disabled = false;
     }
 }
-
 /**
  * ✅ NOWA FUNKCJA POMOCNICZA: Kopiuje produkty z 'leki_wzorcowe' do 'leki'
  */
