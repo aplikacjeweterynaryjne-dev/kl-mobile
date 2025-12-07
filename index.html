@@ -8414,13 +8414,15 @@ async function loadAndCacheProducts() {
 
     // Pobierz ID lecznicy
     let userClinicId = currentUserProfile['ID lecznicy'];
-    // Jeśli to nie admin i brak ID lecznicy - błąd
+
+    // ✅ ZABEZPIECZENIE: Jeśli to nie admin i brak ID lecznicy (np. nowa rejestracja), przerwij po cichu.
     if (!userClinicId && currentUserProfile.Rola !== 'administrator') {
-        console.error("Brak ID lecznicy w profilu. Nie można wczytać produktów.");
-        return;
+        console.log("Wstrzymano ładowanie produktów: Brak ID lecznicy (nowe konto?).");
+        return; 
     }
 
     produktTableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 10px;">Ładowanie produktów... <span class="spinner">⏳</span></td></tr>';
+    // ... (reszta funkcji bez zmian)
     if(loadProductsBtn) loadProductsBtn.disabled = true;
     if(refreshProductsBtn) refreshProductsBtn.disabled = true;
 
@@ -18896,12 +18898,21 @@ if (helpModal) {
 /* ======================================================== */
 
 async function updateDashboard() {
+    // ✅ ZABEZPIECZENIE: Jeśli nie ma profilu lub UID, przerwij po cichu (nie rób błędów)
+    if (!currentUserProfile || !currentUserProfile.uid) {
+        console.log("Dashboard wstrzymany: brak profilu użytkownika.");
+        return;
+    }
+
     console.log("Aktualizacja Dashboardu...");
     const dashboardStats = document.getElementById('dashboardStats');
-    if (!dashboardStats || !currentUserProfile) return;
+    
+    // Jeśli z jakiegoś powodu elementu nie ma, też przerwij
+    if (!dashboardStats) return;
 
-    // Pokaż dashboard
+    // 1. Pokaż dashboard
     dashboardStats.style.display = 'flex';
+    // ... (reszta funkcji bez zmian)
 
     // 1. WIZYTY DZISIAJ
     // Pobieramy z kolekcji wizyt, jeśli nie mamy ich w cache
@@ -18965,12 +18976,21 @@ async function updateDashboard() {
 /* ======================================================== */
 
 async function updateDashboard() {
+    // ✅ ZABEZPIECZENIE: Jeśli nie ma profilu lub UID, przerwij po cichu (nie rób błędów)
+    if (!currentUserProfile || !currentUserProfile.uid) {
+        console.log("Dashboard wstrzymany: brak profilu użytkownika.");
+        return;
+    }
+
     console.log("Aktualizacja Dashboardu...");
     const dashboardStats = document.getElementById('dashboardStats');
-    if (!dashboardStats || !currentUserProfile) return;
+    
+    // Jeśli z jakiegoś powodu elementu nie ma, też przerwij
+    if (!dashboardStats) return;
 
     // 1. Pokaż dashboard
     dashboardStats.style.display = 'flex';
+    // ... (reszta funkcji bez zmian)
 
     const todayISO = new Date().toISOString().split('T')[0];
 
