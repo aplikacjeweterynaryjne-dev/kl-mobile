@@ -18516,7 +18516,7 @@ function openCurrentA4PrintWindow() {
     printWindow.focus();
 }
 /**
- * ✅ WSPÓLNY SZABLON HTML (POPRAWIONY: Gwarancja 1 strony - Skala 80% + Mniejsze odstępy)
+ * ✅ WSPÓLNY SZABLON HTML (POPRAWIONY: Skala 92% + Blokada pustej strony)
  */
 function getUnifiedPrintHTML(header, rowsHTML) {
     return `
@@ -18563,68 +18563,68 @@ function getUnifiedPrintHTML(header, rowsHTML) {
                     box-shadow: 0 0 15px rgba(0,0,0,0.2);
                 }
 
-                /* ZMNIEJSZONE MARGINESY PIONOWE */
+                /* STYLE DLA TREŚCI */
                 h2 { 
-                    text-align: center; font-size: 12pt; 
-                    margin: 0 0 5px 0; /* Mniejszy margines pod tytułem */
+                    text-align: center; font-size: 13pt; 
+                    margin: 0 0 8px 0; 
                     font-weight: 700; color: #000; text-transform: uppercase; line-height: 1.1;
                 }
                 
                 .top-section { 
                     display: grid; 
                     grid-template-columns: 1fr 1fr 1fr; 
-                    font-size: 9pt; /* Nieco mniejsza czcionka w nagłówku */
-                    margin-bottom: 5px; /* Mniejszy odstęp pod nagłówkiem */
-                    gap: 3px; 
+                    font-size: 10pt; 
+                    margin-bottom: 8px; 
+                    gap: 5px; 
                 }
 
-                .top-section div { padding: 3px; border: 1px solid #000; word-wrap: break-word; }
+                .top-section div { padding: 4px; border: 1px solid #000; word-wrap: break-word; }
                 .bold { font-weight: 700; }
 
-                table { border-collapse: collapse; width: 100%; font-size: 9pt; margin-bottom: 2px; }
-                th, td { border: 1px solid #000; padding: 2px 3px; text-align: left; vertical-align: middle; }
-                th { background-color: #EBF5E6; text-align: center; font-weight: bold; padding: 2px; }
+                table { border-collapse: collapse; width: 100%; font-size: 10pt; margin-bottom: 5px; }
+                th, td { border: 1px solid #000; padding: 3px 4px; text-align: left; vertical-align: middle; }
+                th { background-color: #EBF5E6; text-align: center; font-weight: bold; padding: 4px; }
                 .center-text { text-align: center; }
                 
-                p { font-size: 9pt; margin: 2px 0; } /* Ciaśniejsze paragrafy */
+                p { font-size: 10pt; margin: 4px 0; }
                 
-                /* Podpisy bliżej tabeli */
-                .signatures { display: flex; justify-content: space-between; margin-top: 10px; }
+                .signatures { display: flex; justify-content: space-between; margin-top: 15px; }
                 .sig-box { display: flex; flex-direction: column; align-items: center; width: 45%; }
-                .sig-label { font-weight: bold; margin-bottom: 2px; font-size: 9pt; display: block; text-align: center; width: 100%; }
-                .sig-img { display: block; height: 40px; width: 100%; object-fit: contain; margin-top: 2px; }
-                .sig-name { margin-top: 1px; font-size: 9pt; text-align: center; }
+                .sig-label { font-weight: bold; margin-bottom: 2px; font-size: 10pt; display: block; text-align: center; width: 100%; }
+                .sig-img { display: block; height: 45px; width: 100%; object-fit: contain; margin-top: 2px; }
+                .sig-name { margin-top: 1px; font-size: 10pt; text-align: center; }
 
-                /* --- USTAWIENIA DRUKARKI (A4 Landscape - SKOMPRESOWANE) --- */
+                /* --- USTAWIENIA DRUKARKI (A4 Landscape) --- */
                 @media print {
                     html, body {
                         background-color: white !important;
                         margin: 0 !important; padding: 0 !important;
-                        height: auto;
-                        overflow: visible;
+                        height: 100%; /* Wymuszamy wysokość strony */
                         width: 100%;
+                        overflow: hidden !important; /* 🛑 TO BLOKUJE DRUGĄ STRONĘ 🛑 */
                     }
                     .print-controls { display: none; }
                     
                     .page-sheet {
-                        width: 100%; margin: 0; padding: 0; box-shadow: none; border: none;
-                        max-width: none; 
-                        min-width: 0;
+                        margin: 0 !important; padding: 0 !important; 
+                        box-shadow: none !important; border: none !important;
                         
-                        /* ✅ ZMNIEJSZONA SKALA DO 80% (Daje dużo luzu) */
-                        transform: scale(0.80); 
+                        /* ✅ ZWIĘKSZONA SKALA DO 92% */
+                        transform: scale(0.92); 
                         transform-origin: top left;
                         
-                        /* Kompensacja szerokości: 100 / 0.80 = 125% */
-                        width: 125%; 
+                        /* Kompensacja szerokości: 100 / 0.92 = 108.7% */
+                        width: 108.7%; 
                         
+                        /* Zapobieganie łamaniu */
                         page-break-after: avoid !important;
                         page-break-before: avoid !important;
+                        break-inside: avoid;
                     }
                     
                     @page {
                         size: A4 landscape;
-                        margin: 0.4cm; /* Minimalne bezpieczne marginesy */
+                        margin: 0.5cm; /* Marginesy drukarki */
                     }
                 }
             </style>
@@ -18641,18 +18641,18 @@ function getUnifiedPrintHTML(header, rowsHTML) {
                 <div class="top-section">
                     <div>
                         Nazwa i adres zakładu leczniczego dla zwierząt:<br>
-                        <span class="bold" style="font-size: 10pt;">${header.nazwaLecznicy}</span><br>
+                        <span class="bold" style="font-size: 11pt;">${header.nazwaLecznicy}</span><br>
                         Wykonanie czynności lekarsko-weterynaryjnych dnia: <span class="bold">${header.dataWykonania}</span><br>
                         Nr stada: <span class="bold">${header.nrStada}</span>
                     </div>
                     <div>
                         Imię, nazwisko i adres albo nazwa siedziby i adres posiadacza zwierzęcia:<br>
-                        <span class="bold" style="font-size: 10pt;">${header.klient}</span><br>
-                        <span class="bold" style="font-size: 10pt;">${header.adresKlienta}</span>
+                        <span class="bold" style="font-size: 11pt;">${header.klient}</span><br>
+                        <span class="bold" style="font-size: 11pt;">${header.adresKlienta}</span>
                     </div>
                     <div>
                         Zgłoszenie: Data: <span class="bold">${header.dataZgloszenia}</span><br>
-                        Nr dokumentu: <span class="bold" style="font-size: 10pt;">${header.nrDokumentu}</span>
+                        Nr dokumentu: <span class="bold" style="font-size: 11pt;">${header.nrDokumentu}</span>
                     </div>
                 </div>
 
@@ -18695,15 +18695,15 @@ function getUnifiedPrintHTML(header, rowsHTML) {
                 <div class="signatures">
                     <div class="sig-box">
                         <span class="sig-label">Lekarz weterynarii</span>
-                        ${header.podpisLekarzaImg ? `<img src="${header.podpisLekarzaImg}" class="sig-img">` : '<div style="height:40px;"></div>'}
+                        ${header.podpisLekarzaImg ? `<img src="${header.podpisLekarzaImg}" class="sig-img">` : '<div style="height:45px;"></div>'}
                         <span class="sig-name">${header.podpisLekarzaLinia}</span>
                     </div>
                     <div class="sig-box">
                         <span class="sig-label">Podpis posiadacza zwierzęcia</span>
-                        ${header.podpisPosiadaczaImg ? `<img src="${header.podpisPosiadaczaImg}" class="sig-img">` : '<div style="height:40px;"></div>'}
+                        ${header.podpisPosiadaczaImg ? `<img src="${header.podpisPosiadaczaImg}" class="sig-img">` : '<div style="height:45px;"></div>'}
                     </div>
                 </div>
-                <p style="margin-top: 5px; font-size: 8pt;"><b>Wyniki badań uzupełniających:</b><br>*W przypadku zwierząt znajdujących się w rejestrze zwierząt gospodarskich oznakowanych</p>
+                <p style="margin-top: 10px; font-size: 9pt;"><b>Wyniki badań uzupełniających:</b><br>*W przypadku zwierząt znajdujących się w rejestrze zwierząt gospodarskich oznakowanych</p>
             </div>
         </body>
         </html>
