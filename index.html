@@ -18516,7 +18516,7 @@ function openCurrentA4PrintWindow() {
     printWindow.focus();
 }
 /**
- * ✅ WSPÓLNY SZABLON HTML (POPRAWIONY: Zamykanie + Format A4 Poziomo)
+ * ✅ WSPÓLNY SZABLON HTML (POPRAWIONY: Gwarancja 1 strony - Skala 80% + Mniejsze odstępy)
  */
 function getUnifiedPrintHTML(header, rowsHTML) {
     return `
@@ -18554,43 +18554,48 @@ function getUnifiedPrintHTML(header, rowsHTML) {
                 /* KARTKA - Widok na Ekranie */
                 .page-sheet {
                     background: white;
-                    width: 297mm; /* Szerokość A4 Landscape na ekranie */
-                    min-height: 210mm;
+                    width: 210mm; 
+                    min-width: 210mm;
+                    min-height: 297mm;
                     margin: 20px auto; 
                     padding: 10mm; 
                     box-sizing: border-box;
                     box-shadow: 0 0 15px rgba(0,0,0,0.2);
                 }
 
+                /* ZMNIEJSZONE MARGINESY PIONOWE */
                 h2 { 
-                    text-align: center; font-size: 13pt; margin: 0 0 10px 0; 
-                    font-weight: 700; color: #000; text-transform: uppercase; line-height: 1.2;
+                    text-align: center; font-size: 12pt; 
+                    margin: 0 0 5px 0; /* Mniejszy margines pod tytułem */
+                    font-weight: 700; color: #000; text-transform: uppercase; line-height: 1.1;
                 }
                 
                 .top-section { 
                     display: grid; 
                     grid-template-columns: 1fr 1fr 1fr; 
-                    font-size: 10pt; 
-                    margin-bottom: 10px; 
-                    gap: 5px; 
+                    font-size: 9pt; /* Nieco mniejsza czcionka w nagłówku */
+                    margin-bottom: 5px; /* Mniejszy odstęp pod nagłówkiem */
+                    gap: 3px; 
                 }
 
                 .top-section div { padding: 3px; border: 1px solid #000; word-wrap: break-word; }
                 .bold { font-weight: 700; }
 
-                table { border-collapse: collapse; width: 100%; font-size: 9pt; margin-bottom: 5px; }
-                th, td { border: 1px solid #000; padding: 2px 4px; text-align: left; vertical-align: middle; }
-                th { background-color: #EBF5E6; text-align: center; font-weight: bold; }
+                table { border-collapse: collapse; width: 100%; font-size: 9pt; margin-bottom: 2px; }
+                th, td { border: 1px solid #000; padding: 2px 3px; text-align: left; vertical-align: middle; }
+                th { background-color: #EBF5E6; text-align: center; font-weight: bold; padding: 2px; }
                 .center-text { text-align: center; }
                 
-                p { font-size: 10pt; margin: 3px 0; }
-                .signatures { display: flex; justify-content: space-between; margin-top: 15px; }
+                p { font-size: 9pt; margin: 2px 0; } /* Ciaśniejsze paragrafy */
+                
+                /* Podpisy bliżej tabeli */
+                .signatures { display: flex; justify-content: space-between; margin-top: 10px; }
                 .sig-box { display: flex; flex-direction: column; align-items: center; width: 45%; }
-                .sig-label { font-weight: bold; margin-bottom: 2px; font-size: 10pt; display: block; text-align: center; width: 100%; }
-                .sig-img { display: block; height: 45px; width: 100%; object-fit: contain; margin-top: 2px; }
-                .sig-name { margin-top: 1px; font-size: 10pt; text-align: center; }
+                .sig-label { font-weight: bold; margin-bottom: 2px; font-size: 9pt; display: block; text-align: center; width: 100%; }
+                .sig-img { display: block; height: 40px; width: 100%; object-fit: contain; margin-top: 2px; }
+                .sig-name { margin-top: 1px; font-size: 9pt; text-align: center; }
 
-                /* --- USTAWIENIA DRUKARKI (A4 Landscape) --- */
+                /* --- USTAWIENIA DRUKARKI (A4 Landscape - SKOMPRESOWANE) --- */
                 @media print {
                     html, body {
                         background-color: white !important;
@@ -18606,20 +18611,20 @@ function getUnifiedPrintHTML(header, rowsHTML) {
                         max-width: none; 
                         min-width: 0;
                         
-                        /* ✅ SKALOWANIE: Zmniejszamy do 85%, żeby zmieścić stopkę */
-                        transform: scale(0.85); 
+                        /* ✅ ZMNIEJSZONA SKALA DO 80% (Daje dużo luzu) */
+                        transform: scale(0.80); 
                         transform-origin: top left;
-                        /* Rozciągamy kontener, aby skompensować skalowanie (100 / 0.85 = ~117.6%) */
-                        width: 117.6%; 
+                        
+                        /* Kompensacja szerokości: 100 / 0.80 = 125% */
+                        width: 125%; 
                         
                         page-break-after: avoid !important;
                         page-break-before: avoid !important;
                     }
                     
-                    /* ✅ WYMUSZENIE POZIOMEJ STRONY */
                     @page {
                         size: A4 landscape;
-                        margin: 0.5cm; /* Minimalne marginesy */
+                        margin: 0.4cm; /* Minimalne bezpieczne marginesy */
                     }
                 }
             </style>
@@ -18636,18 +18641,18 @@ function getUnifiedPrintHTML(header, rowsHTML) {
                 <div class="top-section">
                     <div>
                         Nazwa i adres zakładu leczniczego dla zwierząt:<br>
-                        <span class="bold" style="font-size: 11pt;">${header.nazwaLecznicy}</span><br>
+                        <span class="bold" style="font-size: 10pt;">${header.nazwaLecznicy}</span><br>
                         Wykonanie czynności lekarsko-weterynaryjnych dnia: <span class="bold">${header.dataWykonania}</span><br>
                         Nr stada: <span class="bold">${header.nrStada}</span>
                     </div>
                     <div>
                         Imię, nazwisko i adres albo nazwa siedziby i adres posiadacza zwierzęcia:<br>
-                        <span class="bold" style="font-size: 11pt;">${header.klient}</span><br>
-                        <span class="bold" style="font-size: 11pt;">${header.adresKlienta}</span>
+                        <span class="bold" style="font-size: 10pt;">${header.klient}</span><br>
+                        <span class="bold" style="font-size: 10pt;">${header.adresKlienta}</span>
                     </div>
                     <div>
                         Zgłoszenie: Data: <span class="bold">${header.dataZgloszenia}</span><br>
-                        Nr dokumentu: <span class="bold" style="font-size: 11pt;">${header.nrDokumentu}</span>
+                        Nr dokumentu: <span class="bold" style="font-size: 10pt;">${header.nrDokumentu}</span>
                     </div>
                 </div>
 
@@ -18690,15 +18695,15 @@ function getUnifiedPrintHTML(header, rowsHTML) {
                 <div class="signatures">
                     <div class="sig-box">
                         <span class="sig-label">Lekarz weterynarii</span>
-                        ${header.podpisLekarzaImg ? `<img src="${header.podpisLekarzaImg}" class="sig-img">` : '<div style="height:45px;"></div>'}
+                        ${header.podpisLekarzaImg ? `<img src="${header.podpisLekarzaImg}" class="sig-img">` : '<div style="height:40px;"></div>'}
                         <span class="sig-name">${header.podpisLekarzaLinia}</span>
                     </div>
                     <div class="sig-box">
                         <span class="sig-label">Podpis posiadacza zwierzęcia</span>
-                        ${header.podpisPosiadaczaImg ? `<img src="${header.podpisPosiadaczaImg}" class="sig-img">` : '<div style="height:45px;"></div>'}
+                        ${header.podpisPosiadaczaImg ? `<img src="${header.podpisPosiadaczaImg}" class="sig-img">` : '<div style="height:40px;"></div>'}
                     </div>
                 </div>
-                <p style="margin-top: 5px; font-size: 9pt;"><b>Wyniki badań uzupełniających:</b><br>*W przypadku zwierząt znajdujących się w rejestrze zwierząt gospodarskich oznakowanych</p>
+                <p style="margin-top: 5px; font-size: 8pt;"><b>Wyniki badań uzupełniających:</b><br>*W przypadku zwierząt znajdujących się w rejestrze zwierząt gospodarskich oznakowanych</p>
             </div>
         </body>
         </html>
