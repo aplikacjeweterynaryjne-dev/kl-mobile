@@ -19914,27 +19914,71 @@ async function checkSharedLink() {
         try {
             const doc = await db.collection("archiwumKarty").doc(shareId).get();
             
-            if (doc.exists) {
+      if (doc.exists) {
                 const cardData = doc.data();
-                if (typeof openDirectPrintWindow === 'function') {
-                    openDirectPrintWindow(cardData);
-                    viewer.innerHTML = `
-                        <h2 style="color:green">Dokument otwarty!</h2>
-                        <p style="text-align:center">Karta otworzyła się w nowym oknie.<br>Jeśli zablokowano wyskakujące okienko, kliknij poniżej:</p>
-                        <button id="retryOpenBtn" style="padding:15px 30px; background:#27ae60; color:#fff; border:none; border-radius:8px; font-size:16px; margin-top:10px;">Otwórz ponownie</button>
-                        <br><br>
-                        <a href="/" style="color:#777; text-decoration:underline;">Wróć do strony głównej</a>
-                    `;
-                    document.getElementById('retryOpenBtn').onclick = () => openDirectPrintWindow(cardData);
+
+                // ✅ WERSJA "INLINE" (Bez Popupów)
+                // Sprawdzamy czy mamy funkcję generującą HTML szablonu
+                if (typeof getUnifiedPrintHTML === 'function') {
+                     
+                     // 1. Przygotuj dane nagłówka
+                     const header = cardData.header || {};
+                     header.podpisPosiadaczaImg = cardData.podpisPosiadacza || '';
+                     
+                     // 2. Odtwórz wiersze tabeli (HTML) z danych
+                     let rowsHTML = '';
+                     const savedRows = cardData.table || [];
+                     
+                     // Funkcje pomocnicze
+                     const findRowData = (idx) => savedRows.find(r => r.logicalIndex === idx);
+                     const clean = (txt) => (txt || '').replace('📅', '').trim(); // Usuwa ikonę kalendarza
+
+                     // Pętla budująca 13 wierszy (tak jak w oryginale)
+                     for (let i = 1; i <= 13; i++) {
+                        let lIdx = (i < 10) ? i - 1 : i - 2;
+
+                        // Wiersz 10 to separator
+                        if (i === 10) {
+                            rowsHTML += `<tr><td colspan="8" style="text-align: left; font-weight: bold; padding: 2px 4px; background-color: #f9f9f9; font-size: 10pt;">Potwierdzenie nabycia produktu leczniczego weterynaryjnego/paszy leczniczej</td></tr>`;
+                            continue;
+                        }
+
+                        const rd = findRowData(lIdx);
+                        const lp = (i < 10) ? `${i}.` : `${i-10}.`;
+                        
+                        rowsHTML += `<tr>
+                            <td style="text-align:center;">${lp}</td>
+                            <td>${rd ? clean(rd.opis) : ''}</td>
+                            <td style="text-align:center;">${rd ? clean(rd.liczba) : ''}</td>
+                            <td style="text-align:center;">${rd ? clean(rd.rozpoznanie) : ''}</td>
+                            <td>${rd ? clean(rd.lek) : ''}</td>
+                            <td style="text-align:center;">${rd ? clean(rd.seria) : ''}</td>
+                            <td>${rd ? clean(rd.iloscDawka) : ''}</td>
+                            <td>${rd ? clean(rd.karencja) : ''}</td>
+                        </tr>`;
+                     }
+
+                     // 3. Wygeneruj pełny HTML strony
+                     const fullHTML = getUnifiedPrintHTML(header, rowsHTML);
+
+                     // 4. Nadpisz bieżącą stronę (to omija blokadę popupów!)
+                     document.open();
+                     document.write(fullHTML);
+                     document.close();
+                     
+                     // 5. Wywołaj drukowanie po sekundzie (żeby zdążyło się załadować)
+                     setTimeout(() => window.print(), 1000);
+
                 } else {
-                    viewer.innerHTML = "Błąd: Aplikacja nie załadowała funkcji druku.";
+                    viewer.innerHTML = "Błąd: Aplikacja nie załadowała funkcji renderującej (getUnifiedPrintHTML).";
                 }
+
             } else {
-                viewer.innerHTML = '<h2 style="color:red;">Błąd: Karta nie istnieje.</h2><a href="/">Wróć</a>';
+                viewer.innerHTML = '<h2 style="text-align:center; color:red;">Błąd: Karta nie istnieje lub została usunięta.</h2><br><center><a href="/">Wróć</a></center>';
             }
         } catch (error) {
             console.error(error);
-            viewer.innerHTML = '<h2 style="color:red;">Błąd dostępu do bazy.</h2>';
+            viewer.innerHTML = '<h2 style="text-align:center; color:red;">Błąd dostępu do bazy danych.</h2>';
         }
     }
 }
