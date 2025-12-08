@@ -8281,147 +8281,104 @@ if(refreshClientsBtn) refreshClientsBtn.style.display = 'inline-block';
 async function fetchUserProfile(uid) {
   try {
     console.log(`Pobieranie profilu dla UID: ${uid}...`);
-    // Szukamy dokumentu, gdzie pole 'uid' jest równe UID zalogowanego użytkownika
+    
+    // --- STREFA KRYTYCZNA: Profil Użytkownika ---
     const querySnapshot = await db.collection("konfiguracja").where("uid", "==", uid).limit(1).get();
 
     if (querySnapshot.empty) {
-      // To jest krytyczny błąd - użytkownik istnieje w Auth, ale nie ma go w 'konfiguracja'
       console.warn("NIE ZNALEZIONO PROFILU! Użytkownik istnieje w Auth, ale brak go w 'konfiguracja'.");
       alert("Błąd logowania: Nie można znaleźć powiązanego profilu użytkownika. Skontaktuj się z administratorem.");
-      auth.signOut(); // Wyloguj go, bo aplikacja nie będzie działać
+      auth.signOut();
       return;
     }
 
-    // Znaleziono profil
     const doc = querySnapshot.docs[0];
-    currentUserProfile = { id: doc.id, ...doc.data() };
-    
-    console.log("Pomyślnie pobrano profil użytkownika:", currentUserProfile);
-// ✅ POCZĄTEK MODUŁU 3: Wczytywanie magazynu do cache
-      if (currentUserProfile.uzywaStanowMagazynowych === true) {
-          console.log("Moduł 3: Użytkownik używa stanów magazynowych. Ładowanie magazynu do cache...");
-          try {
-              await loadMagazynCache(uid);
-          } catch (magazynError) {
-              console.error("Krytyczny błąd ładowania magazynu osobistego:", magazynError);
-              showToast("Nie udało się załadować Twojego magazynu. Stany nie będą sprawdzane.", "error", 5000);
-          }
-      } else {
-          console.log("Moduł 3: Użytkownik nie używa stanów magazynowych.");
-          magazynCache.clear(); // Wyczyść cache na wszelki wypadek
-      }
-      // ✅ KONIEC MODUŁU 3
-      
- /* Plik: index.html (ok. linii 1910) */
+    currentUserProfile = { id: doc.id, ...doc.data() };
+    console.log("Pomyślnie pobrano profil użytkownika:", currentUserProfile);
 
-      fetchDataFromFirebase(); // (Jeśli masz tu zduplikowaną linię, usuń ją)
-
-      // ⬇️ ZASTĄPIONA LINIA ⬇️
-      // To wczyta schematy, zbuduje cache I wypełni listę rozwijaną od razu po zalogowaniu.
-      loadAndRenderSchemas();
-      // ⬆️ KONIEC ZASTĘPOWANIA ⬆️
-      // ⬇️ ⬇️ ⬇️ DODAJ TĘ JEDNĄ LINIĘ ⬇️ ⬇️ ⬇️
-      loadAndCacheProducts(); // To wczyta produkty, ceny i mapy PLU
-      // ⬆️ ⬆️ ⬆️ KONIEC ⬆️ ⬆️ ⬆️
-
-      // ✅ POCZĄTEK: Moduł 4 - Ustawienie nazwy lecznicy w karcie leczenia
-    const nazwaLecznicySpan = document.getElementById('nazwaLecznicy');
-    const nazwaLecznicyZProfilu = currentUserProfile['Nazwa lecznicy'];
-    if (nazwaLecznicySpan && nazwaLecznicyZProfilu) {
-      nazwaLecznicySpan.textContent = nazwaLecznicyZProfilu;
-      console.log(`Moduł 4: Ustawiono nazwę lecznicy na: "${nazwaLecznicyZProfilu}"`);
-    } else {
-      if (!nazwaLecznicySpan) console.warn("Moduł 4: Nie znaleziono elementu #nazwaLecznicy");
-      if (!nazwaLecznicyZProfilu) console.warn("Moduł 4: Brak 'Nazwa lecznicy' w profilu użytkownika.");
-    }
-   // ✅ POCZĄTEK: Moduł 6 - Ustawienie dynamicznego podpisu lekarza
-    const doctorSigImg = document.getElementById('doctor-signature');
-    const doctorSigNameSpan = document.getElementById('doctor-signature-name');
-    
-    const podpisDataUrl = currentUserProfile['Podpis'];
-    const podpisLinia = currentUserProfile['PodpisLinia'];
-
-    if (doctorSigImg && podpisDataUrl) {
-      doctorSigImg.src = podpisDataUrl; // Ustaw obrazek podpisu (Base64)
-    } else if (doctorSigImg) {
-      doctorSigImg.src = ''; // Wyczyść, jeśli nie ma
-    }
-
-    if (doctorSigNameSpan && podpisLinia) {
-      doctorSigNameSpan.textContent = podpisLinia; // Ustaw linię tekstu (np. lek. wet. ...)
-    } else if (doctorSigNameSpan) {
-      doctorSigNameSpan.textContent = ''; // Wyczyść, jeśli nie ma
-    }
-    // ✅ KONIEC: Moduł 6
-      // ✅ KONIEC: Moduł 4
-    // === KONTROLA DOSTĘPU (RBAC) ===
-    // Sprawdź, czy przyciski istnieją, zanim spróbujesz ich użyć
-    if (menuKonfiguracjaBtn && tabKonfiguracjaBtn) {
-      if (adminRoles.includes(currentUserProfile.Rola)) {
-        // Użytkownik JEST adminem/właścicielem
-        console.log("Dostęp (Rola): Przyznano dostęp do Konfiguracji.");
-        menuKonfiguracjaBtn.style.display = 'block'; // Pokaż w menu
-        tabKonfiguracjaBtn.style.display = 'inline-block'; // Pokaż w zakładkach
-      } else {
-        // Użytkownik NIE JEST adminem
-        console.log("Dostęp (Rola): Odmówiono dostępu do Konfiguracji.");
-        menuKonfiguracjaBtn.style.display = 'none'; // Ukryj w menu
-        tabKonfiguracjaBtn.style.display = 'none'; // Ukryj w zakładkach
-      }
+    // Wczytanie cache magazynu (jeśli włączony)
+    if (currentUserProfile.uzywaStanowMagazynowych === true) {
+        try {
+            await loadMagazynCache(uid);
+        } catch (magazynError) {
+            console.error("Błąd ładowania magazynu (niekrytyczny):", magazynError);
+        }
+    } else {
+        if (typeof magazynCache !== 'undefined') magazynCache.clear();
     }
-      // ✅ Uruchom czat w tle (dla licznika wiadomości)
-    initChat();
-    // ✅ Uruchom czyszczenie starych wiadomości
-    runAutoCleanupChat();
-    // === KONIEC KONTROLI DOSTĘPU ===
-// ✅ NAPRAWA: Po załadowaniu profilu, uruchom Menu Główne (to odświeży dashboard)
-    showMainMenu();
+
   } catch (error) {
-    console.error("Krytyczny błąd podczas pobierania profilu użytkownika:", error);
-    alert("Wystąpił błąd podczas ładowania danych użytkownika. Logowanie przerwane.");
+    // Błąd krytyczny PROFILU - tutaj przerywamy
+    console.error("Krytyczny błąd podczas pobierania profilu:", error);
+    alert("Wystąpił błąd podczas weryfikacji konta. Logowanie przerwane.");
     auth.signOut();
+    return;
   }
+
+  // --- STREFA NIEKRYTYCZNA: Dane Operacyjne i UI ---
+  // Jeśli tutaj wystąpi błąd, po prostu go logujemy, ale POZWALAMY wejść do aplikacji.
+  try {
+      // 1. Ustawienie nazwy lecznicy w karcie
+      const nazwaLecznicySpan = document.getElementById('nazwaLecznicy');
+      const nazwaLecznicyZProfilu = currentUserProfile['Nazwa lecznicy'];
+      if (nazwaLecznicySpan && nazwaLecznicyZProfilu) {
+          nazwaLecznicySpan.textContent = nazwaLecznicyZProfilu;
+      }
+
+      // 2. Ustawienie podpisu
+      const doctorSigImg = document.getElementById('doctor-signature');
+      const doctorSigNameSpan = document.getElementById('doctor-signature-name');
+      
+      const podpisDataUrl = currentUserProfile['Podpis'];
+      const podpisLinia = currentUserProfile['PodpisLinia'];
+
+      if (doctorSigImg && podpisDataUrl) {
+          doctorSigImg.src = podpisDataUrl;
+      } else if (doctorSigImg) {
+          doctorSigImg.src = '';
+      }
+
+      if (doctorSigNameSpan && podpisLinia) {
+          doctorSigNameSpan.textContent = podpisLinia;
+      } else if (doctorSigNameSpan) {
+          doctorSigNameSpan.textContent = '';
+      }
+
+      // 3. Kontrola przycisków Admina
+      if (menuKonfiguracjaBtn && tabKonfiguracjaBtn) {
+          const isAdmin = adminRoles.includes(currentUserProfile.Rola);
+          menuKonfiguracjaBtn.style.display = isAdmin ? 'block' : 'none';
+          tabKonfiguracjaBtn.style.display = isAdmin ? 'inline-block' : 'none';
+      }
+
+      // 4. Pobieranie danych (Produkty, Schematy, Czat) - ZABEZPIECZONE
+      // Uruchamiamy tylko jeśli użytkownik ma przypisaną lecznicę LUB jest Adminem
+      if (currentUserProfile.Rola === 'administrator' || currentUserProfile['ID lecznicy']) {
+          
+          // Wywołujemy funkcje asynchronicznie, nie blokujemy wyświetlania menu
+          fetchDataFromFirebase().catch(e => console.warn("Tło: Błąd klientów/leków", e));
+          loadAndRenderSchemas().catch(e => console.warn("Tło: Błąd schematów", e));
+          loadAndCacheProducts().catch(e => console.warn("Tło: Błąd produktów", e));
+          
+          // Czat i czyszczenie
+          setTimeout(() => {
+              if (typeof initChat === 'function') initChat();
+              if (typeof runAutoCleanupChat === 'function') runAutoCleanupChat();
+          }, 1000); 
+          
+      } else {
+          console.log("Nowe konto lub brak lecznicy - pomijam ładowanie danych operacyjnych.");
+          // Wyczyść ewentualne stare dane z widoku
+          if (typeof initData === 'function') initData({ klienci: [], leki: [] });
+      }
+
+  } catch (secondaryError) {
+      console.error("Błąd ładowania danych drugoplanowych (ignorowany):", secondaryError);
+  }
+
+  // ✅ NAJWAŻNIEJSZE: Zawsze pokaż menu, jeśli profil został pobrany
+  showMainMenu();
 }
-    /**
- * ✅ MODUŁ 3: Wczytuje podkolekcję 'magazynOsobisty' danego użytkownika do globalnego 'magazynCache'.
- * Kluczem Mapy jest ID Produktu (z kolekcji 'leki'), Wartością jest obiekt {stan, ...}.
- */
-async function loadMagazynCache(uid) {
-    if (!uid) {
-        console.error("loadMagazynCache: Brak UID użytkownika.");
-        return;
-    }
-
-    // Wyczyść stary cache przed załadowaniem nowego
-    magazynCache.clear();
-
-    // Odwołujemy się do podkolekcji 'magazynOsobisty' w dokumencie użytkownika
-    // WAŻNE: Musimy znać ID dokumentu w 'konfiguracja', a nie UID z autentykacji.
-    // Na szczęście mamy je w 'currentUserProfile.id'
-
-    if (!currentUserProfile || !currentUserProfile.id) {
-         console.error("loadMagazynCache: Brak currentUserProfile.id. Nie można znaleźć dokumentu konfiguracji.");
-        return;
-    }
-
-    const magazynRef = db.collection("konfiguracja").doc(currentUserProfile.id).collection("magazynOsobisty");
-
-    const snapshot = await magazynRef.get();
-
-    if (snapshot.empty) {
-        console.log("Moduł 3: Magazyn osobisty jest pusty.");
-        return;
-    }
-
-    snapshot.docs.forEach(doc => {
-        // Kluczem Mapy staje się ID dokumentu (które powinno być ID produktu)
-        // Wartością jest cały dokument {stan, produkt_nazwa, ...}
-        magazynCache.set(doc.id, doc.data());
-    });
-
-    console.log(`Moduł 3: Pomyślnie załadowano ${magazynCache.size} pozycji do magazynCache.`);
-}
-    
 
 /**
 * Odświeża globalne listy i mapy produktów (używane w Karcie Leczenia i Kalkulatorze).
