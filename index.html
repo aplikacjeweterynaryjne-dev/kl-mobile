@@ -18517,7 +18517,7 @@ function openCurrentA4PrintWindow() {
 }
 /**
 /**
- * ✅ WSPÓLNY SZABLON HTML (FIX: Skala 85% + Poprawki marginesów)
+ * ✅ WSPÓLNY SZABLON HTML (POPRAWIONY: Responsywny na telefonie, A4 na drukarce)
  */
 function getUnifiedPrintHTML(header, rowsHTML) {
     return `
@@ -18525,33 +18525,44 @@ function getUnifiedPrintHTML(header, rowsHTML) {
         <html lang="pl">
         <head>
             <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
             <title>Karta Leczenia</title>
             <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
             <style>
+                /* --- STYLE OGÓLNE (EKRAN) --- */
                 body { 
                     font-family: 'Nunito', sans-serif; 
                     background-color: #525659; 
-                    margin: 0; padding: 20px; 
-                    display: flex; flex-direction: column; align-items: center;
+                    margin: 0; 
+                    padding: 0; 
+                    /* Usunięto flex center, który ucinał lewą stronę na mobile */
+                    display: block; 
                 }
+
                 .print-controls {
                     position: sticky; top: 0; z-index: 1000;
-                    background: #333; color: #fff; padding: 10px; border-radius: 8px;
-                    margin-bottom: 20px; display: flex; gap: 15px;
+                    background: #333; color: #fff; padding: 10px;
+                    display: flex; justify-content: center; gap: 15px;
+                    box-shadow: 0 2px 10px rgba(0,0,0,0.3);
                 }
-                .btn { padding: 8px 20px; cursor: pointer; border-radius: 4px; border:none; font-weight:bold; }
+                .btn { padding: 10px 20px; cursor: pointer; border-radius: 4px; border:none; font-weight:bold; font-size: 16px; }
                 .btn-print { background: #4CAF50; color: white; }
                 .btn-close { background: #f44336; color: white; }
 
-                /* KARTKA A4 - PODGLĄD */
+                /* KARTKA - Widok na Ekranie */
                 .page-sheet {
                     background: white;
-                    width: 297mm; min-height: 210mm;
+                    /* Na ekranie: elastyczna szerokość, ale nie szersza niż A4 */
+                    width: 100%; 
+                    max-width: 210mm; 
+                    min-height: 297mm;
+                    margin: 20px auto; 
                     padding: 10mm; 
                     box-sizing: border-box;
-                    /* ✅ SKALA 85% DLA PODGLĄDU NA EKRANIE */
-                    transform: scale(0.85); transform-origin: top center;
                     box-shadow: 0 0 15px rgba(0,0,0,0.2);
+                    
+                    /* Ważne dla mobile: przewijanie tabeli jeśli wystaje */
+                    overflow-x: auto; 
                 }
 
                 h2 { 
@@ -18560,12 +18571,17 @@ function getUnifiedPrintHTML(header, rowsHTML) {
                 }
                 
                 .top-section { display: grid; grid-template-columns: 1fr 1fr 1fr; font-size: 10pt; margin-bottom: 10px; gap: 5px; }
+                /* Na bardzo małych ekranach ułóż nagłówek w jedną kolumnę */
+                @media (max-width: 600px) {
+                    .top-section { grid-template-columns: 1fr; }
+                }
+
                 .top-section div { padding: 3px; border: 1px solid #000; }
                 .bold { font-weight: 700; }
 
                 table { border-collapse: collapse; width: 100%; font-size: 9pt; margin-bottom: 5px; }
                 th, td { border: 1px solid #000; padding: 3px; text-align: left; vertical-align: middle; }
-                th { background-color: #EBF5E6; text-align: center; font-weight: bold; vertical-align: middle; }
+                th { background-color: #EBF5E6; text-align: center; font-weight: bold; }
                 .center-text { text-align: center; }
                 
                 p { font-size: 10pt; margin: 3px 0; }
@@ -18575,26 +18591,24 @@ function getUnifiedPrintHTML(header, rowsHTML) {
                 .sig-img { display: block; height: 45px; width: 100%; object-fit: contain; margin-top: 2px; }
                 .sig-name { margin-top: 1px; font-size: 10pt; text-align: center; }
 
-                /* --- USTAWIENIA DRUKARKI (85%) --- */
+                /* --- USTAWIENIA DRUKARKI (A4) --- */
                 @media print {
                     html, body {
-                        height: 99%; 
-                        overflow: hidden; 
                         background-color: white !important;
                         margin: 0 !important; padding: 0 !important;
-                        display: block !important;
+                        height: auto;
+                        overflow: visible;
                     }
                     .print-controls { display: none; }
                     
                     .page-sheet {
                         width: 100%; margin: 0; padding: 0; box-shadow: none; border: none;
+                        max-width: none; /* Zdejmij limit na druku */
                         
-                        /* ✅ SKALA 85% */
+                        /* ✅ SKALA TYLKO DLA DRUKARKI */
                         transform: scale(0.85); 
                         transform-origin: top left;
-                        
-                        /* ✅ KOMPENSACJA SZEROKOŚCI (100 / 0.85 = 117.6) */
-                        width: 117.6%; 
+                        width: 117.6%; /* Kompensacja skali */
                         
                         page-break-after: avoid !important;
                         page-break-before: avoid !important;
@@ -18608,8 +18622,8 @@ function getUnifiedPrintHTML(header, rowsHTML) {
         </head>
         <body>
             <div class="print-controls">
-                <button class="btn btn-print" onclick="window.print()">🖨️ Drukuj</button>
-                <button class="btn btn-close" onclick="window.close()">❌ Zamknij</button>
+                <button class="btn btn-print" onclick="window.print()">🖨️ Drukuj / PDF</button>
+                <button class="btn btn-close" onclick="window.location.reload()">❌ Zamknij</button>
             </div>
 
             <div class="page-sheet">
@@ -19901,8 +19915,7 @@ async function checkSharedLink() {
         console.log("Wykryto wejście z QR! ID:", shareId);
         
         // Ukryj UI logowania
-        const loginSec = document.getElementById('loginSection');
-        if (loginSec) loginSec.style.display = 'none';
+        if (typeof loginSection !== 'undefined' && loginSection) loginSection.style.display = 'none';
         
         // Loader
         const viewer = document.createElement('div');
@@ -19916,38 +19929,28 @@ async function checkSharedLink() {
         try {
             const doc = await db.collection("archiwumKarty").doc(shareId).get();
             
-      if (doc.exists) {
+            if (doc.exists) {
                 const cardData = doc.data();
 
-                // ✅ WERSJA "INLINE" (Bez Popupów)
-                // Sprawdzamy czy mamy funkcję generującą HTML szablonu
+                // ✅ WERSJA "INLINE" (Bez Popupów i Bez Auto-Druku)
                 if (typeof getUnifiedPrintHTML === 'function') {
                      
-                     // 1. Przygotuj dane nagłówka
                      const header = cardData.header || {};
                      header.podpisPosiadaczaImg = cardData.podpisPosiadacza || '';
                      
-                     // 2. Odtwórz wiersze tabeli (HTML) z danych
                      let rowsHTML = '';
                      const savedRows = cardData.table || [];
-                     
-                     // Funkcje pomocnicze
                      const findRowData = (idx) => savedRows.find(r => r.logicalIndex === idx);
-                     const clean = (txt) => (txt || '').replace('📅', '').trim(); // Usuwa ikonę kalendarza
+                     const clean = (txt) => (txt || '').replace('📅', '').trim();
 
-                     // Pętla budująca 13 wierszy (tak jak w oryginale)
                      for (let i = 1; i <= 13; i++) {
                         let lIdx = (i < 10) ? i - 1 : i - 2;
-
-                        // Wiersz 10 to separator
                         if (i === 10) {
                             rowsHTML += `<tr><td colspan="8" style="text-align: left; font-weight: bold; padding: 2px 4px; background-color: #f9f9f9; font-size: 10pt;">Potwierdzenie nabycia produktu leczniczego weterynaryjnego/paszy leczniczej</td></tr>`;
                             continue;
                         }
-
                         const rd = findRowData(lIdx);
                         const lp = (i < 10) ? `${i}.` : `${i-10}.`;
-                        
                         rowsHTML += `<tr>
                             <td style="text-align:center;">${lp}</td>
                             <td>${rd ? clean(rd.opis) : ''}</td>
@@ -19960,16 +19963,14 @@ async function checkSharedLink() {
                         </tr>`;
                      }
 
-                     // 3. Wygeneruj pełny HTML strony
                      const fullHTML = getUnifiedPrintHTML(header, rowsHTML);
 
-                     // 4. Nadpisz bieżącą stronę (to omija blokadę popupów!)
                      document.open();
                      document.write(fullHTML);
                      document.close();
                      
-                     // 5. Wywołaj drukowanie po sekundzie (żeby zdążyło się załadować)
-                     setTimeout(() => window.print(), 1000);
+                     // ❌ USUNIĘTO AUTOMATYCZNE DRUKOWANIE
+                     // Użytkownik skorzysta z przycisków na górze strony
 
                 } else {
                     viewer.innerHTML = "Błąd: Aplikacja nie załadowała funkcji renderującej (getUnifiedPrintHTML).";
