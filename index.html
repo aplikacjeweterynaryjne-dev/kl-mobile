@@ -18516,7 +18516,7 @@ function openCurrentA4PrintWindow() {
     printWindow.focus();
 }
 /**
- * ✅ WSPÓLNY SZABLON HTML (POPRAWIONY: Podgląd dopasowuje się do tabeli)
+ * ✅ WSPÓLNY SZABLON HTML (POPRAWIONY: Skala 75% - Gwarancja 1 strony)
  */
 function getUnifiedPrintHTML(header, rowsHTML) {
     return `
@@ -18528,89 +18528,77 @@ function getUnifiedPrintHTML(header, rowsHTML) {
             <title>Karta Leczenia</title>
             <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
             <style>
-                /* --- STYLE OGÓLNE (EKRAN) --- */
+                /* --- STYLE OGÓLNE --- */
                 body { 
                     font-family: 'Nunito', sans-serif; 
                     background-color: #525659; 
-                    margin: 0; 
-                    padding: 0; 
-                    display: block; 
-                    overflow-x: auto; /* Pozwól przewijać tło */
+                    margin: 0; padding: 0; 
+                    display: block; overflow-x: auto; 
                 }
 
+                /* Pasek przycisków */
                 .print-controls {
                     position: sticky; top: 0; left: 0; z-index: 1000;
                     background: #333; color: #fff; padding: 10px;
                     display: flex; justify-content: center; gap: 15px;
-                    box-shadow: 0 2px 10px rgba(0,0,0,0.3);
-                    /* Pasek musi być co najmniej tak szeroki jak kartka */
-                    width: 100%;
-                    min-width: 210mm; 
-                    box-sizing: border-box;
+                    width: 100%; min-width: 210mm; box-sizing: border-box;
                 }
-                .btn { padding: 10px 20px; cursor: pointer; border-radius: 4px; border:none; font-weight:bold; font-size: 16px; }
+                .btn { padding: 8px 20px; cursor: pointer; border-radius: 4px; border:none; font-weight:bold; font-size: 16px; }
                 .btn-print { background: #4CAF50; color: white; }
                 .btn-close { background: #f44336; color: white; }
 
                 /* KARTKA - Widok na Ekranie */
                 .page-sheet {
                     background: white;
-                    
-                    /* ✅ POPRAWKA: Tło dopasowuje się do szerokości tabeli */
+                    /* Dopasowanie do treści */
                     width: fit-content;  
-                    min-width: 210mm; /* Ale nie może być węższe niż A4 */
+                    min-width: 210mm;
                     min-height: 297mm;
                     
                     margin: 20px auto; 
                     padding: 10mm; 
                     box-sizing: border-box;
                     box-shadow: 0 0 15px rgba(0,0,0,0.2);
-                    
-                    /* Centrowanie kartki jeśli jest szersza niż ekran */
                     display: block; 
                 }
 
-                /* STYLE DLA TREŚCI */
+                /* --- KOMPAKTOWE STYLE TREŚCI --- */
                 h2 { 
-                    text-align: center; font-size: 13pt; 
-                    margin: 0 0 8px 0; 
-                    font-weight: 700; color: #000; text-transform: uppercase; line-height: 1.1;
+                    text-align: center; font-size: 12pt; 
+                    margin: 0 0 5px 0; 
+                    font-weight: 700; color: #000; text-transform: uppercase; line-height: 1.0;
                 }
                 
                 .top-section { 
                     display: grid; 
                     grid-template-columns: 1fr 1fr 1fr; 
-                    font-size: 10pt; 
-                    margin-bottom: 8px; 
-                    gap: 5px; 
-                    /* ✅ POPRAWKA: Nagłówek rozciąga się na pełną szerokość kartki */
+                    font-size: 9pt; 
+                    margin-bottom: 5px; 
+                    gap: 3px; 
                     width: 100%;
                 }
-
-                .top-section div { padding: 4px; border: 1px solid #000; word-wrap: break-word; }
+                .top-section div { padding: 2px 4px; border: 1px solid #000; word-wrap: break-word; }
                 .bold { font-weight: 700; }
 
-                table { border-collapse: collapse; width: 100%; font-size: 10pt; margin-bottom: 5px; }
-                th, td { border: 1px solid #000; padding: 3px 4px; text-align: left; vertical-align: middle; }
-                th { background-color: #EBF5E6; text-align: center; font-weight: bold; padding: 4px; }
+                table { border-collapse: collapse; width: 100%; font-size: 9pt; margin-bottom: 3px; }
+                th, td { border: 1px solid #000; padding: 2px 3px; text-align: left; vertical-align: middle; }
+                th { background-color: #EBF5E6; text-align: center; font-weight: bold; }
                 .center-text { text-align: center; }
                 
-                p { font-size: 10pt; margin: 4px 0; }
+                p { font-size: 9pt; margin: 2px 0; }
                 
-                .signatures { display: flex; justify-content: space-between; margin-top: 15px; }
-                .sig-box { display: flex; flex-direction: column; align-items: center; width: 45%; }
-                .sig-label { font-weight: bold; margin-bottom: 2px; font-size: 10pt; display: block; text-align: center; width: 100%; }
-                .sig-img { display: block; height: 45px; width: 100%; object-fit: contain; margin-top: 2px; }
-                .sig-name { margin-top: 1px; font-size: 10pt; text-align: center; }
+                .signatures { display: flex; justify-content: space-between; margin-top: 10px; }
+                .sig-box { display: flex; flex-direction: column; align-items: center; width: 40%; }
+                .sig-label { font-weight: bold; margin-bottom: 0; font-size: 9pt; display: block; text-align: center; width: 100%; }
+                .sig-img { display: block; height: 35px; width: 100%; object-fit: contain; margin-top: 1px; }
+                .sig-name { margin-top: 0; font-size: 8pt; text-align: center; }
 
-                /* --- USTAWIENIA DRUKARKI (A4 Landscape) --- */
-                /* Tutaj zostawiamy idealne ustawienia, które już działają */
+                /* --- USTAWIENIA DRUKARKI (AGRESYWNE) --- */
                 @media print {
                     html, body {
                         background-color: white !important;
                         margin: 0 !important; padding: 0 !important;
-                        height: 100%; 
-                        width: 100%;
+                        height: 100%; width: 100%;
                         overflow: hidden !important; 
                     }
                     .print-controls { display: none; }
@@ -18619,12 +18607,12 @@ function getUnifiedPrintHTML(header, rowsHTML) {
                         margin: 0 !important; padding: 0 !important; 
                         box-shadow: none !important; border: none !important;
                         
-                        /* Skalowanie dla druku */
-                        transform: scale(0.92); 
+                        /* ✅ SKALA 75% - Bardzo bezpieczna */
+                        transform: scale(0.75); 
                         transform-origin: top left;
                         
-                        /* Kompensacja szerokości */
-                        width: 108.7%; 
+                        /* Kompensacja szerokości: 100 / 0.75 = 133.33% */
+                        width: 133.33%; 
                         
                         page-break-after: avoid !important;
                         page-break-before: avoid !important;
@@ -18633,7 +18621,7 @@ function getUnifiedPrintHTML(header, rowsHTML) {
                     
                     @page {
                         size: A4 landscape;
-                        margin: 0.5cm; 
+                        margin: 0; /* Zerujemy marginesy strony, niech decyduje CSS */
                     }
                 }
             </style>
@@ -18650,18 +18638,18 @@ function getUnifiedPrintHTML(header, rowsHTML) {
                 <div class="top-section">
                     <div>
                         Nazwa i adres zakładu leczniczego dla zwierząt:<br>
-                        <span class="bold" style="font-size: 11pt;">${header.nazwaLecznicy}</span><br>
+                        <span class="bold" style="font-size: 10pt;">${header.nazwaLecznicy}</span><br>
                         Wykonanie czynności lekarsko-weterynaryjnych dnia: <span class="bold">${header.dataWykonania}</span><br>
                         Nr stada: <span class="bold">${header.nrStada}</span>
                     </div>
                     <div>
                         Imię, nazwisko i adres albo nazwa siedziby i adres posiadacza zwierzęcia:<br>
-                        <span class="bold" style="font-size: 11pt;">${header.klient}</span><br>
-                        <span class="bold" style="font-size: 11pt;">${header.adresKlienta}</span>
+                        <span class="bold" style="font-size: 10pt;">${header.klient}</span><br>
+                        <span class="bold" style="font-size: 10pt;">${header.adresKlienta}</span>
                     </div>
                     <div>
                         Zgłoszenie: Data: <span class="bold">${header.dataZgloszenia}</span><br>
-                        Nr dokumentu: <span class="bold" style="font-size: 11pt;">${header.nrDokumentu}</span>
+                        Nr dokumentu: <span class="bold" style="font-size: 10pt;">${header.nrDokumentu}</span>
                     </div>
                 </div>
 
@@ -18679,21 +18667,16 @@ function getUnifiedPrintHTML(header, rowsHTML) {
                     <thead>
                         <tr>
                             <th rowspan="2">Lp.</th>
-                            <th rowspan="2" class="center-text">
-                                Nazwa siedziby stada i opis leczonego zwierzęcia<br>
-                                (gatunek, płeć numer identyfikacyjny, sposób oznakowania, wiek, masa ciała)
-                            </th>
+                            <th rowspan="2" class="center-text">Nazwa siedziby stada i opis leczonego zwierzęcia...</th>
                             <th rowspan="2" class="center-text">Liczba leczonych zwierząt</th>
                             <th rowspan="2" class="center-text">Rozpoznanie albo wstępne rozpoznanie choroby</th>
-                            <th colspan="3">
-                                Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posiadacza zwierzęcia produkty lecznicze weterynaryjne lub pasze lecznicze
-                            </th>
-                            <th rowspan="2">okres karencji / Zabieg leczniczy lub profilaktyczne zalecenia lekarskie oraz uwagi</th>
+                            <th colspan="3">Zastosowane u poszczególnych zwierząt produkty...</th>
+                            <th rowspan="2">okres karencji / Zabieg leczniczy...</th>
                         </tr>
                         <tr>
-                            <th>Nazwa produktu leczniczego/ produktu leczniczego weterynaryjnego/ paszy leczniczej</th>
-                            <th>Numer serii produktu leczniczego lub produktu leczniczego weterynaryjnego</th>
-                            <th>Ilość, dawkowanie zastosowanego produktu leczniczego lub ilość, dawkowanie i okres stosowanie nabytego produktu leczniczego, weterynaryjnego/paszy leczniczej</th>
+                            <th>Nazwa produktu...</th>
+                            <th>Numer serii...</th>
+                            <th>Ilość, dawkowanie...</th>
                         </tr>
                     </thead>
                     <tbody>${rowsHTML}</tbody>
@@ -18704,15 +18687,15 @@ function getUnifiedPrintHTML(header, rowsHTML) {
                 <div class="signatures">
                     <div class="sig-box">
                         <span class="sig-label">Lekarz weterynarii</span>
-                        ${header.podpisLekarzaImg ? `<img src="${header.podpisLekarzaImg}" class="sig-img">` : '<div style="height:45px;"></div>'}
+                        ${header.podpisLekarzaImg ? `<img src="${header.podpisLekarzaImg}" class="sig-img">` : '<div style="height:35px;"></div>'}
                         <span class="sig-name">${header.podpisLekarzaLinia}</span>
                     </div>
                     <div class="sig-box">
                         <span class="sig-label">Podpis posiadacza zwierzęcia</span>
-                        ${header.podpisPosiadaczaImg ? `<img src="${header.podpisPosiadaczaImg}" class="sig-img">` : '<div style="height:45px;"></div>'}
+                        ${header.podpisPosiadaczaImg ? `<img src="${header.podpisPosiadaczaImg}" class="sig-img">` : '<div style="height:35px;"></div>'}
                     </div>
                 </div>
-                <p style="margin-top: 10px; font-size: 9pt;"><b>Wyniki badań uzupełniających:</b><br>*W przypadku zwierząt znajdujących się w rejestrze zwierząt gospodarskich oznakowanych</p>
+                <p style="margin-top: 5px; font-size: 8pt;"><b>Wyniki badań uzupełniających:</b><br>*W przypadku zwierząt znajdujących się w rejestrze zwierząt gospodarskich oznakowanych</p>
             </div>
         </body>
         </html>
