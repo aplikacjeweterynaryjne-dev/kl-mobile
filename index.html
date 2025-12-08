@@ -2280,6 +2280,61 @@ table {
         font-size: 8pt;
     }
 }
+    /* --- STYLE DLA MODUŁU QR --- */
+#qrStickerContent {
+    /* Domyślny wygląd na ekranie */
+    background: white;
+}
+
+/* --- STYLE WYDRUKU NAKLEJKI --- */
+@media print {
+    /* 1. Ukryj wszystko inne */
+    body * {
+        visibility: hidden;
+    }
+    
+    /* 2. Pokaż tylko kontener naklejki i jego zawartość */
+    #qrStickerContent, #qrStickerContent * {
+        visibility: visible;
+    }
+
+    /* 3. Pozycjonowanie naklejki na papierze */
+    #qrStickerContent {
+        position: absolute;
+        top: 0;
+        left: 0;
+        margin: 0;
+        padding: 0;
+        border: none !important; /* Usuń ramkę przy druku */
+        width: 100%; /* Dopasuj do szerokości rolki */
+        text-align: center;
+    }
+
+    /* 4. Ustawienia strony (dla drukarek termicznych) */
+    @page {
+        size: auto;   /* Auto dopasowanie do rolki */
+        margin: 0mm;  /* Zerowe marginesy, żeby nie ucięło */
+    }
+    
+    /* Ukrycie elementów interfejsu modala, które mogłyby "prześwitywać" */
+    #qrModal {
+        position: static;
+        background: none;
+        width: auto;
+        height: auto;
+        display: block !important;
+    }
+    .form-card {
+        box-shadow: none;
+        border: none;
+        width: auto !important;
+        height: auto !important;
+        padding: 0 !important;
+    }
+    #printQrBtn, #closeQrBtn, h3, p {
+        display: none !important;
+    }
+}
 </style>
     <div id="calcProductSearchModal" class="product-search-modal" style="display: none; z-index: 10003;">
     <div class="product-search-card">
@@ -2647,6 +2702,7 @@ z-index: 1;
 .dash-label { font-size: 11px; color: #666; display: block; margin-bottom: 2px; }
 .dash-value { font-size: 18px; color: #333; font-weight: 800; }
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 </head>
 <style>
 .menu-btn {
@@ -5943,6 +5999,29 @@ if (printFormat110 && receiptPrintContainer) {
                     <div class="receipt-page">
                         ${receiptContentHTML}
                     </div>
+              <div id="qrModal" class="product-search-modal" style="display: none; z-index: 10060;">
+    <div class="form-card" style="align-items: center; text-align: center; max-width: 350px;">
+        <h3>Naklejka QR</h3>
+        
+        <div id="qrStickerContent" style="padding: 10px; border: 1px dashed #ccc; margin-bottom: 20px; background: white;">
+            <div id="qrcode" style="display: flex; justify-content: center; margin-bottom: 5px;"></div>
+            
+            <div style="font-family: 'Courier New', monospace; font-weight: bold; font-size: 14px; color: #000;">
+                NR: <span id="qrStickerNr">---</span><br>
+                DATA: <span id="qrStickerDate">---</span>
+            </div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 10px; width: 100%;">
+            <button id="printQrBtn" class="btn primary" style="background-color: #34495e;">🖨️ Drukuj Naklejkę (Termiczna)</button>
+            <button id="closeQrBtn" class="btn ghost">Zamknij</button>
+        </div>
+        
+        <p style="font-size: 12px; color: #999; margin-top: 15px;">
+            Podpowiedź: W ustawieniach drukarki wybierz format etykiety (np. 50x50mm lub rolka).
+        </p>
+    </div>
+</div>
                 </body>
                 </html>
             `);
@@ -11082,12 +11161,19 @@ async function loadCardsForUser(lekarz_uid) {
             tdLekarz.textContent = card.lekarz_nazwisko || 'Nieznany';
             tr.appendChild(tdLekarz);
 
-            // Komórka 5: Akcje
+           // Komórka 5: Akcje
             const tdAkcje = document.createElement('td');
             tdAkcje.className = 'col-akcje';
+            // ✅ ZMIANA: Dodano data-card-nr i data-card-date do przycisku QR
             tdAkcje.innerHTML = `
-                <button class="btn primary small btn-view-archived-card" data-card-id="${card.id}">Podgląd KL</button>
-                <button class="btn warn small btn-delete-archived-card" data-card-id="${card.id}" data-card-nr="${card.nrDokumentu || 'Brak nr'}">Usuń</button>
+                <button class="btn primary small btn-view-archived-card" data-card-id="${card.id}" title="Podgląd">📄</button>
+                <button class="btn small btn-qr-card" 
+                        data-card-id="${card.id}" 
+                        data-card-nr="${card.nrDokumentu || '---'}" 
+                        data-card-date="${card.dataWykonania || '---'}"
+                        style="background-color: #34495e; color: white;" 
+                        title="Naklejka QR">🏷️</button>
+                <button class="btn warn small btn-delete-archived-card" data-card-id="${card.id}" data-card-nr="${card.nrDokumentu || 'Brak nr'}" title="Usuń">🗑</button>
             `;
             tr.appendChild(tdAkcje);
             
@@ -19704,6 +19790,127 @@ if (schemaCheckboxHint) {
 
 // Podepnij pod generowanie wierszy (jeśli generujesz je dynamicznie)
 // Najlepiej wywołać `updateTablePlaceholders()` na końcu funkcji `generateRows()`
+/* ======================================================== */
+/* ✅ MODUŁ QR CODE + NAKLEJKA (Zaktualizowany)             */
+/* ======================================================== */
+
+const qrModal = document.getElementById('qrModal');
+const closeQrBtn = document.getElementById('closeQrBtn');
+const printQrBtn = document.getElementById('printQrBtn');
+const qrcodeContainer = document.getElementById('qrcode');
+const qrStickerNr = document.getElementById('qrStickerNr');
+const qrStickerDate = document.getElementById('qrStickerDate');
+
+// 1. Obsługa kliknięcia przycisku w tabeli Archiwum
+if (archiveCardTableBody) {
+    archiveCardTableBody.addEventListener('click', (e) => {
+        // Obsługa kliknięcia w ikonę wewnątrz przycisku (jeśli kliknie się w emoji)
+        const target = e.target.closest('.btn-qr-card');
+        
+        if (target) {
+            const cardId = target.dataset.cardId;
+            const cardNr = target.dataset.cardNr;
+            const cardDate = target.dataset.cardDate;
+            
+            showQrModal(cardId, cardNr, cardDate);
+        }
+    });
+}
+
+// 2. Funkcja pokazująca modal i generująca kod
+function showQrModal(cardId, cardNr, cardDate) {
+    if (!qrModal) return;
+    
+    // Wyczyść stary kod
+    qrcodeContainer.innerHTML = '';
+    
+    // Uzupełnij dane tekstowe na naklejce
+    qrStickerNr.textContent = cardNr;
+    qrStickerDate.textContent = cardDate;
+    
+    // Generuj Link (URL + parametr ?shareId=)
+    const baseUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
+    const shareUrl = `${baseUrl}?shareId=${cardId}`;
+    
+    console.log("Generowanie QR dla:", shareUrl);
+
+    // Generuj obrazek QR
+    new QRCode(qrcodeContainer, {
+        text: shareUrl,
+        width: 128,  // Mniejszy rozmiar, żeby pasował na naklejkę
+        height: 128,
+        colorDark : "#000000",
+        colorLight : "#ffffff",
+        correctLevel : QRCode.CorrectLevel.M
+    });
+
+    // Pokaż modal
+    qrModal.style.display = 'flex';
+}
+
+// 3. Przycisk Drukowania
+if (printQrBtn) {
+    printQrBtn.addEventListener('click', () => {
+        window.print();
+    });
+}
+
+// 4. Zamknij modal
+if (closeQrBtn) {
+    closeQrBtn.addEventListener('click', () => {
+        qrModal.style.display = 'none';
+    });
+}
+
+// === OBSŁUGA OTWIERANIA LINKU PRZEZ ROLNIKA (Bez zmian z poprzedniej instrukcji) ===
+async function checkSharedLink() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const shareId = urlParams.get('shareId');
+
+    if (shareId) {
+        console.log("Wykryto wejście z QR! ID:", shareId);
+        
+        // Ukryj UI logowania
+        if (loginSection) loginSection.style.display = 'none';
+        
+        // Loader
+        const viewer = document.createElement('div');
+        viewer.style.position = 'fixed'; viewer.style.top = '0'; viewer.style.left = '0';
+        viewer.style.width = '100%'; viewer.style.height = '100%';
+        viewer.style.background = '#fff'; viewer.style.zIndex = '99999';
+        viewer.style.display = 'flex'; viewer.style.justifyContent = 'center'; viewer.style.alignItems = 'center'; viewer.style.flexDirection = 'column';
+        viewer.innerHTML = '<h2>🐮 Wczytywanie Karty...</h2><p>Proszę czekać</p>';
+        document.body.appendChild(viewer);
+
+        try {
+            // Pobierz dokument (dzięki regułom publicznego odczytu)
+            const doc = await db.collection("archiwumKarty").doc(shareId).get();
+            
+            if (doc.exists) {
+                const cardData = doc.data();
+                
+                // Automatycznie otwórz okno druku (PDF)
+                if (typeof openDirectPrintWindow === 'function') {
+                    openDirectPrintWindow(cardData);
+                    viewer.innerHTML = `
+                        <h2 style="color:green">Dokument otwarty!</h2>
+                        <p>Karta powinna otworzyć się w nowym oknie/karcie.</p>
+                        <button onclick="location.reload()" style="padding:10px 20px; font-size:16px;">Wróć do strony głównej</button>
+                    `;
+                } else {
+                    viewer.innerHTML = "Błąd: Brak funkcji renderującej w aplikacji.";
+                }
+            } else {
+                viewer.innerHTML = '<h2 style="color:red;">Błąd: Karta nie istnieje lub została usunięta.</h2>';
+            }
+        } catch (error) {
+            console.error(error);
+            viewer.innerHTML = '<h2 style="color:red;">Błąd dostępu.</h2>';
+        }
+    }
+}
+// Uruchom sprawdzanie przy starcie
+checkSharedLink();
 </script> 
 </body>
 </html>
