@@ -18516,7 +18516,7 @@ function openCurrentA4PrintWindow() {
     printWindow.focus();
 }
 /**
- * ✅ WSPÓLNY SZABLON HTML (POPRAWIONY: Skala 85% - Bezpieczna dla każdej drukarki)
+ * ✅ WSPÓLNY SZABLON HTML (POPRAWIONY: Podgląd dopasowuje się do tabeli)
  */
 function getUnifiedPrintHTML(header, rowsHTML) {
     return `
@@ -18535,7 +18535,7 @@ function getUnifiedPrintHTML(header, rowsHTML) {
                     margin: 0; 
                     padding: 0; 
                     display: block; 
-                    overflow-x: auto; 
+                    overflow-x: auto; /* Pozwól przewijać tło */
                 }
 
                 .print-controls {
@@ -18543,6 +18543,7 @@ function getUnifiedPrintHTML(header, rowsHTML) {
                     background: #333; color: #fff; padding: 10px;
                     display: flex; justify-content: center; gap: 15px;
                     box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+                    /* Pasek musi być co najmniej tak szeroki jak kartka */
                     width: 100%;
                     min-width: 210mm; 
                     box-sizing: border-box;
@@ -18555,15 +18556,17 @@ function getUnifiedPrintHTML(header, rowsHTML) {
                 .page-sheet {
                     background: white;
                     
-                    /* Tło dopasowuje się do szerokości */
+                    /* ✅ POPRAWKA: Tło dopasowuje się do szerokości tabeli */
                     width: fit-content;  
-                    min-width: 210mm;
+                    min-width: 210mm; /* Ale nie może być węższe niż A4 */
                     min-height: 297mm;
                     
                     margin: 20px auto; 
                     padding: 10mm; 
                     box-sizing: border-box;
                     box-shadow: 0 0 15px rgba(0,0,0,0.2);
+                    
+                    /* Centrowanie kartki jeśli jest szersza niż ekran */
                     display: block; 
                 }
 
@@ -18580,6 +18583,7 @@ function getUnifiedPrintHTML(header, rowsHTML) {
                     font-size: 10pt; 
                     margin-bottom: 8px; 
                     gap: 5px; 
+                    /* ✅ POPRAWKA: Nagłówek rozciąga się na pełną szerokość kartki */
                     width: 100%;
                 }
 
@@ -18600,6 +18604,7 @@ function getUnifiedPrintHTML(header, rowsHTML) {
                 .sig-name { margin-top: 1px; font-size: 10pt; text-align: center; }
 
                 /* --- USTAWIENIA DRUKARKI (A4 Landscape) --- */
+                /* Tutaj zostawiamy idealne ustawienia, które już działają */
                 @media print {
                     html, body {
                         background-color: white !important;
@@ -18614,12 +18619,12 @@ function getUnifiedPrintHTML(header, rowsHTML) {
                         margin: 0 !important; padding: 0 !important; 
                         box-shadow: none !important; border: none !important;
                         
-                        /* ✅ SKALA 85% - To jest bezpieczna wartość */
-                        transform: scale(0.85); 
+                        /* Skalowanie dla druku */
+                        transform: scale(0.92); 
                         transform-origin: top left;
                         
-                        /* Kompensacja szerokości: 100 / 0.85 = 117.6% */
-                        width: 117.6%; 
+                        /* Kompensacja szerokości */
+                        width: 108.7%; 
                         
                         page-break-after: avoid !important;
                         page-break-before: avoid !important;
