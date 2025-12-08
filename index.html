@@ -6400,24 +6400,24 @@ const saveCardToArchiveBtn = document.getElementById('saveCardToArchiveBtn');
 /**
  * Pkt 4: Listener dla przycisku "Zapisz w Archiwum"
  */
-/* ✅ MODUŁ 8 (FIX 3 - NUMERACJA + SMART CELL): Zapisuje kartę do archiwum */
+/* ✅ MODUŁ 8 (ZAPIS + AUTO-QR): Zapisuje kartę i proponuje wydruk naklejki */
 if (saveCardToArchiveBtn) {
     saveCardToArchiveBtn.addEventListener('click', async () => {
         
-        // Walidacja podstawowa
+        // 1. Walidacja podstawowa
         if (!currentUserProfile || !currentUserProfile.uid || !currentUserProfile.id) {
             alert("Nie można zapisać. Brak danych zalogowanego użytkownika.");
             return;
         }
         const klient = document.getElementById('klientSelect').value;
-        const nrDokStr = document.getElementById('nrDokumentu').value.trim(); // Pobieramy tekst wpisany przez usera
+        const nrDokStr = document.getElementById('nrDokumentu').value.trim(); 
         
         if (!klient || !nrDokStr) {
             showToast("Wypełnij pola 'Klient' i 'Nr Dokumentu'", 'error');
             return;
         }
 
-        // Walidacja Stanu Magazynowego
+        // 2. Walidacja Stanu Magazynowego
         if (typeof isCardStockValid !== 'undefined' && !isCardStockValid) {
             showToast("Nie można zapisać karty. Wykryto błędy w stanach magazynowych.", "error", 4000);
             return;
@@ -6428,7 +6428,7 @@ if (saveCardToArchiveBtn) {
         saveCardToArchiveBtn.textContent = 'Sprawdzanie...';
 
         try {
-            // Walidacja Duplikatów
+            // 3. Walidacja Duplikatów
             const idLecznicy = currentUserProfile['ID lecznicy'];
             const q = db.collection("archiwumKarty")
                 .where("id_lecznicy", "==", idLecznicy)
@@ -6448,7 +6448,7 @@ if (saveCardToArchiveBtn) {
             
             // --- PRZYGOTOWANIE DANYCH ---
             
-            // 1. Podpis Posiadacza
+            // Podpis Posiadacza
             const canvas = document.getElementById('canvasPosiadacz');
             let podpisData = canvas.toDataURL();
             if (podpisData.length < 1000) { 
@@ -6470,7 +6470,7 @@ if (saveCardToArchiveBtn) {
                 podpisLekarzaLinia: document.getElementById('doctor-signature-name').textContent
             };
             
-            // 2. Tabela i Mapa Zużycia (Logika Smart Cell zachowana)
+            // Tabela i Mapa Zużycia
             const tableRowsData = [];
             const productUsageMap = new Map();
             const rows = rowsEditable();
@@ -6524,33 +6524,24 @@ if (saveCardToArchiveBtn) {
                      const productName = rowData.lek.trim();
                      const quantity = parseFloat(iloscValue) || 0;
                      if (productName && quantity > 0) {
-                         const productId = produktyGlowneCache.get(productName);
-                         if (productId) {
-                             const currentRequired = productUsageMap.get(productId) || 0;
-                             productUsageMap.set(productId, currentRequired + quantity);
-                         }
+                          const productId = produktyGlowneCache.get(productName);
+                          if (productId) {
+                              const currentRequired = productUsageMap.get(productId) || 0;
+                              productUsageMap.set(productId, currentRequired + quantity);
+                          }
                      }
                 }
             });
 
-            // ⬇️⬇️⬇️ NAPRAWA LICZNIKA (COUNTER) ⬇️⬇️⬇️
-            // Zamiast ufać `currentCardData.nextCounter`, parsujemy to, co wpisał użytkownik.
-            let finalCounter = currentCardData.nextCounter; // Wartość domyślna
-            
-            // Próba wyciągnięcia liczby z formatu "16/12/2025/..."
+            // NAPRAWA LICZNIKA
+            let finalCounter = currentCardData.nextCounter;
             try {
                 const parts = nrDokStr.split('/');
                 if (parts.length > 0) {
                     const parsedNumber = parseInt(parts[0], 10);
-                    if (!isNaN(parsedNumber)) {
-                        finalCounter = parsedNumber;
-                        console.log(`Zapisywanie z ręcznie wpisanym numerem: ${finalCounter}`);
-                    }
+                    if (!isNaN(parsedNumber)) finalCounter = parsedNumber;
                 }
-            } catch (e) {
-                console.warn("Nie udało się sparsować ręcznego numeru dokumentu, używam automatycznego.");
-            }
-            // ⬆️⬆️⬆️ KONIEC NAPRAWY ⬆️⬆️⬆️
+            } catch (e) { console.warn("Licznik auto"); }
             
             const cardArchiveData = {
                 lekarz_uid: currentUserProfile.uid,
@@ -6559,10 +6550,7 @@ if (saveCardToArchiveBtn) {
                 klient_nazwa: headerData.klient,
                 nrDokumentu: headerData.nrDokumentu,
                 dataWykonania: headerData.dataWykonania,
-                
-                // Zapisujemy POPRAWIONY licznik
                 counter: finalCounter, 
-                
                 miesiac: currentCardData.currentMonth,
                 rok: currentCardData.currentYear,
                 createdAt: firebase.firestore.FieldValue.serverTimestamp(),
@@ -6575,6 +6563,7 @@ if (saveCardToArchiveBtn) {
             const batch = db.batch();
             const userDocId = currentUserProfile.id;
             
+            // Tworzymy referencję z wyprzedzeniem, aby znać ID (potrzebne do QR!)
             const cardRef = db.collection("archiwumKarty").doc();
             batch.set(cardRef, cardArchiveData);
             
@@ -6609,8 +6598,10 @@ if (saveCardToArchiveBtn) {
                 batch.set(logRef, logData);
             }
 
+            // Wykonaj zapis w bazie
             await batch.commit();
 
+            // Aktualizacja cache magazynu (lokalnie, dla wydajności)
             if (currentUserProfile.uzywaStanowMagazynowych === true && productUsageMap.size > 0) {
                  for (const [productId, usageQty] of productUsageMap.entries()) {
                      const stockData = magazynCache.get(productId);
@@ -6621,6 +6612,15 @@ if (saveCardToArchiveBtn) {
             isCurrentCardSaved = true;
             showToast(`Karta (Nr: ${nrDokStr}) zapisana.`, 'success');
             saveCardToArchiveBtn.textContent = 'Zapisano ✔️';
+
+            // ✅ Pytanie o kod QR (Używamy ID nowej karty)
+            if (confirm("Karta została pomyślnie zapisana.\n\nCzy chcesz teraz wydrukować naklejkę z kodem QR?")) {
+                if (typeof showQrModal === 'function') {
+                    showQrModal(cardRef.id, headerData.nrDokumentu, headerData.dataWykonania);
+                } else {
+                    alert("Błąd: Moduł QR nie jest załadowany.");
+                }
+            }
 
         } catch (error) {
             console.error("Błąd zapisu karty:", error);
