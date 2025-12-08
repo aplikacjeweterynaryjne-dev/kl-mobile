@@ -11161,17 +11161,16 @@ async function loadCardsForUser(lekarz_uid) {
             tdLekarz.textContent = card.lekarz_nazwisko || 'Nieznany';
             tr.appendChild(tdLekarz);
 
-           // Komórka 5: Akcje
+         // Komórka 5: Akcje
             const tdAkcje = document.createElement('td');
             tdAkcje.className = 'col-akcje';
-            // ✅ ZMIANA: Dodano data-card-nr i data-card-date do przycisku QR
             tdAkcje.innerHTML = `
                 <button class="btn primary small btn-view-archived-card" data-card-id="${card.id}" title="Podgląd">📄</button>
-                <button class="btn small btn-qr-card" 
+                <button type="button" class="btn small btn-qr-card" 
                         data-card-id="${card.id}" 
                         data-card-nr="${card.nrDokumentu || '---'}" 
                         data-card-date="${card.dataWykonania || '---'}"
-                        style="background-color: #34495e; color: white;" 
+                        style="background-color: #34495e; color: white; margin: 0 4px;" 
                         title="Naklejka QR">🏷️</button>
                 <button class="btn warn small btn-delete-archived-card" data-card-id="${card.id}" data-card-nr="${card.nrDokumentu || 'Brak nr'}" title="Usuń">🗑</button>
             `;
@@ -19791,7 +19790,7 @@ if (schemaCheckboxHint) {
 // Podepnij pod generowanie wierszy (jeśli generujesz je dynamicznie)
 // Najlepiej wywołać `updateTablePlaceholders()` na końcu funkcji `generateRows()`
 /* ======================================================== */
-/* ✅ MODUŁ QR CODE + NAKLEJKA (Zaktualizowany)             */
+/* ✅ MODUŁ QR CODE + NAKLEJKA (Wersja Naprawiona)          */
 /* ======================================================== */
 
 const qrModal = document.getElementById('qrModal');
@@ -19801,68 +19800,96 @@ const qrcodeContainer = document.getElementById('qrcode');
 const qrStickerNr = document.getElementById('qrStickerNr');
 const qrStickerDate = document.getElementById('qrStickerDate');
 
-// 1. Obsługa kliknięcia przycisku w tabeli Archiwum
-if (archiveCardTableBody) {
-    archiveCardTableBody.addEventListener('click', (e) => {
-        // Obsługa kliknięcia w ikonę wewnątrz przycisku (jeśli kliknie się w emoji)
-        const target = e.target.closest('.btn-qr-card');
+// 1. PANCERNA OBSŁUGA KLIKNIĘCIA
+// Podpinamy się pod 'archiveCardTableBody', bo przyciski są dynamiczne
+const archTableBody = document.getElementById('archiveCardTableBody');
+
+if (archTableBody) {
+    archTableBody.addEventListener('click', (e) => {
+        // 'closest' szuka najbliższego rodzica z klasą .btn-qr-card
+        // To naprawia problem kliknięcia w ikonkę 🏷️ zamiast w przycisk
+        const targetBtn = e.target.closest('.btn-qr-card');
         
-        if (target) {
-            const cardId = target.dataset.cardId;
-            const cardNr = target.dataset.cardNr;
-            const cardDate = target.dataset.cardDate;
+        if (targetBtn) {
+            console.log("Kliknięto przycisk QR!"); // Diagnostyka w konsoli
             
-            showQrModal(cardId, cardNr, cardDate);
+            const cardId = targetBtn.dataset.cardId;
+            const cardNr = targetBtn.dataset.cardNr;
+            const cardDate = targetBtn.dataset.cardDate;
+            
+            if (cardId) {
+                showQrModal(cardId, cardNr, cardDate);
+            } else {
+                console.error("Błąd: Przycisk nie ma ID karty (data-card-id).");
+            }
         }
     });
 }
 
-// 2. Funkcja pokazująca modal i generująca kod
+// 2. Funkcja pokazująca modal
 function showQrModal(cardId, cardNr, cardDate) {
-    if (!qrModal) return;
+    if (!qrModal) {
+        console.error("Błąd: Nie znaleziono modala #qrModal w HTML.");
+        return;
+    }
     
+    // Sprawdź czy biblioteka załadowana
+    if (typeof QRCode === 'undefined') {
+        alert("Błąd: Biblioteka QRCode nie została załadowana. Sprawdź sekcję <head>.");
+        return;
+    }
+
     // Wyczyść stary kod
     qrcodeContainer.innerHTML = '';
     
-    // Uzupełnij dane tekstowe na naklejce
-    qrStickerNr.textContent = cardNr;
-    qrStickerDate.textContent = cardDate;
+    // Uzupełnij tekst
+    if(qrStickerNr) qrStickerNr.textContent = cardNr;
+    if(qrStickerDate) qrStickerDate.textContent = cardDate;
     
-    // Generuj Link (URL + parametr ?shareId=)
+    // Generuj Link
     const baseUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
     const shareUrl = `${baseUrl}?shareId=${cardId}`;
     
-    console.log("Generowanie QR dla:", shareUrl);
+    console.log("Generuję QR dla URL:", shareUrl);
 
-    // Generuj obrazek QR
-    new QRCode(qrcodeContainer, {
-        text: shareUrl,
-        width: 128,  // Mniejszy rozmiar, żeby pasował na naklejkę
-        height: 128,
-        colorDark : "#000000",
-        colorLight : "#ffffff",
-        correctLevel : QRCode.CorrectLevel.M
-    });
-
-    // Pokaż modal
-    qrModal.style.display = 'flex';
+    // Generuj QR
+    try {
+        new QRCode(qrcodeContainer, {
+            text: shareUrl,
+            width: 128,
+            height: 128,
+            colorDark : "#000000",
+            colorLight : "#ffffff",
+            correctLevel : QRCode.CorrectLevel.M
+        });
+        
+        // Pokaż modal
+        qrModal.style.display = 'flex';
+        
+    } catch (err) {
+        console.error("Błąd generowania QR:", err);
+        alert("Wystąpił błąd podczas generowania kodu QR.");
+    }
 }
 
-// 3. Przycisk Drukowania
+// 3. Obsługa przycisków w modalu
 if (printQrBtn) {
-    printQrBtn.addEventListener('click', () => {
+    // Usuwamy stare listenery (klonując przycisk), żeby nie dublować akcji
+    const newPrintBtn = printQrBtn.cloneNode(true);
+    printQrBtn.parentNode.replaceChild(newPrintBtn, printQrBtn);
+    
+    newPrintBtn.addEventListener('click', () => {
         window.print();
     });
 }
 
-// 4. Zamknij modal
 if (closeQrBtn) {
     closeQrBtn.addEventListener('click', () => {
         qrModal.style.display = 'none';
     });
 }
 
-// === OBSŁUGA OTWIERANIA LINKU PRZEZ ROLNIKA (Bez zmian z poprzedniej instrukcji) ===
+// === OBSŁUGA OTWIERANIA LINKU PRZEZ ROLNIKA ===
 async function checkSharedLink() {
     const urlParams = new URLSearchParams(window.location.search);
     const shareId = urlParams.get('shareId');
@@ -19871,7 +19898,8 @@ async function checkSharedLink() {
         console.log("Wykryto wejście z QR! ID:", shareId);
         
         // Ukryj UI logowania
-        if (loginSection) loginSection.style.display = 'none';
+        const loginSec = document.getElementById('loginSection');
+        if (loginSec) loginSec.style.display = 'none';
         
         // Loader
         const viewer = document.createElement('div');
@@ -19883,33 +19911,33 @@ async function checkSharedLink() {
         document.body.appendChild(viewer);
 
         try {
-            // Pobierz dokument (dzięki regułom publicznego odczytu)
             const doc = await db.collection("archiwumKarty").doc(shareId).get();
             
             if (doc.exists) {
                 const cardData = doc.data();
-                
-                // Automatycznie otwórz okno druku (PDF)
                 if (typeof openDirectPrintWindow === 'function') {
                     openDirectPrintWindow(cardData);
                     viewer.innerHTML = `
                         <h2 style="color:green">Dokument otwarty!</h2>
-                        <p>Karta powinna otworzyć się w nowym oknie/karcie.</p>
-                        <button onclick="location.reload()" style="padding:10px 20px; font-size:16px;">Wróć do strony głównej</button>
+                        <p style="text-align:center">Karta otworzyła się w nowym oknie.<br>Jeśli zablokowano wyskakujące okienko, kliknij poniżej:</p>
+                        <button id="retryOpenBtn" style="padding:15px 30px; background:#27ae60; color:#fff; border:none; border-radius:8px; font-size:16px; margin-top:10px;">Otwórz ponownie</button>
+                        <br><br>
+                        <a href="/" style="color:#777; text-decoration:underline;">Wróć do strony głównej</a>
                     `;
+                    document.getElementById('retryOpenBtn').onclick = () => openDirectPrintWindow(cardData);
                 } else {
-                    viewer.innerHTML = "Błąd: Brak funkcji renderującej w aplikacji.";
+                    viewer.innerHTML = "Błąd: Aplikacja nie załadowała funkcji druku.";
                 }
             } else {
-                viewer.innerHTML = '<h2 style="color:red;">Błąd: Karta nie istnieje lub została usunięta.</h2>';
+                viewer.innerHTML = '<h2 style="color:red;">Błąd: Karta nie istnieje.</h2><a href="/">Wróć</a>';
             }
         } catch (error) {
             console.error(error);
-            viewer.innerHTML = '<h2 style="color:red;">Błąd dostępu.</h2>';
+            viewer.innerHTML = '<h2 style="color:red;">Błąd dostępu do bazy.</h2>';
         }
     }
 }
-// Uruchom sprawdzanie przy starcie
+// Uruchom sprawdzanie
 checkSharedLink();
 </script> 
 </body>
