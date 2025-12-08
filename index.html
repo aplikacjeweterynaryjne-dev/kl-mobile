@@ -8379,7 +8379,52 @@ async function fetchUserProfile(uid) {
   // ✅ NAJWAŻNIEJSZE: Zawsze pokaż menu, jeśli profil został pobrany
   showMainMenu();
 }
+/**
+ * ✅ MODUŁ 3: Wczytuje podkolekcję 'magazynOsobisty' danego użytkownika do globalnego 'magazynCache'.
+ * Kluczem Mapy jest ID Produktu, Wartością jest obiekt {stan, ...}.
+ */
+async function loadMagazynCache(uid) {
+    if (!uid) {
+        console.error("loadMagazynCache: Brak UID użytkownika.");
+        return;
+    }
 
+    // Upewnij się, że cache jest zainicjowany
+    if (typeof magazynCache === 'undefined') {
+        console.warn("Zmienna magazynCache nie istnieje, tworzę nową.");
+        window.magazynCache = new Map();
+    }
+
+    // Wyczyść stary cache przed załadowaniem nowego
+    magazynCache.clear();
+
+    // Sprawdź profil
+    if (!currentUserProfile || !currentUserProfile.id) {
+         console.error("loadMagazynCache: Brak currentUserProfile.id. Nie można znaleźć dokumentu konfiguracji.");
+        return;
+    }
+
+    try {
+        const magazynRef = db.collection("konfiguracja").doc(currentUserProfile.id).collection("magazynOsobisty");
+        const snapshot = await magazynRef.get();
+
+        if (snapshot.empty) {
+            console.log("Moduł 3: Magazyn osobisty jest pusty.");
+            return;
+        }
+
+        snapshot.docs.forEach(doc => {
+            // Kluczem Mapy jest ID dokumentu (ID produktu)
+            magazynCache.set(doc.id, doc.data());
+        });
+
+        console.log(`Moduł 3: Pomyślnie załadowano ${magazynCache.size} pozycji do magazynCache.`);
+        
+    } catch (error) {
+        console.error("Błąd wewnątrz loadMagazynCache:", error);
+        throw error; // Rzuć błąd wyżej, żeby fetchUserProfile go odnotował
+    }
+}
 /**
 * Odświeża globalne listy i mapy produktów (używane w Karcie Leczenia i Kalkulatorze).
 * Należy wywołać po załadowaniu danych lub po każdej zmianie (dodaniu/edycji/usunięciu).
