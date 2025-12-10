@@ -5393,19 +5393,27 @@ function selectRowInForm(logicalIndex){
 /* ---- po wyborze produktu w formularzu automatycznie uzupełnij seria/dawkowanie/karencja ---- */
 document.getElementById('formLek').addEventListener('input', function(){
     const n = this.value;
+    
+    // 1. Uzupełnij dane z map (seria, dawkowanie, karencja)
     document.getElementById('formSeria').value = mapaSerii[n] || '';
-    // jeśli dawkowanie ma być w polu 'tekstowym' (zachowujemy format tabeli)
     document.getElementById('formDawkowanie').value = mapaIlosci[n] || '';
     document.getElementById('formKarencja').value = mapaKarencji[n] || '';
     
-    // ✅ NOWA LINIA: Wymuś aktualizację widoczności (Moduł 3.1)
+    // 2. Wymuś aktualizację widoczności (pokaż/ukryj detale)
     if (typeof updateProductTabVisibility === 'function') {
         updateProductTabVisibility();
     }
     
-    // Jeśli produkt został wybrany, spróbuj ustawić focus na Ilości i przenieś na zakładkę Produkt
+    // 3. ✅ NOWOŚĆ: Natychmiast pokaż stan magazynowy (lub "niewprowadzony")
+    if (typeof updateFormStockDisplay === 'function') {
+        updateFormStockDisplay();
+    }
+    
+    // 4. Jeśli produkt został wybrany, spróbuj ustawić focus na Ilości i przenieś na zakładkę Produkt
     if (n.trim() !== '') {
-        document.getElementById('formIlosc')?.focus();
+        // Opcjonalnie: ustaw focus na pole ilość
+        // document.getElementById('formIlosc')?.focus(); 
+        
         if (typeof switchRowTab === 'function') {
             switchRowTab('produkt'); // Przełącz na zakładkę Produkt
         }
@@ -20355,7 +20363,10 @@ function updateFormStockDisplay() {
 
     // Wyświetl wynik
     if (stockDisplay && stockValueSpan) {
-        stockDisplay.style.display = 'inline-block'; // Pokaż element
+        // ✅ ZMIANA: Używamy flex, żeby tekst był ładnie wyśrodkowany
+        stockDisplay.style.display = 'inline-flex'; 
+        stockDisplay.style.alignItems = 'center';
+        stockDisplay.style.gap = '4px'; 
         
         if (found) {
             stockValueSpan.textContent = availableQty;
@@ -20364,41 +20375,44 @@ function updateFormStockDisplay() {
             if (availableQty <= 0) {
                 stockDisplay.style.color = '#c0392b'; 
                 stockDisplay.style.backgroundColor = '#fadbd8';
+                stockDisplay.style.border = '1px solid #c0392b'; // Dodana ramka
             } else if (availableQty < 5) {
                 stockDisplay.style.color = '#d35400';
                 stockDisplay.style.backgroundColor = '#fdebd0';
+                stockDisplay.style.border = '1px solid #d35400'; // Dodana ramka
             } else {
                 stockDisplay.style.color = '#27ae60'; 
                 stockDisplay.style.backgroundColor = '#e8f5e9';
+                stockDisplay.style.border = '1px solid #27ae60'; // Dodana ramka
             }
         } else {
-            // Produkt spoza bazy magazynowej
-            stockValueSpan.textContent = "?";
-            stockDisplay.style.color = '#7f8c8d';
+            // ✅ ZMIANA GŁÓWNA: "niewprowadzony" zamiast "?"
+            stockValueSpan.textContent = "niewprowadzony";
+            stockDisplay.style.color = '#555';
             stockDisplay.style.backgroundColor = '#f0f0f0';
-            stockDisplay.title = "Produkt nie znaleziony w magazynie";
+            stockDisplay.style.border = '1px solid #ccc';
         }
     }
 }
 
-// 2. Podpięcie pod pole wpisywania leku (To jest to, o co pytałeś)
+// 2. Podpięcie pod pole wpisywania leku (To sprawia, że stan pojawia się od razu)
 const formLekInputTrigger = document.getElementById('formLek');
 if (formLekInputTrigger) {
-    // Uruchom przy wpisywaniu/wybieraniu
+    // Uruchom przy każdym znaku wpisanym lub wybranym z listy
     formLekInputTrigger.addEventListener('input', () => {
         updateFormStockDisplay();
     });
 }
 
 // 3. Dodatkowe zabezpieczenie: Uruchom też przy ładowaniu wiersza
-// (Jeśli klikniesz "Edytuj wiersz", stan też się pokaże)
+// (Dzięki temu stan pokaże się też, gdy klikniesz strzałkami "Poprzedni/Następny")
 const originalSelectRowInForm = window.selectRowInForm; // Zapisz starą funkcję
 if (typeof selectRowInForm === 'function') {
     window.selectRowInForm = function(logicalIndex) {
         // Wywołaj oryginalną funkcję
         if (originalSelectRowInForm) originalSelectRowInForm(logicalIndex);
-        // I dodaj naszą aktualizację stanu
-        setTimeout(updateFormStockDisplay, 100);
+        // I dodaj naszą aktualizację stanu z małym opóźnieniem (żeby dane zdążyły wejść)
+        setTimeout(updateFormStockDisplay, 50);
     };
 }
 </script> 
