@@ -11860,63 +11860,71 @@ else if (target.classList.contains('btn-pay-debt')) {
                   const doc = await docRef.get();
                   
                   let existingNote = '';
-                  let previousOwner = 'Inny lekarz'; 
-                  
+                  let previousOwner = 'Nieznany';
+                  let originalDate = 'Brak daty';
+
                   if (doc.exists) {
                       const d = doc.data();
                       existingNote = d.notatka || '';
+                      // Pobieramy dane pierwotne
                       if (d.lekarz_nazwisko) previousOwner = d.lekarz_nazwisko;
+                      if (d.data) originalDate = d.data;
                   }
                   
-                  // Nowa notatka
-                  const newNote = `SPŁATA DŁUGU (Przejęto od: ${previousOwner})` + (existingNote ? ` | ${existingNote}` : '');
+                  // ✅ NOWA TREŚĆ NOTATKI WG TWOJEGO WZORU
+                  const notePrefix = `Spłata długu z dnia: ${originalDate} / wizytę zrealizował: ${previousOwner}`;
+                  
+                  // Jeśli była jakaś stara notatka, dopisujemy ją po separatorze " | "
+                  const newNote = notePrefix + (existingNote ? ` | ${existingNote}` : '');
                   
                   // Dane do aktualizacji
                   const updateData = {
                       status: "Zapłacone",
                       data: today, 
                       notatka: newNote,
-                      lekarz_uid: currentUserProfile.uid,
+                      lekarz_uid: currentUserProfile.uid, // Przypisz do aktualnie zalogowanego (spłacającego)
                       lekarz_nazwisko: `${currentUserProfile.Imie} ${currentUserProfile.Nazwisko}`
                   };
                   
                   // Wyślij do bazy
                   await docRef.update(updateData);
                   
-                  // Aktualizuj tabelę w widoku
+                  // Aktualizuj tabelę w widoku (bez przeładowania)
                   const tr = target.closest('tr');
                   if (tr) {
-                      // 1. Aktualizuj dane wizualne i atrybuty
+                      // 1. Aktualizuj Datę (indeks 0)
                       tr.cells[0].textContent = today;
                       tr.dataset.data = today;
                       
+                      // 2. Aktualizuj Status (indeks 4)
                       tr.cells[4].textContent = "Zapłacone";
                       tr.cells[4].style.color = "green";
                       tr.dataset.status = "Zapłacone";
                       
+                      // 3. Aktualizuj Lekarza "Wystawił" (indeks 6) - teraz to Ty jesteś właścicielem wpłaty
                       if (tr.cells[6]) {
                           tr.cells[6].textContent = updateData.lekarz_nazwisko;
                           tr.dataset.lekarz = updateData.lekarz_nazwisko;
                       }
 
+                      // 4. Aktualizuj Notatkę (indeks 7)
                       if (tr.cells[7]) { 
                           tr.cells[7].textContent = newNote.substring(0, 30) + (newNote.length > 30 ? '...' : ''); 
                           tr.cells[7].title = newNote;
                           tr.dataset.notatka = newNote;
                       }
 
-                      // 2. ✅ KLUCZOWA POPRAWKA: Przenieś wiersz na samą górę tabeli (ponieważ data to "dzisiaj")
-                      // Znajdujemy ciało tabeli (tbody) i wstawiamy wiersz jako pierwsze dziecko
+                      // 5. Przenieś wiersz na górę tabeli (bo data dzisiejsza)
                       const tbody = tr.parentElement;
-                      tbody.prepend(tr); 
-                      
-                      // Opcjonalnie: Podświetl wiersz, żeby użytkownik widział, gdzie "poleciał"
-                      tr.style.backgroundColor = "#e8f5e9"; // Jasna zieleń
-                      setTimeout(() => tr.style.backgroundColor = "", 2000);
+                      tbody.insertBefore(tr, tbody.firstChild);
+
+                      // Podświetlenie sukcesu
+                      tr.style.backgroundColor = "#e8f5e9"; 
+                      setTimeout(() => { tr.style.backgroundColor = ""; }, 2000);
                   }
                   
-                  target.style.display = 'none';
-                  alert('Dług spłacony. Paragon został przeniesiony na górę listy (data dzisiejsza) i przepisany do Twojego konta.');
+                  target.style.display = 'none'; // Ukryj przycisk po spłacie
+                  alert('Dług spłacony. Paragon został zaktualizowany.');
 
               } catch (error) {
                   console.error("Błąd podczas spłaty długu:", error);
