@@ -13490,48 +13490,50 @@ try {
     function selectFormProduct(lekName) {
         if (!lekName) return;
         
-      /* ---- PODPIĘCIE: Wybór produktu w formularzu (Obsługa automatyczna) ---- */
-const formLekInput = document.getElementById('formLek');
+       // Wybór produktu (wewnątrz obsługi Modala Produktów w Formularzu)
+    function selectFormProduct(lekName) {
+        if (!lekName) return;
+        
+        // 1. Zapisz produkt
+        const formLekInput = document.getElementById('formLek');
+        if (formLekInput) {
+            formLekInput.value = lekName;
+        }
 
-if (formLekInput) {
-    // Funkcja wykonująca całą logikę po zmianie leku
-    const handleLekChange = function() {
-        const n = formLekInput.value;
-
-        // 1. Uzupełnij dane z map (seria, dawkowanie, karencja)
-        document.getElementById('formSeria').value = mapaSerii[n] || '';
-        document.getElementById('formDawkowanie').value = mapaIlosci[n] || '';
-        document.getElementById('formKarencja').value = mapaKarencji[n] || '';
-
-        // 2. Wymuś aktualizację widoczności (pokaż/ukryj detale)
+        // 2. Uruchom logikę auto-uzupełniania (z zabezpieczeniem)
+        const n = lekName;
+        
+        const formSeria = document.getElementById('formSeria');
+        if (formSeria) formSeria.value = mapaSerii[n] || '';
+        
+        const formDawkowanie = document.getElementById('formDawkowanie');
+        if (formDawkowanie) formDawkowanie.value = mapaIlosci[n] || '';
+        
+        const formKarencja = document.getElementById('formKarencja');
+        if (formKarencja) formKarencja.value = mapaKarencji[n] || '';
+        
+        // 3. Wymuś aktualizację widoczności (Moduł 3.1)
         if (typeof updateProductTabVisibility === 'function') {
             updateProductTabVisibility();
         }
 
-        // 3. ✅ NOWOŚĆ: Pokaż stan z małym opóźnieniem (Fix dla datalist)
-        // setTimeout(0) przesuwa wykonanie na koniec kolejki zadań przeglądarki
-        setTimeout(() => {
-            if (typeof updateFormStockDisplay === 'function') {
-                updateFormStockDisplay();
-            }
-        }, 10); 
-
-        // 4. Jeśli produkt został wybrany, ustaw focus (opcjonalne)
-        if (n.trim() !== '') {
-            if (typeof switchRowTab === 'function') {
-                switchRowTab('produkt');
-            }
+        // ✅ NOWOŚĆ: Wywołaj aktualizację stanu natychmiast po wyborze z modala
+        if (typeof updateFormStockDisplay === 'function') {
+            updateFormStockDisplay();
         }
-    };
-
-    // Podpinamy tę samą logikę pod dwa zdarzenia dla pewności:
+        
+        // 4. Zamknij modal i ustaw focus
+        modal.style.display = 'none';
+        
+        // Opcjonalnie: Przesuń fokus na następne pole, np. Ilość (i przełącz zakładkę)
+        const formIlosc = document.getElementById('formIlosc');
+        if (formIlosc) formIlosc.focus();
+        
+        if (typeof switchRowTab === 'function') {
+            switchRowTab('produkt');
+        }
+    }
     
-    // A. Zdarzenie 'input' (działa w trakcie pisania)
-    formLekInput.addEventListener('input', handleLekChange);
-    
-    // B. Zdarzenie 'change' (działa po kliknięciu myszką w opcję z listy)
-    formLekInput.addEventListener('change', handleLekChange);
-}
 } catch(err) {
     console.error("Błąd inicjalizacji Modala Produktów (Formularz):", err);
 }
