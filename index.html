@@ -20247,44 +20247,56 @@ async function checkAndShowClientDebt(clientName) {
     }
 }
 
-// Przenosi do Archiwum z ustawionymi filtrami (Gdy klikniemy w dług)
-function goToArchiveDebtView(clientName) {
+// Przenosi do Archiwum z ustawionymi filtrami (Wersja Poprawiona - z czekaniem na listę userów)
+async function goToArchiveDebtView(clientName) {
     // 1. Przełącz sekcję na Archiwum Paragonów
     if (typeof showSection === 'function') {
         showSection('archiwumParagony');
     }
     
-    // 2. Ustaw filtry w Archiwum
     const userSelect = document.getElementById('archiveReceiptUserSelect');
     const clientInput = document.getElementById('arcReceiptClient');
     const statusSelect = document.getElementById('arcReceiptStatus');
-    
-    // Logika wyboru "Wszyscy" w selectcie lekarzy (żeby widzieć długi u innych lekarzy w lecznicy)
-    let hasAllOption = false;
-    if (userSelect) {
-        for (let i=0; i<userSelect.options.length; i++) {
-            if (userSelect.options[i].value === "ALL") hasAllOption = true;
-        }
-        
-        if (hasAllOption) {
-            userSelect.value = "ALL"; 
-        } else if (currentUserProfile && currentUserProfile.uid) {
-             userSelect.value = currentUserProfile.uid;
+
+    if (!userSelect) return;
+
+    // 2. ⚠️ WAŻNE: Sprawdź, czy lista użytkowników jest załadowana. Jeśli nie - załaduj ją.
+    if (userSelect.options.length <= 1) {
+        console.log("Link Długu: Lista użytkowników pusta. Wymuszam ładowanie...");
+        if (typeof loadArchiveReceiptUsers === 'function') {
+            await loadArchiveReceiptUsers(); // Czekamy aż się załaduje!
         }
     }
     
-    // 3. Wymuś załadowanie danych
-    if (typeof loadReceiptsForUser === 'function' && userSelect) {
-        loadReceiptsForUser(userSelect.value).then(() => {
-            // 4. Po załadowaniu danych - wpisz nazwisko i status, a potem przefiltruj
-            if (clientInput) clientInput.value = clientName;
-            if (statusSelect) statusSelect.value = "Dług";
-            
-            if (typeof applyReceiptFilters === 'function') {
-                applyReceiptFilters();
-                if (typeof showToast === 'function') showToast(`Filtruję zadłużenie dla: ${clientName}`, "info");
-            }
-        });
+    // 3. Logika wyboru "Wszyscy" w selectcie lekarzy
+    let hasAllOption = false;
+    for (let i=0; i<userSelect.options.length; i++) {
+        if (userSelect.options[i].value === "ALL") hasAllOption = true;
+    }
+    
+    let targetUserValue = "";
+    if (hasAllOption) {
+        targetUserValue = "ALL"; 
+    } else if (currentUserProfile && currentUserProfile.uid) {
+         targetUserValue = currentUserProfile.uid;
+    }
+    
+    // Ustaw wartość w selectcie
+    userSelect.value = targetUserValue;
+    
+    // 4. Wymuś załadowanie danych paragonów dla wybranego usera
+    if (typeof loadReceiptsForUser === 'function') {
+        // Czekamy na pobranie danych z bazy (używamy await zamiast .then)
+        await loadReceiptsForUser(targetUserValue);
+        
+        // 5. Dopiero TERAZ ustawiamy filtry tekstowe i filtrujemy widok
+        if (clientInput) clientInput.value = clientName;
+        if (statusSelect) statusSelect.value = "Dług";
+        
+        if (typeof applyReceiptFilters === 'function') {
+            applyReceiptFilters();
+            if (typeof showToast === 'function') showToast(`Filtruję zadłużenie dla: ${clientName}`, "info");
+        }
     }
 }
 /* ======================================================== */
