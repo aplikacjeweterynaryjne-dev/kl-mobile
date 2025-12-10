@@ -3146,9 +3146,15 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
             
                 <form id="myForm">
                     <div class="form-row">
-                        <label>Ilość</label>
-                        <input type="number" inputmode="numeric" pattern="[0-9]*" id="formIlosc" placeholder="0" style="width:60px;">
-                    </div>
+    <label>Ilość</label>
+    <div style="display: flex; align-items: center; gap: 10px;">
+        <input type="number" inputmode="numeric" pattern="[0-9]*" id="formIlosc" placeholder="0" style="width: 80px;">
+        
+        <span id="formStockDisplay" style="font-size: 14px; font-weight: bold; color: #555; background: #e8f5e9; padding: 4px 8px; border-radius: 4px; display: none;">
+            Stan: <span id="formStockValue">--</span>
+        </span>
+    </div>
+</div>
                     
                     <div class="form-row">
                         <label for="formSeria">Numer serii produktu</label>
@@ -20310,6 +20316,91 @@ async function goToArchiveDebtView(clientName) {
     }
 }
 /* ======================================================== */
+/* ======================================================== */
+/* ✅ MODUŁ: Wyświetlanie stanu w Formularzu (Wklej na końcu) */
+/* ======================================================== */
+
+// 1. Funkcja aktualizująca stan
+function updateFormStockDisplay() {
+    const stockDisplay = document.getElementById('formStockDisplay');
+    const stockValueSpan = document.getElementById('formStockValue');
+    const lekInput = document.getElementById('formLek');
+
+    if (!lekInput) return;
+    const productName = lekInput.value.trim();
+
+    // Jeśli nie ma produktu lub magazyn wyłączony -> ukryj
+    if (!productName || !currentUserProfile || !currentUserProfile.uzywaStanowMagazynowych) {
+        if (stockDisplay) stockDisplay.style.display = 'none';
+        return;
+    }
+
+    // Pobierz ID produktu z cache
+    let productId = null;
+    if (typeof produktyGlowneCache !== 'undefined') {
+        productId = produktyGlowneCache.get(productName);
+    }
+
+    // Pobierz stan z magazynu osobistego
+    let availableQty = 0;
+    let found = false;
+
+    if (productId && typeof magazynCache !== 'undefined') {
+        const stockData = magazynCache.get(productId);
+        if (stockData) {
+            availableQty = stockData.stan || 0;
+            found = true;
+        }
+    }
+
+    // Wyświetl wynik
+    if (stockDisplay && stockValueSpan) {
+        stockDisplay.style.display = 'inline-block'; // Pokaż element
+        
+        if (found) {
+            stockValueSpan.textContent = availableQty;
+            
+            // Kolorowanie: Czerwony <= 0, Pomarańczowy < 5, Zielony OK
+            if (availableQty <= 0) {
+                stockDisplay.style.color = '#c0392b'; 
+                stockDisplay.style.backgroundColor = '#fadbd8';
+            } else if (availableQty < 5) {
+                stockDisplay.style.color = '#d35400';
+                stockDisplay.style.backgroundColor = '#fdebd0';
+            } else {
+                stockDisplay.style.color = '#27ae60'; 
+                stockDisplay.style.backgroundColor = '#e8f5e9';
+            }
+        } else {
+            // Produkt spoza bazy magazynowej
+            stockValueSpan.textContent = "?";
+            stockDisplay.style.color = '#7f8c8d';
+            stockDisplay.style.backgroundColor = '#f0f0f0';
+            stockDisplay.title = "Produkt nie znaleziony w magazynie";
+        }
+    }
+}
+
+// 2. Podpięcie pod pole wpisywania leku (To jest to, o co pytałeś)
+const formLekInputTrigger = document.getElementById('formLek');
+if (formLekInputTrigger) {
+    // Uruchom przy wpisywaniu/wybieraniu
+    formLekInputTrigger.addEventListener('input', () => {
+        updateFormStockDisplay();
+    });
+}
+
+// 3. Dodatkowe zabezpieczenie: Uruchom też przy ładowaniu wiersza
+// (Jeśli klikniesz "Edytuj wiersz", stan też się pokaże)
+const originalSelectRowInForm = window.selectRowInForm; // Zapisz starą funkcję
+if (typeof selectRowInForm === 'function') {
+    window.selectRowInForm = function(logicalIndex) {
+        // Wywołaj oryginalną funkcję
+        if (originalSelectRowInForm) originalSelectRowInForm(logicalIndex);
+        // I dodaj naszą aktualizację stanu
+        setTimeout(updateFormStockDisplay, 100);
+    };
+}
 </script> 
 </body>
 </html>
