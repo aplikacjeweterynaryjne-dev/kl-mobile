@@ -15117,66 +15117,98 @@ function openSchemaSearchModalIfNeeded(event) {
 /* ⬇️ ⬇️ ⬇️ WKLEJ TEN BLOK KODU NA KOŃCU SKRYPTU (ok. linii 4928) ⬇️ ⬇️ ⬇️ */
 
 /* ======================================================== */
-/* ✅ POCZĄTEK: MODUŁ 6 - Logika Modala Klienta (Kalkulator) */
+/* ✅ MODUŁ 6 (UNIWERSALNY): Logika Modala Klienta (Kalkulator + Raporty + Archiwum) */
 /* ======================================================== */
 try {
-    // --- Zmienne dla nowego modala klienta ---
-    const calcClientSearchModal = document.getElementById('calcClientSearchModal');
-    const calcClientSearchInput = document.getElementById('calcClientSearchInputModal');
-    const calcClientSearchList = document.getElementById('calcClientSearchListModal');
-    const calcClientSearchCloseBtn = document.getElementById('calcClientSearchCloseBtn');
-    // To jest input w formularzu Kalkulatora
-    const calcClientTrigger = document.getElementById('calcKlientInput'); 
+    // --- Zmienne dla modala wyszukiwania ---
+    const uniClientSearchModal = document.getElementById('calcClientSearchModal'); // Używamy istniejącego modala z kalkulatora
+    const uniClientSearchInput = document.getElementById('calcClientSearchInputModal');
+    const uniClientSearchList = document.getElementById('calcClientSearchListModal');
+    const uniClientSearchCloseBtn = document.getElementById('calcClientSearchCloseBtn');
+    
+    // Zmienna przechowująca, które pole wywołało modal (Kalkulator, Raport czy Archiwum)
+    let activeClientInputTrigger = null; 
 
-    // 1. Otwieranie modala
-    function openCalcClientSearchModal(e) {
-        e.preventDefault();
-        if (!calcClientSearchModal) return;
-        
-        // Wypełnij pole wyszukiwania w modalu aktualną wartością
-        calcClientSearchInput.value = (calcClientTrigger.value !== "Kliknij, aby wyszukać klienta...") ? calcClientTrigger.value : "";
-        populateAndFilterCalcClientList(); // Użyjemy nowej funkcji
-        calcClientSearchModal.style.display = 'flex';
-        setTimeout(() => calcClientSearchInput.focus(), 50);
-    }
+    // Lista ID pól, które mają korzystać z tego modala
+    const clientInputIds = [
+        'calcKlientInput',      // Kalkulator
+        'reportClientInput',    // Raporty
+        'arcCardClient',        // Archiwum Kart
+        'arcReceiptClient'      // Archiwum Paragonów
+    ];
 
-    // 2. Zamykanie modala
-    function closeCalcClientSearchModal() {
-        if (calcClientSearchModal) calcClientSearchModal.style.display = 'none';
-    }
+    // 1. Inicjalizacja pól (blokada pisania, dodanie kursora, podpięcie listenera)
+    clientInputIds.forEach(id => {
+        const inputEl = document.getElementById(id);
+        if (inputEl) {
+            // Ustawiamy styl, żeby wyglądało jak przycisk
+            inputEl.style.cursor = 'pointer';
+            inputEl.setAttribute('readonly', true); // Blokada klawiatury na mobilnych
+            inputEl.placeholder = "Kliknij, aby wybrać klienta...";
+            
+            // Podpinamy otwieranie modala
+            // Usuwamy stare listenery (klonowanie) aby uniknąć dublowania
+            const newInputEl = inputEl.cloneNode(true);
+            inputEl.parentNode.replaceChild(newInputEl, inputEl);
+            
+            newInputEl.addEventListener('click', (e) => {
+                e.preventDefault();
+                openUniversalClientModal(e.target);
+            });
+            
+            // Dla kalkulatora musimy przywrócić nasłuchiwanie na 'input' do długu (jeśli było)
+            // Ale tutaj obsłużymy to centralnie w funkcji wyboru
+        }
+    });
 
- // 3. Wypełnianie i filtrowanie listy (Kalkulator - z obsługą polskich znaków i opcją niestandardową)
-    function populateAndFilterCalcClientList() {
-        const dataList = document.getElementById('klientList');
+    // 2. Funkcja Otwierająca Modal
+    function openUniversalClientModal(triggerElement) {
+        if (!uniClientSearchModal) return;
         
-        // Pobieramy surowy tekst (do wyświetlenia/użycia) i znormalizowany (do filtrowania)
-        const rawText = calcClientSearchInput.value.trim();
+        activeClientInputTrigger = triggerElement; // Zapamiętaj, kto wywołał
+        console.log("Otwieranie uniwersalnego modala dla:", activeClientInputTrigger.id);
+        
+        // Wypełnij pole szukania obecną wartością (jeśli nie jest to placeholder)
+        const currentVal = activeClientInputTrigger.value;
+        uniClientSearchInput.value = (currentVal && currentVal !== "Kliknij, aby wybrać klienta...") ? currentVal : "";
+        
+        populateAndFilterUniversalList();
+        
+        uniClientSearchModal.style.display = 'flex';
+        setTimeout(() => uniClientSearchInput.focus(), 50);
+    }
+
+    // 3. Funkcja Zamykająca
+    function closeUniversalClientModal() {
+        if (uniClientSearchModal) uniClientSearchModal.style.display = 'none';
+        // Nie czyścimy activeClientInputTrigger od razu, może się przydać
+    }
+
+    // 4. Wypełnianie Listy
+    function populateAndFilterUniversalList() {
+        const dataList = document.getElementById('klientList');
+        const rawText = uniClientSearchInput.value.trim();
         const filterText = normalizePL(rawText);
         
-        calcClientSearchList.innerHTML = '';
+        uniClientSearchList.innerHTML = '';
         
-        // --- ✅ NOWOŚĆ: Opcja użycia wpisanego tekstu (nawet jak nie ma w bazie) ---
+        // Opcja "Użyj wpisanego" (pozwala wpisać kogoś spoza bazy)
         if (rawText.length > 0) {
             const customDiv = document.createElement('div');
             customDiv.className = 'client-search-item';
-            // Wyróżniamy ten element kolorem, żeby było widać, że to "nowy" wpis
             customDiv.style.backgroundColor = '#e8f5e9'; 
             customDiv.style.borderBottom = '2px solid #6A994E';
             customDiv.innerHTML = `<strong>➕ Użyj wpisanego:</strong> "${rawText}"`;
-            
-            customDiv.addEventListener('click', () => {
-                selectCalcClient(rawText);
-            });
-            calcClientSearchList.appendChild(customDiv);
+            customDiv.addEventListener('click', () => selectUniversalClient(rawText));
+            uniClientSearchList.appendChild(customDiv);
         }
-        // --------------------------------------------------------------------------
 
         if (!dataList || dataList.options.length === 0) {
             const infoDiv = document.createElement('div');
             infoDiv.className = 'client-search-item';
             infoDiv.style.color = '#999';
-            infoDiv.textContent = 'Brak bazy klientów (ale możesz wpisać własnego powyżej).';
-            calcClientSearchList.appendChild(infoDiv);
+            infoDiv.textContent = 'Brak bazy klientów.';
+            uniClientSearchList.appendChild(infoDiv);
             return;
         }
 
@@ -15202,172 +15234,76 @@ try {
                         ${nrStada ? `Nr stada: ${nrStada}` : ''}
                     </span>
                 `;
-                itemDiv.addEventListener('click', () => {
-                    selectCalcClient(nazwa);
-                });
-                calcClientSearchList.appendChild(itemDiv);
+                itemDiv.addEventListener('click', () => selectUniversalClient(nazwa));
+                uniClientSearchList.appendChild(itemDiv);
                 foundItems++;
             }
         });
 
-        // Jeśli nic nie znaleziono w bazie, a pole nie jest puste, komunikat jest zbędny bo mamy przycisk "Użyj wpisanego"
-        // Ale jeśli pole jest puste i nic nie znaleziono (np. pusta baza), to wyświetlamy info
         if (foundItems === 0 && rawText === '') {
-             calcClientSearchList.innerHTML = '<div class="client-search-item" style="color: #999;">Brak pasujących klientów.</div>';
+             uniClientSearchList.innerHTML = '<div class="client-search-item" style="color: #999;">Brak pasujących klientów.</div>';
         }
     }
 
-// 4. Funkcja wyboru klienta z modala (Zezwolenie na ręczny wpis + OBSŁUGA DŁUGU)
-    function selectCalcClient(klientName) {
-        if (!klientName) return;
+    // 5. GŁÓWNA FUNKCJA WYBORU (Routing logiki)
+    function selectUniversalClient(clientName) {
+        if (!activeClientInputTrigger) return;
+        
+        // A. Wpisz wartość do pola, które wywołało modal
+        activeClientInputTrigger.value = clientName;
+        
+        // B. Zamknij modal
+        closeUniversalClientModal();
 
-        // Wpisz wartość do pola w kalkulatorze
-        if (calcClientTrigger) {
-            calcClientTrigger.value = klientName;
-            
-            // ✅ KLUCZOWE: Wymuszamy zdarzenie 'input', które uruchamia listener z Krok 1A (np. ładowanie starych paragonów do korekty)
-            calcClientTrigger.dispatchEvent(new Event('input', { bubbles: true }));
+        // C. LOGIKA SPECYFICZNA DLA KONKRETNYCH PÓL
+        const triggerId = activeClientInputTrigger.id;
+
+        // --- 1. KALKULATOR ---
+        if (triggerId === 'calcKlientInput') {
+             // Wywołaj event input (dla ewentualnych innych listenerów)
+             activeClientInputTrigger.dispatchEvent(new Event('input', { bubbles: true }));
+             
+             // Sprawdź dług (Twoja nowa funkcja)
+             if (typeof checkAndShowClientDebt === 'function') {
+                 checkAndShowClientDebt(clientName);
+             }
+             // Przesuń fokus
+             document.getElementById('calcCzynnosciInput')?.focus();
+        } 
+        
+        // --- 2. RAPORTY ---
+        else if (triggerId === 'reportClientInput') {
+             // W raportach nie musimy robić nic poza wpisaniem wartości
+             // Użytkownik i tak musi kliknąć "Generuj Raport"
         }
-        
-        closeCalcClientSearchModal();
-        
-        // Ustaw focus na następnym polu (Czynności)
-        document.getElementById('calcCzynnosciInput')?.focus();
 
-        // ✅ NOWOŚĆ: Sprawdź i wyświetl zadłużenie pod nazwiskiem
-        // (Definicja tej funkcji musi znaleźć się w kodzie - patrz poniżej)
-        if (typeof checkAndShowClientDebt === 'function') {
-            checkAndShowClientDebt(klientName);
+        // --- 3. ARCHIWUM KART ---
+        else if (triggerId === 'arcCardClient') {
+             // Wymuś filtrowanie tabeli od razu
+             if (typeof applyCardFilters === 'function') {
+                 applyCardFilters();
+             }
+        }
+
+        // --- 4. ARCHIWUM PARAGONÓW ---
+        else if (triggerId === 'arcReceiptClient') {
+             // Wymuś filtrowanie tabeli od razu
+             if (typeof applyReceiptFilters === 'function') {
+                 applyReceiptFilters();
+             }
         }
     }
 
-    // 5. Podpięcie listenerów
-    if (calcClientTrigger) calcClientTrigger.addEventListener('click', openCalcClientSearchModal);
-    if (calcClientSearchCloseBtn) calcClientSearchCloseBtn.addEventListener('click', closeCalcClientSearchModal);
-    if (calcClientSearchInput) calcClientSearchInput.addEventListener('input', populateAndFilterCalcClientList);
+    // 6. Listenery wewnętrzne modala
+    if (uniClientSearchCloseBtn) {
+        uniClientSearchCloseBtn.addEventListener('click', closeUniversalClientModal);
+    }
+    if (uniClientSearchInput) {
+        uniClientSearchInput.addEventListener('input', populateAndFilterUniversalList);
+    }
 
 } catch(err) {
-    console.error("Błąd inicjalizacji Modala Klientów (Kalkulator):", err);
-}
-    /* --- NOWE FUNKCJE: Obsługa Długu w Kalkulatorze --- */
-
-// Sprawdza dług klienta i wyświetla go pod polem wyboru
-async function checkAndShowClientDebt(clientName) {
-    // 1. Znajdź lub stwórz kontener na informację o długu
-    let debtContainer = document.getElementById('calcClientDebtContainer');
-    
-    // Jeśli kontenera nie ma, stwórz go dynamicznie pod inputem klienta
-    if (!debtContainer) {
-        const inputParent = document.getElementById('calcKlientInput').parentNode;
-        if (inputParent) {
-            debtContainer = document.createElement('div');
-            debtContainer.id = 'calcClientDebtContainer';
-            debtContainer.style.marginTop = '5px';
-            debtContainer.style.fontSize = '15px'; // Wyraźna czcionka
-            debtContainer.style.fontWeight = '600';
-            inputParent.appendChild(debtContainer);
-        } else {
-            return; // Nie ma gdzie wyświetlić
-        }
-    }
-    
-    // Resetuj widok (pokazuje, że coś się dzieje)
-    debtContainer.innerHTML = '<span style="color: #777;">Sprawdzanie salda...</span>';
-
-    if (!currentUserProfile || !currentUserProfile['ID lecznicy']) {
-        debtContainer.innerHTML = '';
-        return;
-    }
-
-    try {
-        // 2. Pobierz długi z Archiwum (status = "Dług", ten klient, ta lecznica)
-        const q = db.collection("archiwumParagony")
-            .where("id_lecznicy", "==", currentUserProfile['ID lecznicy'])
-            .where("klient", "==", clientName)
-            .where("status", "==", "Dług");
-
-        const snapshot = await q.get();
-        
-        let totalDebt = 0;
-        snapshot.forEach(doc => {
-            totalDebt += parseFloat(doc.data().suma) || 0;
-        });
-
-        if (totalDebt > 0) {
-            // Wyświetl na czerwono z linkiem
-            // Używamy formatPrice jeśli dostępna, w przeciwnym razie raw number
-            const debtText = (typeof formatPrice === 'function') ? formatPrice(totalDebt) : totalDebt + " zł";
-            
-            debtContainer.innerHTML = `
-                <span style="color: #c0392b;">
-                    ⚠️ Zadłużenie: 
-                    <span id="debtLink" style="text-decoration: underline; cursor: pointer; color: #d35400;">${debtText}</span>
-                    <span style="font-size: 12px; color: #555; margin-left: 5px;">(Kliknij, aby zobaczyć)</span>
-                </span>`;
-            
-            // Dodaj listener kliknięcia
-            const link = document.getElementById('debtLink');
-            if (link) {
-                link.addEventListener('click', () => {
-                    goToArchiveDebtView(clientName);
-                });
-            }
-            
-        } else {
-            // Brak długu - na zielono
-            debtContainer.innerHTML = '<span style="color: #27ae60;">✔️ Brak zaległości.</span>';
-            // Ukryj po 4 sekundach, żeby nie zaśmiecać widoku
-            setTimeout(() => { debtContainer.innerHTML = ''; }, 4000);
-        }
-
-    } catch (e) {
-        console.error("Błąd sprawdzania długu:", e);
-        // Jeśli błąd (np. brak indeksu), wyczyść pole
-        debtContainer.innerHTML = '';
-    }
-}
-
-// Przenosi do Archiwum z ustawionymi filtrami
-function goToArchiveDebtView(clientName) {
-    // 1. Przełącz sekcję na Archiwum Paragonów
-    if (typeof showSection === 'function') {
-        showSection('archiwumParagony');
-    }
-    
-    // 2. Ustaw filtry w Archiwum
-    const userSelect = document.getElementById('archiveReceiptUserSelect');
-    const clientInput = document.getElementById('arcReceiptClient');
-    const statusSelect = document.getElementById('arcReceiptStatus');
-    
-    // Logika wyboru "Wszyscy" w selectcie lekarzy
-    let hasAllOption = false;
-    if (userSelect) {
-        for (let i=0; i<userSelect.options.length; i++) {
-            if (userSelect.options[i].value === "ALL") hasAllOption = true;
-        }
-        
-        if (hasAllOption) {
-            userSelect.value = "ALL"; // Pokaż długi u wszystkich lekarzy
-        } else if (currentUserProfile && currentUserProfile.uid) {
-             // Jeśli pracownik nie widzi "ALL", zaznacz jego (zobaczy tylko długi u siebie)
-             userSelect.value = currentUserProfile.uid;
-        }
-    }
-    
-    // 3. Wymuś załadowanie danych
-    // (Funkcja loadReceiptsForUser musi być dostępna globalnie)
-    if (typeof loadReceiptsForUser === 'function' && userSelect) {
-        loadReceiptsForUser(userSelect.value).then(() => {
-            // 4. Po załadowaniu danych - wpisz nazwisko i status, a potem przefiltruj
-            if (clientInput) clientInput.value = clientName;
-            if (statusSelect) statusSelect.value = "Dług";
-            
-            if (typeof applyReceiptFilters === 'function') {
-                applyReceiptFilters();
-                if (typeof showToast === 'function') showToast(`Filtruję zadłużenie dla: ${clientName}`, "info");
-            }
-        });
-    }
+    console.error("Błąd inicjalizacji Uniwersalnego Modala Klientów:", err);
 }
 /* ======================================================== */
 /* ✅ KONIEC: MODUŁ 6 */
