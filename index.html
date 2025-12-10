@@ -5347,12 +5347,23 @@ function selectRowInForm(logicalIndex){
         updateProductTabVisibility();
     }
 
-    // Przełączanie zakładek
-    const activeTabButton = document.querySelector('#form-tab-buttons .primary');
-    if (activeTabButton && activeTabButton.dataset.tab === 'produkt' && lekValue.trim() !== '' && formNoweDaneContainer.style.display !== 'block') {
-        if (typeof switchRowTab === 'function') switchRowTab('produkt'); 
+   // ✅ POPRAWKA: Automatyczne przełączanie na "Produkt" dla konkretnych wierszy
+    // Wiersze 2-9 to indeksy 1-8.
+    // Wiersze 11-12 to indeksy 10-11.
+    const forceProductTab = (logicalIndex >= 1 && logicalIndex <= 8) || (logicalIndex >= 10 && logicalIndex <= 11);
+
+    if (forceProductTab) {
+        // Dla tych wierszy ZAWSZE idź do produktu (chyba że użytkownik ręcznie wróci)
+        if (typeof switchRowTab === 'function') switchRowTab('produkt');
     } else {
-        if (typeof switchRowTab === 'function') switchRowTab('dane'); 
+        // Dla wiersza 1 (indeks 0) i 10 (indeks 9 - "Pozostawione 1") domyślnie "Dane"
+        // Ale zachowajmy starą logikę: jeśli już coś jest wpisane w lek, to pokaż produkt
+        const hasProduct = lekValue.trim() !== '';
+        if (hasProduct) {
+             if (typeof switchRowTab === 'function') switchRowTab('produkt');
+        } else {
+             if (typeof switchRowTab === 'function') switchRowTab('dane');
+        }
     }
     
     // Tytuł
@@ -15206,29 +15217,157 @@ try {
         }
     }
 
-// 4. Funkcja wyboru klienta z modala (Zezwolenie na ręczny wpis)
-function selectCalcClient(klientName) {
-    if (!klientName) return;
+// 4. Funkcja wyboru klienta z modala (Zezwolenie na ręczny wpis + OBSŁUGA DŁUGU)
+    function selectCalcClient(klientName) {
+        if (!klientName) return;
 
-    // Wpisz wartość do pola w kalkulatorze
-    calcClientTrigger.value = klientName;
-    
-    // ✅ KLUCZOWE: Wymuszamy zdarzenie 'input', które uruchamia listener z Krok 1A
-    calcClientTrigger.dispatchEvent(new Event('input', { bubbles: true }));
-    
-    closeCalcClientSearchModal();
-    
-    // Ustaw focus na następnym polu (Czynności)
-    document.getElementById('calcCzynnosciInput')?.focus();
-}
+        // Wpisz wartość do pola w kalkulatorze
+        if (calcClientTrigger) {
+            calcClientTrigger.value = klientName;
+            
+            // ✅ KLUCZOWE: Wymuszamy zdarzenie 'input', które uruchamia listener z Krok 1A (np. ładowanie starych paragonów do korekty)
+            calcClientTrigger.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+        
+        closeCalcClientSearchModal();
+        
+        // Ustaw focus na następnym polu (Czynności)
+        document.getElementById('calcCzynnosciInput')?.focus();
 
-    // 5. Podpięcie listenerów
-    if (calcClientTrigger) calcClientTrigger.addEventListener('click', openCalcClientSearchModal);
-    if (calcClientSearchCloseBtn) calcClientSearchCloseBtn.addEventListener('click', closeCalcClientSearchModal);
-    if (calcClientSearchInput) calcClientSearchInput.addEventListener('input', populateAndFilterCalcClientList);
+        // ✅ NOWOŚĆ: Sprawdź i wyświetl zadłużenie pod nazwiskiem
+        // (Definicja tej funkcji musi znaleźć się w kodzie - patrz poniżej)
+        if (typeof checkAndShowClientDebt === 'function') {
+            checkAndShowClientDebt(klientName);
+        }
+    }
+
+    // 5. Podpięcie listenerów
+    if (calcClientTrigger) calcClientTrigger.addEventListener('click', openCalcClientSearchModal);
+    if (calcClientSearchCloseBtn) calcClientSearchCloseBtn.addEventListener('click', closeCalcClientSearchModal);
+    if (calcClientSearchInput) calcClientSearchInput.addEventListener('input', populateAndFilterCalcClientList);
 
 } catch(err) {
-    console.error("Błąd inicjalizacji Modala Klientów (Kalkulator):", err);
+    console.error("Błąd inicjalizacji Modala Klientów (Kalkulator):", err);
+}
+    /* --- NOWE FUNKCJE: Obsługa Długu w Kalkulatorze --- */
+
+// Sprawdza dług klienta i wyświetla go pod polem wyboru
+async function checkAndShowClientDebt(clientName) {
+    // 1. Znajdź lub stwórz kontener na informację o długu
+    let debtContainer = document.getElementById('calcClientDebtContainer');
+    
+    // Jeśli kontenera nie ma, stwórz go dynamicznie pod inputem klienta
+    if (!debtContainer) {
+        const inputParent = document.getElementById('calcKlientInput').parentNode;
+        if (inputParent) {
+            debtContainer = document.createElement('div');
+            debtContainer.id = 'calcClientDebtContainer';
+            debtContainer.style.marginTop = '5px';
+            debtContainer.style.fontSize = '15px'; // Wyraźna czcionka
+            debtContainer.style.fontWeight = '600';
+            inputParent.appendChild(debtContainer);
+        } else {
+            return; // Nie ma gdzie wyświetlić
+        }
+    }
+    
+    // Resetuj widok (pokazuje, że coś się dzieje)
+    debtContainer.innerHTML = '<span style="color: #777;">Sprawdzanie salda...</span>';
+
+    if (!currentUserProfile || !currentUserProfile['ID lecznicy']) {
+        debtContainer.innerHTML = '';
+        return;
+    }
+
+    try {
+        // 2. Pobierz długi z Archiwum (status = "Dług", ten klient, ta lecznica)
+        const q = db.collection("archiwumParagony")
+            .where("id_lecznicy", "==", currentUserProfile['ID lecznicy'])
+            .where("klient", "==", clientName)
+            .where("status", "==", "Dług");
+
+        const snapshot = await q.get();
+        
+        let totalDebt = 0;
+        snapshot.forEach(doc => {
+            totalDebt += parseFloat(doc.data().suma) || 0;
+        });
+
+        if (totalDebt > 0) {
+            // Wyświetl na czerwono z linkiem
+            // Używamy formatPrice jeśli dostępna, w przeciwnym razie raw number
+            const debtText = (typeof formatPrice === 'function') ? formatPrice(totalDebt) : totalDebt + " zł";
+            
+            debtContainer.innerHTML = `
+                <span style="color: #c0392b;">
+                    ⚠️ Zadłużenie: 
+                    <span id="debtLink" style="text-decoration: underline; cursor: pointer; color: #d35400;">${debtText}</span>
+                    <span style="font-size: 12px; color: #555; margin-left: 5px;">(Kliknij, aby zobaczyć)</span>
+                </span>`;
+            
+            // Dodaj listener kliknięcia
+            const link = document.getElementById('debtLink');
+            if (link) {
+                link.addEventListener('click', () => {
+                    goToArchiveDebtView(clientName);
+                });
+            }
+            
+        } else {
+            // Brak długu - na zielono
+            debtContainer.innerHTML = '<span style="color: #27ae60;">✔️ Brak zaległości.</span>';
+            // Ukryj po 4 sekundach, żeby nie zaśmiecać widoku
+            setTimeout(() => { debtContainer.innerHTML = ''; }, 4000);
+        }
+
+    } catch (e) {
+        console.error("Błąd sprawdzania długu:", e);
+        // Jeśli błąd (np. brak indeksu), wyczyść pole
+        debtContainer.innerHTML = '';
+    }
+}
+
+// Przenosi do Archiwum z ustawionymi filtrami
+function goToArchiveDebtView(clientName) {
+    // 1. Przełącz sekcję na Archiwum Paragonów
+    if (typeof showSection === 'function') {
+        showSection('archiwumParagony');
+    }
+    
+    // 2. Ustaw filtry w Archiwum
+    const userSelect = document.getElementById('archiveReceiptUserSelect');
+    const clientInput = document.getElementById('arcReceiptClient');
+    const statusSelect = document.getElementById('arcReceiptStatus');
+    
+    // Logika wyboru "Wszyscy" w selectcie lekarzy
+    let hasAllOption = false;
+    if (userSelect) {
+        for (let i=0; i<userSelect.options.length; i++) {
+            if (userSelect.options[i].value === "ALL") hasAllOption = true;
+        }
+        
+        if (hasAllOption) {
+            userSelect.value = "ALL"; // Pokaż długi u wszystkich lekarzy
+        } else if (currentUserProfile && currentUserProfile.uid) {
+             // Jeśli pracownik nie widzi "ALL", zaznacz jego (zobaczy tylko długi u siebie)
+             userSelect.value = currentUserProfile.uid;
+        }
+    }
+    
+    // 3. Wymuś załadowanie danych
+    // (Funkcja loadReceiptsForUser musi być dostępna globalnie)
+    if (typeof loadReceiptsForUser === 'function' && userSelect) {
+        loadReceiptsForUser(userSelect.value).then(() => {
+            // 4. Po załadowaniu danych - wpisz nazwisko i status, a potem przefiltruj
+            if (clientInput) clientInput.value = clientName;
+            if (statusSelect) statusSelect.value = "Dług";
+            
+            if (typeof applyReceiptFilters === 'function') {
+                applyReceiptFilters();
+                if (typeof showToast === 'function') showToast(`Filtruję zadłużenie dla: ${clientName}`, "info");
+            }
+        });
+    }
 }
 /* ======================================================== */
 /* ✅ KONIEC: MODUŁ 6 */
