@@ -20165,6 +20165,129 @@ async function checkSharedLink() {
 }
 // Uruchom sprawdzanie
 checkSharedLink();
+/* ======================================================== */
+/* ✅ BRAKUJĄCE FUNKCJE: Obsługa Długu w Kalkulatorze       */
+/* (Wklej to na samym końcu skryptu, aby były dostępne)     */
+/* ======================================================== */
+
+// Sprawdza dług klienta i wyświetla go pod polem wyboru w Kalkulatorze
+async function checkAndShowClientDebt(clientName) {
+    // 1. Znajdź lub stwórz kontener na informację o długu
+    let debtContainer = document.getElementById('calcClientDebtContainer');
+    
+    // Jeśli kontenera nie ma, stwórz go dynamicznie pod inputem klienta
+    if (!debtContainer) {
+        const inputElement = document.getElementById('calcKlientInput');
+        if (inputElement && inputElement.parentNode) {
+            debtContainer = document.createElement('div');
+            debtContainer.id = 'calcClientDebtContainer';
+            debtContainer.style.marginTop = '5px';
+            debtContainer.style.fontSize = '15px'; // Wyraźna czcionka
+            debtContainer.style.fontWeight = '600';
+            inputElement.parentNode.appendChild(debtContainer);
+        } else {
+            return; // Nie ma gdzie wyświetlić
+        }
+    }
+    
+    // Resetuj widok (pokazuje, że coś się dzieje)
+    debtContainer.innerHTML = '<span style="color: #777;">Sprawdzanie salda...</span>';
+
+    if (!currentUserProfile || !currentUserProfile['ID lecznicy']) {
+        debtContainer.innerHTML = '';
+        return;
+    }
+
+    try {
+        // 2. Pobierz długi z Archiwum (status = "Dług", ten klient, ta lecznica)
+        const q = db.collection("archiwumParagony")
+            .where("id_lecznicy", "==", currentUserProfile['ID lecznicy'])
+            .where("klient", "==", clientName)
+            .where("status", "==", "Dług");
+
+        const snapshot = await q.get();
+        
+        let totalDebt = 0;
+        snapshot.forEach(doc => {
+            totalDebt += parseFloat(doc.data().suma) || 0;
+        });
+
+        if (totalDebt > 0) {
+            // Używamy formatPrice jeśli dostępna
+            const debtText = (typeof formatPrice === 'function') ? formatPrice(totalDebt) : totalDebt + " zł";
+            
+            // Wyświetl na czerwono z linkiem
+            debtContainer.innerHTML = `
+                <span style="color: #c0392b;">
+                    ⚠️ Zadłużenie: 
+                    <span id="debtLink" style="text-decoration: underline; cursor: pointer; color: #d35400;">${debtText}</span>
+                    <span style="font-size: 12px; color: #555; margin-left: 5px;">(Kliknij, aby zobaczyć)</span>
+                </span>`;
+            
+            // Dodaj listener kliknięcia (ważne: robimy to po wstawieniu HTML)
+            setTimeout(() => {
+                const link = document.getElementById('debtLink');
+                if (link) {
+                    link.addEventListener('click', () => {
+                        goToArchiveDebtView(clientName);
+                    });
+                }
+            }, 100);
+            
+        } else {
+            // Brak długu - na zielono
+            debtContainer.innerHTML = '<span style="color: #27ae60;">✔️ Brak zaległości.</span>';
+            // Ukryj po 4 sekundach
+            setTimeout(() => { debtContainer.innerHTML = ''; }, 4000);
+        }
+
+    } catch (e) {
+        console.error("Błąd sprawdzania długu:", e);
+        debtContainer.innerHTML = '';
+    }
+}
+
+// Przenosi do Archiwum z ustawionymi filtrami (Gdy klikniemy w dług)
+function goToArchiveDebtView(clientName) {
+    // 1. Przełącz sekcję na Archiwum Paragonów
+    if (typeof showSection === 'function') {
+        showSection('archiwumParagony');
+    }
+    
+    // 2. Ustaw filtry w Archiwum
+    const userSelect = document.getElementById('archiveReceiptUserSelect');
+    const clientInput = document.getElementById('arcReceiptClient');
+    const statusSelect = document.getElementById('arcReceiptStatus');
+    
+    // Logika wyboru "Wszyscy" w selectcie lekarzy (żeby widzieć długi u innych lekarzy w lecznicy)
+    let hasAllOption = false;
+    if (userSelect) {
+        for (let i=0; i<userSelect.options.length; i++) {
+            if (userSelect.options[i].value === "ALL") hasAllOption = true;
+        }
+        
+        if (hasAllOption) {
+            userSelect.value = "ALL"; 
+        } else if (currentUserProfile && currentUserProfile.uid) {
+             userSelect.value = currentUserProfile.uid;
+        }
+    }
+    
+    // 3. Wymuś załadowanie danych
+    if (typeof loadReceiptsForUser === 'function' && userSelect) {
+        loadReceiptsForUser(userSelect.value).then(() => {
+            // 4. Po załadowaniu danych - wpisz nazwisko i status, a potem przefiltruj
+            if (clientInput) clientInput.value = clientName;
+            if (statusSelect) statusSelect.value = "Dług";
+            
+            if (typeof applyReceiptFilters === 'function') {
+                applyReceiptFilters();
+                if (typeof showToast === 'function') showToast(`Filtruję zadłużenie dla: ${clientName}`, "info");
+            }
+        });
+    }
+}
+/* ======================================================== */
 </script> 
 </body>
 </html>
