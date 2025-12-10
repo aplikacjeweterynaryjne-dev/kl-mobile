@@ -11843,13 +11843,11 @@ if (archiveReceiptTableBody) {
                 }
             }
         }
- // --- ✅ ZADANIE 3: ZMODYFIKOWANA LOGIKA SPŁATY DŁUGU ---
-     else if (target.classList.contains('btn-pay-debt')) {
+else if (target.classList.contains('btn-pay-debt')) {
           const receiptId = target.dataset.receiptId;
           const klient = target.dataset.receiptKlient;
           const suma = parseFloat(target.dataset.receiptSuma) || 0;
           
-          // Zmiana komunikatu dla jasności
           if (confirm(`Czy na pewno chcesz spłacić dług dla: ${klient} (Suma: ${formatPrice(suma)})?\n\nStatus zmieni się na "Zapłacone", data na dzisiejszą, a paragon zostanie przepisany na TWOJE konto.`)) {
               
               target.disabled = true;
@@ -11862,7 +11860,7 @@ if (archiveReceiptTableBody) {
                   const doc = await docRef.get();
                   
                   let existingNote = '';
-                  let previousOwner = 'Inny lekarz'; // Do zapisu w historii
+                  let previousOwner = 'Inny lekarz'; 
                   
                   if (doc.exists) {
                       const d = doc.data();
@@ -11870,50 +11868,55 @@ if (archiveReceiptTableBody) {
                       if (d.lekarz_nazwisko) previousOwner = d.lekarz_nazwisko;
                   }
                   
-                  // Stwórz nową notatkę z informacją o przejęciu
+                  // Nowa notatka
                   const newNote = `SPŁATA DŁUGU (Przejęto od: ${previousOwner})` + (existingNote ? ` | ${existingNote}` : '');
                   
-                  // ✅ DANE DO AKTUALIZACJI: Zmieniamy też właściciela (lekarz_uid)
+                  // Dane do aktualizacji
                   const updateData = {
                       status: "Zapłacone",
                       data: today, 
                       notatka: newNote,
-                      lekarz_uid: currentUserProfile.uid, // Przypisz do aktualnie zalogowanego
-                      lekarz_nazwisko: `${currentUserProfile.Imie} ${currentUserProfile.Nazwisko}` // Aktualizuj wyświetlaną nazwę
+                      lekarz_uid: currentUserProfile.uid,
+                      lekarz_nazwisko: `${currentUserProfile.Imie} ${currentUserProfile.Nazwisko}`
                   };
                   
                   // Wyślij do bazy
                   await docRef.update(updateData);
                   
-                  // Aktualizuj tabelę w widoku (bez przeładowania)
+                  // Aktualizuj tabelę w widoku
                   const tr = target.closest('tr');
                   if (tr) {
-                      // 1. Aktualizuj Datę (indeks 0)
+                      // 1. Aktualizuj dane wizualne i atrybuty
                       tr.cells[0].textContent = today;
                       tr.dataset.data = today;
                       
-                      // 2. Aktualizuj Status (indeks 4)
                       tr.cells[4].textContent = "Zapłacone";
                       tr.cells[4].style.color = "green";
                       tr.dataset.status = "Zapłacone";
                       
-                      // 3. ✅ Aktualizuj Lekarza "Wystawił" (indeks 6 - zgodnie ze strukturą tabeli)
-                      // Sprawdzamy czy komórka istnieje dla bezpieczeństwa
                       if (tr.cells[6]) {
                           tr.cells[6].textContent = updateData.lekarz_nazwisko;
                           tr.dataset.lekarz = updateData.lekarz_nazwisko;
                       }
 
-                      // 4. Aktualizuj Notatkę (indeks 7)
                       if (tr.cells[7]) { 
                           tr.cells[7].textContent = newNote.substring(0, 30) + (newNote.length > 30 ? '...' : ''); 
                           tr.cells[7].title = newNote;
                           tr.dataset.notatka = newNote;
                       }
+
+                      // 2. ✅ KLUCZOWA POPRAWKA: Przenieś wiersz na samą górę tabeli (ponieważ data to "dzisiaj")
+                      // Znajdujemy ciało tabeli (tbody) i wstawiamy wiersz jako pierwsze dziecko
+                      const tbody = tr.parentElement;
+                      tbody.prepend(tr); 
+                      
+                      // Opcjonalnie: Podświetl wiersz, żeby użytkownik widział, gdzie "poleciał"
+                      tr.style.backgroundColor = "#e8f5e9"; // Jasna zieleń
+                      setTimeout(() => tr.style.backgroundColor = "", 2000);
                   }
                   
                   target.style.display = 'none';
-                  alert('Dług spłacony. Paragon został pomyślnie przepisany do Twojego konta.');
+                  alert('Dług spłacony. Paragon został przeniesiony na górę listy (data dzisiejsza) i przepisany do Twojego konta.');
 
               } catch (error) {
                   console.error("Błąd podczas spłaty długu:", error);
