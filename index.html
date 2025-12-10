@@ -6433,7 +6433,7 @@ const saveCardToArchiveBtn = document.getElementById('saveCardToArchiveBtn');
 /**
  * Pkt 4: Listener dla przycisku "Zapisz w Archiwum"
  */
-/* ✅ MODUŁ 8 (ZAPIS + AUTO-QR + OFFLINE): Zapisuje kartę i obsługuje brak sieci */
+/* ✅ MODUŁ 8 (OFFLINE-PROOF): Zapis Karty z wymuszeniem odblokowania */
 if (saveCardToArchiveBtn) {
     saveCardToArchiveBtn.addEventListener('click', async () => {
         
@@ -6461,7 +6461,7 @@ if (saveCardToArchiveBtn) {
         saveCardToArchiveBtn.textContent = 'Przetwarzanie...';
 
         try {
-            // 3. Walidacja Duplikatów (Tylko jeśli ONLINE)
+            // 3. Walidacja Duplikatów (TYLKO ONLINE - Offline to pomija, żeby nie wisieć)
             if (navigator.onLine) {
                  const idLecznicy = currentUserProfile['ID lecznicy'];
                  const q = db.collection("archiwumKarty")
@@ -6469,25 +6469,21 @@ if (saveCardToArchiveBtn) {
                      .where("nrDokumentu", "==", nrDokStr)
                      .limit(1);
                  
-                 // Krótki timeout dla sprawdzenia duplikatu (żeby nie wisiało przy słabym necie)
-                 const duplicateCheck = new Promise((resolve, reject) => {
-                     q.get().then(resolve).catch(reject);
-                     setTimeout(() => resolve(null), 2000); // 2 sekundy timeoutu
-                 });
-
-                 const duplicateSnapshot = await duplicateCheck;
+                 // "Wyścig": Jeśli sprawdzenie trwa dłużej niż 2s, anuluj je (uznaj, że sieć jest słaba)
+                 const checkPromise = q.get();
+                 const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve('TIMEOUT'), 2000));
                  
-                 if (duplicateSnapshot && !duplicateSnapshot.empty) {
+                 const result = await Promise.race([checkPromise, timeoutPromise]);
+
+                 if (result !== 'TIMEOUT' && result && !result.empty) {
                      showToast(`Błąd: Karta o numerze [${nrDokStr}] już istnieje (Online)!`, "error", 5000);
                      saveCardToArchiveBtn.disabled = false;
                      saveCardToArchiveBtn.textContent = '💾 Zapisz w Archiwum';
                      return;
                  }
-            } else {
-                console.log("Tryb Offline: Pomijam sprawdzanie duplikatów na serwerze.");
             }
             
-            // --- PRZYGOTOWANIE DANYCH (Bez zmian) ---
+            // --- PRZYGOTOWANIE DANYCH (Standard) ---
             const canvas = document.getElementById('canvasPosiadacz');
             let podpisData = canvas.toDataURL();
             if (podpisData.length < 1000) { 
@@ -6570,7 +6566,6 @@ if (saveCardToArchiveBtn) {
                 }
             });
 
-            // NAPRAWA LICZNIKA
             let finalCounter = currentCardData.nextCounter;
             try {
                 const parts = nrDokStr.split('/');
@@ -6596,7 +6591,7 @@ if (saveCardToArchiveBtn) {
                 podpisPosiadacza: podpisData
             };
             
-            // --- TRANSAKCJA (BATCH) ---
+            // --- BATCH (ZAPIS) ---
             const batch = db.batch();
             const userDocId = currentUserProfile.id;
             const cardRef = db.collection("archiwumKarty").doc();
@@ -6633,12 +6628,14 @@ if (saveCardToArchiveBtn) {
                 batch.set(logRef, logData);
             }
 
-            // ✅ CRITICAL FIX: Zapisz batch, ale nie blokuj UI w nieskończoność
-            // W trybie offline batch.commit() zapisuje do IndexedDB i zwraca promise.
-            // Ale dla pewności obsługujemy scenariusz offline.
-            await batch.commit();
+            // ✅ CRITICAL FIX: WYŚCIG Z CZASEM
+            // Dajemy bazie 2.5 sekundy na potwierdzenie. Jak nie zdąży -> uznajemy że jest Offline (ale zapisane lokalnie) i puszczamy.
+            const savePromise = batch.commit();
+            const offlineTimeout = new Promise((resolve) => setTimeout(() => resolve('OFFLINE_ASSUMED'), 2500));
+            
+            const raceResult = await Promise.race([savePromise, offlineTimeout]);
 
-            // Aktualizacja cache magazynu (lokalnie, dla wydajności)
+            // Niezależnie od wyniku wyścigu, aktualizujemy cache lokalny dla wydajności
             if (currentUserProfile.uzywaStanowMagazynowych === true && productUsageMap.size > 0) {
                  for (const [productId, usageQty] of productUsageMap.entries()) {
                      const stockData = magazynCache.get(productId);
@@ -6646,16 +6643,15 @@ if (saveCardToArchiveBtn) {
                  }
             }
 
-            // ✅ SUKCES ZAPISU (Lokalny lub Zdalny)
-            isCurrentCardSaved = true; // 🔓 ODBLOKOWANIE DRUKOWANIA
-
-            // Komunikat zależny od stanu sieci
-            if (navigator.onLine) {
-                showToast(`Karta (Nr: ${nrDokStr}) zapisana w chmurze.`, 'success');
-                saveCardToArchiveBtn.textContent = 'Zapisano ✔️';
+            // ✅ ODBLOKOWANIE UI I DRUKOWANIA
+            isCurrentCardSaved = true; // To najważniejsze - zdejmuje blokadę druku!
+            
+            if (raceResult === 'OFFLINE_ASSUMED' || !navigator.onLine) {
+                 alert("📡 ZAPISANO OFFLINE: Karta została bezpiecznie zapisana w pamięci telefonu.\nSynchronizacja nastąpi automatycznie po odzyskaniu sieci.\n\nMożesz teraz drukować.");
+                 saveCardToArchiveBtn.textContent = 'Zapisano (Offline) 💾';
             } else {
-                alert("📡 TRYB OFFLINE: Karta została zapisana w pamięci telefonu.\n\nMożesz teraz bezpiecznie drukować.\nNie wylogowuj się i nie czyść pamięci przeglądarki aż do odzyskania internetu - wtedy dane wyślą się automatycznie.");
-                saveCardToArchiveBtn.textContent = 'Zapisano (Offline) 💾';
+                 showToast(`Karta (Nr: ${nrDokStr}) zapisana w chmurze.`, 'success');
+                 saveCardToArchiveBtn.textContent = 'Zapisano ✔️';
             }
 
             // Pytanie o kod QR
@@ -6664,14 +6660,29 @@ if (saveCardToArchiveBtn) {
                     showQrModal(cardRef.id, headerData.nrDokumentu, headerData.dataWykonania);
                 }
             }
+            
+            // Odsłoń przycisk "Zamknij" jeśli jesteśmy w formularzu (Krok 3)
+            const fClose = document.getElementById('formCloseAfterSaveBtn');
+            const fSave = document.getElementById('formOnlySaveBtn');
+            if (fClose && fSave) {
+                fClose.style.display = 'block';
+                fSave.style.display = 'none';
+            }
 
         } catch (error) {
             console.error("Błąd zapisu karty:", error);
-            // Jeśli błąd offline, traktuj jako sukces lokalny
-            if (!navigator.onLine || error.code === 'unavailable') {
-                 isCurrentCardSaved = true; // Odblokuj druk awaryjnie
-                 alert("📡 TRYB OFFLINE: Wystąpił błąd połączenia, ale dane zostały zakolejkowane lokalnie.\n\nMożesz kontynuować pracę.");
+            // Jeśli to błąd sieci, traktuj jako sukces lokalny
+            if (error.code === 'unavailable' || !navigator.onLine) {
+                 isCurrentCardSaved = true; // Awaryjne odblokowanie
+                 alert("📡 ZAPISANO OFFLINE: Wystąpił problem z siecią, ale dane są bezpieczne w pamięci telefonu.\nMożesz drukować.");
                  saveCardToArchiveBtn.textContent = 'Zapisano (Offline) 💾';
+                 
+                 const fClose = document.getElementById('formCloseAfterSaveBtn');
+                 const fSave = document.getElementById('formOnlySaveBtn');
+                 if (fClose && fSave) {
+                    fClose.style.display = 'block';
+                    fSave.style.display = 'none';
+                 }
             } else {
                  alert("Wystąpił błąd podczas zapisu: " + error.message);
                  saveCardToArchiveBtn.disabled = false;
@@ -7592,12 +7603,11 @@ if (copyCheckbox) {
 // ✅ Moduł 2: ZMODYFIKOWANA funkcja zapisu paragonu (dodaje status)
 /* Plik: index.html (zastąp cały blok saveReceiptBtn, ok. linii 1475) */
 
-/* ✅ MODUŁ 2 (OFFLINE FIX): Zapis paragonu z obsługą braku sieci */
+/* ✅ MODUŁ 2 (OFFLINE FIX - PROMISE RACE): Kalkulator */
 if (saveReceiptBtn) {
     saveReceiptBtn.addEventListener('click', async () => {
         let confirmResult = false; 
         
-        // 1. Podstawowe Walidacje
         if (receiptItems.length === 0) {
             alert('Paragon jest pusty, nie ma czego zapisywać.');
             return;
@@ -7614,7 +7624,6 @@ if (saveReceiptBtn) {
         }
         if (errorMsgEl) errorMsgEl.style.display = 'none';
         
-        // 2. Pobranie Danych
         const nrDokumentu = document.getElementById('calcNrDokInput').value.trim();
         const isCorrectionMode = document.getElementById('correctionModeCheckbox').checked;
         const originalReceiptId = document.getElementById('correctionReceiptSelect').value;
@@ -7643,36 +7652,35 @@ if (saveReceiptBtn) {
         };
         
         if (!confirm(`Paragon został wygenerowany.\n\nCzy chcesz ${actionText} ten paragon w ARCHIWUM?`)) {
-            showToast('Zapis anulowany.', 'info');
             return;
         }
 
-        // 4. Zapis do Firestore (z obsługą offline)
         try {
             saveReceiptBtn.disabled = true;
             saveReceiptBtn.textContent = isUpdate ? 'Nadpisywanie...' : 'Zapisywanie...';
             
-            // --- KOREKTA ---
+            let dbPromise;
             if (isUpdate) {
-                // ... (logika korekty bez zmian)
                 delete receiptData.counter;
                 delete receiptData.miesiac;
                 delete receiptData.rok;
                 delete receiptData.nrDokumentu; 
-                await db.collection("archiwumParagony").doc(originalReceiptId).update(receiptData);
+                dbPromise = db.collection("archiwumParagony").doc(originalReceiptId).update(receiptData);
             } else {
-                // --- NOWY ZAPIS ---
-                await db.collection("archiwumParagony").add(receiptData);
+                dbPromise = db.collection("archiwumParagony").add(receiptData);
             }
             
-            // ✅ SUKCES (Online lub Offline)
-            if (navigator.onLine) {
+            // ✅ CRITICAL FIX: WYŚCIG Z CZASEM (2.5 sekundy)
+            const offlineTimeout = new Promise((resolve) => setTimeout(() => resolve('OFFLINE_ASSUMED'), 2500));
+            const raceResult = await Promise.race([dbPromise, offlineTimeout]);
+            
+            // Logika po "zapisie" (lub timeoutcie)
+            if (raceResult === 'OFFLINE_ASSUMED' || !navigator.onLine) {
+                 alert("📡 ZAPISANO OFFLINE: Dane zostały zapisane w pamięci telefonu.\nSynchronizacja nastąpi automatycznie po odzyskaniu sieci.");
+            } else {
                  showToast(`Paragon zapisany w chmurze.`, 'success');
-            } else {
-                 alert("📡 TRYB OFFLINE: Paragon zapisany lokalnie.\nSynchronizacja nastąpi automatycznie po odzyskaniu sieci.");
             }
             
-            // Potwierdzenie wyjścia
             confirmResult = confirm(`Paragon został pomyślnie ${actionText}.\n\nCzy chcesz odświeżyć aplikację (rozpocząć nowy)?`);
             
             if (confirmResult) {
@@ -7682,17 +7690,15 @@ if (saveReceiptBtn) {
         } catch (error) {
             console.error(`Błąd zapisu paragonu:`, error);
             
-            // Obsługa błędu offline (gdyby promise rzucił błąd zamiast zawisnąć)
             if (!navigator.onLine || error.code === 'unavailable') {
-                 alert("📡 TRYB OFFLINE: Dane zapisane w kolejce lokalnej.");
-                 window.location.reload(); // Wymuś odświeżenie, żeby wyczyścić formularz
+                 alert("📡 ZAPISANO OFFLINE: Wystąpił problem z siecią, ale dane są bezpieczne.");
+                 window.location.reload();
             } else {
                  alert(`Wystąpił błąd podczas zapisu: ${error.message}`);
                  saveReceiptBtn.disabled = false;
                  saveReceiptBtn.textContent = '💾 ZAPISZ I ZAMKNIJ';
             }
         } finally {
-            // Ręczny reset
             if (!confirmResult && saveReceiptBtn.disabled) {
                 saveReceiptBtn.disabled = false;
                 saveReceiptBtn.textContent = '💾 ZAPISZ I ZAMKNIJ';
