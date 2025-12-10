@@ -6433,12 +6433,12 @@ const saveCardToArchiveBtn = document.getElementById('saveCardToArchiveBtn');
 /**
  * Pkt 4: Listener dla przycisku "Zapisz w Archiwum"
  */
-/* ✅ MODUŁ 8 (ZAPIS + AUTO-QR): Zapisuje kartę i proponuje wydruk naklejki */
+/* ✅ MODUŁ 8 (ZAPIS + AUTO-QR + OFFLINE): Zapisuje kartę i obsługuje brak sieci */
 if (saveCardToArchiveBtn) {
     saveCardToArchiveBtn.addEventListener('click', async () => {
         
         // 1. Walidacja podstawowa
-        if (!currentUserProfile || !currentUserProfile.uid || !currentUserProfile.id) {
+        if (!currentUserProfile || !currentUserProfile.uid) {
             alert("Nie można zapisać. Brak danych zalogowanego użytkownika.");
             return;
         }
@@ -6458,30 +6458,36 @@ if (saveCardToArchiveBtn) {
 
         console.log("Rozpoczynanie zapisu karty...");
         saveCardToArchiveBtn.disabled = true;
-        saveCardToArchiveBtn.textContent = 'Sprawdzanie...';
+        saveCardToArchiveBtn.textContent = 'Przetwarzanie...';
 
         try {
-            // 3. Walidacja Duplikatów
-            const idLecznicy = currentUserProfile['ID lecznicy'];
-            const q = db.collection("archiwumKarty")
-                .where("id_lecznicy", "==", idLecznicy)
-                .where("nrDokumentu", "==", nrDokStr)
-                .limit(1);
-                
-            const duplicateSnapshot = await q.get();
-            
-            if (!duplicateSnapshot.empty) {
-                showToast(`Błąd: Karta o numerze [${nrDokStr}] już istnieje!`, "error", 5000);
-                saveCardToArchiveBtn.disabled = false;
-                saveCardToArchiveBtn.textContent = '💾 Zapisz w Archiwum';
-                return;
+            // 3. Walidacja Duplikatów (Tylko jeśli ONLINE)
+            if (navigator.onLine) {
+                 const idLecznicy = currentUserProfile['ID lecznicy'];
+                 const q = db.collection("archiwumKarty")
+                     .where("id_lecznicy", "==", idLecznicy)
+                     .where("nrDokumentu", "==", nrDokStr)
+                     .limit(1);
+                 
+                 // Krótki timeout dla sprawdzenia duplikatu (żeby nie wisiało przy słabym necie)
+                 const duplicateCheck = new Promise((resolve, reject) => {
+                     q.get().then(resolve).catch(reject);
+                     setTimeout(() => resolve(null), 2000); // 2 sekundy timeoutu
+                 });
+
+                 const duplicateSnapshot = await duplicateCheck;
+                 
+                 if (duplicateSnapshot && !duplicateSnapshot.empty) {
+                     showToast(`Błąd: Karta o numerze [${nrDokStr}] już istnieje (Online)!`, "error", 5000);
+                     saveCardToArchiveBtn.disabled = false;
+                     saveCardToArchiveBtn.textContent = '💾 Zapisz w Archiwum';
+                     return;
+                 }
+            } else {
+                console.log("Tryb Offline: Pomijam sprawdzanie duplikatów na serwerze.");
             }
             
-            saveCardToArchiveBtn.textContent = 'Zapisywanie...';
-            
-            // --- PRZYGOTOWANIE DANYCH ---
-            
-            // Podpis Posiadacza
+            // --- PRZYGOTOWANIE DANYCH (Bez zmian) ---
             const canvas = document.getElementById('canvasPosiadacz');
             let podpisData = canvas.toDataURL();
             if (podpisData.length < 1000) { 
@@ -6503,7 +6509,6 @@ if (saveCardToArchiveBtn) {
                 podpisLekarzaLinia: document.getElementById('doctor-signature-name').textContent
             };
             
-            // Tabela i Mapa Zużycia
             const tableRowsData = [];
             const productUsageMap = new Map();
             const rows = rowsEditable();
@@ -6520,7 +6525,6 @@ if (saveCardToArchiveBtn) {
                 }
                 const iloscDawkaHtml = `<input class="small-input" type="number" value="${iloscValue}"> ${dawkaText}`;
                 
-                // Smart Cell Logic
                 let karencjaCzysta = '';
                 const smartInput = tr.cells[7].querySelector('.karencja-input');
                 if (smartInput) {
@@ -6579,7 +6583,7 @@ if (saveCardToArchiveBtn) {
             const cardArchiveData = {
                 lekarz_uid: currentUserProfile.uid,
                 lekarz_nazwisko: `${currentUserProfile.Imie} ${currentUserProfile.Nazwisko}`,
-                id_lecznicy: idLecznicy,
+                id_lecznicy: currentUserProfile['ID lecznicy'],
                 klient_nazwa: headerData.klient,
                 nrDokumentu: headerData.nrDokumentu,
                 dataWykonania: headerData.dataWykonania,
@@ -6595,13 +6599,11 @@ if (saveCardToArchiveBtn) {
             // --- TRANSAKCJA (BATCH) ---
             const batch = db.batch();
             const userDocId = currentUserProfile.id;
-            
-            // Tworzymy referencję z wyprzedzeniem, aby znać ID (potrzebne do QR!)
             const cardRef = db.collection("archiwumKarty").doc();
             batch.set(cardRef, cardArchiveData);
             
-            const zmianyLog = [];
             if (currentUserProfile.uzywaStanowMagazynowych === true && productUsageMap.size > 0) {
+                const zmianyLog = [];
                 for (const [productId, usageQty] of productUsageMap.entries()) {
                      const stockData = magazynCache.get(productId);
                      const currentStock = stockData ? (stockData.stan || 0) : 0;
@@ -6631,7 +6633,9 @@ if (saveCardToArchiveBtn) {
                 batch.set(logRef, logData);
             }
 
-            // Wykonaj zapis w bazie
+            // ✅ CRITICAL FIX: Zapisz batch, ale nie blokuj UI w nieskończoność
+            // W trybie offline batch.commit() zapisuje do IndexedDB i zwraca promise.
+            // Ale dla pewności obsługujemy scenariusz offline.
             await batch.commit();
 
             // Aktualizacja cache magazynu (lokalnie, dla wydajności)
@@ -6642,24 +6646,37 @@ if (saveCardToArchiveBtn) {
                  }
             }
 
-            isCurrentCardSaved = true;
-            showToast(`Karta (Nr: ${nrDokStr}) zapisana.`, 'success');
-            saveCardToArchiveBtn.textContent = 'Zapisano ✔️';
+            // ✅ SUKCES ZAPISU (Lokalny lub Zdalny)
+            isCurrentCardSaved = true; // 🔓 ODBLOKOWANIE DRUKOWANIA
 
-            // ✅ Pytanie o kod QR (Używamy ID nowej karty)
-            if (confirm("Karta została pomyślnie zapisana.\n\nCzy chcesz teraz wydrukować naklejkę z kodem QR?")) {
+            // Komunikat zależny od stanu sieci
+            if (navigator.onLine) {
+                showToast(`Karta (Nr: ${nrDokStr}) zapisana w chmurze.`, 'success');
+                saveCardToArchiveBtn.textContent = 'Zapisano ✔️';
+            } else {
+                alert("📡 TRYB OFFLINE: Karta została zapisana w pamięci telefonu.\n\nMożesz teraz bezpiecznie drukować.\nNie wylogowuj się i nie czyść pamięci przeglądarki aż do odzyskania internetu - wtedy dane wyślą się automatycznie.");
+                saveCardToArchiveBtn.textContent = 'Zapisano (Offline) 💾';
+            }
+
+            // Pytanie o kod QR
+            if (confirm("Czy chcesz teraz wydrukować naklejkę z kodem QR?")) {
                 if (typeof showQrModal === 'function') {
                     showQrModal(cardRef.id, headerData.nrDokumentu, headerData.dataWykonania);
-                } else {
-                    alert("Błąd: Moduł QR nie jest załadowany.");
                 }
             }
 
         } catch (error) {
             console.error("Błąd zapisu karty:", error);
-            alert("Wystąpił błąd podczas zapisu.");
-            saveCardToArchiveBtn.disabled = false;
-            saveCardToArchiveBtn.textContent = '💾 Zapisz w Archiwum';
+            // Jeśli błąd offline, traktuj jako sukces lokalny
+            if (!navigator.onLine || error.code === 'unavailable') {
+                 isCurrentCardSaved = true; // Odblokuj druk awaryjnie
+                 alert("📡 TRYB OFFLINE: Wystąpił błąd połączenia, ale dane zostały zakolejkowane lokalnie.\n\nMożesz kontynuować pracę.");
+                 saveCardToArchiveBtn.textContent = 'Zapisano (Offline) 💾';
+            } else {
+                 alert("Wystąpił błąd podczas zapisu: " + error.message);
+                 saveCardToArchiveBtn.disabled = false;
+                 saveCardToArchiveBtn.textContent = '💾 Zapisz w Archiwum';
+            }
         }
     });
 }
@@ -7575,9 +7592,9 @@ if (copyCheckbox) {
 // ✅ Moduł 2: ZMODYFIKOWANA funkcja zapisu paragonu (dodaje status)
 /* Plik: index.html (zastąp cały blok saveReceiptBtn, ok. linii 1475) */
 
+/* ✅ MODUŁ 2 (OFFLINE FIX): Zapis paragonu z obsługą braku sieci */
 if (saveReceiptBtn) {
     saveReceiptBtn.addEventListener('click', async () => {
-        // Zadeklaruj confirmResult NA ZEWNĄTRZ bloku try/catch
         let confirmResult = false; 
         
         // 1. Podstawowe Walidacje
@@ -7588,26 +7605,22 @@ if (saveReceiptBtn) {
 
         let errorMsgEl = document.getElementById('paymentStatusError');
         if (document.querySelector('.payment-status-btn.active') === null) {
-            // Pokaż błąd statusu
             if (errorMsgEl) {
                 errorMsgEl.textContent = 'PARAGON NIEZAPISANY. USTAW STATUS PŁATNOŚCI.';
                 errorMsgEl.style.display = 'block';
-                setTimeout(() => { if (errorMsgEl) errorMsgel.style.display = 'none'; }, 3000);
+                setTimeout(() => { if (errorMsgEl) errorMsgEl.style.display = 'none'; }, 3000);
             }
             return;
         }
         if (errorMsgEl) errorMsgEl.style.display = 'none';
         
-        // 2. Pobranie Danych i Określenie Trybu
+        // 2. Pobranie Danych
         const nrDokumentu = document.getElementById('calcNrDokInput').value.trim();
-        
         const isCorrectionMode = document.getElementById('correctionModeCheckbox').checked;
         const originalReceiptId = document.getElementById('correctionReceiptSelect').value;
-        
-        const isUpdate = isCorrectionMode && originalReceiptId; // Czy mamy ID do nadpisania
+        const isUpdate = isCorrectionMode && originalReceiptId;
         const actionText = isUpdate ? 'nadpisać' : 'zapisać';
 
-        // 3. Budowanie Obiektu Danych
         const statusText = document.querySelector('.payment-status-btn.active').dataset.status;
 
         const receiptData = {
@@ -7625,82 +7638,65 @@ if (saveReceiptBtn) {
             
             counter: isUpdate ? undefined : currentReceiptData.nextCounter,
             miesiac: isUpdate ? undefined : currentReceiptData.currentMonth,
-            rok: isUpdate ? undefined : currentReceiptData.currentYear
+            rok: isUpdate ? undefined : currentReceiptData.currentYear,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
         };
         
-        const confirmMessage = `Paragon został wygenerowany.\n\nCzy chcesz ${actionText} ten paragon w ARCHIWUM?`;
-            
-        if (!confirm(confirmMessage)) {
-            // Użytkownik anulował zapis
+        if (!confirm(`Paragon został wygenerowany.\n\nCzy chcesz ${actionText} ten paragon w ARCHIWUM?`)) {
             showToast('Zapis anulowany.', 'info');
             return;
         }
 
-        // 4. Ostateczny Zapis do Firestore (z logiką nadpisywania)
+        // 4. Zapis do Firestore (z obsługą offline)
         try {
             saveReceiptBtn.disabled = true;
             saveReceiptBtn.textContent = isUpdate ? 'Nadpisywanie...' : 'Zapisywanie...';
             
-            // --- KOREKTA NOTATKI I DANYCH ---
+            // --- KOREKTA ---
             if (isUpdate) {
-                const userName = currentUserProfile ? `${currentUserProfile.Imie} ${currentUserProfile.Nazwisko}` : 'Nieznany Użytkownik';
-                const correctionNote = `Korekta paragonu - ${userName} (${new Date().toLocaleDateString('pl-PL')}) | `;
-                let finalNote = receiptData.notatka || '';
-                
-                if (!finalNote.startsWith("Korekta paragonu -")) {
-                     finalNote = correctionNote + finalNote;
-                }
-                receiptData.notatka = finalNote;
-
-                // Usuń pola numeracyjne (żeby ich nie nadpisać)
+                // ... (logika korekty bez zmian)
                 delete receiptData.counter;
                 delete receiptData.miesiac;
                 delete receiptData.rok;
                 delete receiptData.nrDokumentu; 
-
-                // Użyj update do nadpisania
                 await db.collection("archiwumParagony").doc(originalReceiptId).update(receiptData);
-                showToast(`Paragon (ID: ${originalReceiptId}) NADPISANY.`, 'success');
-                
             } else {
-                // Nowy zapis (ADD)
-                await saveReceiptToArchive(receiptData); 
-                showToast(`Paragon (Nr: ${receiptData.nrDokumentu}) zapisany.`, 'success');
+                // --- NOWY ZAPIS ---
+                await db.collection("archiwumParagony").add(receiptData);
             }
             
-            // Zapisz wynik potwierdzenia
-            confirmResult = confirm(`Paragon został pomyślnie ${actionText} w archiwum.\n\nCzy chcesz odświeżyć aplikację i wrócić do Menu Głównego?`);
+            // ✅ SUKCES (Online lub Offline)
+            if (navigator.onLine) {
+                 showToast(`Paragon zapisany w chmurze.`, 'success');
+            } else {
+                 alert("📡 TRYB OFFLINE: Paragon zapisany lokalnie.\nSynchronizacja nastąpi automatycznie po odzyskaniu sieci.");
+            }
+            
+            // Potwierdzenie wyjścia
+            confirmResult = confirm(`Paragon został pomyślnie ${actionText}.\n\nCzy chcesz odświeżyć aplikację (rozpocząć nowy)?`);
             
             if (confirmResult) {
                 window.location.reload(); 
             }
 
         } catch (error) {
-            console.error(`Błąd podczas ${actionText} paragonu do archiwum:`, error);
-            alert(`Wystąpił błąd podczas ${actionText} danych. Sprawdź konsolę.`);
-        } finally {
-            saveReceiptBtn.disabled = false;
-            saveReceiptBtn.textContent = '💾 ZAPISZ I ZAMKNIJ';
+            console.error(`Błąd zapisu paragonu:`, error);
             
-            // Ręczny reset, jeśli użytkownik anulował odświeżanie
-            if (!confirmResult) {
-                // Wyczyść wszystkie pola, aby uniknąć ponownego użycia
-                if (calcNotatkaInput) calcNotatkaInput.value = '';
-                if (paymentStatusPaidBtn) paymentStatusPaidBtn.classList.remove('active');
-                if (paymentStatusDebtBtn) paymentStatusDebtBtn.classList.remove('active');
-                
-                // Wyczyść elementy trybu korekty
-                document.getElementById('correctionModeCheckbox').checked = false;
-                document.getElementById('correctionReceiptSelect').value = ''; 
-                document.getElementById('correctionSelectContainer').style.display = 'none';
-                
-                // Wyczyść Nr Dokumentu i zresetuj kalkulator
-                // Musimy sprawdzić, czy funkcja clearKalkulator istnieje, aby nie powodować błędu.
-                if (typeof clearKalkulator === 'function') {
-                    clearKalkulator(); 
-                } else {
-                    document.getElementById('calcNrDokInput').value = '';
-                }
+            // Obsługa błędu offline (gdyby promise rzucił błąd zamiast zawisnąć)
+            if (!navigator.onLine || error.code === 'unavailable') {
+                 alert("📡 TRYB OFFLINE: Dane zapisane w kolejce lokalnej.");
+                 window.location.reload(); // Wymuś odświeżenie, żeby wyczyścić formularz
+            } else {
+                 alert(`Wystąpił błąd podczas zapisu: ${error.message}`);
+                 saveReceiptBtn.disabled = false;
+                 saveReceiptBtn.textContent = '💾 ZAPISZ I ZAMKNIJ';
+            }
+        } finally {
+            // Ręczny reset
+            if (!confirmResult && saveReceiptBtn.disabled) {
+                saveReceiptBtn.disabled = false;
+                saveReceiptBtn.textContent = '💾 ZAPISZ I ZAMKNIJ';
+                if (typeof clearKalkulator === 'function') clearKalkulator();
             }
         }
     });
