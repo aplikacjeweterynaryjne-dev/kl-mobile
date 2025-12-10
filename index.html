@@ -3245,16 +3245,22 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
     </div>
     
 <div class="form-actions" style="margin-top: 25px; flex-direction: column; gap: 10px;">
-        <button id="formSaveAndArchiveBtn" type="button" class="btn primary" style="font-size: 18px; padding: 15px;">
-            💾 Zamknij i zapisz w archiwum
-        </button>
-        <button id="formPrintBtn" type="button" class="btn" style="font-size: 18px; padding: 15px; background: #e6e6e6;">
-            🖨️ Drukuj / Zapisz PDF
-        </button>
-        <button id="formCancelStep3Btn" type="button" class="btn warn small" style="width: 100%; font-size: 18px; padding: 15px; border-color: #c0392b;">
-            ❌ Anuluj
-        </button>
-    </div>
+    <button id="formOnlySaveBtn" type="button" class="btn primary" style="font-size: 18px; padding: 15px; background-color: #27ae60; border-color: #229954;">
+        💾 ZAPISZ W ARCHIWUM (bez zamykania)
+    </button>
+    
+    <button id="formPrintBtn" type="button" class="btn" style="font-size: 18px; padding: 15px; background: #e6e6e6;">
+        🖨️ Drukuj / Zapisz PDF
+    </button>
+
+    <button id="formCloseAfterSaveBtn" type="button" class="btn" style="font-size: 18px; padding: 15px; background-color: #34495e; color: white; display: none;">
+        🚪 Zamknij Formularz
+    </button>
+
+    <button id="formCancelStep3Btn" type="button" class="btn warn small" style="width: 100%; font-size: 18px; padding: 15px; border-color: #c0392b;">
+        ❌ Anuluj / Zamknij
+    </button>
+</div>
 
     <div class="form-actions" style="margin-top: 15px; justify-content: flex-start; border-top: 1px solid #eee; padding-top: 15px;">
         <button id="backToRows" class="btn ghost small">⬅️ Wróć do edycji wierszy</button>
@@ -4975,18 +4981,34 @@ const formRowSelect = document.getElementById('formRowSelect');
 const formNoweDaneContainer = document.getElementById('formNoweDaneContainer');
 const formBtnNoweDane = document.getElementById('formBtnNoweDane');
 const formRowDetailsContainer = document.getElementById('formRowDetailsContainer');
+/* ---- Formularz: otwieranie, krokowanie, synchronizacja nagłówka ---- */
 formBtn.addEventListener('click', ()=>{
-formModal.style.display = 'flex';
-showStep(1);
-populateRowSelect();
-formRowSelect.dataset.prevIndex = 0; 
-// set form fields from current header values (so form reflects table)
-document.getElementById('formKlient').value = document.getElementById('klientSelect').value || '';
-document.getElementById('formAdres').value = document.getElementById('adresKlienta').textContent || '';
-document.getElementById('formNrStada').value = document.getElementById('nrStada').textContent || '';
-document.getElementById('formDataZgloszenia').value = document.getElementById('dataZgloszenia').value || '';
-document.getElementById('formDataWykonania').value = document.getElementById('dataWykonania').value || '';
-document.getElementById('formNrDokumentu').value = document.getElementById('nrDokumentu').value || '';
+    formModal.style.display = 'flex';
+    showStep(1);
+    populateRowSelect();
+    formRowSelect.dataset.prevIndex = 0; 
+    
+    // set form fields from current header values (so form reflects table)
+    document.getElementById('formKlient').value = document.getElementById('klientSelect').value || '';
+    document.getElementById('formAdres').value = document.getElementById('adresKlienta').textContent || '';
+    document.getElementById('formNrStada').value = document.getElementById('nrStada').textContent || '';
+    document.getElementById('formDataZgloszenia').value = document.getElementById('dataZgloszenia').value || '';
+    document.getElementById('formDataWykonania').value = document.getElementById('dataWykonania').value || '';
+    document.getElementById('formNrDokumentu').value = document.getElementById('nrDokumentu').value || '';
+
+    // ⬇️ ✅ PUNKT 4: RESET PRZYCISKÓW W PODSUMOWANIU ⬇️
+    // Przy każdym otwarciu formularza upewniamy się, że widać "Zapisz", a "Zamknij" jest ukryty.
+    const fSave = document.getElementById('formOnlySaveBtn');
+    const fClose = document.getElementById('formCloseAfterSaveBtn');
+    
+    if (fSave) {
+        fSave.style.display = 'block';   // Pokaż "Zapisz"
+        fSave.disabled = false;          // Odblokuj (na wypadek gdyby został zablokowany)
+        fSave.textContent = '💾 ZAPISZ W ARCHIWUM (bez zamykania)'; // Reset tekstu
+    }
+    if (fClose) {
+        fClose.style.display = 'none';   // Ukryj "Zamknij"
+    }
 });
 
 closeForm.addEventListener('click', ()=> formModal.style.display = 'none');
@@ -5768,11 +5790,18 @@ const receiptPrintContainer = document.getElementById('receiptPrintContainer');
 
 // 1. Przechwyć kliknięcie głównego przycisku "Drukuj"
 if (drukujBtn && printFormatModal) {
-    // Upewnij się, że stary listener jest usunięty (na wszelki wypadek)
     drukujBtn.removeAttribute('onclick');
     
     drukujBtn.addEventListener('click', () => {
-        // Zamiast drukować, pokaż modal wyboru formatu
+        // ✅ NOWA WALIDACJA: Blokada druku przed zapisem (tylko dla magazynierów)
+        if (currentUserProfile && currentUserProfile.uzywaStanowMagazynowych === true) {
+            if (!isCurrentCardSaved) {
+                alert("⚠️ UWAGA: Masz włączony Magazyn.\n\nMusisz najpierw ZAPISAĆ kartę w archiwum (aby ściągnąć stany), zanim będziesz mógł ją wydrukować.");
+                return;
+            }
+        }
+
+        // Jeśli walidacja przeszła (lub magazyn wyłączony), pokaż modal
         printFormatModal.style.display = 'flex';
     });
 }
@@ -18097,49 +18126,84 @@ document.addEventListener('DOMContentLoaded', initFormSignature);
 
 /* 3. Pkt 2, 3: Logika dla przycisków "Zamknij i zapisz" i "Drukuj" */
 
-// PRZYCISK: Zamknij i zapisz w archiwum
-document.getElementById('formSaveAndArchiveBtn')?.addEventListener('click', () => {
-    // 1. Zapisz aktualnie edytowany wiersz (jeśli jesteśmy w kroku 2)
-    const prevIdx = parseInt(formRowSelect.dataset.prevIndex, 10);
-    if (!isNaN(prevIdx) && document.getElementById('step2').classList.contains('active')) {
-        saveRow(prevIdx);
-    }
-    
-    // 2. Zapisz dane z nagłówka (jeśli zmieniono w kroku 1)
-    syncHeaderFormToTop();
-    
-    // 3. Skopiuj podpis z form-canvas do głównego canvasa (dla zapisu Base64)
-    copyFormSignToCard(); 
+/* --- NOWA LOGIKA PRZYCISKÓW W KROKU 3 (Rozdzielone Zapisz / Zamknij / Drukuj) --- */
 
-    // 4. Wywołaj logikę zapisu do archiwum (Używamy istniejącej funkcji)
-    const saveBtn = document.getElementById('saveCardToArchiveBtn');
-    if (saveBtn) {
-        saveBtn.click();
-        formModal.style.display = 'none'; // Zamknij modal po wywołaniu zapisu
-    } else {
-        alert("Błąd: Nie znaleziono głównego przycisku zapisu.");
-    }
-});
+// A. PRZYCISK: Tylko Zapisz (bez zamykania)
+const formOnlySaveBtn = document.getElementById('formOnlySaveBtn');
+const formCloseAfterSaveBtn = document.getElementById('formCloseAfterSaveBtn');
 
+if (formOnlySaveBtn) {
+    formOnlySaveBtn.addEventListener('click', async () => {
+        // 1. Zapisz ewentualne zmiany w wierszach i nagłówku
+        const prevIdx = parseInt(formRowSelect.dataset.prevIndex, 10);
+        if (!isNaN(prevIdx) && document.getElementById('step2').classList.contains('active')) {
+            saveRow(prevIdx);
+        }
+        syncHeaderFormToTop();
+        copyFormSignToCard(); 
 
-// PRZYCISK: Drukuj / Zapisz PDF
-document.getElementById('formPrintBtn')?.addEventListener('click', () => {
-    // 1. Zapisz dane
-    const prevIdx = parseInt(formRowSelect.dataset.prevIndex, 10);
-    if (!isNaN(prevIdx) && document.getElementById('step2').classList.contains('active')) {
-        saveRow(prevIdx);
-    }
-    syncHeaderFormToTop();
-    copyFormSignToCard();
-    
-    // 2. Wywołaj logikę drukowania (Używamy istniejącej funkcji)
-    const printBtn = document.getElementById('printBtn');
-    if (printBtn) {
-        printBtn.click(); // Wywołuje modal wyboru A4/110mm
-    } else {
-        alert("Błąd: Nie znaleziono głównego przycisku drukowania.");
-    }
-});
+        // 2. Wywołaj logikę zapisu (Klikamy w główny przycisk na stronie pod spodem)
+        const saveBtn = document.getElementById('saveCardToArchiveBtn');
+        if (saveBtn) {
+            // Symulujemy kliknięcie, aby uruchomić całą logikę walidacji i zapisu do Firebase
+            saveBtn.click();
+            
+            // Pokaż przycisk "Zamknij" dopiero po kliknięciu zapisu
+            if (formCloseAfterSaveBtn) {
+                formCloseAfterSaveBtn.style.display = 'block';
+                formOnlySaveBtn.style.display = 'none'; // Ukryj "Zapisz", bo już kliknięto
+            }
+        }
+    });
+}
+
+// B. PRZYCISK: Zamknij (widoczny dopiero po kliknięciu Zapisz)
+if (formCloseAfterSaveBtn) {
+    formCloseAfterSaveBtn.addEventListener('click', () => {
+         formModal.style.display = 'none';
+         // Reset widoku przycisków na przyszłość (żeby przy kolejnym otwarciu było znów "Zapisz")
+         formCloseAfterSaveBtn.style.display = 'none';
+         if (formOnlySaveBtn) formOnlySaveBtn.style.display = 'block';
+    });
+}
+
+// C. PRZYCISK: Drukuj (z walidacją stanu magazynowego)
+// Ten przycisk jest wewnątrz formularza, ale wywołuje główny druk
+const formPrintBtnInside = document.getElementById('formPrintBtn'); // Unikalna zmienna lokalna
+
+if (formPrintBtnInside) {
+    formPrintBtnInside.addEventListener('click', () => {
+        // 1. Zapisz lokalne zmiany do DOM (na wypadek gdyby user drukował bez zapisu - jeśli nie ma magazynu)
+        const prevIdx = parseInt(formRowSelect.dataset.prevIndex, 10);
+        if (!isNaN(prevIdx) && document.getElementById('step2').classList.contains('active')) {
+            saveRow(prevIdx);
+        }
+        syncHeaderFormToTop();
+        copyFormSignToCard();
+        
+        // 2. ✅ WALIDACJA MAGAZYNU
+        if (currentUserProfile && currentUserProfile.uzywaStanowMagazynowych === true) {
+            // Sprawdzamy globalną flagę zapisu (którą ustawia funkcja zapisu po sukcesie)
+            if (!isCurrentCardSaved) {
+                alert("⚠️ BLOKADA DRUKU: Masz włączony Magazyn.\n\nKliknij zielony przycisk 'ZAPISZ W ARCHIWUM' powyżej, aby zaktualizować stany magazynowe. Dopiero wtedy wydruk będzie możliwy.");
+                return; 
+            }
+        }
+
+        // 3. Wywołaj logikę drukowania (Główny przycisk na stronie)
+        const printBtn = document.getElementById('printBtn');
+        if (printBtn) {
+            // Otwórz modal wyboru formatu (A4/110mm)
+            // Używamy bezpiecznie zmiennej printFormatModal z głównego zakresu
+            if (typeof printFormatModal !== 'undefined') {
+                printFormatModal.style.display = 'flex';
+            } else {
+                 // Fallback
+                 printBtn.click();
+            }
+        }
+    });
+}
     /**
  * Funkcja pomocnicza: Kopiuje podpis z canvasa w Karcie Leczenia do canvasa w formularzu (Krok 3).
  * Wywoływana po zamknięciu podpisu pełnoekranowego.
