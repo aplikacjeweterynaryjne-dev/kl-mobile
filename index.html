@@ -13441,29 +13441,32 @@ try {
     const trigger = document.getElementById('formLek'); // Trigger z formularza
 
     // Otwieranie modala
-    trigger.addEventListener('click', (e) => {
-        e.preventDefault();
-        if (!modal) return;
-        input.value = (trigger.value !== "Kliknij, aby wyszukać produkt...") ? trigger.value : "";
-        populateAndFilterFormProductList();
-        modal.style.display = 'flex';
-        setTimeout(() => input.focus(), 50);
-    });
+    if (trigger) {
+        trigger.addEventListener('click', (e) => {
+            e.preventDefault();
+            if (!modal) return;
+            input.value = (trigger.value !== "Kliknij, aby wyszukać produkt...") ? trigger.value : "";
+            populateAndFilterFormProductList();
+            modal.style.display = 'flex';
+            setTimeout(() => input.focus(), 50);
+        });
+    }
 
     // Zamykanie modala
-    closeBtn.addEventListener('click', () => { modal.style.display = 'none'; });
+    if (closeBtn) closeBtn.addEventListener('click', () => { if (modal) modal.style.display = 'none'; });
+    
     // Filtrowanie listy
-    input.addEventListener('input', populateAndFilterFormProductList);
+    if (input) input.addEventListener('input', populateAndFilterFormProductList);
 
     // Wypełnianie listy (czyta z globalnej `nazwyLekow`)
     function populateAndFilterFormProductList() {
         if (typeof nazwyLekow === 'undefined' || nazwyLekow.length === 0) {
-            list.innerHTML = '<div class="product-search-item">Błąd: Brak bazy leków.</div>';
+            if (list) list.innerHTML = '<div class="product-search-item">Błąd: Brak bazy leków.</div>';
             return;
         }
 
         const filterText = input.value.toLowerCase().trim();
-        list.innerHTML = '';
+        if (list) list.innerHTML = '';
         let foundItems = 0;
 
         nazwyLekow.forEach(lekName => {
@@ -13475,22 +13478,14 @@ try {
                 itemDiv.addEventListener('click', () => {
                     selectFormProduct(lekName);
                 });
-                list.appendChild(itemDiv);
+                if (list) list.appendChild(itemDiv);
                 foundItems++;
             }
         });
-        if (foundItems === 0) list.innerHTML = '<div class="product-search-item" style="color: #999;">Brak pasujących produktów.</div>';
+        if (foundItems === 0 && list) list.innerHTML = '<div class="product-search-item" style="color: #999;">Brak pasujących produktów.</div>';
     }
 
-    /* Plik: index.html (ZASTĄP CAŁĄ FUNKCJĘ selectFormProduct) */
-
-/* Plik: index.html (ok. linii 12200 - cały blok selectFormProduct) */
-
-    // Wybór produktu
-    function selectFormProduct(lekName) {
-        if (!lekName) return;
-        
-       // Wybór produktu (wewnątrz obsługi Modala Produktów w Formularzu)
+    // Wybór produktu (ZAKTUALIZOWANA FUNKCJA Z POPRAWKĄ STANU)
     function selectFormProduct(lekName) {
         if (!lekName) return;
         
@@ -13522,8 +13517,8 @@ try {
             updateFormStockDisplay();
         }
         
-        // 4. Zamknij modal i ustaw focus
-        modal.style.display = 'none';
+        // 4. Zamknij modal
+        if (modal) modal.style.display = 'none';
         
         // Opcjonalnie: Przesuń fokus na następne pole, np. Ilość (i przełącz zakładkę)
         const formIlosc = document.getElementById('formIlosc');
