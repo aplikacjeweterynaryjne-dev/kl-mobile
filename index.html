@@ -4802,12 +4802,12 @@ function generateRows(){
             
             if (j>=2 && j<=4) cell.classList.add('center-text');
 
-            // --- ✅ NOWOŚĆ: Kolumna 2 (Opis zwierzęcia) jako INPUT z LISTĄ ---
+         // --- ✅ ZMIANA: Kolumna 2 (Opis zwierzęcia) otwiera Modal ---
             if (j===2 && i!==10) {
-                cell.style.padding = '0'; // Usuń padding komórki dla inputa
+                cell.style.padding = '0';
                 const input = document.createElement('input');
                 input.type = 'text';
-                input.setAttribute('list', 'listaOpisowZwierzat'); // Podpięcie listy!
+                // input.setAttribute('list', 'listaOpisowZwierzat'); // ❌ USUWAMY TO
                 input.style.width = '100%';
                 input.style.height = '100%';
                 input.style.border = 'none';
@@ -4816,12 +4816,14 @@ function generateRows(){
                 input.style.fontFamily = 'inherit';
                 input.style.fontSize = 'inherit';
                 input.style.background = 'transparent';
-                input.placeholder = 'Opis...';
-                
-                // Synchronizacja z atrybutem drukowania (ważne dla A4!)
-                input.addEventListener('input', function(){
-                    // W tej kolumnie nie używamy data-print-value, bo tekst jest wprost
-                    // Ale musimy to obsłużyć przy pobieraniu danych do druku (patrz niżej)
+                input.placeholder = 'Kliknij...';
+                input.readOnly = true; // ✅ Blokujemy pisanie bezpośrednie (wymuszamy modal na mobile)
+                input.style.cursor = 'pointer'; // Kursor łapki
+
+                // Kliknięcie otwiera modal
+                input.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    openAnimalDescModal(input); // Otwórz modal dla tego pola
                 });
 
                 cell.appendChild(input);
@@ -6177,7 +6179,25 @@ if (printFormat110 && receiptPrintContainer) {
                     <div class="receipt-page">
                         ${receiptContentHTML}
                     </div>
-             
+             <div id="animalDescriptionModal" class="product-search-modal" style="display: none; z-index: 10005;">
+    <div class="product-search-card">
+        <h3>Wybierz opis zwierzęcia</h3>
+        <p style="font-size: 12px; color: #666; margin-bottom: 10px; text-align: center;">
+            Historia dla klienta: <strong id="animalDescClientName">...</strong>
+        </p>
+        
+        <input type="search" id="animalDescSearchInput" placeholder="Szukaj w historii lub wpisz nowy..." style="width: 100%; padding: 10px; font-size: 16px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; margin-bottom: 10px;">
+        
+        <div id="animalDescList" class="product-search-list" style="flex: 1; overflow-y: auto; border: 1px solid #eee;">
+            <div style="padding: 20px; text-align: center; color: #999;">Ładowanie historii...</div>
+        </div>
+        
+        <div class="form-actions" style="justify-content: space-between; margin-top: 15px;">
+            <button id="btnUseNewAnimalDesc" class="btn primary small">➕ Użyj wpisanego</button>
+            <button id="animalDescCloseBtn" class="btn ghost">Anuluj</button>
+        </div>
+    </div>
+</div>
                 </body>
                 </html>
             `);
@@ -21266,6 +21286,193 @@ async function loadAnimalDescriptionHistory(clientName) {
         }
     }
 }
+    /* ======================================================== */
+/* ✅ NOWY MODUŁ: Modal Historii Opisów Zwierząt */
+/* (Wklej to na samym końcu skryptu, przed </script>) */
+/* ======================================================== */
+
+const animalDescModal = document.getElementById('animalDescriptionModal');
+const animalDescInput = document.getElementById('animalDescSearchInput');
+const animalDescList = document.getElementById('animalDescList');
+const animalDescCloseBtn = document.getElementById('animalDescCloseBtn');
+const btnUseNewAnimalDesc = document.getElementById('btnUseNewAnimalDesc');
+const animalDescClientNameLabel = document.getElementById('animalDescClientName');
+
+let currentAnimalDescTargetInput = null; // Gdzie wpisać wynik (input w tabeli lub formularzu)
+let animalDescCache = []; // Cache historii dla danego klienta
+
+// 1. Otwieranie Modala
+function openAnimalDescModal(targetInput) {
+    const clientName = document.getElementById('klientSelect').value;
+    
+    if (!clientName || clientName === "Kliknij, aby wybrać klienta...") {
+        alert("Najpierw wybierz klienta w nagłówku karty.");
+        return;
+    }
+
+    currentAnimalDescTargetInput = targetInput;
+    if(animalDescClientNameLabel) animalDescClientNameLabel.textContent = clientName;
+    
+    // Wpisz obecną wartość z pola do wyszukiwarki
+    if(animalDescInput) animalDescInput.value = targetInput.value;
+
+    // Pokaż modal
+    if (animalDescModal) {
+        animalDescModal.style.display = 'flex';
+        // Pobierz historię
+        fetchAndRenderAnimalHistory(clientName);
+        
+        setTimeout(() => animalDescInput.focus(), 50);
+    }
+}
+
+// 2. Pobieranie i renderowanie historii
+async function fetchAndRenderAnimalHistory(clientName) {
+    if(!animalDescList) return;
+    animalDescList.innerHTML = '<div style="padding:20px; text-align:center; color:#999;">Ładowanie historii... ⏳</div>';
+    
+    // Oblicz datę graniczną (180 dni)
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - 180);
+    const cutoffDateString = cutoffDate.toISOString().split('T')[0];
+
+    try {
+        let q = db.collection("archiwumKarty")
+            .where("klient_nazwa", "==", clientName)
+            .orderBy("dataWykonania", "desc")
+            .limit(50);
+            
+        // Filtr lecznicy (jeśli nie admin)
+        if (currentUserProfile && currentUserProfile.Rola !== 'administrator') {
+             const userClinicId = currentUserProfile['ID lecznicy'];
+             if (userClinicId) q = q.where("id_lecznicy", "==", userClinicId);
+        }
+
+        const snapshot = await q.get();
+        const descriptions = new Set();
+
+        snapshot.docs.forEach(doc => {
+            const data = doc.data();
+            // Sprawdź datę (JS filter)
+            if (data.dataWykonania >= cutoffDateString) {
+                if (data.table && Array.isArray(data.table)) {
+                    data.table.forEach(row => {
+                        const desc = (row.opis || '').trim();
+                        if (desc && desc.length > 2 && desc !== '---') {
+                            descriptions.add(desc);
+                        }
+                    });
+                }
+            }
+        });
+
+        animalDescCache = Array.from(descriptions);
+        filterAnimalDescList(); // Wyświetl przefiltrowaną listę
+
+    } catch (error) {
+        console.error("Błąd historii zwierząt:", error);
+        // Jeśli błąd indeksu, pokaż pustą listę (nie blokuj)
+        animalDescCache = []; 
+        filterAnimalDescList();
+    }
+}
+
+// 3. Filtrowanie i Wyświetlanie
+function filterAnimalDescList() {
+    if(!animalDescInput || !animalDescList) return;
+    const filterText = animalDescInput.value.toLowerCase().trim();
+    animalDescList.innerHTML = '';
+
+    let found = 0;
+    
+    // Opcja "Wyczyść" na górze
+    const clearDiv = document.createElement('div');
+    clearDiv.className = 'product-search-item';
+    clearDiv.style.padding = '12px'; // Dodaj padding inline, bo klasa może nie działać w nowym modalu
+    clearDiv.style.color = '#c0392b';
+    clearDiv.style.fontWeight = 'bold';
+    clearDiv.style.borderBottom = '2px solid #ddd';
+    clearDiv.style.cursor = 'pointer';
+    clearDiv.textContent = '❌ [WYCZYŚĆ POLE]';
+    clearDiv.addEventListener('click', () => {
+        selectAnimalDesc('');
+    });
+    animalDescList.appendChild(clearDiv);
+
+    // Lista z historii
+    animalDescCache.forEach(desc => {
+        if (filterText === '' || desc.toLowerCase().includes(filterText)) {
+            const div = document.createElement('div');
+            div.className = 'product-search-item';
+            div.style.padding = '12px';
+            div.style.borderBottom = '1px solid #eee';
+            div.style.cursor = 'pointer';
+            div.textContent = desc;
+            
+            div.addEventListener('click', () => {
+                selectAnimalDesc(desc);
+            });
+            
+            animalDescList.appendChild(div);
+            found++;
+        }
+    });
+
+    if (found === 0) {
+        const info = document.createElement('div');
+        info.style.padding = '15px';
+        info.style.textAlign = 'center';
+        info.style.color = '#999';
+        info.innerHTML = 'Brak pasujących wyników w historii.<br>Kliknij "➕ Użyj wpisanego", aby dodać nowy opis.';
+        animalDescList.appendChild(info);
+    }
+}
+
+// 4. Wybór (Zatwierdzenie)
+function selectAnimalDesc(text) {
+    if (currentAnimalDescTargetInput) {
+        currentAnimalDescTargetInput.value = text;
+        // Wyzwól zdarzenie input, aby system wiedział o zmianie (np. autozapis)
+        currentAnimalDescTargetInput.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+    
+    if (animalDescModal) animalDescModal.style.display = 'none';
+    currentAnimalDescTargetInput = null;
+}
+
+// 5. Listenery
+if (animalDescCloseBtn) {
+    animalDescCloseBtn.addEventListener('click', () => {
+        if (animalDescModal) animalDescModal.style.display = 'none';
+    });
+}
+if (animalDescInput) {
+    animalDescInput.addEventListener('input', filterAnimalDescList);
+}
+if (btnUseNewAnimalDesc) {
+    btnUseNewAnimalDesc.addEventListener('click', () => {
+        const text = animalDescInput.value.trim();
+        selectAnimalDesc(text); // Użyj tego co wpisano
+    });
+}
+    // --- Podpięcie Modala do pola w Formularzu (#formOpis) ---
+    const formOpisInput = document.getElementById('formOpis');
+    if (formOpisInput) {
+        // Ustaw readonly i cursor
+        formOpisInput.readOnly = true;
+        formOpisInput.style.cursor = 'pointer';
+        formOpisInput.placeholder = "Kliknij, aby wybrać lub wpisać...";
+        // Usuń atrybut listy jeśli został w HTML
+        formOpisInput.removeAttribute('list');
+
+        // Dodaj listener
+        formOpisInput.addEventListener('click', (e) => {
+            e.preventDefault();
+            openAnimalDescModal(formOpisInput);
+        });
+    }
+    
+    // ⬆️⬆️⬆️ KONIEC WKLEJANIA ⬆️⬆️⬆️
 </script> 
 </body>
 </html>
