@@ -6197,7 +6197,7 @@ if (printFormat110 && receiptPrintContainer) {
                     <div class="print-controls">
                 <button class="btn btn-print" onclick="window.print()">🖨️ Drukuj / PDF</button>
                 
-                <button class="btn btn-email" onclick="if(window.opener) { window.opener.shareCurrentCardViaEmail(); } else { alert('Błąd połączenia z oknem głównym.'); }">📧 Wyślij E-mail</button>
+                <button class="btn btn-email" onclick="var em = prompt('Podaj adres e-mail odbiorcy:'); if(em) { if(window.opener) { window.opener.shareCurrentCardViaEmail(em); } else { alert('Błąd: Główne okno aplikacji zostało zamknięte.'); } }">📧 Wyślij E-mail</button>
                 
                 <button class="btn btn-close" onclick="window.close()">❌ Zamknij</button>
             </div>
@@ -11870,10 +11870,10 @@ if (archivePrintBtn) {
                 <div class="print-controls">
                         <button class="print-btn" onclick="window.print();">🖨️ Drukuj</button>
                         
-                        <button style="padding: 8px 20px; font-size: 16px; margin: 0 10px; cursor: pointer; border-radius: 6px; border: 1px solid #2c3e50; font-family: 'Nunito', sans-serif; font-weight: 600; background-color: #34495e; color: white;" 
-                                onclick="if(window.opener) { window.opener.shareCurrentCardViaEmail(); } else { alert('Błąd połączenia z oknem głównym.'); }">
-                            📧 Wyślij
-                        </button>
+                     <button style="padding: 8px 20px; font-size: 16px; margin: 0 10px; cursor: pointer; border-radius: 6px; border: 1px solid #2c3e50; font-family: 'Nunito', sans-serif; font-weight: 600; background-color: #34495e; color: white;" 
+        onclick="var em = prompt('Podaj adres e-mail odbiorcy:'); if(em) { if(window.opener) { window.opener.shareCurrentCardViaEmail(em); } else { alert('Błąd: Główne okno aplikacji zostało zamknięte.'); } }">
+    📧 Wyślij
+</button>
 
                         <button class="close-btn" onclick="window.close();">Zamknij okno</button>
                     </div>
@@ -21497,11 +21497,12 @@ if (btnUseNewAnimalDesc) {
     
     // ⬆️⬆️⬆️ KONIEC WKLEJANIA ⬆️⬆️⬆️
 /* ======================================================== */
-/* ✅ MODUŁ POPRAWIONY v4: Wysyłka LINKU (Refaktoryzacja)   */
+/* ✅ MODUŁ POPRAWIONY v5: Wysyłka LINKU (Obsługa z okienek) */
 /* ======================================================== */
 
-// 1. Definicja globalnej funkcji (dostępnej dla okien podglądu)
-window.shareCurrentCardViaEmail = async function() {
+// 1. Definicja globalnej funkcji
+// Dodano parametr emailFromPopup (domyślnie null)
+window.shareCurrentCardViaEmail = async function(emailFromPopup = null) {
     // Ukryj modal wyboru (jeśli jest otwarty w oknie głównym)
     const modal = document.getElementById('printFormatModal');
     if (modal) modal.style.display = 'none';
@@ -21512,40 +21513,43 @@ window.shareCurrentCardViaEmail = async function() {
         return;
     }
 
-    const clientName = document.getElementById('klientSelect').value.trim();
-    let clientEmail = '';
+    let emailToUse = emailFromPopup; // Jeśli podano e-mail z popupa (okna druku), użyj go od razu
 
-    // --- ETAP 1: Szukanie w pamięci podręcznej (Szybkie) ---
-    if (typeof cachedClients !== 'undefined' && cachedClients && cachedClients.length > 0) {
-        const clientObj = cachedClients.find(c => c.nazwa === clientName);
-        if (clientObj && clientObj.email) {
-            clientEmail = clientObj.email;
-            console.log("Znaleziono email w cache:", clientEmail);
-        }
-    }
+    // Jeśli NIE podano e-maila (czyli wywołano z głównego okna), uruchom "Smart Fetch"
+    if (!emailToUse) {
+        const clientName = document.getElementById('klientSelect').value.trim();
+        let clientEmail = '';
 
-    // --- ETAP 2: "Koło ratunkowe" - Szukanie w bazie ---
-    if (!clientEmail) {
-        showToast("Szukam adresu e-mail w bazie... ⏳", "info", 2000);
-        try {
-            const q = db.collection("klienci").where("nazwa", "==", clientName).limit(1);
-            const snapshot = await q.get();
-            
-            if (!snapshot.empty) {
-                const clientData = snapshot.docs[0].data();
-                if (clientData.email) {
-                    clientEmail = clientData.email;
-                }
+        // --- ETAP 1: Szukanie w pamięci podręcznej ---
+        if (typeof cachedClients !== 'undefined' && cachedClients && cachedClients.length > 0) {
+            const clientObj = cachedClients.find(c => c.nazwa === clientName);
+            if (clientObj && clientObj.email) {
+                clientEmail = clientObj.email;
             }
-        } catch (err) {
-            console.error("Błąd podczas pobierania emaila z bazy:", err);
         }
+
+        // --- ETAP 2: Szukanie w bazie ---
+        if (!clientEmail) {
+            showToast("Szukam adresu e-mail w bazie... ⏳", "info", 2000);
+            try {
+                const q = db.collection("klienci").where("nazwa", "==", clientName).limit(1);
+                const snapshot = await q.get();
+                if (!snapshot.empty) {
+                    const clientData = snapshot.docs[0].data();
+                    if (clientData.email) clientEmail = clientData.email;
+                }
+            } catch (err) {
+                console.error("Błąd pobierania emaila:", err);
+            }
+        }
+
+        // --- ETAP 3: Weryfikacja (Prompt w oknie głównym) ---
+        // Pytamy tylko, jeśli nie przekazano maila z zewnątrz
+        emailToUse = prompt("Zweryfikuj adres e-mail odbiorcy:", clientEmail);
     }
 
-    // --- ETAP 3: Weryfikacja przez użytkownika ---
-    const emailToUse = prompt("Zweryfikuj adres e-mail odbiorcy:", clientEmail);
-
-    if (emailToUse === null) return; // Anulowano
+    // Jeśli anulowano (w którymkolwiek prompcie) lub puste
+    if (emailToUse === null || emailToUse.trim() === '') return; 
 
     // 4. Generuj Link
     const baseUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
@@ -21563,10 +21567,11 @@ window.shareCurrentCardViaEmail = async function() {
     showToast("Otwieranie programu pocztowego... 📧", "success");
 };
 
-// 2. Podpięcie starego przycisku w modalu
+// 2. Podpięcie starego przycisku w modalu (wywołanie bez argumentów)
 const printFormatShare = document.getElementById('printFormatShare');
 if (printFormatShare) {
-    printFormatShare.addEventListener('click', window.shareCurrentCardViaEmail);
+    // Używamy funkcji strzałkowej, żeby nie przekazać przypadkowych danych zdarzenia
+    printFormatShare.addEventListener('click', () => window.shareCurrentCardViaEmail());
 }
 
 /* ======================================================== */
