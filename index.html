@@ -3516,6 +3516,12 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
 <div id="bazaKlientowSection" style="display: none;">
 
 <h2>Baza Klientów</h2>
+    <div id="adminClientFilterContainer" style="display: none; background: #e3f2fd; padding: 10px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #90caf9;">
+    <label for="adminClientClinicSelect" style="font-weight: bold; margin-right: 10px;">🏥 Filtruj po lecznicy:</label>
+    <select id="adminClientClinicSelect" style="padding: 5px; font-size: 16px; min-width: 250px;">
+        <option value="">-- Wszystkie Lecznice --</option>
+    </select>
+</div>
 <div style="margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 10px;">
     <button id="loadClientsBtn" class="btn primary">📥 Wczytaj bazę klientów</button>
     <button id="refreshClientsBtn" class="btn small" style="display: none; margin-left: 8px;">🔄 Odśwież bazę</button>
@@ -3633,6 +3639,12 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
 <div id="bazaProduktowSection" style="display: none;">
 
 <h2>Baza Produktów</h2>
+    <div id="adminProductFilterContainer" style="display: none; background: #e3f2fd; padding: 10px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #90caf9;">
+    <label for="adminProductClinicSelect" style="font-weight: bold; margin-right: 10px;">🏥 Filtruj po lecznicy:</label>
+    <select id="adminProductClinicSelect" style="padding: 5px; font-size: 16px; min-width: 250px;">
+        <option value="">-- Wszystkie Lecznice --</option>
+    </select>
+</div>
 <div style="margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 10px;">
 <button id="loadProductsBtn" class="btn primary">📥 Wczytaj bazę produktów</button>
 <button id="refreshProductsBtn" class="btn small" style="display: none; margin-left: 8px;">🔄 Odśwież bazę</button>
@@ -8429,14 +8441,21 @@ async function fetchUserProfile(uid) {
           tabKonfiguracjaBtn.style.display = isAdmin ? 'inline-block' : 'none';
       }
 
-      // 4. Pobieranie danych (Produkty, Schematy, Czat) - ZABEZPIECZONE
+     // 4. Pobieranie danych (Produkty, Schematy, Czat) - ZABEZPIECZONE
       // Uruchamiamy tylko jeśli użytkownik ma przypisaną lecznicę LUB jest Adminem
       if (currentUserProfile.Rola === 'administrator' || currentUserProfile['ID lecznicy']) {
+          
+          // ✅ NOWOŚĆ: Uruchom filtry dla Admina (pobieranie listy lecznic)
+          if (typeof initAdminFilters === 'function') {
+              initAdminFilters(); 
+          }
           
           // Wywołujemy funkcje asynchronicznie, nie blokujemy wyświetlania menu
           fetchDataFromFirebase().catch(e => console.warn("Tło: Błąd klientów/leków", e));
           loadAndRenderSchemas().catch(e => console.warn("Tło: Błąd schematów", e));
           loadAndCacheProducts().catch(e => console.warn("Tło: Błąd produktów", e));
+
+          
           
           // Czat i czyszczenie
           setTimeout(() => {
@@ -20709,6 +20728,144 @@ if (deleteAllProductsBtn) {
         }
     });
 }
+    /* ======================================================== */
+/* ✅ MODUŁ: FILTROWANIE PO LECZNICY DLA ADMINISTRATORA */
+/* ======================================================== */
+
+// 1. Zmienne
+const adminClientFilterContainer = document.getElementById('adminClientFilterContainer');
+const adminClientClinicSelect = document.getElementById('adminClientClinicSelect');
+const adminProductFilterContainer = document.getElementById('adminProductFilterContainer');
+const adminProductClinicSelect = document.getElementById('adminProductClinicSelect');
+
+// Cache na nazwy lecznic (ID -> Nazwa)
+let clinicNamesMap = new Map();
+
+/**
+ * Funkcja inicjująca filtry admina (uruchamiana po zalogowaniu)
+ */
+async function initAdminFilters() {
+    if (!currentUserProfile || currentUserProfile.Rola !== 'administrator') {
+        // Ukryj filtry jeśli nie admin
+        if (adminClientFilterContainer) adminClientFilterContainer.style.display = 'none';
+        if (adminProductFilterContainer) adminProductFilterContainer.style.display = 'none';
+        return;
+    }
+
+    // Pokaż kontenery filtrów
+    if (adminClientFilterContainer) adminClientFilterContainer.style.display = 'block';
+    if (adminProductFilterContainer) adminProductFilterContainer.style.display = 'block';
+
+    // Pobierz listę lecznic
+    await loadClinicsForFilter();
+}
+
+/**
+ * Pobiera listę wszystkich unikalnych lecznic z kolekcji 'konfiguracja' (tylko właściciele mają nazwy lecznic)
+ */
+async function loadClinicsForFilter() {
+    try {
+        const q = db.collection("konfiguracja").where("Rola", "in", ["właściciel", "administrator"]);
+        const snapshot = await q.get();
+        
+        clinicNamesMap.clear();
+        const clinics = new Map(); // ID -> Nazwa
+
+        snapshot.docs.forEach(doc => {
+            const data = doc.data();
+            if (data['ID lecznicy'] && data['Nazwa lecznicy']) {
+                clinics.set(data['ID lecznicy'], data['Nazwa lecznicy']);
+            }
+        });
+
+        // Zapisz do globalnej mapy
+        clinicNamesMap = clinics;
+
+        // Wypełnij selecty
+        populateAdminSelects(clinics);
+
+    } catch (error) {
+        console.error("Błąd ładowania listy lecznic:", error);
+    }
+}
+
+function populateAdminSelects(clinicsMap) {
+    const sortedClinics = Array.from(clinicsMap.entries()).sort((a, b) => a[1].localeCompare(b[1]));
+
+    const createOptions = () => {
+        let opts = '<option value="">-- Wszystkie Lecznice --</option>';
+        sortedClinics.forEach(([id, name]) => {
+            opts += `<option value="${id}">${name}</option>`;
+        });
+        return opts;
+    };
+
+    const optionsHTML = createOptions();
+
+    if (adminClientClinicSelect) adminClientClinicSelect.innerHTML = optionsHTML;
+    if (adminProductClinicSelect) adminProductClinicSelect.innerHTML = optionsHTML;
+}
+
+// --- LISTENERY ZMIANY FILTRA ---
+
+// 1. Filtrowanie Klientów
+if (adminClientClinicSelect) {
+    adminClientClinicSelect.addEventListener('change', () => {
+        const selectedClinicId = adminClientClinicSelect.value;
+        filterTableByClinic('klientTableBody', 5, selectedClinicId); // 5 to indeks kolumny ID Lecznicy
+    });
+}
+
+// 2. Filtrowanie Produktów
+if (adminProductClinicSelect) {
+    adminProductClinicSelect.addEventListener('change', () => {
+        const selectedClinicId = adminProductClinicSelect.value;
+        // W tabeli produktów nie mamy ID lecznicy w widoku, więc musimy przefiltrować cache i przerysować
+        filterProductsByClinicId(selectedClinicId);
+    });
+}
+
+/**
+ * Filtruje tabelę HTML po ukrytej/widocznej kolumnie (Dla Klientów)
+ */
+function filterTableByClinic(tableBodyId, columnIndex, clinicId) {
+    const tbody = document.getElementById(tableBodyId);
+    if (!tbody) return;
+    
+    const rows = tbody.querySelectorAll('tr');
+    rows.forEach(row => {
+        if (row.cells.length <= columnIndex) return;
+        
+        const cellValue = row.cells[columnIndex].textContent.trim();
+        
+        // Jeśli nie wybrano nic (puste) LUB wartość się zgadza -> pokaż
+        if (clinicId === "" || cellValue === clinicId) {
+            row.style.display = "";
+        } else {
+            row.style.display = "none";
+        }
+    });
+}
+
+/**
+ * Specjalne filtrowanie dla Produktów (przerysowanie z cache)
+ */
+function filterProductsByClinicId(clinicId) {
+    if (!cachedProducts) return;
+
+    if (clinicId === "") {
+        // Pokaż wszystko
+        renderProductTable(cachedProducts);
+    } else {
+        // Filtruj po ID w obiekcie danych
+        const filtered = cachedProducts.filter(p => p.id_lecznicy === clinicId);
+        renderProductTable(filtered);
+    }
+}
+
+// --- WAŻNE: Aktualizacja funkcji renderowania produktów ---
+// Musimy dodać wywołanie initAdminFilters() w odpowiednim momencie.
+// Najlepiej dodać to do funkcji fetchUserProfile, gdy wykryjemy admina.
 </script> 
 </body>
 </html>
