@@ -3116,7 +3116,12 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
             </div>
             
             <div id="formRowDetailsContainer" style="display: block;">
-                <div class="form-row"><label for="formOpis">Nazwa siedziby stada i opis zwierzęcia</label><input type="text" id="formOpis" placeholder="Opis zwierzęcia"></div>
+                <div class="form-row">
+    <label for="formOpis">Nazwa siedziby stada i opis zwierzęcia</label>
+    <div style="position: relative;">
+        <input type="text" id="formOpis" list="listaOpisowZwierzat" placeholder="Wpisz lub wybierz z historii..." autocomplete="off">
+    </div>
+</div>
                 <div class="form-row"><label for="formLiczba">Liczba leczonych zwierząt</label><input type="number" id="formLiczba" min="0" placeholder="0"></div>
                 <div class="form-row">
     <label for="formRozpoznanie">Rozpoznanie / wstępne rozpoznanie</label>
@@ -3342,6 +3347,7 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
     </div>
 </div>
 <datalist id="listaLekow"></datalist>
+<datalist id="listaOpisowZwierzat"></datalist>
 <datalist id="listaRozpoznan"></datalist>
 
 <div id="kalkulatorWizytySection" style="display: none;">
@@ -4723,7 +4729,7 @@ generateRows();
 setupClientAutoFill();
 
     }
-/* ---- generowanie wierszy (ZMODYFIKOWANA O GENERATOR DAT) ---- */
+/* ---- generowanie wierszy (ZMODYFIKOWANA O HISTORIĘ OPISÓW) ---- */
 function generateRows(){
     const tbody = document.querySelector('#karta tbody');
     tbody.innerHTML = '';
@@ -4731,7 +4737,7 @@ function generateRows(){
     for (let i=1; i<=13; i++){
         const row = document.createElement('tr');
         
-        // Wiersz 10 - Rozdzielacz
+        // Wiersz 10 - Rozdzielacz (Bez zmian)
         if (i===10) {
             const cell = document.createElement('td');
             cell.colSpan = 8;
@@ -4774,7 +4780,7 @@ function generateRows(){
         for (let j=1; j<=8; j++){
             const cell = document.createElement('td');
             
-            // Kolumna 1: Lp. i przycisk edycji
+            // Kolumna 1: Lp. (Bez zmian)
             if (j===1) {
                 const logicalIndex = (i > 10) ? i - 2 : i - 1;
                 const rowNumText = (i > 10 ? i - 10 : i) + '.';
@@ -4790,14 +4796,38 @@ function generateRows(){
                 cell.appendChild(btn);
             }
 
-            // Ustaw contentEditable (z wyłączeniem specjalnych kolumn i ostatnich wierszy dla kolumny 8)
-            // ✅ ZMIANA: Wyłączamy edycję dla kolumny 8 w wierszach > 10, bo tam będzie nasz Smart Cell
-            if (i !== 10 && j !== 3 && j !== 4 && j !== 5 && j !== 7 && !(i > 10 && j === 8)) { 
-                cell.contentEditable = true;
-            }
+            // Domyślne ustawienia (resetowane przez specyficzne kolumny)
+            // Ustawiamy contentEditable na false, bo teraz większość pól to inputy
+            cell.contentEditable = false; 
+            
             if (j>=2 && j<=4) cell.classList.add('center-text');
 
-            // Kolumna 3: Input Liczby
+            // --- ✅ NOWOŚĆ: Kolumna 2 (Opis zwierzęcia) jako INPUT z LISTĄ ---
+            if (j===2 && i!==10) {
+                cell.style.padding = '0'; // Usuń padding komórki dla inputa
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.setAttribute('list', 'listaOpisowZwierzat'); // Podpięcie listy!
+                input.style.width = '100%';
+                input.style.height = '100%';
+                input.style.border = 'none';
+                input.style.padding = '4px';
+                input.style.boxSizing = 'border-box';
+                input.style.fontFamily = 'inherit';
+                input.style.fontSize = 'inherit';
+                input.style.background = 'transparent';
+                input.placeholder = 'Opis...';
+                
+                // Synchronizacja z atrybutem drukowania (ważne dla A4!)
+                input.addEventListener('input', function(){
+                    // W tej kolumnie nie używamy data-print-value, bo tekst jest wprost
+                    // Ale musimy to obsłużyć przy pobieraniu danych do druku (patrz niżej)
+                });
+
+                cell.appendChild(input);
+            }
+
+            // Kolumna 3: Input Liczby (Bez zmian)
             if (j===3 && i!==10){
                 const input = document.createElement('input');
                 input.type = 'number';
@@ -4805,29 +4835,24 @@ function generateRows(){
                 input.pattern = '[0-9]*';
                 input.style.width = '60px';
                 input.style.textAlign = 'center';
-                cell.textContent = '';
                 cell.appendChild(input);
             }
 
-            // Kolumna 4: Input Rozpoznania
+            // Kolumna 4: Input Rozpoznania (Bez zmian)
             if (j === 4 && i !== 10) {
                 const input = document.createElement('input');
                 input.setAttribute('list', 'listaRozpoznan');
                 input.style.width = '95%';
                 input.placeholder = 'Rozpoznanie...';
-                input.readOnly = false;
-                input.style.cursor = 'text';
-                input.style.background = '#fefefe';
                 input.addEventListener('input', function(){
                     this.parentElement.dataset.printValue = this.value;
                 });
                 input.addEventListener('input', applySchema);
                 input.addEventListener('dblclick', openSchemaSearchModalIfNeeded);
-                cell.textContent = '';
                 cell.appendChild(input);
             }
 
-            // Kolumna 5: Input Produktu
+            // Kolumna 5: Input Produktu (Bez zmian)
             if (j===5 && i!==10){
                 const input = document.createElement('input');
                 input.setAttribute('list','listaLekow');
@@ -4835,7 +4860,7 @@ function generateRows(){
                 input.addEventListener('input', function(){
                     const nrCell = row.cells[5];
                     const iloscCell = row.cells[6];
-                    const karCell = row.cells[7]; // To może być teraz Smart Cell
+                    const karCell = row.cells[7];
                     
                     const nazwa = this.value;
                     this.parentElement.dataset.printValue = nazwa;
@@ -4846,7 +4871,6 @@ function generateRows(){
                     nrCell.textContent = nr;
                     iloscCell.innerHTML = `<input class="small-input" type="number" inputmode="numeric" pattern="[0-9]*" placeholder="ilość"> ${dawka||''}`;
                     
-                    // Jeśli to Smart Cell (input), wpisz do value, w przeciwnym razie textContent
                     const smartInput = karCell.querySelector('input.karencja-input');
                     if (smartInput) {
                         smartInput.value = kar;
@@ -4856,13 +4880,26 @@ function generateRows(){
 
                     if (typeof validateCardStock === 'function') validateCardStock();
                 });
-                cell.textContent = '';
                 cell.appendChild(input);
             }
 
-            // ✅ NOWOŚĆ: Kolumna 8 (Karencja/Uwagi) w wierszach > 10 (czyli 11, 12, 13)
+            // Kolumna 8 (Karencja/Uwagi) (Bez zmian)
             if (j === 8 && i > 10) {
                 createSmartDosageCell(cell, row);
+            } else if (j === 8 && i <= 10) {
+                // Dla wierszy 1-9 to zwykła komórka edytowalna (chyba że chcesz input wszędzie)
+                // W poprzedniej wersji było contentEditable, tu zostawiamy input dla spójności
+                 cell.contentEditable = true;
+            }
+            
+            // Przywróć contentEditable dla kolumn 6 (Seria) i 7 (Ilość - tekstowa część) jeśli nie są inputami
+            if (j===6 || j===7) {
+                 // Uwaga: Kolumna 6 (nr serii) i 7 (ilość) są obsługiwane przez logikę produktu,
+                 // ale użytkownik może chcieć je ręcznie poprawić.
+                 // Tutaj zostawiamy domyślne (inputy są wstawiane dynamicznie po wyborze leku)
+                 // Jeśli nie ma leku, komórki są puste.
+                 // Aby umożliwić wpisanie serii ręcznie:
+                 if (j===6) cell.contentEditable = true;
             }
 
             row.appendChild(cell);
@@ -4874,6 +4911,7 @@ function generateRows(){
         updateTablePlaceholders();
     }
 }
+
 /* ✅ DODAJ TĘ NOWĄ FUNKCJĘ: ✅ */
 
 /* ---- NOWA FUNKCJA: Otwiera formularz na konkretnym wierszu ---- */
@@ -4909,19 +4947,39 @@ dl.appendChild(o);
 
 /* ---- podłączenie autouzupełniania klienta (nagłówek i pole formularza) ---- */
 function setupClientAutoFill(){
-const klientSelect = document.getElementById('klientSelect');
-const klientList = document.getElementById('klientList');
-klientSelect.addEventListener('input', function(){
-const val = this.value;
-const opt = [...klientList.options].find(o=>o.value===val);
-if (opt){
-document.getElementById('adresKlienta').textContent = opt.dataset.adres || '';
-document.getElementById('nrStada').textContent = opt.dataset.nrstada || '';
-} else {
-document.getElementById('adresKlienta').textContent = '';
-document.getElementById('nrStada').textContent = '';
+    const klientSelect = document.getElementById('klientSelect');
+    const klientList = document.getElementById('klientList');
+    
+    // Obsługa wyboru w nagłówku
+    klientSelect.addEventListener('input', function(){
+        const val = this.value;
+        const opt = [...klientList.options].find(o=>o.value===val);
+        if (opt){
+            document.getElementById('adresKlienta').textContent = opt.dataset.adres || '';
+            document.getElementById('nrStada').textContent = opt.dataset.nrstada || '';
+            
+            // ✅ NOWOŚĆ: Załaduj historię zwierząt dla tego klienta
+            loadAnimalDescriptionHistory(val);
+        } else {
+            document.getElementById('adresKlienta').textContent = '';
+            document.getElementById('nrStada').textContent = '';
+        }
+    });
+
+    // Formularz - automatyczne uzupełnianie adresu i nr stada po wyborze klienta
+    const formKlient = document.getElementById('formKlient');
+    formKlient.addEventListener('input', function(){
+        const val = this.value;
+        const opt = [...klientList.options].find(o=>o.value===val);
+        if (opt){
+            document.getElementById('formAdres').value = opt.dataset.adres || '';
+            document.getElementById('formNrStada').value = opt.dataset.nrstada || '';
+            
+            // ✅ NOWOŚĆ: Tutaj też ładujemy historię (gdyby wybrano przez formularz)
+            loadAnimalDescriptionHistory(val);
+        }
+    });
 }
-});
 
 // formularz - automatyczne uzupełnianie adresu i nr stada po wyborze klienta
 const formKlient = document.getElementById('formKlient');
@@ -5338,7 +5396,8 @@ function selectRowInForm(logicalIndex){
     const formDawkowanie = document.getElementById('formDawkowanie');
     const formKarencja = document.getElementById('formKarencja');
 
-    if (formOpis) formOpis.value = row.cells[1].textContent.trim();
+    const cell1Input = row.cells[1].querySelector('input');
+if (formOpis) formOpis.value = cell1Input ? cell1Input.value : row.cells[1].textContent.trim();
     
     const inpLiczba = row.cells[2].querySelector('input');
     if (formLiczba) formLiczba.value = inpLiczba ? inpLiczba.value : '';
@@ -5712,7 +5771,12 @@ function saveRow(idx){
     // --- 2. ZAPISZ WARTOŚCI DO TABELI ---
     
     // a) Opis
-    row.cells[1].textContent = opisValue; 
+const opisInput = row.cells[1].querySelector('input');
+if (opisInput) {
+    opisInput.value = opisValue;
+} else {
+    row.cells[1].textContent = opisValue; // Fallback
+}
     
     // b) Liczba
     const inpLiczba = row.cells[2].querySelector('input');
@@ -6598,7 +6662,7 @@ if (saveCardToArchiveBtn) {
                 const rowData = {
                     logicalIndex: logicalIndex,
                     lp: tr.cells[0].textContent,
-                    opis: tr.cells[1].textContent,
+                    opis: tr.cells[1].querySelector('input') ? tr.cells[1].querySelector('input').value : tr.cells[1].textContent,
                     liczba: tr.cells[2].querySelector('input') ? tr.cells[2].querySelector('input').value : '',
                     rozpoznanie: tr.cells[3].querySelector('input') ? tr.cells[3].querySelector('input').value : '',
                     lek: lekInput ? lekInput.value : '',
@@ -18980,7 +19044,9 @@ function openCurrentA4PrintWindow() {
         };
 
         const lp = tr.cells[0].textContent.replace('➡️', '').trim();
-        const opis = tr.cells[1].textContent;
+        // Pobieramy wartość z inputa, jeśli tam jest
+const opisInput = tr.cells[1].querySelector('input');
+const opis = opisInput ? opisInput.value : tr.cells[1].textContent;
         const liczba = getVal(2, true);
         const rozpoznanie = getVal(3, true);
         const lek = getVal(4, true);
@@ -21128,6 +21194,76 @@ function renderReportProductList(filterText) {
         emptyInfo.style.color = '#999';
         emptyInfo.textContent = 'Brak pasujących produktów.';
         sharedSearchList.appendChild(emptyInfo);
+    }
+}
+    /**
+ * ✅ NOWA FUNKCJA: Wczytuje historię opisów zwierząt dla wybranego klienta
+ * - Filtruje duplikaty.
+ * - Ogranicza do ostatnich 180 dni.
+ */
+async function loadAnimalDescriptionHistory(clientName) {
+    const dataList = document.getElementById('listaOpisowZwierzat');
+    if (!dataList || !clientName) return;
+
+    console.log(`Pobieranie historii zwierząt dla klienta: ${clientName}...`);
+    dataList.innerHTML = ''; // Wyczyść listę
+
+    // Oblicz datę graniczną (180 dni temu)
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - 180);
+    // Format YYYY-MM-DD (taki jak w bazie)
+    const cutoffDateString = cutoffDate.toISOString().split('T')[0];
+
+    try {
+        let q = db.collection("archiwumKarty")
+            .where("klient_nazwa", "==", clientName)
+            .orderBy("dataWykonania", "desc") // Najnowsze pierwsze
+            .limit(50); // Pobierz ostatnie 50 kart (dla wydajności)
+
+        // Dodaj filtr lecznicy, jeśli to nie admin
+        if (currentUserProfile && currentUserProfile.Rola !== 'administrator') {
+             const userClinicId = currentUserProfile['ID lecznicy'];
+             if (userClinicId) {
+                 q = q.where("id_lecznicy", "==", userClinicId);
+             }
+        }
+
+        const snapshot = await q.get();
+        const descriptions = new Set(); // Używamy Set, aby mieć unikaty
+
+        snapshot.docs.forEach(doc => {
+            const data = doc.data();
+            
+            // Sprawdź datę (JS filter, bo Firestore wymagałby indeksu kompozytowego)
+            if (data.dataWykonania >= cutoffDateString) {
+                // Przejrzyj tabelę w karcie
+                if (data.table && Array.isArray(data.table)) {
+                    data.table.forEach(row => {
+                        const desc = (row.opis || '').trim();
+                        // Dodaj tylko jeśli nie jest puste i nie jest to nagłówek "---"
+                        if (desc && desc.length > 2 && desc !== '---') {
+                            descriptions.add(desc);
+                        }
+                    });
+                }
+            }
+        });
+
+        // Wypełnij datalist
+        descriptions.forEach(desc => {
+            const opt = document.createElement('option');
+            opt.value = desc;
+            dataList.appendChild(opt);
+        });
+
+        console.log(`Załadowano ${descriptions.size} unikalnych opisów zwierząt.`);
+
+    } catch (error) {
+        console.error("Błąd pobierania historii zwierząt:", error);
+        // Jeśli błąd indeksu, nie blokujemy aplikacji
+        if (error.code === 'failed-precondition') {
+             console.warn("Brak indeksu dla historii zwierząt. Podpowiedzi mogą nie działać.");
+        }
     }
 }
 </script> 
