@@ -2335,49 +2335,6 @@ table {
         display: none !important;
     }
 }
-    /* ======================================================== */
-/* ✅ POPRAWKA: ZABEZPIECZENIE SZEROKOŚCI KOLUMN (ANTY-ZNIKANIE) */
-/* ======================================================== */
-
-/* 1. Dla Generatora Karty Leczenia (#karta) */
-/* Kolumna 5 (Produkt) - niech ma miejsce na długą nazwę */
-#karta th:nth-child(5), 
-#karta td:nth-child(5) {
-    min-width: 180px !important; 
-}
-
-/* Kolumna 6 (Nr Serii) - blokada przed znikaniem */
-#karta th:nth-child(6), 
-#karta td:nth-child(6) {
-    min-width: 90px !important; 
-    white-space: nowrap; /* Zapobiega łamaniu numeru serii */
-}
-
-/* Kolumna 7 (Ilość) - żeby dawkowanie się mieściło */
-#karta th:nth-child(7), 
-#karta td:nth-child(7) {
-    min-width: 90px !important;
-}
-
-
-/* 2. Dla Bazy Produktów (Import/Edycja) (#produktTable) */
-/* Wymuszamy, aby KAŻDA kolumna miała minimalną szerokość */
-#produktTable th, 
-#produktTable td {
-    min-width: 70px !important; /* Żadna kolumna nie będzie węższa niż to */
-}
-
-/* Specjalnie dla Nazwy w Bazie Produktów (żeby była szersza) */
-#produktTable th:nth-child(1), 
-#produktTable td:nth-child(1) {
-    min-width: 150px !important;
-}
-
-/* Wymuszenie paska przewijania, jeśli tabela będzie szersza niż ekran */
-.table-container {
-    overflow-x: auto !important; /* Pozwala przewijać na boki zamiast ściskać */
-    width: 100%;
-}
 </style>
     <div id="calcProductSearchModal" class="product-search-modal" style="display: none; z-index: 10003;">
     <div class="product-search-card">
@@ -3701,21 +3658,21 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
 
 <div class="table-container">
 <table id="produktTable">
-<thead>
-<tr>
-<th>Nazwa</th>
-<th>PLU</th>
-<th>Cena (zł)</th>
-<th>J.m. / Dawkowanie</th>
-<th>Karencja</th>
-<th>Stan mag.</th>
-<th class="col-akcje" style="width: 130px;">Akcje</th>
-</tr>
-</thead>
-<tbody id="produktTableBody">
-<tr><td colspan="7" style="text-align: center; padding: 20px; color: #777; font-size: 1.1em;"><i>Proszę czekać...</i><br><br>Kliknij <i class="bi bi-box-arrow-in-down"></i> <b>Wczytaj bazę produktów</b>, aby rozpocząć.</td></tr>
-</tbody>
-    </table>
+    <thead>
+        <tr>
+            <th>Nazwa</th>
+            <th>PLU</th>
+            <th>Nr Serii</th> <th>Cena (zł)</th>
+            <th>J.m. / Dawkowanie</th>
+            <th>Karencja</th>
+            <th>Stan mag.</th>
+            <th class="col-akcje" style="width: 130px;">Akcje</th>
+        </tr>
+    </thead>
+    <tbody id="produktTableBody">
+        <tr><td colspan="8" style="text-align: center; padding: 20px; color: #777; font-size: 1.1em;"><i>Proszę czekać...</i><br><br>Kliknij <i class="bi bi-box-arrow-in-down"></i> <b>Wczytaj bazę produktów</b>, aby rozpocząć.</td></tr>
+    </tbody>
+</table>
   </div> </div> <div id="productFormModal" aria-hidden="true" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.48); display: none; z-index: 10003; justify-content: center; align-items: center; overflow: hidden;">
   <div class="form-card" role="dialog" aria-modal="true">
 
@@ -3723,7 +3680,7 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
 
     <input type="hidden" id="productFormDocId">
 
-    <div class="form-row">
+<div class="form-row">
       <label for="productFormNazwa">Nazwa produktu *</label>
       <input type="text" id="productFormNazwa" placeholder="Wpisz nazwę produktu" required>
     </div>
@@ -3733,6 +3690,10 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
       <input type="text" id="productFormPlu" placeholder="Wpisz kod PLU (opcjonalnie)">
     </div>
 
+    <div class="form-row">
+      <label for="productFormNrSerii">Numer Serii</label>
+      <input type="text" id="productFormNrSerii" placeholder="Nr serii (opcjonalnie)">
+    </div>
     <div class="form-row">
       <label for="productFormCena">Cena (zł)</label>
       <input type="number" id="productFormCena" placeholder="0.00" step="0.01" min="0">
@@ -8601,54 +8562,55 @@ if(productUnitDisplay) productUnitDisplay.textContent = '';
 * Zawiera sortowanie wg nazwy.
 */
 function renderProductTable(productsData) {
-if (!produktTableBody) return;
-produktTableBody.innerHTML = ''; // Wyczyść tabelę
+    if (!produktTableBody) return;
+    produktTableBody.innerHTML = ''; // Wyczyść tabelę
 
-if (!productsData || productsData.length === 0) {
-produktTableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 10px;">Brak produktów w bazie danych.</td></tr>';
-return;
-}
+    if (!productsData || productsData.length === 0) {
+        // ✅ ZMIANA: colspan z 7 na 8
+        produktTableBody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 10px;">Brak produktów w bazie danych.</td></tr>';
+        return;
+    }
 
-// Sortuj dane wg nazwy (polskie znaki)
-console.log("Sortowanie produktów przed renderowaniem...");
-productsData.sort((a, b) => {
-const nameA = a.nazwa || '';
-const nameB = b.nazwa || '';
-return nameA.localeCompare(nameB, 'pl', { sensitivity: 'base' });
-});
-console.log("Sortowanie zakończone.");
+    // Sortuj dane wg nazwy (polskie znaki)
+    console.log("Sortowanie produktów przed renderowaniem...");
+    productsData.sort((a, b) => {
+        const nameA = a.nazwa || '';
+        const nameB = b.nazwa || '';
+        return nameA.localeCompare(nameB, 'pl', { sensitivity: 'base' });
+    });
+    console.log("Sortowanie zakończone.");
 
-// Generuj wiersze
-console.log("Renderowanie tabeli produktów...");
-productsData.forEach(produkt => {
-const tr = document.createElement('tr');
-tr.dataset.id = produkt.id; // ID dokumentu z Firestore
+    // Generuj wiersze
+    console.log("Renderowanie tabeli produktów...");
+    productsData.forEach(produkt => {
+        const tr = document.createElement('tr');
+        tr.dataset.id = produkt.id; // ID dokumentu z Firestore
 
-// Formatowanie ceny
-const cenaFormatted = formatPrice(parseFloat(produkt.cena) || 0); // Użyj istniejącej funkcji formatPrice
+        // Formatowanie ceny
+        const cenaFormatted = formatPrice(parseFloat(produkt.cena) || 0);
 
-tr.innerHTML = `
-       <td data-label="Nazwa">${produkt.nazwa || 'Brak nazwy'}</td>
-       <td data-label="PLU">${produkt.plu || ''}</td>
-       <td data-label="Cena (zł)" style="text-align: right;">${cenaFormatted}</td>
-       <td data-label="J.m. / Dawkowanie">${produkt.dawkowanie || ''}</td>
-       <td data-label="Karencja">${produkt.karencja || ''}</td>
-       <td data-label="Stan mag." style="text-align: center;">${produkt.stanMagazynowy || '0'}</td>
-       <td class="col-akcje">
-           <button class="btn btn-edit-product" data-id="${produkt.id}" title="Edytuj produkt">Edytuj</button>
-           <button class="btn warn btn-delete-product" data-id="${produkt.id}" title="Usuń produkt">Usuń</button>
-       </td>
-     `;
-produktTableBody.appendChild(tr);
-});
-console.log("Renderowanie tabeli produktów zakończone.");
+        tr.innerHTML = `
+            <td data-label="Nazwa">${produkt.nazwa || 'Brak nazwy'}</td>
+            <td data-label="PLU">${produkt.plu || ''}</td>
+            <td data-label="Nr Serii">${produkt.nrSerii || ''}</td> <td data-label="Cena (zł)" style="text-align: right;">${cenaFormatted}</td>
+            <td data-label="J.m. / Dawkowanie">${produkt.dawkowanie || ''}</td>
+            <td data-label="Karencja">${produkt.karencja || ''}</td>
+            <td data-label="Stan mag." style="text-align: center;">${produkt.stanMagazynowy || '0'}</td>
+            <td class="col-akcje">
+                <button class="btn btn-edit-product" data-id="${produkt.id}" title="Edytuj produkt">Edytuj</button>
+                <button class="btn warn btn-delete-product" data-id="${produkt.id}" title="Usuń produkt">Usuń</button>
+            </td>
+        `;
+        produktTableBody.appendChild(tr);
+    });
+    console.log("Renderowanie tabeli produktów zakończone.");
 
-// Pokaż powiązane UI po renderowaniu
-if(productSearchRow) productSearchRow.style.display = 'block';
-if(addNewProductBtn) addNewProductBtn.style.display = 'inline-block';
-if(productImportActionsContainer) productImportActionsContainer.style.display = 'flex';
-if(loadProductsBtn) loadProductsBtn.style.display = 'none';
-if(refreshProductsBtn) refreshProductsBtn.style.display = 'inline-block';
+    // Pokaż powiązane UI po renderowaniu
+    if(productSearchRow) productSearchRow.style.display = 'block';
+    if(addNewProductBtn) addNewProductBtn.style.display = 'inline-block';
+    if(productImportActionsContainer) productImportActionsContainer.style.display = 'flex';
+    if(loadProductsBtn) loadProductsBtn.style.display = 'none';
+    if(refreshProductsBtn) refreshProductsBtn.style.display = 'inline-block';
 }
 
 /**
@@ -10010,7 +9972,8 @@ if (saveProductImportBtn) {
 
             rows.forEach(row => {
                 // Pomiń wiersze, które są nagłówkami lub komunikatami
-                if (row.cells.length < 6) return;
+                // Teraz mamy 7 kolumn danych, więc sprawdzamy >= 7
+                if (row.cells.length < 7) return;
 
                 // Odczytaj dane
                 const nazwa = row.cells[0].textContent.trim();
@@ -10018,17 +9981,21 @@ if (saveProductImportBtn) {
                 if (!nazwa) return;
 
                 const plu = row.cells[1].textContent.trim();
-                // Zamiana przecinka na kropkę dla ceny
-                const cenaStr = row.cells[2].textContent.replace(',', '.').trim();
+                const nrSerii = row.cells[2].textContent.trim(); // ✅ NOWE POLE (Index 2)
+                
+                // Cena jest teraz w komórce 3
+                const cenaStr = row.cells[3].textContent.replace(',', '.').trim();
                 const cena = parseFloat(cenaStr) || 0;
-                const dawkowanie = row.cells[3].textContent.trim();
-                const karencja = row.cells[4].textContent.trim();
-                const stanMagazynowy = parseInt(row.cells[5].textContent.trim()) || 0;
+                
+                const dawkowanie = row.cells[4].textContent.trim();
+                const karencja = row.cells[5].textContent.trim();
+                const stanMagazynowy = parseInt(row.cells[6].textContent.trim()) || 0;
 
                 const productData = {
                     id_lecznicy: userClinicId, // Przypisz produkt do lecznicy
                     nazwa: nazwa,
                     plu: plu,
+                    nrSerii: nrSerii, // ✅ ZAPIS DO BAZY
                     cena: cena,
                     dawkowanie: dawkowanie,
                     karencja: karencja,
@@ -10071,19 +10038,19 @@ if (saveProductImportBtn) {
         }
     });
 }
-// ✅ 1. Funkcja pomocnicza: Tworzy pusty wiersz (wymagana do działania wklejania)
+// ✅ 1. Funkcja pomocnicza: Tworzy pusty wiersz (Z NOWĄ KOLUMNĄ NR SERII)
 function createEmptyProductRow() {
     const tr = document.createElement('tr');
-    // Tworzymy strukturę wiersza identyczną jak w Twojej tabeli (6 kolumn danych + akcje)
+    // Teraz mamy 7 kolumn danych + akcje
     tr.innerHTML = `
-       <td contenteditable="true" style="cursor: text;"></td> <td contenteditable="true" style="cursor: text;"></td> <td contenteditable="true" style="cursor: text;"></td> <td contenteditable="true" style="cursor: text;"></td> <td contenteditable="true" style="cursor: text;"></td> <td contenteditable="true" style="cursor: text;"></td> <td class="col-akcje">
+       <td contenteditable="true" style="cursor: text;"></td> <td contenteditable="true" style="cursor: text;"></td> <td contenteditable="true" style="cursor: text;"></td> <td contenteditable="true" style="cursor: text;"></td> <td contenteditable="true" style="cursor: text;"></td> <td contenteditable="true" style="cursor: text;"></td> <td contenteditable="true" style="cursor: text;"></td> <td class="col-akcje">
            <span style="color: #999; font-size: 12px;">(Nowy)</span>
        </td>
     `;
     return tr;
 }
 
-// ✅ 2. Ulepszona obsługa wklejania (paste)
+// ✅ 2. Ulepszona obsługa wklejania (paste) z uwzględnieniem nowej kolumny
 if (produktTableBody) {
     produktTableBody.addEventListener('paste', (event) => {
         const targetCell = event.target.closest('td[contenteditable="true"]');
@@ -10110,7 +10077,7 @@ if (produktTableBody) {
         let allRows = Array.from(produktTableBody.querySelectorAll('tr'));
         let startRowIndex = allRows.indexOf(startRow);
         
-        // Zabezpieczenie na wypadek pustej tabeli (kliknięcie w nagłówek lub błąd)
+        // Zabezpieczenie na wypadek pustej tabeli
         if (startRowIndex === -1) {
              if (allRows.length === 0) {
                  const newRow = createEmptyProductRow();
@@ -10124,21 +10091,20 @@ if (produktTableBody) {
         lines.forEach((lineContent, lineIndex) => {
             const currentRowIndex = startRowIndex + lineIndex;
             
-            // 🔥 TO JEST KLUCZOWA POPRAWKA 🔥
             // Jeśli brakuje wierszy w tabeli, dodaj nowy!
             if (currentRowIndex >= allRows.length) {
                 const newRow = createEmptyProductRow();
                 produktTableBody.appendChild(newRow);
-                allRows.push(newRow); // Aktualizujemy listę wierszy, żeby pętla "widziała" ten nowy
+                allRows.push(newRow); 
             }
 
-            // Teraz mamy pewność, że wiersz istnieje, więc go pobieramy
+            // Teraz mamy pewność, że wiersz istnieje
             const targetRow = allRows[currentRowIndex];
             
             // Wstawiamy dane do komórki
             if (targetRow && targetRow.cells[cellIndex]) {
-                // Specjalna obsługa dla Ceny (index 2) - zamiana przecinka na kropkę
-                if (cellIndex === 2) {
+                // Specjalna obsługa dla Ceny (teraz to index 3!)
+                if (cellIndex === 3) {
                     targetRow.cells[cellIndex].textContent = lineContent.replace(',', '.').trim();
                 } else {
                     targetRow.cells[cellIndex].textContent = lineContent.trim();
@@ -10146,7 +10112,7 @@ if (produktTableBody) {
             }
         });
 
-        console.log(`Zaimportowano ${lines.length} linii (automatycznie dodano brakujące wiersze).`);
+        console.log(`Zaimportowano ${lines.length} linii (z obsługą Nr Serii).`);
     });
 }
 
