@@ -13687,6 +13687,7 @@ try {
     if (input) input.addEventListener('input', populateAndFilterFormProductList);
 
     // Wypełnianie listy (czyta z globalnej `nazwyLekow`)
+   // Wypełnianie listy (czyta z globalnej `nazwyLekow`)
     function populateAndFilterFormProductList() {
         if (typeof nazwyLekow === 'undefined' || nazwyLekow.length === 0) {
             if (list) list.innerHTML = '<div class="product-search-item">Błąd: Brak bazy leków.</div>';
@@ -13695,6 +13696,53 @@ try {
 
         const filterText = input.value.toLowerCase().trim();
         if (list) list.innerHTML = '';
+
+        // --- ✅ NOWOŚĆ: Dodaj opcję "Wyczyść" na samej górze ---
+        const clearItem = document.createElement('div');
+        clearItem.className = 'product-search-item';
+        
+        // Style dla przycisku czyszczenia
+        clearItem.style.padding = '12px';
+        clearItem.style.borderBottom = '2px solid #ccc'; // Wyróżniająca linia
+        clearItem.style.cursor = 'pointer';
+        clearItem.style.fontWeight = 'bold';
+        clearItem.style.color = '#c0392b'; // Czerwony kolor
+        clearItem.style.backgroundColor = '#fff0f0'; // Lekko różowe tło
+        clearItem.innerHTML = '❌ [WYCZYŚĆ POLE] - Brak produktu';
+
+        // Akcja po kliknięciu: wyczyść pola i zamknij modal
+        clearItem.addEventListener('click', () => {
+            // 1. Wyczyść pole leku
+            const formLekInput = document.getElementById('formLek');
+            if (formLekInput) formLekInput.value = "";
+
+            // 2. Wyczyść pola zależne
+            const formSeria = document.getElementById('formSeria');
+            if (formSeria) formSeria.value = "";
+            
+            const formDawkowanie = document.getElementById('formDawkowanie');
+            if (formDawkowanie) formDawkowanie.value = "";
+            
+            const formKarencja = document.getElementById('formKarencja');
+            if (formKarencja) formKarencja.value = "";
+
+            // 3. Zaktualizuj widoczność (ukryje detale produktu, bo pole leku jest puste)
+            if (typeof updateProductTabVisibility === 'function') {
+                updateProductTabVisibility();
+            }
+
+            // 4. Zresetuj wyświetlanie stanu magazynowego
+            const stockDisplay = document.getElementById('formStockDisplay');
+            if (stockDisplay) stockDisplay.style.display = 'none';
+
+            // 5. Zamknij modal
+            if (modal) modal.style.display = 'none';
+        });
+
+        // Dodaj element czyszczący jako pierwszy
+        if (list) list.appendChild(clearItem);
+        // --- KONIEC NOWOŚCI ---
+
         let foundItems = 0;
 
         nazwyLekow.forEach(lekName => {
@@ -13710,7 +13758,15 @@ try {
                 foundItems++;
             }
         });
-        if (foundItems === 0 && list) list.innerHTML = '<div class="product-search-item" style="color: #999;">Brak pasujących produktów.</div>';
+        
+        if (foundItems === 0 && list) {
+            // Nawet jak nie znaleziono, przycisk "Wyczyść" zostaje na górze
+            const emptyInfo = document.createElement('div');
+            emptyInfo.className = 'product-search-item';
+            emptyInfo.style.color = '#999';
+            emptyInfo.textContent = 'Brak pasujących produktów.';
+            list.appendChild(emptyInfo);
+        }
     }
 
     // Wybór produktu (ZAKTUALIZOWANA FUNKCJA Z POPRAWKĄ STANU)
@@ -21010,6 +21066,34 @@ function renderReportProductList(filterText) {
     sharedSearchList.innerHTML = '';
     filterText = filterText.toLowerCase().trim();
 
+    // --- ✅ NOWOŚĆ: Dodaj opcję "Wyczyść" na samej górze listy ---
+    const clearDiv = document.createElement('div');
+    clearDiv.className = 'product-search-item'; 
+    // Style wyróżniające przycisk resetu
+    clearDiv.style.padding = '12px';
+    clearDiv.style.borderBottom = '2px solid #ccc'; // Grubsza linia oddzielająca
+    clearDiv.style.cursor = 'pointer';
+    clearDiv.style.fontWeight = 'bold';
+    clearDiv.style.color = '#c0392b'; // Czerwony kolor dla uwagi
+    clearDiv.style.backgroundColor = '#fff0f0'; // Lekko różowe tło
+    
+    // Tekst przycisku
+    clearDiv.textContent = '❌ [WYCZYŚĆ FILTR] - Pokaż wszystkie';
+    
+    // Akcja po kliknięciu: wyczyść pole i zamknij modal
+    clearDiv.onclick = () => {
+        if (reportProductInput) {
+            reportProductInput.value = ""; // Pusta wartość = brak filtra
+        }
+        if (sharedSearchModal) {
+            sharedSearchModal.style.display = 'none';
+        }
+    };
+    
+    // Dodajemy element do listy jako pierwszy
+    sharedSearchList.appendChild(clearDiv);
+    // --- KONIEC NOWOŚCI ---
+
     if (typeof nazwyLekow === 'undefined') return;
 
     let count = 0;
@@ -21024,8 +21108,8 @@ function renderReportProductList(filterText) {
             
             div.onclick = () => {
                 // Wybór produktu
-                reportProductInput.value = name;
-                sharedSearchModal.style.display = 'none';
+                if (reportProductInput) reportProductInput.value = name;
+                if (sharedSearchModal) sharedSearchModal.style.display = 'none';
             };
             
             sharedSearchList.appendChild(div);
@@ -21034,16 +21118,13 @@ function renderReportProductList(filterText) {
     });
     
     if (count === 0) {
-        sharedSearchList.innerHTML = '<div style="padding:10px; color:#999;">Brak wyników.</div>';
+        // Dodajemy info o braku wyników, ale "Wyczyść filtr" i tak zostanie na górze
+        const emptyInfo = document.createElement('div');
+        emptyInfo.style.padding = '10px';
+        emptyInfo.style.color = '#999';
+        emptyInfo.textContent = 'Brak pasujących produktów.';
+        sharedSearchList.appendChild(emptyInfo);
     }
-}
-
-// Zamknięcie modala (podpinamy się pod istniejący przycisk, ale musimy uważać na konflikty)
-// Najlepiej dodać listener "click" wewnątrz funkcji otwierającej lub tutaj globalnie, 
-// ale sharedSearchModal jest używany też w schematach.
-// Rozwiązanie: Modal po prostu się zamyka. Nie ma znaczenia kto go otworzył.
-if (sharedSearchCloseBtn) {
-    // Istniejący listener już tam jest (zdefiniowany w sekcji schematów), więc zamknie modal.
 }
 </script> 
 </body>
