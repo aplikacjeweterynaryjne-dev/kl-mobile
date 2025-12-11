@@ -21478,7 +21478,7 @@ if (btnUseNewAnimalDesc) {
     
     // ⬆️⬆️⬆️ KONIEC WKLEJANIA ⬆️⬆️⬆️
 /* ======================================================== */
-/* ✅ MODUŁ POPRAWIONY: Udostępnianie PDF (E-mail + Fix Pustych Stron) */
+/* ✅ MODUŁ POPRAWIONY v2: Udostępnianie PDF (Fix Pustej Strony + E-mail) */
 /* ======================================================== */
 
 const printFormatShare = document.getElementById('printFormatShare');
@@ -21502,6 +21502,8 @@ if (printFormatShare) {
         }
 
         // --- A. LOGIKA E-MAILA (AUTO-COPY) ---
+        // System nie pozwala wpisać odbiorcy automatycznie w oknie udostępniania.
+        // Dlatego kopiujemy e-mail do schowka, abyś mógł go wkleić jednym kliknięciem.
         const clientName = document.getElementById('klientSelect').value;
         let clientEmail = '';
         
@@ -21516,12 +21518,25 @@ if (printFormatShare) {
         if (clientEmail) {
             // Kopiuj do schowka
             navigator.clipboard.writeText(clientEmail).then(() => {
-                showToast(`E-mail klienta (${clientEmail}) skopiowany do schowka! Wklej go w polu "Do".`, "success", 6000);
+                showToast(`E-mail (${clientEmail}) skopiowany! Wklej go w polu "Do".`, "success", 6000);
             }).catch(err => console.error("Nie udało się skopiować e-maila", err));
         } else {
             showToast("Generowanie PDF... (Brak e-maila klienta w bazie)", "info", 4000);
         }
 
+        // 4. Pokaż komunikat o przetwarzaniu
+        // Tworzymy tymczasowy overlay, żeby użytkownik nie widział "migającej" tabeli pod spodem
+        const loadingOverlay = document.createElement('div');
+        loadingOverlay.style.position = 'fixed';
+        loadingOverlay.style.top = '0'; loadingOverlay.style.left = '0';
+        loadingOverlay.style.width = '100vw'; loadingOverlay.style.height = '100vh';
+        loadingOverlay.style.background = 'rgba(255,255,255,0.9)';
+        loadingOverlay.style.zIndex = '99999';
+        loadingOverlay.style.display = 'flex';
+        loadingOverlay.style.justifyContent = 'center';
+        loadingOverlay.style.alignItems = 'center';
+        loadingOverlay.innerHTML = '<h2 style="color:#333;">Generowanie PDF... Proszę czekać ⏳</h2>';
+        document.body.appendChild(loadingOverlay);
 
         try {
             // --- B. ZBIERANIE DANYCH ---
@@ -21542,18 +21557,11 @@ if (printFormatShare) {
             const rows = document.querySelectorAll('#karta tbody tr');
             
             rows.forEach((tr, index) => {
-                // Obsługa wiersza separatora (Wiersz 10)
                 if (tr.cells.length === 1) { 
                     rowsHTML += `<tr><td colspan="8" style="text-align: left; font-weight: bold; padding: 2px 4px; background-color: #f9f9f9; font-size: 10pt;">Potwierdzenie nabycia produktu leczniczego weterynaryjnego/paszy leczniczej</td></tr>`;
                     return;
                 }
-
-                // Helpery
-                const getVal = (idx) => {
-                    const cell = tr.cells[idx];
-                    const input = cell.querySelector('input');
-                    return input ? input.value : cell.textContent;
-                };
+                const getVal = (idx) => { const cell = tr.cells[idx]; const input = cell.querySelector('input'); return input ? input.value : cell.textContent; };
                 
                 const getIlosc = () => {
                     const cell = tr.cells[6];
@@ -21563,7 +21571,6 @@ if (printFormatShare) {
                     return (input ? input.value : '') + ' ' + text;
                 };
 
-                // Karencja (czyszczenie ikonki)
                 let karencja = '';
                 const karInput = tr.cells[7].querySelector('input, textarea');
                 if (karInput) {
@@ -21594,62 +21601,51 @@ if (printFormatShare) {
                 `;
             });
 
-            // --- C. GENEROWANIE HTML (FIX PUSTYCH STRON) ---
-            
-            // 1. Używamy Twojej funkcji szablonu
+            // --- C. STWÓRZ KONTENER ---
             let rawHTML = getUnifiedPrintHTML(header, rowsHTML);
-            
-            // 2. Wyciągamy zawartość <body> z szablonu (usuwamy otoczkę <html>...</html>, bo wstawimy to do diva)
-            // Najprościej: tworzymy tymczasowy parser
             const parser = new DOMParser();
             const doc = parser.parseFromString(rawHTML, 'text/html');
-            
-            // Pobieramy style i zawartość .page-sheet
             const styles = doc.querySelector('style').innerHTML;
-            const content = doc.querySelector('.page-sheet').outerHTML; // Pobieramy całą kartkę
+            const content = doc.querySelector('.page-sheet').outerHTML; 
 
-            // 3. Tworzymy kontener tymczasowy, który jest WIDOCZNY dla silnika renderowania, ale poza ekranem
+            // ✅ FIX 1: Kontener jest FIXED (widoczny dla renderera) ale pod spodem (z-index ujemny)
             const container = document.createElement('div');
-            container.style.position = 'absolute';
-            container.style.left = '-9999px';
+            container.style.position = 'fixed';
+            container.style.left = '0';
             container.style.top = '0';
-            container.style.width = '1150px'; // Wymuszamy szerokość A4 (landscape) w pikselach dla pewności
+            container.style.zIndex = '-9999'; // Pod spodem
+            container.style.width = '1150px'; // Sztywna szerokość A4 landscape dla pewności
+            container.style.background = 'white'; // Ważne tło
             
-            // Wstrzykujemy style i treść
             container.innerHTML = `
                 <style>${styles}</style>
                 <style>
-                    /* Nadpisujemy style dla generatora PDF, aby wyglądało idealnie */
-                    .page-sheet { 
-                        margin: 0 !important; 
-                        box-shadow: none !important; 
-                        transform: none !important; 
-                        width: 100% !important;
-                    }
+                    .page-sheet { margin: 0 !important; box-shadow: none !important; transform: none !important; width: 100% !important; }
                     body { background: white !important; }
                 </style>
                 ${content}
             `;
 
-            // 4. Dołączamy do body (TO NAPRAWIA PUSTE STRONY)
             document.body.appendChild(container);
+
+            // ✅ FIX 2: Czekamy chwilę, aż przeglądarka narysuje tabelę
+            await new Promise(r => setTimeout(r, 500)); 
 
             // --- D. KONFIGURACJA PDF ---
             const opt = {
                 margin:       0, 
                 filename:     `Karta_${header.nrDokumentu.replace(/\//g, '-')}.pdf`,
                 image:        { type: 'jpeg', quality: 0.98 },
-                html2canvas:  { scale: 2, useCORS: true, scrollY: 0 }, // scrollY: 0 ważne!
+                html2canvas:  { scale: 2, useCORS: true, scrollY: 0, windowWidth: 1200 }, // windowWidth wymusza renderowanie "jak na komputerze"
                 jsPDF:        { unit: 'mm', format: 'a4', orientation: 'landscape' }
             };
 
             // --- E. GENEROWANIE I UDOSTĘPNIANIE ---
-            
-            // Generujemy PDF z naszego tymczasowego kontenera
             const pdfBlob = await html2pdf().set(opt).from(container).output('blob');
 
-            // Usuwamy kontener (sprzątanie)
+            // Sprzątanie
             document.body.removeChild(container);
+            document.body.removeChild(loadingOverlay); // Usuń ekran ładowania
 
             const file = new File([pdfBlob], opt.filename, { type: 'application/pdf' });
 
@@ -21661,15 +21657,15 @@ if (printFormatShare) {
 
             if (navigator.canShare(shareData)) {
                 await navigator.share(shareData);
-                showToast("Menu udostępniania otwarte ✅", "success");
             } else {
-                alert("Twój system nie pozwala na udostępnianie plików PDF w ten sposób.");
+                alert("Błąd: Urządzenie nie pozwoliło na udostępnienie pliku.");
             }
 
         } catch (err) {
-            // Usuń kontener w razie błędu, żeby nie wisiał w pamięci
-            const existingContainer = document.querySelector('div[style*="-9999px"]');
-            if (existingContainer) document.body.removeChild(existingContainer);
+            // Usuń overlaye w razie błędu
+            if(document.body.contains(loadingOverlay)) document.body.removeChild(loadingOverlay);
+            const hiddenContainer = document.querySelector('div[style*="z-index: -9999"]');
+            if(hiddenContainer) document.body.removeChild(hiddenContainer);
 
             if (err.name !== 'AbortError') {
                 console.error("Błąd generowania/wysyłki PDF:", err);
