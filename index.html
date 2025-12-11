@@ -16686,8 +16686,9 @@ async function loadAndRenderMagazyn() {
 }
 
 /**
- * Renderuje główną tabelę stanów magazynowych.
+ * Renderuje główną tabelę stanów magazynowych (MÓJ MAGAZYN).
  * Łączy dane z 'cachedProducts' (wszystkie produkty) i 'magazynCache' (stany).
+ * ✅ POPRAWKA: Filtruje produkty tylko do ID Lecznicy użytkownika (nawet dla Admina).
  */
 function renderMagazynTable() {
     magazynTableBody.innerHTML = ''; // Wyczyść
@@ -16700,7 +16701,16 @@ function renderMagazynTable() {
     const filterText = magazynSearchInput.value.toLowerCase().trim();
     const threeDaysAgo = new Date().getTime() - (3 * 24 * 60 * 60 * 1000);
     
-    let productsToRender = [...cachedProducts]; // Pracuj na kopii
+    // Pobierz wszystkie produkty z cache
+    let productsToRender = [...cachedProducts]; 
+
+    // ✅ KLUCZOWA ZMIANA: FILTRACJA PO ID LECZNICY
+    // Nawet jeśli jesteś administratorem i masz pobraną całą bazę (wszystkie lecznice),
+    // w sekcji "Mój Magazyn" chcesz widzieć tylko produkty Twojej placówki.
+    if (currentUserProfile && currentUserProfile['ID lecznicy']) {
+        const myClinicId = currentUserProfile['ID lecznicy'];
+        productsToRender = productsToRender.filter(p => p.id_lecznicy === myClinicId);
+    }
     
     // Sortowanie (A-Z domyślnie)
     productsToRender.sort((a, b) => (a.nazwa || '').localeCompare(b.nazwa || '', 'pl'));
@@ -16709,7 +16719,7 @@ function renderMagazynTable() {
         const nazwa = product.nazwa || 'Brak Nazwy';
         const productId = product.id; // ID produktu z kolekcji 'leki'
         
-        // Filtrowanie
+        // Filtrowanie (wyszukiwarka)
         if (filterText && !nazwa.toLowerCase().includes(filterText)) {
             return; // Pomiń ten wiersz
         }
@@ -16744,8 +16754,7 @@ function renderMagazynTable() {
         
         const tr = document.createElement('tr');
         tr.className = highlightClass;
-        // ✅ MODUŁ 5: Zapisz ID produktu w wierszu, abyśmy wiedzieli, co aktualizujemy
-        tr.dataset.productId = productId;
+        tr.dataset.productId = productId;
         // Zapisujemy dane do sortowania
         tr.dataset.nazwa = nazwa;
         tr.dataset.stan = aktualnyStan;
@@ -16755,25 +16764,30 @@ function renderMagazynTable() {
         tr.dataset.typ = typOperacji;
         
         tr.innerHTML = `
-    <td>${nazwa}</td>
-    <td style="text-align: center; font-weight: bold;">${aktualnyStan}</td>
+            <td>${nazwa}</td>
+            <td style="text-align: center; font-weight: bold;">${aktualnyStan}</td>
 
-    <td class="col-topup" style="text-align: center;">
-        <input type="number" 
-               class="topup-input" 
-               data-product-id="${productId}" 
-               placeholder="0" 
-               min="0" 
-               step="1">
-    </td>
+            <td class="col-topup" style="text-align: center;">
+                <input type="number" 
+                       class="topup-input" 
+                       data-product-id="${productId}" 
+                       placeholder="0" 
+                       min="0" 
+                       step="1">
+            </td>
 
-    <td class="col-log">${dataOperacji}</td>
-    <td class="col-log">${ktoOperacji}</td>
-    <td class="col-log" style="text-align: center; font-weight: 600;">${iloscOperacji}</td>
-    <td class="col-log">${typOperacji}</td>
-`;
+            <td class="col-log">${dataOperacji}</td>
+            <td class="col-log">${ktoOperacji}</td>
+            <td class="col-log" style="text-align: center; font-weight: 600;">${iloscOperacji}</td>
+            <td class="col-log">${typOperacji}</td>
+        `;
         magazynTableBody.appendChild(tr);
     });
+    
+    // Jeśli po filtracji lista jest pusta
+    if (productsToRender.length === 0) {
+        magazynTableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 20px;">Brak produktów przypisanych do Twojej lecznicy.</td></tr>';
+    }
 }
 
 /**
