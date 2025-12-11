@@ -5282,6 +5282,7 @@ function updateFormLivePreview() {
 /* Plik: index.html (ZASTĄP CAŁĄ FUNKCJĘ selectRowInForm, ok. linii 5005) */
 
 /* Plik: index.html (ZASTĄP CAŁĄ FUNKCJĘ selectRowInForm) */
+/* Plik: index.html (ZASTĄP CAŁĄ FUNKCJĘ selectRowInForm) */
 function selectRowInForm(logicalIndex){
     updateFormLivePreview();
     
@@ -5318,17 +5319,14 @@ function selectRowInForm(logicalIndex){
         }
     }
 
-    // --- ✅ NOWOŚĆ: POKAŻ/UKRYJ GENERATOR DAT (tylko dla wierszy 10-12) ---
-    // Indeksy logiczne dla produktów pozostawionych to 9, 10, 11
+    // --- POKAŻ/UKRYJ GENERATOR DAT (tylko dla wierszy 10-12) ---
     if (logicalIndex >= 9 && logicalIndex <= 11) {
         formDosageDates.style.display = 'block';
-        // Czyścimy daty przy zmianie wiersza, żeby nie mylić
         formDosageDateStart.value = '';
         formDosageDateEnd.value = '';
     } else {
         formDosageDates.style.display = 'none';
     }
-    // ---------------------------------------------------------------------
 
     // Pobieranie danych do formularza
     const formOpis = document.getElementById('formOpis');
@@ -5363,9 +5361,8 @@ function selectRowInForm(logicalIndex){
     }
     if (formDawkowanie) formDawkowanie.value = tekstDawkowania;
 
-  // ✅ Wczytaj karencję / uwagi (obsługa Smart Cell - Textarea/Input)
+    // Wczytaj karencję
     if (formKarencja) {
-        // Szukamy elementu po klasie, nie po tagu
         const karencjaCellElement = row.cells[7].querySelector('.karencja-input');
         if (karencjaCellElement) {
             formKarencja.value = karencjaCellElement.value;
@@ -5378,17 +5375,24 @@ function selectRowInForm(logicalIndex){
         updateProductTabVisibility();
     }
 
-   // ✅ POPRAWKA: Automatyczne przełączanie na "Produkt" dla konkretnych wierszy
+    // Automatyczne przełączanie na "Produkt"
     // Wiersze 2-9 to indeksy 1-8.
     // Wiersze 11-12 to indeksy 10-11.
     const forceProductTab = (logicalIndex >= 1 && logicalIndex <= 8) || (logicalIndex >= 10 && logicalIndex <= 11);
 
     if (forceProductTab) {
-        // Dla tych wierszy ZAWSZE idź do produktu (chyba że użytkownik ręcznie wróci)
         if (typeof switchRowTab === 'function') switchRowTab('produkt');
+        
+        // ✅ NOWOŚĆ: Automatyczne otwarcie listy produktów
+        // Jeśli pole jest puste (lub chcesz otwierać zawsze), symulujemy kliknięcie
+        if (formLek) {
+            setTimeout(() => {
+                formLek.focus(); // Ustaw focus
+                formLek.click(); // Wywołaj kliknięcie (otwiera modal)
+            }, 100); // Małe opóźnienie, by UI zdążyło się przerysować
+        }
+
     } else {
-        // Dla wiersza 1 (indeks 0) i 10 (indeks 9 - "Pozostawione 1") domyślnie "Dane"
-        // Ale zachowajmy starą logikę: jeśli już coś jest wpisane w lek, to pokaż produkt
         const hasProduct = lekValue.trim() !== '';
         if (hasProduct) {
              if (typeof switchRowTab === 'function') switchRowTab('produkt');
@@ -5397,7 +5401,7 @@ function selectRowInForm(logicalIndex){
         }
     }
     
-    // Tytuł
+    // Tytuł wiersza
     const titleEl = document.getElementById('formRowTitle');
     if (titleEl) {
         let titleText = '';
@@ -13688,6 +13692,7 @@ try {
 
     // Wypełnianie listy (czyta z globalnej `nazwyLekow`)
    // Wypełnianie listy (czyta z globalnej `nazwyLekow`)
+// Wypełnianie listy (czyta z globalnej `nazwyLekow`)
     function populateAndFilterFormProductList() {
         if (typeof nazwyLekow === 'undefined' || nazwyLekow.length === 0) {
             if (list) list.innerHTML = '<div class="product-search-item">Błąd: Brak bazy leków.</div>';
@@ -13697,49 +13702,49 @@ try {
         const filterText = input.value.toLowerCase().trim();
         if (list) list.innerHTML = '';
 
-        // --- ✅ NOWOŚĆ: Dodaj opcję "Wyczyść" na samej górze ---
+        // --- ✅ NOWOŚĆ: Przycisk "Wyczyść" (Wersja Poprawiona: Nie zmienia zakładki) ---
         const clearItem = document.createElement('div');
         clearItem.className = 'product-search-item';
         
-        // Style dla przycisku czyszczenia
+        // Style
         clearItem.style.padding = '12px';
-        clearItem.style.borderBottom = '2px solid #ccc'; // Wyróżniająca linia
+        clearItem.style.borderBottom = '2px solid #ccc';
         clearItem.style.cursor = 'pointer';
         clearItem.style.fontWeight = 'bold';
-        clearItem.style.color = '#c0392b'; // Czerwony kolor
-        clearItem.style.backgroundColor = '#fff0f0'; // Lekko różowe tło
+        clearItem.style.color = '#c0392b';
+        clearItem.style.backgroundColor = '#fff0f0';
         clearItem.innerHTML = '❌ [WYCZYŚĆ POLE] - Brak produktu';
 
-        // Akcja po kliknięciu: wyczyść pola i zamknij modal
         clearItem.addEventListener('click', () => {
             // 1. Wyczyść pole leku
             const formLekInput = document.getElementById('formLek');
             if (formLekInput) formLekInput.value = "";
 
             // 2. Wyczyść pola zależne
-            const formSeria = document.getElementById('formSeria');
-            if (formSeria) formSeria.value = "";
+            document.getElementById('formSeria').value = "";
+            document.getElementById('formDawkowanie').value = "";
+            document.getElementById('formKarencja').value = "";
             
-            const formDawkowanie = document.getElementById('formDawkowanie');
-            if (formDawkowanie) formDawkowanie.value = "";
-            
-            const formKarencja = document.getElementById('formKarencja');
-            if (formKarencja) formKarencja.value = "";
-
-            // 3. Zaktualizuj widoczność (ukryje detale produktu, bo pole leku jest puste)
-            if (typeof updateProductTabVisibility === 'function') {
-                updateProductTabVisibility();
+            // 3. ✅ ZMIANA: Zamiast wywoływać updateProductTabVisibility(),
+            // ręcznie ukrywamy detale, żeby NIE przełączało zakładki.
+            const detailsContainer = document.getElementById('productDetailsContainer');
+            if (detailsContainer) {
+                detailsContainer.style.display = 'none';
             }
 
-            // 4. Zresetuj wyświetlanie stanu magazynowego
+            // 4. ✅ ZMIANA: Dla pewności wymuszamy pozostanie na zakładce 'produkt'
+            if (typeof switchRowTab === 'function') {
+                switchRowTab('produkt');
+            }
+
+            // 5. Zresetuj wyświetlanie stanu magazynowego
             const stockDisplay = document.getElementById('formStockDisplay');
             if (stockDisplay) stockDisplay.style.display = 'none';
 
-            // 5. Zamknij modal
+            // 6. Zamknij modal
             if (modal) modal.style.display = 'none';
         });
-
-        // Dodaj element czyszczący jako pierwszy
+        
         if (list) list.appendChild(clearItem);
         // --- KONIEC NOWOŚCI ---
 
@@ -13760,7 +13765,6 @@ try {
         });
         
         if (foundItems === 0 && list) {
-            // Nawet jak nie znaleziono, przycisk "Wyczyść" zostaje na górze
             const emptyInfo = document.createElement('div');
             emptyInfo.className = 'product-search-item';
             emptyInfo.style.color = '#999';
