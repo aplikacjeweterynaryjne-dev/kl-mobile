@@ -6742,6 +6742,7 @@ if (saveCardToArchiveBtn) {
             const batch = db.batch();
             const userDocId = currentUserProfile.id;
             const cardRef = db.collection("archiwumKarty").doc();
+            lastSavedDocId = cardRef.id; // ⬅️ ✅ DODAJ TĘ LINIJKĘ (Zapamiętujemy ID)
             batch.set(cardRef, cardArchiveData);
             
             if (currentUserProfile.uzywaStanowMagazynowych === true && productUsageMap.size > 0) {
@@ -6928,6 +6929,8 @@ const clientFormNrStada = document.getElementById('clientFormNrStada'); // Popra
 // Zmienna do przechowywania wczytanych klientów w pamięci
 let cachedClients = null;
 let currentUserProfile = null; // ✅ DODAJ TĘ LINIĘ
+/* ----- GŁÓWNE ZMIENNE APLIKACJI ----- */
+let lastSavedDocId = null; // ✅ NOWA ZMIENNA: Tu zapiszemy ID karty po kliknięciu "Zapisz"
 let clientFormReturnToModal = null; // ⬅️ ⬅️ ⬅️ DODAJ TĘ LINIĘ
 const adminRoles = ['administrator', 'właściciel'];
 // Przyciski ładowania/odświeżania
@@ -21478,7 +21481,7 @@ if (btnUseNewAnimalDesc) {
     
     // ⬆️⬆️⬆️ KONIEC WKLEJANIA ⬆️⬆️⬆️
 /* ======================================================== */
-/* ✅ MODUŁ POPRAWIONY v2: Udostępnianie PDF (Fix Pustej Strony + E-mail) */
+/* ✅ MODUŁ POPRAWIONY v3: Wysyłka LINKU (Mailto - Szybki i Lekki) */
 /* ======================================================== */
 
 const printFormatShare = document.getElementById('printFormatShare');
@@ -21489,25 +21492,17 @@ if (printFormatShare) {
         const modal = document.getElementById('printFormatModal');
         if (modal) modal.style.display = 'none';
 
-        // 2. Walidacja stanu magazynowego
-        if (typeof isCardStockValid !== 'undefined' && !isCardStockValid) {
-            showToast("Napraw błędy w stanach magazynowych przed wysyłką.", "error");
+        // 2. Sprawdź, czy karta została zapisana (mamy ID?)
+        if (!lastSavedDocId) {
+            alert("Najpierw musisz ZAPISAĆ kartę w archiwum, aby wygenerować do niej link.");
             return;
         }
 
-        // 3. Sprawdź obsługę udostępniania
-        if (!navigator.canShare || !navigator.share) {
-            alert("Twoja przeglądarka nie obsługuje funkcji udostępniania plików.\nUżyj opcji 'Drukuj -> Zapisz jako PDF' i wyślij plik ręcznie.");
-            return;
-        }
-
-        // --- A. LOGIKA E-MAILA (AUTO-COPY) ---
-        // System nie pozwala wpisać odbiorcy automatycznie w oknie udostępniania.
-        // Dlatego kopiujemy e-mail do schowka, abyś mógł go wkleić jednym kliknięciem.
+        // 3. Pobierz dane do e-maila
         const clientName = document.getElementById('klientSelect').value;
         let clientEmail = '';
-        
-        // Szukamy e-maila w cache klientów
+
+        // Szukamy e-maila klienta w bazie
         if (typeof cachedClients !== 'undefined' && cachedClients) {
             const clientObj = cachedClients.find(c => c.nazwa === clientName);
             if (clientObj && clientObj.email) {
@@ -21515,163 +21510,37 @@ if (printFormatShare) {
             }
         }
 
-        if (clientEmail) {
-            // Kopiuj do schowka
-            navigator.clipboard.writeText(clientEmail).then(() => {
-                showToast(`E-mail (${clientEmail}) skopiowany! Wklej go w polu "Do".`, "success", 6000);
-            }).catch(err => console.error("Nie udało się skopiować e-maila", err));
-        } else {
-            showToast("Generowanie PDF... (Brak e-maila klienta w bazie)", "info", 4000);
-        }
-
-        // 4. Pokaż komunikat o przetwarzaniu
-        // Tworzymy tymczasowy overlay, żeby użytkownik nie widział "migającej" tabeli pod spodem
-        const loadingOverlay = document.createElement('div');
-        loadingOverlay.style.position = 'fixed';
-        loadingOverlay.style.top = '0'; loadingOverlay.style.left = '0';
-        loadingOverlay.style.width = '100vw'; loadingOverlay.style.height = '100vh';
-        loadingOverlay.style.background = 'rgba(255,255,255,0.9)';
-        loadingOverlay.style.zIndex = '99999';
-        loadingOverlay.style.display = 'flex';
-        loadingOverlay.style.justifyContent = 'center';
-        loadingOverlay.style.alignItems = 'center';
-        loadingOverlay.innerHTML = '<h2 style="color:#333;">Generowanie PDF... Proszę czekać ⏳</h2>';
-        document.body.appendChild(loadingOverlay);
-
-        try {
-            // --- B. ZBIERANIE DANYCH ---
-            const header = {
-                nazwaLecznicy: document.getElementById('nazwaLecznicy').textContent,
-                dataWykonania: document.getElementById('dataWykonania').value,
-                nrStada: document.getElementById('nrStada').textContent,
-                klient: document.getElementById('klientSelect').value,
-                adresKlienta: document.getElementById('adresKlienta').textContent,
-                dataZgloszenia: document.getElementById('dataZgloszenia').value,
-                nrDokumentu: document.getElementById('nrDokumentu').value,
-                podpisLekarzaImg: document.getElementById('doctor-signature').src,
-                podpisLekarzaLinia: document.getElementById('doctor-signature-name').textContent,
-                podpisPosiadaczaImg: document.getElementById('canvasPosiadacz').toDataURL()
-            };
-
-            let rowsHTML = '';
-            const rows = document.querySelectorAll('#karta tbody tr');
-            
-            rows.forEach((tr, index) => {
-                if (tr.cells.length === 1) { 
-                    rowsHTML += `<tr><td colspan="8" style="text-align: left; font-weight: bold; padding: 2px 4px; background-color: #f9f9f9; font-size: 10pt;">Potwierdzenie nabycia produktu leczniczego weterynaryjnego/paszy leczniczej</td></tr>`;
-                    return;
-                }
-                const getVal = (idx) => { const cell = tr.cells[idx]; const input = cell.querySelector('input'); return input ? input.value : cell.textContent; };
-                
-                const getIlosc = () => {
-                    const cell = tr.cells[6];
-                    const input = cell.querySelector('input');
-                    let text = '';
-                    cell.childNodes.forEach(node => { if (node.nodeType === Node.TEXT_NODE) text += node.textContent; });
-                    return (input ? input.value : '') + ' ' + text;
-                };
-
-                let karencja = '';
-                const karInput = tr.cells[7].querySelector('input, textarea');
-                if (karInput) {
-                    karencja = karInput.value;
-                } else {
-                    const clone = tr.cells[7].cloneNode(true);
-                    const icon = clone.querySelector('.cal-icon');
-                    if (icon) icon.remove();
-                    karencja = clone.textContent.replace('📅', '').trim();
-                }
-                
-                // Opis (Input vs Tekst)
-                const opisInput = tr.cells[1].querySelector('input');
-                const opis = opisInput ? opisInput.value : tr.cells[1].textContent;
-                const lp = (index < 9) ? (index + 1) + '.' : (index - 8) + '.';
-
-                rowsHTML += `
-                    <tr>
-                        <td style="text-align: center;">${lp}</td>
-                        <td>${opis}</td>
-                        <td style="text-align: center;">${getVal(2)}</td>
-                        <td style="text-align: center;">${getVal(3)}</td>
-                        <td>${getVal(4)}</td>
-                        <td style="text-align: center;">${tr.cells[5].textContent}</td>
-                        <td>${getIlosc()}</td>
-                        <td>${karencja}</td>
-                    </tr>
-                `;
-            });
-
-            // --- C. STWÓRZ KONTENER ---
-            let rawHTML = getUnifiedPrintHTML(header, rowsHTML);
-            const parser = new DOMParser();
-            const doc = parser.parseFromString(rawHTML, 'text/html');
-            const styles = doc.querySelector('style').innerHTML;
-            const content = doc.querySelector('.page-sheet').outerHTML; 
-
-            // ✅ FIX 1: Kontener jest FIXED (widoczny dla renderera) ale pod spodem (z-index ujemny)
-            const container = document.createElement('div');
-            container.style.position = 'fixed';
-            container.style.left = '0';
-            container.style.top = '0';
-            container.style.zIndex = '-9999'; // Pod spodem
-            container.style.width = '1150px'; // Sztywna szerokość A4 landscape dla pewności
-            container.style.background = 'white'; // Ważne tło
-            
-            container.innerHTML = `
-                <style>${styles}</style>
-                <style>
-                    .page-sheet { margin: 0 !important; box-shadow: none !important; transform: none !important; width: 100% !important; }
-                    body { background: white !important; }
-                </style>
-                ${content}
-            `;
-
-            document.body.appendChild(container);
-
-            // ✅ FIX 2: Czekamy chwilę, aż przeglądarka narysuje tabelę
-            await new Promise(r => setTimeout(r, 500)); 
-
-            // --- D. KONFIGURACJA PDF ---
-            const opt = {
-                margin:       0, 
-                filename:     `Karta_${header.nrDokumentu.replace(/\//g, '-')}.pdf`,
-                image:        { type: 'jpeg', quality: 0.98 },
-                html2canvas:  { scale: 2, useCORS: true, scrollY: 0, windowWidth: 1200 }, // windowWidth wymusza renderowanie "jak na komputerze"
-                jsPDF:        { unit: 'mm', format: 'a4', orientation: 'landscape' }
-            };
-
-            // --- E. GENEROWANIE I UDOSTĘPNIANIE ---
-            const pdfBlob = await html2pdf().set(opt).from(container).output('blob');
-
-            // Sprzątanie
-            document.body.removeChild(container);
-            document.body.removeChild(loadingOverlay); // Usuń ekran ładowania
-
-            const file = new File([pdfBlob], opt.filename, { type: 'application/pdf' });
-
-            const shareData = {
-                title: 'Karta leczenia z ostatniego leczenia weterynaryjnego', 
-                text: `Dzień dobry,\n\nPrzesyłam w załączniku kartę leczenia z ostatniego leczenia weterynaryjnego.\n\npozdrawiam\nZespół Weterynaryjny`, 
-                files: [file]
-            };
-
-            if (navigator.canShare(shareData)) {
-                await navigator.share(shareData);
-            } else {
-                alert("Błąd: Urządzenie nie pozwoliło na udostępnienie pliku.");
-            }
-
-        } catch (err) {
-            // Usuń overlaye w razie błędu
-            if(document.body.contains(loadingOverlay)) document.body.removeChild(loadingOverlay);
-            const hiddenContainer = document.querySelector('div[style*="z-index: -9999"]');
-            if(hiddenContainer) document.body.removeChild(hiddenContainer);
-
-            if (err.name !== 'AbortError') {
-                console.error("Błąd generowania/wysyłki PDF:", err);
-                alert("Wystąpił błąd: " + err.message);
+        if (!clientEmail) {
+            if(!confirm("Ten klient nie ma przypisanego adresu e-mail w bazie. Czy chcesz otworzyć pocztę i wpisać go ręcznie?")) {
+                return;
             }
         }
+
+        // 4. Generuj Link do Karty
+        // Budujemy link: obecny_adres_strony + ?shareId=ID_KARTY
+        const baseUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
+        const linkDoKarty = `${baseUrl}?shareId=${lastSavedDocId}`;
+
+        // 5. Przygotuj treść e-maila
+        const subject = encodeURIComponent("Karta leczenia z ostatniego leczenia weterynaryjnego");
+        
+        const bodyText = `Dzień dobry,
+
+Udostępniam link do karty leczenia z ostatniego leczenia weterynaryjnego:
+${linkDoKarty}
+
+Pozdrawiam,
+Zespół Weterynaryjny`;
+
+        const body = encodeURIComponent(bodyText);
+
+        // 6. Otwórz program pocztowy (to działa natychmiastowo)
+        // Format: mailto:adres@email.com?subject=Temat&body=Treść
+        const mailtoLink = `mailto:${clientEmail}?subject=${subject}&body=${body}`;
+        
+        window.location.href = mailtoLink;
+        
+        showToast("Otwieranie programu pocztowego... 📧", "success");
     });
 }
 /* ======================================================== */
