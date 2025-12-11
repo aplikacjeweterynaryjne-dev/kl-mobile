@@ -21489,23 +21489,23 @@ if (printFormatShare) {
         const modal = document.getElementById('printFormatModal');
         if (modal) modal.style.display = 'none';
 
-        // 2. Walidacja stanu magazynowego (dla pewności)
+        // 2. Walidacja stanu magazynowego
         if (typeof isCardStockValid !== 'undefined' && !isCardStockValid) {
             showToast("Napraw błędy w stanach magazynowych przed wysyłką.", "error");
             return;
         }
 
-        // 3. Sprawdź, czy przeglądarka obsługuje udostępnianie plików
+        // 3. Sprawdź obsługę udostępniania
         if (!navigator.canShare || !navigator.share) {
             alert("Twoja przeglądarka nie obsługuje funkcji udostępniania plików.\nUżyj opcji 'Drukuj -> Zapisz jako PDF' i wyślij plik ręcznie.");
             return;
         }
 
-        // 4. Pokaż komunikat (proces trwa kilka sekund)
+        // 4. Pokaż komunikat
         showToast("Generowanie PDF i otwieranie poczty... ⏳", "info", 5000);
 
         try {
-            // --- A. Pobierz dane do wydruku (korzystamy z istniejącej logiki) ---
+            // --- A. Pobierz dane do wydruku ---
             const header = {
                 nazwaLecznicy: document.getElementById('nazwaLecznicy').textContent,
                 dataWykonania: document.getElementById('dataWykonania').value,
@@ -21519,24 +21519,22 @@ if (printFormatShare) {
                 podpisPosiadaczaImg: document.getElementById('canvasPosiadacz').toDataURL()
             };
 
-            // --- B. Zbuduj wiersze tabeli (czyszczenie inputów) ---
+            // --- B. Zbuduj wiersze tabeli ---
             let rowsHTML = '';
             const rows = document.querySelectorAll('#karta tbody tr');
             
             rows.forEach((tr) => {
-                if (tr.cells.length === 1) { // Separator
+                if (tr.cells.length === 1) { 
                     rowsHTML += `<tr><td colspan="8" style="text-align: left; font-weight: bold; padding: 2px 4px; background-color: #f9f9f9; font-size: 10pt;">Potwierdzenie nabycia produktu leczniczego weterynaryjnego/paszy leczniczej</td></tr>`;
                     return;
                 }
 
-                // Helper do wyciągania wartości (tekst lub input)
                 const getVal = (idx) => {
                     const cell = tr.cells[idx];
                     const input = cell.querySelector('input');
                     return input ? input.value : cell.textContent;
                 };
                 
-                // Ilość (tekst + input)
                 const getIlosc = () => {
                     const cell = tr.cells[6];
                     const input = cell.querySelector('input');
@@ -21545,7 +21543,6 @@ if (printFormatShare) {
                     return (input ? input.value : '') + ' ' + text;
                 };
 
-                // Karencja (bez ikonki kalendarza)
                 let karencja = '';
                 const karInput = tr.cells[7].querySelector('input, textarea');
                 if (karInput) {
@@ -21571,53 +21568,42 @@ if (printFormatShare) {
                 `;
             });
 
-            // --- C. Stwórz HTML dla PDF ---
-            // Używamy Twojej funkcji getUnifiedPrintHTML, ale musimy usunąć z niej przyciski
+            // --- C. Stwórz HTML ---
             let rawHTML = getUnifiedPrintHTML(header, rowsHTML);
-            
             const tempDiv = document.createElement('div');
             tempDiv.innerHTML = rawHTML;
-            
-            // Usuń przyciski sterujące z HTML-a
             const controls = tempDiv.querySelector('.print-controls');
             if (controls) controls.remove();
-            
-            // Pobierz właściwą "kartkę" do wydruku
             const contentToPrint = tempDiv.querySelector('.page-sheet') || tempDiv;
 
-            // --- D. Konfiguracja PDF (html2pdf) ---
+            // --- D. Konfiguracja PDF ---
             const opt = {
-                margin:       0, // Marginesy są już w CSS .page-sheet
+                margin:       0, 
                 filename:     `Karta_${header.nrDokumentu.replace(/\//g, '-')}.pdf`,
                 image:        { type: 'jpeg', quality: 0.98 },
-                html2canvas:  { scale: 2, useCORS: true }, // scale: 2 = lepsza jakość
+                html2canvas:  { scale: 2, useCORS: true },
                 jsPDF:        { unit: 'mm', format: 'a4', orientation: 'landscape' }
             };
 
             // --- E. Generowanie i Udostępnianie ---
-            // 1. Stwórz Blob (plik w pamięci)
             const pdfBlob = await html2pdf().set(opt).from(contentToPrint).output('blob');
-
-            // 2. Stwórz obiekt pliku
             const file = new File([pdfBlob], opt.filename, { type: 'application/pdf' });
 
-            // 3. Sprawdź czy dane są poprawne do udostępnienia
+            // ✅ TUTAJ JEST ZMIANA TREŚCI I TEMATU E-MAILA
             const shareData = {
-                title: 'Karta Leczenia Zwierząt',
-                text: `Dzień dobry,\nPrzesyłam kartę leczenia nr ${header.nrDokumentu} dla klienta ${header.klient}.\n\nZ poważaniem,\n${header.podpisLekarzaLinia}`,
+                title: 'Karta leczenia z ostatniego leczenia weterynaryjnego', // Temat
+                text: `Dzień dobry,\n\nPrzesyłam w załączniku kartę leczenia z ostatniego leczenia weterynaryjnego.\n\npozdrawiam\nZespół Weterynaryjny`, // Treść
                 files: [file]
             };
 
             if (navigator.canShare(shareData)) {
                 await navigator.share(shareData);
-                // Sukces (lub użytkownik zamknął menu)
                 showToast("Menu udostępniania otwarte ✅", "success");
             } else {
                 alert("Twój system nie pozwala na udostępnianie plików PDF w ten sposób.");
             }
 
         } catch (err) {
-            // Ignorujemy błąd przerwania przez użytkownika (AbortError)
             if (err.name !== 'AbortError') {
                 console.error("Błąd generowania/wysyłki PDF:", err);
                 alert("Wystąpił błąd: " + err.message);
@@ -21626,6 +21612,8 @@ if (printFormatShare) {
     });
 }
 /* ======================================================== */
+
+
 </script> 
 </body>
 </html>
