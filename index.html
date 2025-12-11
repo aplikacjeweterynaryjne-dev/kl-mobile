@@ -21481,13 +21481,14 @@ if (btnUseNewAnimalDesc) {
     
     // ⬆️⬆️⬆️ KONIEC WKLEJANIA ⬆️⬆️⬆️
 /* ======================================================== */
-/* ✅ MODUŁ POPRAWIONY v3: Wysyłka LINKU (Mailto - Szybki i Lekki) */
+/* ✅ MODUŁ POPRAWIONY v4: Wysyłka LINKU (Smart Email Fetch) */
 /* ======================================================== */
 
 const printFormatShare = document.getElementById('printFormatShare');
 
 if (printFormatShare) {
     printFormatShare.addEventListener('click', async () => {
+        
         // 1. Ukryj modal wyboru
         const modal = document.getElementById('printFormatModal');
         if (modal) modal.style.display = 'none';
@@ -21498,26 +21499,48 @@ if (printFormatShare) {
             return;
         }
 
-        // 3. Pobierz dane do e-maila
-        const clientName = document.getElementById('klientSelect').value;
+        const clientName = document.getElementById('klientSelect').value.trim();
         let clientEmail = '';
 
-        // Szukamy e-maila klienta w bazie
-        if (typeof cachedClients !== 'undefined' && cachedClients) {
+        // --- ETAP 1: Szukanie w pamięci podręcznej (Szybkie) ---
+        if (typeof cachedClients !== 'undefined' && cachedClients && cachedClients.length > 0) {
             const clientObj = cachedClients.find(c => c.nazwa === clientName);
             if (clientObj && clientObj.email) {
                 clientEmail = clientObj.email;
+                console.log("Znaleziono email w cache:", clientEmail);
             }
         }
 
+        // --- ETAP 2: "Koło ratunkowe" - Szukanie w bazie (jeśli cache pusty) ---
         if (!clientEmail) {
-            if(!confirm("Ten klient nie ma przypisanego adresu e-mail w bazie. Czy chcesz otworzyć pocztę i wpisać go ręcznie?")) {
-                return;
+            showToast("Szukam adresu e-mail w bazie... ⏳", "info", 2000);
+            try {
+                // Pobieramy klienta po nazwie (zakładamy, że nazwy są unikalne lub bierzemy pierwszego)
+                const q = db.collection("klienci").where("nazwa", "==", clientName).limit(1);
+                const snapshot = await q.get();
+                
+                if (!snapshot.empty) {
+                    const clientData = snapshot.docs[0].data();
+                    if (clientData.email) {
+                        clientEmail = clientData.email;
+                        console.log("Znaleziono email w Firestore:", clientEmail);
+                    }
+                }
+            } catch (err) {
+                console.error("Błąd podczas pobierania emaila z bazy:", err);
             }
+        }
+
+        // --- ETAP 3: Weryfikacja przez użytkownika (ZADANIE) ---
+        // Wyświetlamy okienko, gdzie użytkownik widzi e-mail i może go zmienić
+        const emailToUse = prompt("Zweryfikuj adres e-mail odbiorcy:", clientEmail);
+
+        // Jeśli użytkownik kliknie "Anuluj" w prompt, przerywamy
+        if (emailToUse === null) {
+            return; 
         }
 
         // 4. Generuj Link do Karty
-        // Budujemy link: obecny_adres_strony + ?shareId=ID_KARTY
         const baseUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
         const linkDoKarty = `${baseUrl}?shareId=${lastSavedDocId}`;
 
@@ -21534,9 +21557,8 @@ Zespół Weterynaryjny`;
 
         const body = encodeURIComponent(bodyText);
 
-        // 6. Otwórz program pocztowy (to działa natychmiastowo)
-        // Format: mailto:adres@email.com?subject=Temat&body=Treść
-        const mailtoLink = `mailto:${clientEmail}?subject=${subject}&body=${body}`;
+        // 6. Otwórz program pocztowy
+        const mailtoLink = `mailto:${emailToUse}?subject=${subject}&body=${body}`;
         
         window.location.href = mailtoLink;
         
