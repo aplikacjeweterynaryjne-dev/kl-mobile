@@ -5977,7 +5977,7 @@ if (printFormatA4) {
 
 // ⬇️ ⬇️ ⬇️ WKLEJ TEN NOWY BLOK W MIEJSCE STAREGO ⬇️ ⬇️ ⬇️
 
-// 4. Listener dla przycisku "110mm" (Wersja z ładnym podglądem)
+// 4. Listener dla przycisku "110mm" (Wersja z E-mailem i Linkiem)
 if (printFormat110 && receiptPrintContainer) {
     printFormat110.addEventListener('click', () => {
         
@@ -5993,7 +5993,18 @@ if (printFormat110 && receiptPrintContainer) {
         showToast('Generowanie podglądu 110mm...', 'info', 1000);
 
         try {
-            // Generuj treść HTML
+            // --- 1. PRZYGOTOWANIE DANYCH DO E-MAILA ---
+            const cardIdForEmail = typeof lastSavedDocId !== 'undefined' ? lastSavedDocId : '';
+            
+            // Pobierz email klienta z cache
+            const clientName = document.getElementById('klientSelect').value;
+            let clientEmail = '';
+            if (typeof cachedClients !== 'undefined' && cachedClients) {
+                const c = cachedClients.find(x => x.nazwa === clientName);
+                if (c) clientEmail = c.email || '';
+            }
+
+            // --- 2. GENEROWANIE TREŚCI ---
             const receiptContentHTML = generate110mmReceiptHTML();
             
             // Otwórz nowe okno
@@ -6004,7 +6015,7 @@ if (printFormat110 && receiptPrintContainer) {
                 return;
             }
 
-            // Wpisz strukturę HTML (Stylizowaną tak jak Raporty)
+            // --- 3. WPISANIE HTML (Z OBSŁUGĄ E-MAILA) ---
             printWindow.document.write(`
                 <!DOCTYPE html>
                 <html lang="pl">
@@ -6017,14 +6028,14 @@ if (printFormat110 && receiptPrintContainer) {
                             font-family: 'Nunito', sans-serif; /* Tło ma zwykłą czcionkę */
                             margin: 0; 
                             padding: 0; 
-                            background-color: #525659; /* Ciemnoszare tło jak w profesjonalnych podglądach PDF */
+                            background-color: #525659; /* Ciemnoszare tło */
                             display: flex;
                             flex-direction: column;
                             align-items: center;
                             min-height: 100vh;
                         }
 
-                        /* --- Pasek narzędzi (Drukuj / Zamknij) --- */
+                        /* --- Pasek narzędzi --- */
                         .print-controls {
                             width: 100%;
                             padding: 12px; 
@@ -6035,11 +6046,13 @@ if (printFormat110 && receiptPrintContainer) {
                             top: 0; 
                             z-index: 1000;
                             box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+                            display: flex;
+                            justify-content: center;
+                            gap: 10px;
                         }
                         .print-controls button {
-                            padding: 8px 20px; 
-                            font-size: 16px; 
-                            margin: 0 10px; 
+                            padding: 8px 15px; 
+                            font-size: 14px; 
                             cursor: pointer; 
                             border-radius: 6px; 
                             border: 1px solid #777;
@@ -6053,6 +6066,14 @@ if (printFormat110 && receiptPrintContainer) {
                             border-color: #388E3C;
                         }
                         .print-controls .print-btn:hover { background-color: #43A047; }
+
+                        /* Styl przycisku email (Niebieski) */
+                        .print-controls .email-btn {
+                            background-color: #34495e;
+                            color: white;
+                            border-color: #2c3e50;
+                        }
+                        .print-controls .email-btn:hover { background-color: #2c3e50; }
 
                         .print-controls .close-btn { 
                             background-color: #f44336; 
@@ -6072,11 +6093,11 @@ if (printFormat110 && receiptPrintContainer) {
                             width: 105mm; /* Szerokość 110mm minus marginesy */
                             min-height: 150mm;
                             
-                            margin: 30px auto; /* Odstęp od paska i dołu */
+                            margin: 30px auto; 
                             padding: 5mm 35mm 5mm 5mm; /* Prawy margines 35mm (1/3 kartki) */
                             
                             box-sizing: border-box;
-                            box-shadow: 0 5px 25px rgba(0,0,0,0.5); /* Wyraźny cień */
+                            box-shadow: 0 5px 25px rgba(0,0,0,0.5); 
                         }
 
                         /* Style wewnętrzne paragonu */
@@ -6112,97 +6133,52 @@ if (printFormat110 && receiptPrintContainer) {
                                 orientation: portrait;
                             }
                         }
-                        /* --- STYLE SPOŁECZNOŚCI --- */
-
-/* Dymki czatu */
-.chat-msg {
-    max-width: 75%;
-    padding: 10px 15px;
-    border-radius: 18px;
-    font-size: 15px;
-    line-height: 1.4;
-    position: relative;
-    word-wrap: break-word;
-}
-.chat-msg-me {
-    align-self: flex-end;
-    background-color: #0084ff; /* Niebieski (Ja) */
-    color: white;
-    border-bottom-right-radius: 4px;
-}
-.chat-msg-other {
-    align-self: flex-start;
-    background-color: #e4e6eb; /* Szary (Inni) */
-    color: #050505;
-    border-bottom-left-radius: 4px;
-}
-.chat-author {
-    font-size: 11px;
-    color: #666;
-    margin-bottom: 2px;
-    margin-left: 5px;
-}
-.chat-time {
-    font-size: 10px;
-    opacity: 0.7;
-    text-align: right;
-    margin-top: 4px;
-}
-
-/* Kafelki Bazy Wiedzy */
-.knowledge-card {
-    background: #fff;
-    border: 1px solid #ddd;
-    border-radius: 8px;
-    padding: 15px;
-    margin-bottom: 15px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-}
-.knowledge-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    border-bottom: 1px solid #eee;
-    padding-bottom: 8px;
-    margin-bottom: 8px;
-}
-.knowledge-title { font-size: 18px; font-weight: bold; color: #2c3e50; }
-.knowledge-author { font-size: 12px; color: #777; }
-.knowledge-products { font-size: 13px; color: #444; margin-bottom: 10px; }
-.knowledge-likes { font-weight: bold; color: #e67e22; }
-                    /* Kolor fioletowy dla dashboardu */
-.dash-card.purple { border-bottom-color: #9b59b6; }
-
-/* Przycisk usuwania wiadomości (mały krzyżyk) */
-.btn-delete-msg {
-    background: none;
-    border: none;
-    color: #999;
-    font-size: 12px;
-    cursor: pointer;
-    margin-left: 5px;
-    padding: 0 4px;
-}
-.btn-delete-msg:hover {
-    color: #c0392b;
-    font-weight: bold;
-}
-/* Ukrycie przycisku "Dodaj nowego" w oknie wyszukiwania produktu */
-#productSearchAddNewBtn {
-    display: none !important;
-}
                     </style>
+                    <script>
+                        function sendEmail() {
+                            const cardId = '${cardIdForEmail}';
+                            let email = '${clientEmail}';
+                            
+                            if (!cardId) {
+                                alert('Błąd: Karta nie została jeszcze zapisana w systemie. Wróć i kliknij "Zapisz w Archiwum".');
+                                return;
+                            }
+                            
+                            // Weryfikacja adresu e-mail
+                            const confirmedEmail = prompt("Adres e-mail odbiorcy:", email);
+                            if (confirmedEmail === null) return; // Anulowano
+                            
+                            // Budowanie linku
+                            let baseUrl = window.location.href; // Fallback
+                            try {
+                                // Próbujemy pobrać URL z okna rodzica (głównej aplikacji)
+                                if (window.opener) {
+                                    baseUrl = window.opener.location.origin + window.opener.location.pathname;
+                                }
+                            } catch(e) {}
+
+                            const link = baseUrl + '?shareId=' + cardId;
+                            
+                            // Przygotowanie treści
+                            const subject = encodeURIComponent("Karta leczenia z ostatniego leczenia weterynaryjnego");
+                            const bodyText = "Dzień dobry,\\n\\nUdostępniam link do karty leczenia z ostatniego leczenia weterynaryjnego:\\n" + link + "\\n\\nPozdrawiam,\\nZespół Weterynaryjny";
+                            const body = encodeURIComponent(bodyText);
+                            
+                            // Otwarcie klienta poczty
+                            window.location.href = 'mailto:' + confirmedEmail + '?subject=' + subject + '&body=' + body;
+                        }
+                    </script>
                 </head>
                 <body>
                     <div class="print-controls">
-                        <button class="print-btn" onclick="window.print();">🖨️ Drukuj</button>
-                        <button class="close-btn" onclick="window.close();">Zamknij okno</button>
+                        <button class="print-btn" onclick="window.print()">🖨️ Drukuj</button>
+                        <button class="email-btn" onclick="sendEmail()">📧 Wyślij Link</button>
+                        <button class="close-btn" onclick="window.close()">Zamknij okno</button>
                     </div>
                     
                     <div class="receipt-page">
                         ${receiptContentHTML}
                     </div>
- 
                 </body>
                 </html>
             `);
@@ -19024,15 +19000,28 @@ function createSmartDosageCell(cell, row) {
  * - Ignoruje ikonę kalendarza przy pobieraniu danych z tabeli.
  * - Używa powiększonego szablonu.
  */
+/**
+ * ✅ POPRAWIONA FUNKCJA (Generator): Druk bieżącej karty + Guzik E-mail.
+ */
 function openCurrentA4PrintWindow() {
-    console.log("Generowanie podglądu A4 (Generator - Unified Fix)...");
+    console.log("Generowanie podglądu A4 z opcją E-mail...");
 
-    // 1. Pobieranie danych
+    // 1. Sprawdź czy karta zapisana (do linku)
+    const cardIdForEmail = typeof lastSavedDocId !== 'undefined' ? lastSavedDocId : '';
+    // Pobierz email klienta z cache
+    const clientName = document.getElementById('klientSelect').value;
+    let clientEmail = '';
+    if (typeof cachedClients !== 'undefined' && cachedClients) {
+        const c = cachedClients.find(x => x.nazwa === clientName);
+        if (c) clientEmail = c.email || '';
+    }
+
+    // 2. Pobieranie danych
     const header = {
         nazwaLecznicy: document.getElementById('nazwaLecznicy').textContent,
         dataWykonania: document.getElementById('dataWykonania').value,
         nrStada: document.getElementById('nrStada').textContent,
-        klient: document.getElementById('klientSelect').value,
+        klient: clientName,
         adresKlienta: document.getElementById('adresKlienta').textContent,
         dataZgloszenia: document.getElementById('dataZgloszenia').value,
         nrDokumentu: document.getElementById('nrDokumentu').value,
@@ -19072,27 +19061,23 @@ function openCurrentA4PrintWindow() {
         };
 
         const lp = tr.cells[0].textContent.replace('➡️', '').trim();
-        // Pobieramy wartość z inputa, jeśli tam jest
-const opisInput = tr.cells[1].querySelector('input');
-const opis = opisInput ? opisInput.value : tr.cells[1].textContent;
+        const opisInput = tr.cells[1].querySelector('input');
+        const opis = opisInput ? opisInput.value : tr.cells[1].textContent;
         const liczba = getVal(2, true);
         const rozpoznanie = getVal(3, true);
         const lek = getVal(4, true);
         const seria = tr.cells[5].textContent;
         const ilosc = getIlosc();
         
-        // --- FIX IKONY KALENDARZA W GENERATORZE ---
         let karencja = '';
         const karInput = tr.cells[7].querySelector('input, textarea');
         if (karInput) {
-            // Jeśli jest input (smart cell), bierzemy jego wartość (tam nie ma ikony, to czysty tekst)
             karencja = karInput.value;
         } else {
-            // Jeśli to zwykła komórka, bierzemy tekst, ale klonujemy, żeby usunąć ikonę
             const clone = tr.cells[7].cloneNode(true);
-            const icon = clone.querySelector('.cal-icon'); // Znajdź ikonę po klasie
-            if (icon) icon.remove(); // Usuń ją z klona
-            karencja = clone.textContent.trim(); // Pobierz czysty tekst
+            const icon = clone.querySelector('.cal-icon');
+            if (icon) icon.remove();
+            karencja = clone.textContent.trim();
         }
 
         rowsHTML += `
@@ -19112,7 +19097,41 @@ const opis = opisInput ? opisInput.value : tr.cells[1].textContent;
     const printWindow = window.open('', '_blank', 'width=1150,height=800,scrollbars=yes,resizable=yes');
     if (!printWindow) { alert('Zablokowano okno.'); return; }
 
-    printWindow.document.write(getUnifiedPrintHTML(header, rowsHTML));
+    // Generujemy HTML z wstrzykniętą logiką e-maila
+    const rawHTML = getUnifiedPrintHTML(header, rowsHTML);
+    
+    // Wstrzykujemy przycisk E-mail do paska narzędzi wewnątrz nowego okna
+    // Szukamy <div class="print-controls"> i dodajemy przycisk
+    const emailBtnHTML = `
+        <button class="btn btn-email" onclick="sendEmail()" style="background-color: #34495e; color: white; border-color: #2c3e50;">📧 Wyślij Link</button>
+        <script>
+            function sendEmail() {
+                const cardId = '${cardIdForEmail}';
+                let email = '${clientEmail}';
+                
+                if (!cardId) {
+                    alert('Błąd: Karta nie została jeszcze zapisana w systemie. Wróć i kliknij "Zapisz w Archiwum".');
+                    return;
+                }
+                
+                const confirmedEmail = prompt("Adres e-mail odbiorcy:", email);
+                if (confirmedEmail === null) return;
+                
+                const baseUrl = window.opener ? window.opener.location.origin + window.opener.location.pathname : window.location.origin + window.location.pathname;
+                const link = baseUrl + '?shareId=' + cardId;
+                
+                const subject = encodeURIComponent("Karta leczenia z ostatniego leczenia weterynaryjnego");
+                const body = encodeURIComponent("Dzień dobry,\\n\\nUdostępniam link do karty leczenia z ostatniego leczenia weterynaryjnego:\\n" + link + "\\n\\nPozdrawiam,\\nZespół Weterynaryjny");
+                
+                window.location.href = 'mailto:' + confirmedEmail + '?subject=' + subject + '&body=' + body;
+            }
+        </script>
+    `;
+
+    // Wstawiamy przycisk przed przyciskiem Zamknij
+    const finalHTML = rawHTML.replace('<button class="btn btn-close"', emailBtnHTML + '<button class="btn btn-close"');
+
+    printWindow.document.write(finalHTML);
     printWindow.document.close();
     printWindow.focus();
 }
