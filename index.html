@@ -3951,7 +3951,10 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
             <datalist id="reportClientDatalist">
                 </datalist>
         </div>
-        
+        <div class="form-row" id="reportProductFilterContainer" style="display: none;">
+    <label for="reportProductInput">6. Filtruj produkt (opcjonalnie):</label>
+    <input type="text" id="reportProductInput" placeholder="Kliknij, aby wybrać produkt..." readonly style="cursor: pointer; background: #fff;">
+</div>
         <div class="form-row" style="grid-column: 1 / -1; display: flex; gap: 10px; align-items: flex-end; margin-top: 10px;">
             <button id="generateReportBtn" class="btn primary" style="font-size: 16px; padding: 10px 15px;">Generuj Raport</button>
             <button id="printReportBtn" class="btn" style="font-size: 16px; padding: 10px 15px; display: none;">🖨️ Drukuj Raport</button>
@@ -12537,9 +12540,30 @@ function onShowRaporty() {
 /**
  * Wczytuje użytkowników (lekarzy) do listy <select> w raportach.
  */
+/**
+ * Wczytuje użytkowników (lekarzy) do listy <select> w raportach.
+ * ✅ POPRAWKA: Pracownik widzi tylko siebie i nie może tego zmienić.
+ */
 async function loadReportUsers() {
     if (!reportUserSelect || !currentUserProfile) return;
 
+    // 1. Logika dla PRACOWNIKA (Restrykcyjna)
+    if (currentUserProfile.Rola === 'pracownik') {
+        reportUserSelect.innerHTML = '';
+        // Dodaj tylko jedną opcję - zalogowanego użytkownika
+        const myName = `${currentUserProfile.Imie} ${currentUserProfile.Nazwisko}`;
+        reportUserSelect.add(new Option(myName, currentUserProfile.uid));
+        
+        // Zablokuj pole
+        reportUserSelect.value = currentUserProfile.uid;
+        reportUserSelect.disabled = true;
+        reportUserSelect.style.backgroundColor = "#eee";
+        
+        reportUsersLoaded = true;
+        return; // Koniec funkcji dla pracownika
+    }
+
+    // 2. Logika dla WŁAŚCICIELA i ADMINA (Standardowa)
     let query;
     if (currentUserProfile.Rola === 'administrator') {
         query = db.collection("konfiguracja").orderBy("Nazwisko");
@@ -12552,21 +12576,27 @@ async function loadReportUsers() {
     try {
         const snapshot = await query.get();
         reportUserSelect.innerHTML = ''; // Wyczyść
-        reportUserSelect.add(new Option("Wszyscy Pracownicy", "ALL")); // Opcja "Wszyscy"
+        reportUserSelect.disabled = false; // Odblokuj (jeśli był zablokowany)
+        reportUserSelect.style.backgroundColor = "#fff";
+
+        reportUserSelect.add(new Option("Wszyscy Pracownicy", "ALL")); 
         
         snapshot.docs.forEach(doc => {
             const user = doc.data();
+            // Właściciel nie powinien widzieć Administratora na liście do raportów (chyba że chce)
+            if (currentUserProfile.Rola === 'właściciel' && user.Rola === 'administrator') {
+                return; 
+            }
             const optionText = `${user.Imie} ${user.Nazwisko}`;
-            reportUserSelect.add(new Option(optionText, user.uid)); // Wartością jest UID
+            reportUserSelect.add(new Option(optionText, user.uid));
         });
         
-        // Ustaw domyślnie na zalogowanego użytkownika
+        // Ustaw domyślnie na zalogowanego
         if (currentUserProfile.uid) {
             reportUserSelect.value = currentUserProfile.uid;
         }
         
         reportUsersLoaded = true;
-        console.log("Wczytano użytkowników do raportów.");
     } catch (error) {
         console.error("Błąd wczytywania użytkowników do raportów:", error);
         reportUserSelect.innerHTML = '<option value="">Błąd ładowania</option>';
@@ -12821,10 +12851,17 @@ function generateWizytyReport(allReceipts, filters) {
  * ✅ NOWA FUNKCJA: Generuje Raport Zużycia na podstawie KART LECZENIA.
  * Parsuje HTML z kolumny ilości, aby wydobyć liczbę.
  */
+/**
+ * ✅ ZAKTUALIZOWANA FUNKCJA: Generuje Raport Zużycia z filtrowaniem po PRODUKCIE.
+ */
 function generateZuzyciaReportFromCards(allCards, filters) {
     console.log("Generowanie raportu zużycia z KART LECZENIA...");
 
-    // 1. Filtr Klienta (jeśli wpisano)
+    // 1. Pobierz wartość filtra produktu (NOWOŚĆ)
+    const productFilterInput = document.getElementById('reportProductInput');
+    const targetProduct = productFilterInput ? productFilterInput.value.trim().toLowerCase() : "";
+
+    // 2. Filtr Klienta (jeśli wpisano)
     let filteredCards = [...allCards];
     if (filters.klient) {
         // Sprawdzamy pole klient_nazwa w karcie
@@ -12835,15 +12872,20 @@ function generateZuzyciaReportFromCards(allCards, filters) {
     // Mapa: Nazwa Produktu -> { totalQty, uses: [] }
     const productMap = new Map();
 
-    // 2. Iteracja po kartach
+    // 3. Iteracja po kartach
     for (const card of filteredCards) {
         // Iteracja po wierszach tabeli w karcie
         // (W archiwum wiersze są w tablicy `table`)
         if (card.table && Array.isArray(card.table)) {
             for (const row of card.table) {
                 // Szukamy nazwy leku (row.lek)
-                const productName = (row.lek || '').trim();
-                if (!productName) continue;
+                const rowProductName = (row.lek || '').trim();
+                if (!rowProductName) continue;
+
+                // ✅ 4. FILTRACJA PO PRODUKCIE (Jeśli filtr jest ustawiony)
+                if (targetProduct !== "" && !rowProductName.toLowerCase().includes(targetProduct)) {
+                    continue; // Pomiń ten produkt, bo nie pasuje do filtra
+                }
 
                 // --- PARSOWANIE ILOŚCI ---
                 // W bazie iloscDawka to np: `<input class="..." value="50"> ml`
@@ -12864,10 +12906,10 @@ function generateZuzyciaReportFromCards(allCards, filters) {
                     // Format: "12/2025/AW (5)"
                     const usageEntry = `${docNr} (<strong>${qty}</strong>)`;
 
-                    if (!productMap.has(productName)) {
-                        productMap.set(productName, { totalQty: 0, uses: [] });
+                    if (!productMap.has(rowProductName)) {
+                        productMap.set(rowProductName, { totalQty: 0, uses: [] });
                     }
-                    const entry = productMap.get(productName);
+                    const entry = productMap.get(rowProductName);
                     entry.totalQty += qty;
                     entry.uses.push(usageEntry);
                 }
@@ -12875,7 +12917,7 @@ function generateZuzyciaReportFromCards(allCards, filters) {
         }
     }
 
-    // --- 3. Budowanie HTML tabeli ---
+    // --- 5. Budowanie HTML tabeli ---
     let tableHtml = '';
     const sortedProducts = Array.from(productMap.keys()).sort((a, b) => a.localeCompare(b, 'pl'));
 
@@ -12894,23 +12936,25 @@ function generateZuzyciaReportFromCards(allCards, filters) {
         `;
     }
 
-    // --- 4. Aktualizacja widoku ---
-    reportZuzyciaTableBody.innerHTML = tableHtml || '<tr><td colspan="3" style="text-align: center; padding: 20px;">Brak zużytych produktów w kartach dla wybranych kryteriów.</td></tr>';
+    // --- 6. Aktualizacja widoku ---
+    reportZuzyciaTableBody.innerHTML = tableHtml || '<tr><td colspan="3" style="text-align: center; padding: 20px;">Brak danych dla wybranych filtrów.</td></tr>';
     
     // Pokaż odpowiednie kontenery
     reportWizytyTableContainer.style.display = 'none';
     reportZuzyciaTableContainer.style.display = 'block';
-    reportFuelSection.style.display = 'none'; 
-    reportNetSumContainer.style.display = 'none';
+    if(reportFuelSection) reportFuelSection.style.display = 'none'; 
+    if(reportNetSumContainer) reportNetSumContainer.style.display = 'none';
 
-    // Aktualizuj nagłówki
-    reportMainTitle.textContent = "Raport Zużycia (z Kart Leczenia)";
+    // Aktualizuj nagłówki (Dynamiczny tytuł)
+    const prodFilterVal = document.getElementById('reportProductInput')?.value || '';
+    reportMainTitle.textContent = targetProduct ? `Raport Zużycia: "${prodFilterVal}"` : "Raport Zużycia (Wszystkie Produkty)";
+    
     reportDateDisplay.textContent = `Okres: ${filters.dateStart} do ${filters.dateEnd}`;
     reportUserDisplay.textContent = `Lekarz: ${filters.userName}`;
-    reportSumTitle.textContent = `Liczba unikalnych leków:`;
+    reportSumTitle.textContent = `Znaleziono pozycji:`;
     reportCalculatedSum.textContent = `${sortedProducts.length}`;
-    reportNetSum.textContent = '';
-    reportFuelCost.value = 0;
+    if(reportNetSum) reportNetSum.textContent = '';
+    if(reportFuelCost) reportFuelCost.value = 0;
 }
 
 
@@ -12964,33 +13008,48 @@ if (printReportBtn) {
     });
 }
 
-// Listener dla zmiany typu raportu (aby pokazać/ukryć koszty paliwa)
+// Listener dla zmiany typu raportu (aby pokazać/ukryć pola)
 if (reportTypeSelect) {
     reportTypeSelect.addEventListener('change', () => {
+        const type = reportTypeSelect.value;
+        const fuelSection = document.getElementById('reportFuelSection');
+        const netSumContainer = document.getElementById('reportNetSumContainer');
+        const productFilterContainer = document.getElementById('reportProductFilterContainer'); // ✅ Nowy kontener
+
+        // 1. Obsługa pola produktu (Pokaż tylko dla zużycia)
+        if (productFilterContainer) {
+            if (type === 'zuzycia') {
+                productFilterContainer.style.display = 'flex'; // Pokaż dla zużycia
+            } else {
+                productFilterContainer.style.display = 'none'; // Ukryj dla innych
+                // Opcjonalnie wyczyść filtr przy zmianie typu
+                const prodInput = document.getElementById('reportProductInput');
+                if(prodInput) prodInput.value = '';
+            }
+        }
+
+        // 2. Obsługa pola kosztów (tylko dla widoku wyników, jeśli jest już widoczny)
         if (reportResultArea.style.display === 'block') {
-            // Jeśli raport jest już wygenerowany, ukryj/pokaż pole paliwa
-            if (reportTypeSelect.value === 'gotowka') {
-                reportFuelSection.style.display = 'flex';
-                reportNetSumContainer.style.display = 'inline';
-                // Zaktualizuj tytuł sumy
-                reportSumTitle.textContent = 'Suma przyjętej gotówki:';
-            } else if (reportTypeSelect.value === 'ogolny') {
-                reportFuelSection.style.display = 'none';
-                reportNetSumContainer.style.display = 'none';
-                reportSumTitle.textContent = 'Suma wszystkich wizyt:';
-            } else if (reportTypeSelect.value === 'dluznicy') {
-                reportFuelSection.style.display = 'none';
-                reportNetSumContainer.style.display = 'none';
-                reportSumTitle.textContent = 'Suma zadłużenia:';
-            } else if (reportTypeSelect.value === 'zuzycia') {
-                reportFuelSection.style.display = 'none';
-                reportNetSumContainer.style.display = 'none';
-                reportSumTitle.textContent = 'Łączna liczba unikalnych produktów:';
+             if (type === 'gotowka') {
+                if(fuelSection) fuelSection.style.display = 'flex';
+                if(netSumContainer) netSumContainer.style.display = 'inline';
+                if(reportSumTitle) reportSumTitle.textContent = 'Suma przyjętej gotówki:';
+            } else if (type === 'ogolny') {
+                if(fuelSection) fuelSection.style.display = 'none';
+                if(netSumContainer) netSumContainer.style.display = 'none';
+                if(reportSumTitle) reportSumTitle.textContent = 'Suma wszystkich wizyt:';
+            } else if (type === 'dluznicy') {
+                if(fuelSection) fuelSection.style.display = 'none';
+                if(netSumContainer) netSumContainer.style.display = 'none';
+                if(reportSumTitle) reportSumTitle.textContent = 'Suma zadłużenia:';
+            } else if (type === 'zuzycia') {
+                if(fuelSection) fuelSection.style.display = 'none';
+                if(netSumContainer) netSumContainer.style.display = 'none';
+                if(reportSumTitle) reportSumTitle.textContent = 'Łączna liczba unikalnych produktów:';
             }
         }
     });
 }
-
 
 /* ✅ KONIEC: Logika dla sekcji Raportów                   */
 /* ⬆️ ======================================================= ⬆️ */
@@ -20904,6 +20963,88 @@ function filterProductsByClinicId(clinicId) {
 // --- WAŻNE: Aktualizacja funkcji renderowania produktów ---
 // Musimy dodać wywołanie initAdminFilters() w odpowiednim momencie.
 // Najlepiej dodać to do funkcji fetchUserProfile, gdy wykryjemy admina.
+/* ======================================================== */
+/* ✅ MODUŁ: Filtr Produktu w Raportach (Search Modal)      */
+/* ======================================================== */
+
+// Wykorzystujemy istniejący modal 'topUpProductSearchModal' lub tworzymy logikę dynamiczną.
+// Aby nie dublować HTML, użyjemy istniejącego modala "schemaProductSearchModal" 
+// (jest czysty i pasuje idealnie), lub napiszemy szybką obsługę dla pola raportu.
+
+const reportProductInput = document.getElementById('reportProductInput');
+// Używamy modala z "Bazy Schematów" (schemaProductSearchModal), bo jest prosty i dostępny
+const sharedSearchModal = document.getElementById('schemaProductSearchModal'); 
+const sharedSearchInput = document.getElementById('schemaProductSearchInput');
+const sharedSearchList = document.getElementById('schemaProductSearchList');
+const sharedSearchCloseBtn = document.getElementById('schemaProductSearchCloseBtn');
+
+// Listener otwierania
+if (reportProductInput) {
+    reportProductInput.addEventListener('click', (e) => {
+        e.preventDefault();
+        // Otwórz modal
+        if (sharedSearchModal) {
+            sharedSearchModal.style.display = 'flex';
+            if (sharedSearchInput) {
+                sharedSearchInput.value = '';
+                sharedSearchInput.focus();
+                // Podepnij specjalną funkcję renderującą dla Raportów
+                sharedSearchInput.oninput = () => renderReportProductList(sharedSearchInput.value);
+                renderReportProductList(''); // Pokaż wszystkie na start
+            }
+        }
+    });
+    
+    // Dodaj "krzyżyk" do czyszczenia pola, jeśli coś wybrano
+    reportProductInput.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        if (confirm("Wyczyścić filtr produktu?")) {
+            reportProductInput.value = "";
+        }
+    });
+}
+
+// Funkcja renderująca listę w modalu (specjalnie dla raportu)
+function renderReportProductList(filterText) {
+    if (!sharedSearchList) return;
+    sharedSearchList.innerHTML = '';
+    filterText = filterText.toLowerCase().trim();
+
+    if (typeof nazwyLekow === 'undefined') return;
+
+    let count = 0;
+    nazwyLekow.forEach(name => {
+        if (filterText === '' || name.toLowerCase().includes(filterText)) {
+            const div = document.createElement('div');
+            div.className = 'product-search-item'; // Styl z CSS
+            div.style.padding = '10px';
+            div.style.borderBottom = '1px solid #eee';
+            div.style.cursor = 'pointer';
+            div.textContent = name;
+            
+            div.onclick = () => {
+                // Wybór produktu
+                reportProductInput.value = name;
+                sharedSearchModal.style.display = 'none';
+            };
+            
+            sharedSearchList.appendChild(div);
+            count++;
+        }
+    });
+    
+    if (count === 0) {
+        sharedSearchList.innerHTML = '<div style="padding:10px; color:#999;">Brak wyników.</div>';
+    }
+}
+
+// Zamknięcie modala (podpinamy się pod istniejący przycisk, ale musimy uważać na konflikty)
+// Najlepiej dodać listener "click" wewnątrz funkcji otwierającej lub tutaj globalnie, 
+// ale sharedSearchModal jest używany też w schematach.
+// Rozwiązanie: Modal po prostu się zamyka. Nie ma znaczenia kto go otworzył.
+if (sharedSearchCloseBtn) {
+    // Istniejący listener już tam jest (zdefiniowany w sekcji schematów), więc zamknie modal.
+}
 </script> 
 </body>
 </html>
