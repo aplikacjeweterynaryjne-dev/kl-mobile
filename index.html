@@ -9170,111 +9170,151 @@ row.style.display = isVisible ? '' : 'none';
       });
     }
 
-    // --- Przycisk: Zapisz Import (NAJWAŻNIEJSZE) ---
-    if (saveImportBtn) {
-      saveImportBtn.addEventListener('click', async () => {
-        if (!confirm('Czy na pewno chcesz zapisać wszystkie zmiany z tabeli do bazy danych Firestore? Ta operacja nadpisze dane.')) {
-          return;
-        }
+   // --- Przycisk: Zapisz Import Klientów (Obsługa UPDATE i CREATE) ---
+if (saveImportBtn) {
+    saveImportBtn.addEventListener('click', async () => {
+        if (!confirm('Czy na pewno chcesz zapisać zmiany w bazie klientów? Nowe pozycje zostaną dodane, a istniejące zaktualizowane.')) {
+            return;
+        }
 
-        saveImportBtn.disabled = true;
-        saveImportBtn.textContent = 'Zapisywanie...';
+        // Zabezpieczenie: Pobierz ID lecznicy użytkownika
+        const currentUserClinicId = currentUserProfile ? currentUserProfile['ID lecznicy'] : '';
 
-        try {
-          const batch = db.batch();
-          const rows = klientTableBody.querySelectorAll('tr');
-          let updateCounter = 0;
+        saveImportBtn.disabled = true;
+        saveImportBtn.textContent = 'Zapisywanie... ⏳';
 
-          rows.forEach(row => {
-            const docId = row.dataset.id;
-            if (docId) {
-              // Odczytaj dane z edytowalnych komórek
-              const updatedData = {
-                nazwa: row.cells[0] ? row.cells[0].textContent.trim() : '',
-                adres: row.cells[1] ? row.cells[1].textContent.trim() : '',
-                nrStada: row.cells[2] ? row.cells[2].textContent.trim() : '',
-              telefon: row.cells[3] ? row.cells[3].textContent.trim() : '',
-                email: row.cells[4] ? row.cells[4].textContent.trim() : '',
-                idLecznicy: row.cells[5] ? row.cells[5].textContent.trim() : ''
-              };
+        try {
+            const batch = db.batch();
+            const rows = klientTableBody.querySelectorAll('tr');
+            let updateCounter = 0;
+            let createCounter = 0;
 
-              // Dodaj operację 'update' do batcha
-              const docRef = db.collection("klienci").doc(docId);
-              batch.update(docRef, updatedData);
-              updateCounter++;
-            }
-          });
+            rows.forEach(row => {
+                // Pomiń wiersze techniczne (sprawdź czy mają komórki danych)
+                if (row.cells.length < 6) return;
 
-          // Wykonaj wszystkie operacje w batchu
-          await batch.commit();
+                // Odczytaj dane z komórek
+                const nazwa = row.cells[0].textContent.trim();
+                // Jeśli brak nazwy, pomiń wiersz
+                if (!nazwa) return;
 
-          alert(`Pomyślnie zaktualizowano ${updateCounter} klientów!`);
+                const adres = row.cells[1].textContent.trim();
+                const nrStada = row.cells[2].textContent.trim();
+                const telefon = row.cells[3].textContent.trim();
+                const email = row.cells[4].textContent.trim();
+                
+                // Pobierz ID lecznicy z tabeli LUB użyj ID zalogowanego użytkownika
+                let idLecznicy = row.cells[5].textContent.trim();
+                if (!idLecznicy) {
+                    idLecznicy = currentUserClinicId;
+                }
 
-        } catch (error) {
-          console.error("Błąd podczas zapisywania importu: ", error);
-          alert('Wystąpił krytyczny błąd podczas zapisu. Sprawdź konsolę.');
-        } finally {
-          // Przywróć UI
-          saveImportBtn.disabled = false;
-          saveImportBtn.textContent = '💾 Zapisz zmiany importu';
-          toggleImportMode(false); // Wyłącz tryb importu
-          loadClientsToTable(); // Odśwież tabelę z danymi z bazy
-          refreshClientDataLists(); // Odśwież datalisty w całej apce
-        }
-      });
-    }
-// --- Obsługa wklejania (paste) w trybie importu ---
-    if (klientTableBody) {
-      klientTableBody.addEventListener('paste', (event) => {
-        // Sprawdź, czy jesteśmy w trybie importu i czy wklejamy do komórki tabeli
-        const targetCell = event.target.closest('td[contenteditable="true"]');
-        if (!klientTable.classList.contains('import-mode') || !targetCell) {
-          return; // Jeśli nie, pozwól na domyślne wklejanie
-        }
+                const klientData = {
+                    nazwa: nazwa,
+                    adres: adres,
+                    nrStada: nrStada,
+                    telefon: telefon,
+                    email: email,
+                    idLecznicy: idLecznicy
+                };
 
-        event.preventDefault(); // Zatrzymaj domyślne wklejanie przeglądarki
+                const docId = row.dataset.id; // Czy wiersz ma ID z bazy?
 
-        // Pobierz dane ze schowka jako zwykły tekst
-        const clipboardData = event.clipboardData || window.clipboardData;
-        const pastedText = clipboardData.getData('text/plain');
+                if (docId) {
+                    // --- ISTNIEJĄCY KLIENT: UPDATE ---
+                    const docRef = db.collection("klienci").doc(docId);
+                    batch.update(docRef, klientData);
+                    updateCounter++;
+                } else {
+                    // --- NOWY KLIENT (z wklejenia): CREATE ---
+                    const newDocRef = db.collection("klienci").doc();
+                    batch.set(newDocRef, klientData);
+                    createCounter++;
+                }
+            });
 
-        // Podziel tekst na linie (uwzględniając różne rodzaje końca linii: \n, \r\n)
-       const lines = pastedText.split(/\r?\n/); // Podziel tekst na linie (zachowaj puste)
-if (lines.length > 0 && lines[lines.length - 1] === '') {
-          lines.pop();
-        }
+            // Wyślij wszystko do bazy
+            await batch.commit();
 
-        // Znajdź wiersz i indeks kolumny, do której wklejamy
-        const startRow = targetCell.closest('tr');
-        const cellIndex = targetCell.cellIndex;
-        const allRows = Array.from(klientTableBody.querySelectorAll('tr'));
-        const startRowIndex = allRows.indexOf(startRow);
+            alert(`Sukces!\nZaktualizowano: ${updateCounter}\nDodano nowych: ${createCounter}`);
 
-       // Wklej każdą linię do odpowiedniej komórki w dół (Z DODANYM LOGOWANIEM)
-        lines.forEach((lineContent, lineIndex) => {
-          const currentRowIndex = startRowIndex + lineIndex;
-          console.log(`Próba wklejenia linii ${lineIndex + 1}: "${lineContent}" do wiersza ${currentRowIndex + 1}, komórki ${cellIndex + 1}`); // Log 1
+        } catch (error) {
+            console.error("Błąd podczas zapisywania importu klientów: ", error);
+            alert('Wystąpił krytyczny błąd podczas zapisu. Sprawdź konsolę.');
+        } finally {
+            // Przywróć UI
+            saveImportBtn.disabled = false;
+            saveImportBtn.textContent = '💾 Zapisz zmiany importu';
+            
+            toggleImportMode(false); // Wyłącz tryb importu
+            
+            // Odśwież dane z bazy
+            cachedClients = null; 
+            loadAndCacheClients(); 
+            refreshClientDataLists(); 
+        }
+    });
+}
 
-          // Upewnij się, że nie wychodzimy poza tabelę
-          if (currentRowIndex < allRows.length) {
-            const targetRow = allRows[currentRowIndex];
-            const cellToUpdate = targetRow.cells[cellIndex];
+// --- ULEPSZONA Obsługa wklejania (paste) w trybie importu klientów ---
+if (klientTableBody) {
+    klientTableBody.addEventListener('paste', (event) => {
+        // Sprawdź, czy jesteśmy w trybie importu i czy wklejamy do komórki tabeli
+        const targetCell = event.target.closest('td[contenteditable="true"]');
+        if (!klientTable.classList.contains('import-mode') || !targetCell) {
+            return; 
+        }
 
-            if (cellToUpdate && cellToUpdate.isContentEditable) { // Używamy .isContentEditable dla pewności
-              console.log(`Znaleziono komórkę docelową w wierszu ${currentRowIndex + 1}. Wklejam...`); // Log 2
-              cellToUpdate.textContent = lineContent.trim(); // Wstaw zawartość linii
-            } else {
-              console.warn(`Pominięto wiersz ${currentRowIndex + 1}: Nie znaleziono edytowalnej komórki o indeksie ${cellIndex}.`); // Log 3 (ostrzeżenie)
-            }
-          } else {
-            console.warn(`Pominięto linię ${lineIndex + 1}: Wiersz ${currentRowIndex + 1} wykracza poza tabelę.`); // Log 4 (ostrzeżenie)
-          }
-        });
+        event.preventDefault(); // Zatrzymaj domyślne wklejanie przeglądarki
 
-        console.log(`Wklejono ${lines.length} linii do kolumny ${cellIndex + 1}.`);
-      });
-    }
-    // ✅ KONIEC: LOGIKA IMPORTU Z ARKUSZA
+        const clipboardData = event.clipboardData || window.clipboardData;
+        const pastedText = clipboardData.getData('text/plain');
+
+        // Podziel tekst na linie, usuń puste z końca
+        const lines = pastedText.split(/\r?\n/).filter((line, index, arr) => {
+            return index < arr.length - 1 || line.trim() !== '';
+        });
+
+        const startRow = targetCell.closest('tr');
+        const cellIndex = targetCell.cellIndex;
+        
+        // Pobierz wszystkie obecne wiersze
+        let allRows = Array.from(klientTableBody.querySelectorAll('tr'));
+        let startRowIndex = allRows.indexOf(startRow);
+        
+        // Zabezpieczenie na wypadek pustej tabeli
+        if (startRowIndex === -1) {
+             if (allRows.length === 0) {
+                 const newRow = createEmptyClientRow(); // Używa funkcji, którą dodaliśmy wcześniej
+                 klientTableBody.appendChild(newRow);
+                 allRows = [newRow];
+                 startRowIndex = 0;
+             }
+        }
+
+        // Pętla po wklejanych liniach
+        lines.forEach((lineContent, lineIndex) => {
+            const currentRowIndex = startRowIndex + lineIndex;
+            
+            // 🔥 AUTOMATYCZNE DODAWANIE WIERSZY DLA KLIENTÓW 🔥
+            // Jeśli brakuje wiersza, dodaj nowy
+            if (currentRowIndex >= allRows.length) {
+                const newRow = createEmptyClientRow();
+                klientTableBody.appendChild(newRow);
+                allRows.push(newRow); 
+            }
+
+            // Wypełnianie danych
+            const targetRow = allRows[currentRowIndex];
+            if (targetRow && targetRow.cells[cellIndex]) {
+                targetRow.cells[cellIndex].textContent = lineContent.trim();
+            }
+        });
+
+        console.log(`Zaimportowano ${lines.length} linii klientów (automatycznie dodano brakujące wiersze).`);
+    });
+}
+// ✅ KONIEC: LOGIKA IMPORTU Z ARKUSZA
 // --- Obsługa przycisków ładowania / odświeżania ---
 
 if (loadClientsBtn) {
@@ -10038,6 +10078,19 @@ if (saveProductImportBtn) {
         }
     });
 }
+    /**
+ * ✅ NOWA FUNKCJA: Tworzy pusty wiersz w tabeli klientów
+ */
+function createEmptyClientRow() {
+    const tr = document.createElement('tr');
+    // Wiersz bez ID (będzie traktowany jako nowy)
+    tr.innerHTML = `
+       <td contenteditable="true" style="cursor: text;"></td> <td contenteditable="true" style="cursor: text;"></td> <td contenteditable="true" style="cursor: text;"></td> <td contenteditable="true" style="cursor: text;"></td> <td contenteditable="true" style="cursor: text;"></td> <td contenteditable="true" style="cursor: text;"></td> <td class="col-akcje">
+           <span style="color: #999; font-size: 12px;">(Nowy)</span>
+       </td>
+    `;
+    return tr;
+}
 // ✅ 1. Funkcja pomocnicza: Tworzy pusty wiersz (Z NOWĄ KOLUMNĄ NR SERII)
 function createEmptyProductRow() {
     const tr = document.createElement('tr');
@@ -10050,13 +10103,13 @@ function createEmptyProductRow() {
     return tr;
 }
 
-// ✅ 2. Ulepszona obsługa wklejania (paste) z uwzględnieniem nowej kolumny
-if (produktTableBody) {
-    produktTableBody.addEventListener('paste', (event) => {
+// --- ULEPSZONA Obsługa wklejania (paste) w tabeli klientów ---
+if (klientTableBody) {
+    klientTableBody.addEventListener('paste', (event) => {
         const targetCell = event.target.closest('td[contenteditable="true"]');
         
         // Sprawdź czy jesteśmy w trybie importu
-        if (!produktTable.classList.contains('import-mode') || !targetCell) {
+        if (!klientTable.classList.contains('import-mode') || !targetCell) {
             return; 
         }
 
@@ -10074,14 +10127,14 @@ if (produktTableBody) {
         const cellIndex = targetCell.cellIndex;
         
         // Pobierz wszystkie obecne wiersze
-        let allRows = Array.from(produktTableBody.querySelectorAll('tr'));
+        let allRows = Array.from(klientTableBody.querySelectorAll('tr'));
         let startRowIndex = allRows.indexOf(startRow);
         
         // Zabezpieczenie na wypadek pustej tabeli
         if (startRowIndex === -1) {
              if (allRows.length === 0) {
-                 const newRow = createEmptyProductRow();
-                 produktTableBody.appendChild(newRow);
+                 const newRow = createEmptyClientRow();
+                 klientTableBody.appendChild(newRow);
                  allRows = [newRow];
                  startRowIndex = 0;
              }
@@ -10091,28 +10144,21 @@ if (produktTableBody) {
         lines.forEach((lineContent, lineIndex) => {
             const currentRowIndex = startRowIndex + lineIndex;
             
-            // Jeśli brakuje wierszy w tabeli, dodaj nowy!
+            // 🔥 AUTOMATYCZNE DODAWANIE WIERSZY DLA KLIENTÓW 🔥
             if (currentRowIndex >= allRows.length) {
-                const newRow = createEmptyProductRow();
-                produktTableBody.appendChild(newRow);
+                const newRow = createEmptyClientRow();
+                klientTableBody.appendChild(newRow);
                 allRows.push(newRow); 
             }
 
-            // Teraz mamy pewność, że wiersz istnieje
+            // Wypełnianie danych
             const targetRow = allRows[currentRowIndex];
-            
-            // Wstawiamy dane do komórki
             if (targetRow && targetRow.cells[cellIndex]) {
-                // Specjalna obsługa dla Ceny (teraz to index 3!)
-                if (cellIndex === 3) {
-                    targetRow.cells[cellIndex].textContent = lineContent.replace(',', '.').trim();
-                } else {
-                    targetRow.cells[cellIndex].textContent = lineContent.trim();
-                }
+                targetRow.cells[cellIndex].textContent = lineContent.trim();
             }
         });
 
-        console.log(`Zaimportowano ${lines.length} linii (z obsługą Nr Serii).`);
+        console.log(`Zaimportowano ${lines.length} linii klientów (automatycznie dodano brakujące wiersze).`);
     });
 }
 
