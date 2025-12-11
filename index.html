@@ -2745,6 +2745,7 @@ z-index: 1;
 .dash-value { font-size: 18px; color: #333; font-weight: 800; }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 </head>
 <style>
 .menu-btn {
@@ -4444,6 +4445,9 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
         <div style="display: flex; flex-direction: column; gap: 15px; margin-top: 20px;">
             <button id="printFormatA4" class="btn primary" style="font-size: 18px; padding: 12px;">Standardowy A4</button>
             <button id="printFormat110" class="btn" style="font-size: 18px; padding: 12px;">Drukarka paragonowa (110mm)</button>
+            <button id="printFormatShare" class="btn" style="font-size: 18px; padding: 12px; margin-top: 10px; background-color: #34495e; color: white; border-color: #2c3e50;">
+    📧 Udostępnij / Wyślij E-mail (PDF)
+</button>
         </div>
         <div class="form-actions" style="margin-top: 25px; justify-content: flex-end;">
             <button id="printFormatCancel" class="btn ghost small" style="font-size: 16px;">Anuluj</button>
@@ -21473,6 +21477,155 @@ if (btnUseNewAnimalDesc) {
     }
     
     // ⬆️⬆️⬆️ KONIEC WKLEJANIA ⬆️⬆️⬆️
+/* ======================================================== */
+/* ✅ NOWY MODUŁ: Udostępnianie PDF (E-mail) - Web Share API */
+/* ======================================================== */
+
+const printFormatShare = document.getElementById('printFormatShare');
+
+if (printFormatShare) {
+    printFormatShare.addEventListener('click', async () => {
+        // 1. Ukryj modal wyboru
+        const modal = document.getElementById('printFormatModal');
+        if (modal) modal.style.display = 'none';
+
+        // 2. Walidacja stanu magazynowego (dla pewności)
+        if (typeof isCardStockValid !== 'undefined' && !isCardStockValid) {
+            showToast("Napraw błędy w stanach magazynowych przed wysyłką.", "error");
+            return;
+        }
+
+        // 3. Sprawdź, czy przeglądarka obsługuje udostępnianie plików
+        if (!navigator.canShare || !navigator.share) {
+            alert("Twoja przeglądarka nie obsługuje funkcji udostępniania plików.\nUżyj opcji 'Drukuj -> Zapisz jako PDF' i wyślij plik ręcznie.");
+            return;
+        }
+
+        // 4. Pokaż komunikat (proces trwa kilka sekund)
+        showToast("Generowanie PDF i otwieranie poczty... ⏳", "info", 5000);
+
+        try {
+            // --- A. Pobierz dane do wydruku (korzystamy z istniejącej logiki) ---
+            const header = {
+                nazwaLecznicy: document.getElementById('nazwaLecznicy').textContent,
+                dataWykonania: document.getElementById('dataWykonania').value,
+                nrStada: document.getElementById('nrStada').textContent,
+                klient: document.getElementById('klientSelect').value,
+                adresKlienta: document.getElementById('adresKlienta').textContent,
+                dataZgloszenia: document.getElementById('dataZgloszenia').value,
+                nrDokumentu: document.getElementById('nrDokumentu').value,
+                podpisLekarzaImg: document.getElementById('doctor-signature').src,
+                podpisLekarzaLinia: document.getElementById('doctor-signature-name').textContent,
+                podpisPosiadaczaImg: document.getElementById('canvasPosiadacz').toDataURL()
+            };
+
+            // --- B. Zbuduj wiersze tabeli (czyszczenie inputów) ---
+            let rowsHTML = '';
+            const rows = document.querySelectorAll('#karta tbody tr');
+            
+            rows.forEach((tr) => {
+                if (tr.cells.length === 1) { // Separator
+                    rowsHTML += `<tr><td colspan="8" style="text-align: left; font-weight: bold; padding: 2px 4px; background-color: #f9f9f9; font-size: 10pt;">Potwierdzenie nabycia produktu leczniczego weterynaryjnego/paszy leczniczej</td></tr>`;
+                    return;
+                }
+
+                // Helper do wyciągania wartości (tekst lub input)
+                const getVal = (idx) => {
+                    const cell = tr.cells[idx];
+                    const input = cell.querySelector('input');
+                    return input ? input.value : cell.textContent;
+                };
+                
+                // Ilość (tekst + input)
+                const getIlosc = () => {
+                    const cell = tr.cells[6];
+                    const input = cell.querySelector('input');
+                    let text = '';
+                    cell.childNodes.forEach(node => { if (node.nodeType === Node.TEXT_NODE) text += node.textContent; });
+                    return (input ? input.value : '') + ' ' + text;
+                };
+
+                // Karencja (bez ikonki kalendarza)
+                let karencja = '';
+                const karInput = tr.cells[7].querySelector('input, textarea');
+                if (karInput) {
+                    karencja = karInput.value;
+                } else {
+                    const clone = tr.cells[7].cloneNode(true);
+                    const icon = clone.querySelector('.cal-icon');
+                    if (icon) icon.remove();
+                    karencja = clone.textContent.replace('📅', '').trim();
+                }
+
+                rowsHTML += `
+                    <tr>
+                        <td style="text-align: center;">${tr.cells[0].textContent.replace('➡️', '').trim()}</td>
+                        <td>${tr.cells[1].querySelector('input') ? tr.cells[1].querySelector('input').value : tr.cells[1].textContent}</td>
+                        <td style="text-align: center;">${getVal(2)}</td>
+                        <td style="text-align: center;">${getVal(3)}</td>
+                        <td>${getVal(4)}</td>
+                        <td style="text-align: center;">${tr.cells[5].textContent}</td>
+                        <td>${getIlosc()}</td>
+                        <td>${karencja}</td>
+                    </tr>
+                `;
+            });
+
+            // --- C. Stwórz HTML dla PDF ---
+            // Używamy Twojej funkcji getUnifiedPrintHTML, ale musimy usunąć z niej przyciski
+            let rawHTML = getUnifiedPrintHTML(header, rowsHTML);
+            
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = rawHTML;
+            
+            // Usuń przyciski sterujące z HTML-a
+            const controls = tempDiv.querySelector('.print-controls');
+            if (controls) controls.remove();
+            
+            // Pobierz właściwą "kartkę" do wydruku
+            const contentToPrint = tempDiv.querySelector('.page-sheet') || tempDiv;
+
+            // --- D. Konfiguracja PDF (html2pdf) ---
+            const opt = {
+                margin:       0, // Marginesy są już w CSS .page-sheet
+                filename:     `Karta_${header.nrDokumentu.replace(/\//g, '-')}.pdf`,
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { scale: 2, useCORS: true }, // scale: 2 = lepsza jakość
+                jsPDF:        { unit: 'mm', format: 'a4', orientation: 'landscape' }
+            };
+
+            // --- E. Generowanie i Udostępnianie ---
+            // 1. Stwórz Blob (plik w pamięci)
+            const pdfBlob = await html2pdf().set(opt).from(contentToPrint).output('blob');
+
+            // 2. Stwórz obiekt pliku
+            const file = new File([pdfBlob], opt.filename, { type: 'application/pdf' });
+
+            // 3. Sprawdź czy dane są poprawne do udostępnienia
+            const shareData = {
+                title: 'Karta Leczenia Zwierząt',
+                text: `Dzień dobry,\nPrzesyłam kartę leczenia nr ${header.nrDokumentu} dla klienta ${header.klient}.\n\nZ poważaniem,\n${header.podpisLekarzaLinia}`,
+                files: [file]
+            };
+
+            if (navigator.canShare(shareData)) {
+                await navigator.share(shareData);
+                // Sukces (lub użytkownik zamknął menu)
+                showToast("Menu udostępniania otwarte ✅", "success");
+            } else {
+                alert("Twój system nie pozwala na udostępnianie plików PDF w ten sposób.");
+            }
+
+        } catch (err) {
+            // Ignorujemy błąd przerwania przez użytkownika (AbortError)
+            if (err.name !== 'AbortError') {
+                console.error("Błąd generowania/wysyłki PDF:", err);
+                alert("Wystąpił błąd: " + err.message);
+            }
+        }
+    });
+}
+/* ======================================================== */
 </script> 
 </body>
 </html>
