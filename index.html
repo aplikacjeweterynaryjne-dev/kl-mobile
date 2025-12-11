@@ -21478,7 +21478,7 @@ if (btnUseNewAnimalDesc) {
     
     // ⬆️⬆️⬆️ KONIEC WKLEJANIA ⬆️⬆️⬆️
 /* ======================================================== */
-/* ✅ NOWY MODUŁ: Udostępnianie PDF (E-mail) - Web Share API */
+/* ✅ MODUŁ POPRAWIONY: Udostępnianie PDF (E-mail + Fix Pustych Stron) */
 /* ======================================================== */
 
 const printFormatShare = document.getElementById('printFormatShare');
@@ -21501,11 +21501,30 @@ if (printFormatShare) {
             return;
         }
 
-        // 4. Pokaż komunikat
-        showToast("Generowanie PDF i otwieranie poczty... ⏳", "info", 5000);
+        // --- A. LOGIKA E-MAILA (AUTO-COPY) ---
+        const clientName = document.getElementById('klientSelect').value;
+        let clientEmail = '';
+        
+        // Szukamy e-maila w cache klientów
+        if (typeof cachedClients !== 'undefined' && cachedClients) {
+            const clientObj = cachedClients.find(c => c.nazwa === clientName);
+            if (clientObj && clientObj.email) {
+                clientEmail = clientObj.email;
+            }
+        }
+
+        if (clientEmail) {
+            // Kopiuj do schowka
+            navigator.clipboard.writeText(clientEmail).then(() => {
+                showToast(`E-mail klienta (${clientEmail}) skopiowany do schowka! Wklej go w polu "Do".`, "success", 6000);
+            }).catch(err => console.error("Nie udało się skopiować e-maila", err));
+        } else {
+            showToast("Generowanie PDF... (Brak e-maila klienta w bazie)", "info", 4000);
+        }
+
 
         try {
-            // --- A. Pobierz dane do wydruku ---
+            // --- B. ZBIERANIE DANYCH ---
             const header = {
                 nazwaLecznicy: document.getElementById('nazwaLecznicy').textContent,
                 dataWykonania: document.getElementById('dataWykonania').value,
@@ -21519,16 +21538,17 @@ if (printFormatShare) {
                 podpisPosiadaczaImg: document.getElementById('canvasPosiadacz').toDataURL()
             };
 
-            // --- B. Zbuduj wiersze tabeli ---
             let rowsHTML = '';
             const rows = document.querySelectorAll('#karta tbody tr');
             
-            rows.forEach((tr) => {
+            rows.forEach((tr, index) => {
+                // Obsługa wiersza separatora (Wiersz 10)
                 if (tr.cells.length === 1) { 
                     rowsHTML += `<tr><td colspan="8" style="text-align: left; font-weight: bold; padding: 2px 4px; background-color: #f9f9f9; font-size: 10pt;">Potwierdzenie nabycia produktu leczniczego weterynaryjnego/paszy leczniczej</td></tr>`;
                     return;
                 }
 
+                // Helpery
                 const getVal = (idx) => {
                     const cell = tr.cells[idx];
                     const input = cell.querySelector('input');
@@ -21543,6 +21563,7 @@ if (printFormatShare) {
                     return (input ? input.value : '') + ' ' + text;
                 };
 
+                // Karencja (czyszczenie ikonki)
                 let karencja = '';
                 const karInput = tr.cells[7].querySelector('input, textarea');
                 if (karInput) {
@@ -21553,11 +21574,16 @@ if (printFormatShare) {
                     if (icon) icon.remove();
                     karencja = clone.textContent.replace('📅', '').trim();
                 }
+                
+                // Opis (Input vs Tekst)
+                const opisInput = tr.cells[1].querySelector('input');
+                const opis = opisInput ? opisInput.value : tr.cells[1].textContent;
+                const lp = (index < 9) ? (index + 1) + '.' : (index - 8) + '.';
 
                 rowsHTML += `
                     <tr>
-                        <td style="text-align: center;">${tr.cells[0].textContent.replace('➡️', '').trim()}</td>
-                        <td>${tr.cells[1].querySelector('input') ? tr.cells[1].querySelector('input').value : tr.cells[1].textContent}</td>
+                        <td style="text-align: center;">${lp}</td>
+                        <td>${opis}</td>
                         <td style="text-align: center;">${getVal(2)}</td>
                         <td style="text-align: center;">${getVal(3)}</td>
                         <td>${getVal(4)}</td>
@@ -21568,31 +21594,68 @@ if (printFormatShare) {
                 `;
             });
 
-            // --- C. Stwórz HTML ---
+            // --- C. GENEROWANIE HTML (FIX PUSTYCH STRON) ---
+            
+            // 1. Używamy Twojej funkcji szablonu
             let rawHTML = getUnifiedPrintHTML(header, rowsHTML);
-            const tempDiv = document.createElement('div');
-            tempDiv.innerHTML = rawHTML;
-            const controls = tempDiv.querySelector('.print-controls');
-            if (controls) controls.remove();
-            const contentToPrint = tempDiv.querySelector('.page-sheet') || tempDiv;
+            
+            // 2. Wyciągamy zawartość <body> z szablonu (usuwamy otoczkę <html>...</html>, bo wstawimy to do diva)
+            // Najprościej: tworzymy tymczasowy parser
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(rawHTML, 'text/html');
+            
+            // Pobieramy style i zawartość .page-sheet
+            const styles = doc.querySelector('style').innerHTML;
+            const content = doc.querySelector('.page-sheet').outerHTML; // Pobieramy całą kartkę
 
-            // --- D. Konfiguracja PDF ---
+            // 3. Tworzymy kontener tymczasowy, który jest WIDOCZNY dla silnika renderowania, ale poza ekranem
+            const container = document.createElement('div');
+            container.style.position = 'absolute';
+            container.style.left = '-9999px';
+            container.style.top = '0';
+            container.style.width = '1150px'; // Wymuszamy szerokość A4 (landscape) w pikselach dla pewności
+            
+            // Wstrzykujemy style i treść
+            container.innerHTML = `
+                <style>${styles}</style>
+                <style>
+                    /* Nadpisujemy style dla generatora PDF, aby wyglądało idealnie */
+                    .page-sheet { 
+                        margin: 0 !important; 
+                        box-shadow: none !important; 
+                        transform: none !important; 
+                        width: 100% !important;
+                    }
+                    body { background: white !important; }
+                </style>
+                ${content}
+            `;
+
+            // 4. Dołączamy do body (TO NAPRAWIA PUSTE STRONY)
+            document.body.appendChild(container);
+
+            // --- D. KONFIGURACJA PDF ---
             const opt = {
                 margin:       0, 
                 filename:     `Karta_${header.nrDokumentu.replace(/\//g, '-')}.pdf`,
                 image:        { type: 'jpeg', quality: 0.98 },
-                html2canvas:  { scale: 2, useCORS: true },
+                html2canvas:  { scale: 2, useCORS: true, scrollY: 0 }, // scrollY: 0 ważne!
                 jsPDF:        { unit: 'mm', format: 'a4', orientation: 'landscape' }
             };
 
-            // --- E. Generowanie i Udostępnianie ---
-            const pdfBlob = await html2pdf().set(opt).from(contentToPrint).output('blob');
+            // --- E. GENEROWANIE I UDOSTĘPNIANIE ---
+            
+            // Generujemy PDF z naszego tymczasowego kontenera
+            const pdfBlob = await html2pdf().set(opt).from(container).output('blob');
+
+            // Usuwamy kontener (sprzątanie)
+            document.body.removeChild(container);
+
             const file = new File([pdfBlob], opt.filename, { type: 'application/pdf' });
 
-            // ✅ TUTAJ JEST ZMIANA TREŚCI I TEMATU E-MAILA
             const shareData = {
-                title: 'Karta leczenia z ostatniego leczenia weterynaryjnego', // Temat
-                text: `Dzień dobry,\n\nPrzesyłam w załączniku kartę leczenia z ostatniego leczenia weterynaryjnego.\n\npozdrawiam\nZespół Weterynaryjny`, // Treść
+                title: 'Karta leczenia z ostatniego leczenia weterynaryjnego', 
+                text: `Dzień dobry,\n\nPrzesyłam w załączniku kartę leczenia z ostatniego leczenia weterynaryjnego.\n\npozdrawiam\nZespół Weterynaryjny`, 
                 files: [file]
             };
 
@@ -21604,6 +21667,10 @@ if (printFormatShare) {
             }
 
         } catch (err) {
+            // Usuń kontener w razie błędu, żeby nie wisiał w pamięci
+            const existingContainer = document.querySelector('div[style*="-9999px"]');
+            if (existingContainer) document.body.removeChild(existingContainer);
+
             if (err.name !== 'AbortError') {
                 console.error("Błąd generowania/wysyłki PDF:", err);
                 alert("Wystąpił błąd: " + err.message);
@@ -21612,7 +21679,6 @@ if (printFormatShare) {
     });
 }
 /* ======================================================== */
-
 
 </script> 
 </body>
