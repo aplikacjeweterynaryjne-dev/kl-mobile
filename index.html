@@ -3527,6 +3527,10 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
 <button id="addNewClientBtn" class="btn primary" style="margin-bottom: 15px;">
 ＋ Dodaj nowego klienta
 </button>
+<button id="deleteAllClientsBtn" class="btn warn" style="float: right; background-color: #c0392b; border-color: #992d22;">
+    🗑️ Usuń CAŁĄ bazę klientów
+</button>
+<div style="clear: both; margin-bottom: 10px;"></div>
 <div id="importActions" style="margin-bottom: 15px; border-top: 1px solid #ccc; padding-top: 10px; display: none; gap: 8px; flex-wrap: wrap;">
     <button id="startImportBtn" class="btn small">📥 Importuj z arkusza</button>
     <button id="saveImportBtn" class="btn primary small" style="display: none;">💾 Zapisz zmiany importu</button>
@@ -3642,7 +3646,10 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
 <button id="addNewProductBtn" class="btn primary" style="margin-bottom: 15px;">
 ＋ Dodaj nowy produkt
 </button>
-
+<button id="deleteAllProductsBtn" class="btn warn" style="float: right; background-color: #c0392b; border-color: #992d22;">
+    🗑️ Usuń CAŁĄ bazę produktów
+</button>
+<div style="clear: both; margin-bottom: 10px;"></div>
 <div id="productImportActions" style="margin-bottom: 15px; border-top: 1px solid #ccc; padding-top: 10px; display: none; gap: 8px; flex-wrap: wrap;">
 <button id="startProductImportBtn" class="btn small">📥 Importuj z arkusza</button>
 <button id="saveProductImportBtn" class="btn primary small" style="display: none;">💾 Zapisz zmiany importu</button>
@@ -20418,6 +20425,170 @@ if (typeof selectRowInForm === 'function') {
         // I dodaj naszą aktualizację stanu z małym opóźnieniem (żeby dane zdążyły wejść)
         setTimeout(updateFormStockDisplay, 50);
     };
+}
+    /* ======================================================== */
+/* ✅ MODUŁ: Masowe usuwanie baz danych (Klienci i Produkty) */
+/* ======================================================== */
+
+// --- 1. Usuwanie całej bazy KLIENTÓW ---
+const deleteAllClientsBtn = document.getElementById('deleteAllClientsBtn');
+if (deleteAllClientsBtn) {
+    deleteAllClientsBtn.addEventListener('click', async () => {
+        if (!currentUserProfile) return;
+
+        // Zabezpieczenie: Tylko admin/właściciel
+        if (currentUserProfile.Rola !== 'administrator' && currentUserProfile.Rola !== 'właściciel') {
+            alert("Brak uprawnień. Tylko Administrator lub Właściciel może wyczyścić całą bazę.");
+            return;
+        }
+
+        if (!confirm("⚠️ CZY NA PEWNO CHCESZ USUNĄĆ WSZYSTKICH KLIENTÓW?\n\nTej operacji nie da się cofnąć! Baza klientów zostanie całkowicie wyczyszczona.")) {
+            return;
+        }
+
+        const confirmationText = "USUŃ WSZYSTKO";
+        const userText = prompt(`To operacja krytyczna.\nAby potwierdzić, wpisz wielkimi literami: "${confirmationText}"`);
+
+        if (userText !== confirmationText) {
+            alert("Anulowano. Niepoprawny kod potwierdzający.");
+            return;
+        }
+
+        deleteAllClientsBtn.disabled = true;
+        deleteAllClientsBtn.textContent = 'Usuwanie... ⏳';
+
+        try {
+            const idLecznicy = currentUserProfile['ID lecznicy'];
+            // Pobieramy wszystkich klientów TEJ lecznicy
+            const q = db.collection("klienci").where("idLecznicy", "==", idLecznicy);
+            const snapshot = await q.get();
+
+            if (snapshot.empty) {
+                alert("Baza klientów jest już pusta.");
+                deleteAllClientsBtn.disabled = false;
+                deleteAllClientsBtn.textContent = '🗑️ Usuń CAŁĄ bazę klientów';
+                return;
+            }
+
+            // Usuwanie partiami (Firestore limit 500)
+            const BATCH_SIZE = 400;
+            let batch = db.batch();
+            let counter = 0;
+            let totalDeleted = 0;
+
+            for (const doc of snapshot.docs) {
+                batch.delete(doc.ref);
+                counter++;
+                totalDeleted++;
+
+                if (counter >= BATCH_SIZE) {
+                    await batch.commit();
+                    batch = db.batch();
+                    counter = 0;
+                    console.log(`Usunięto partię klientów...`);
+                }
+            }
+
+            if (counter > 0) {
+                await batch.commit();
+            }
+
+            alert(`Sukces! Usunięto ${totalDeleted} klientów.`);
+            
+            // Odśwież widok
+            cachedClients = []; // Wyczyść cache
+            renderClientTable([]); // Wyczyść tabelę
+            refreshClientDataLists(); // Wyczyść datalisty
+
+        } catch (error) {
+            console.error("Błąd podczas usuwania klientów:", error);
+            alert("Wystąpił błąd podczas usuwania. Sprawdź konsolę.");
+        } finally {
+            deleteAllClientsBtn.disabled = false;
+            deleteAllClientsBtn.textContent = '🗑️ Usuń CAŁĄ bazę klientów';
+        }
+    });
+}
+
+
+// --- 2. Usuwanie całej bazy PRODUKTÓW ---
+const deleteAllProductsBtn = document.getElementById('deleteAllProductsBtn');
+if (deleteAllProductsBtn) {
+    deleteAllProductsBtn.addEventListener('click', async () => {
+        if (!currentUserProfile) return;
+
+        // Zabezpieczenie: Tylko admin/właściciel
+        if (currentUserProfile.Rola !== 'administrator' && currentUserProfile.Rola !== 'właściciel') {
+            alert("Brak uprawnień. Tylko Administrator lub Właściciel może wyczyścić całą bazę.");
+            return;
+        }
+
+        if (!confirm("⚠️ CZY NA PEWNO CHCESZ USUNĄĆ WSZYSTKIE PRODUKTY?\n\nTej operacji nie da się cofnąć! Baza leków zostanie całkowicie wyczyszczona.")) {
+            return;
+        }
+
+        const confirmationText = "USUŃ WSZYSTKO";
+        const userText = prompt(`To operacja krytyczna.\nAby potwierdzić, wpisz wielkimi literami: "${confirmationText}"`);
+
+        if (userText !== confirmationText) {
+            alert("Anulowano. Niepoprawny kod potwierdzający.");
+            return;
+        }
+
+        deleteAllProductsBtn.disabled = true;
+        deleteAllProductsBtn.textContent = 'Usuwanie... ⏳';
+
+        try {
+            const idLecznicy = currentUserProfile['ID lecznicy'];
+            // Pobieramy wszystkie leki TEJ lecznicy
+            const q = db.collection("leki").where("id_lecznicy", "==", idLecznicy);
+            const snapshot = await q.get();
+
+            if (snapshot.empty) {
+                alert("Baza produktów jest już pusta.");
+                deleteAllProductsBtn.disabled = false;
+                deleteAllProductsBtn.textContent = '🗑️ Usuń CAŁĄ bazę produktów';
+                return;
+            }
+
+            // Usuwanie partiami
+            const BATCH_SIZE = 400;
+            let batch = db.batch();
+            let counter = 0;
+            let totalDeleted = 0;
+
+            for (const doc of snapshot.docs) {
+                batch.delete(doc.ref);
+                counter++;
+                totalDeleted++;
+
+                if (counter >= BATCH_SIZE) {
+                    await batch.commit();
+                    batch = db.batch();
+                    counter = 0;
+                    console.log(`Usunięto partię produktów...`);
+                }
+            }
+
+            if (counter > 0) {
+                await batch.commit();
+            }
+
+            alert(`Sukces! Usunięto ${totalDeleted} produktów.`);
+            
+            // Odśwież widok
+            cachedProducts = []; // Wyczyść cache
+            renderProductTable([]); // Wyczyść tabelę
+            refreshProductDataLists(); // Wyczyść datalisty w kalkulatorze
+
+        } catch (error) {
+            console.error("Błąd podczas usuwania produktów:", error);
+            alert("Wystąpił błąd podczas usuwania. Sprawdź konsolę.");
+        } finally {
+            deleteAllProductsBtn.disabled = false;
+            deleteAllProductsBtn.textContent = '🗑️ Usuń CAŁĄ bazę produktów';
+        }
+    });
 }
 </script> 
 </body>
