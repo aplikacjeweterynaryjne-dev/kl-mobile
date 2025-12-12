@@ -5977,34 +5977,38 @@ if (printFormatA4) {
 
 // ⬇️ ⬇️ ⬇️ WKLEJ TEN NOWY BLOK W MIEJSCE STAREGO ⬇️ ⬇️ ⬇️
 
-// 4. Listener dla przycisku "110mm" (Wersja z ładnym podglądem)
+// 4. Listener dla przycisku "110mm" (Wersja zunifikowana z A4)
 if (printFormat110 && receiptPrintContainer) {
     printFormat110.addEventListener('click', () => {
         
-        // ✅ POCZĄTEK MODUŁU 7: Blokada druku
+        // Walidacja stanów
         if (typeof isCardStockValid !== 'undefined' && !isCardStockValid) {
-            showToast("Nie można drukować karty. Wykryto błędy w stanach magazynowych (czerwone pola).", "error", 4000);
+            showToast("Nie można drukować karty. Wykryto błędy w stanach magazynowych.", "error", 4000);
             printFormatModal.style.display = 'none';
             return;
         }
-        // ✅ KONIEC MODUŁU 7
 
-        printFormatModal.style.display = 'none'; // Ukryj modal wyboru
+        printFormatModal.style.display = 'none';
         showToast('Generowanie podglądu 110mm...', 'info', 1000);
 
+        // --- SZUKANIE MAILA DLA 110mm (Identycznie jak w A4) ---
+        let prefilledEmail = "";
         try {
-            // Generuj treść HTML
+            const currentClientName = document.getElementById('klientSelect').value;
+            if (typeof cachedClients !== 'undefined' && cachedClients) {
+                const clientObj = cachedClients.find(c => c.nazwa === currentClientName);
+                if (clientObj && clientObj.email) prefilledEmail = clientObj.email;
+            }
+        } catch (e) {}
+
+        try {
             const receiptContentHTML = generate110mmReceiptHTML();
-            
-            // Otwórz nowe okno
             const printWindow = window.open('', '_blank', 'width=500,height=700,scrollbars=yes,resizable=yes');
-            
             if (!printWindow) {
-                showToast('Nie udało się otworzyć nowego okna. Wyłącz blokowanie wyskakujących okienek.', 'error');
+                showToast('Nie udało się otworzyć okna. Wyłącz blokowanie wyskakujących okienek.', 'error');
                 return;
             }
 
-            // Wpisz strukturę HTML (Stylizowaną tak jak Raporty)
             printWindow.document.write(`
                 <!DOCTYPE html>
                 <html lang="pl">
@@ -6013,73 +6017,17 @@ if (printFormat110 && receiptPrintContainer) {
                     <title>Podgląd 110mm</title>
                     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
                     <style>
-                        body { 
-                            font-family: 'Nunito', sans-serif; /* Tło ma zwykłą czcionkę */
-                            margin: 0; 
-                            padding: 0; 
-                            background-color: #525659; /* Ciemnoszare tło jak w profesjonalnych podglądach PDF */
-                            display: flex;
-                            flex-direction: column;
-                            align-items: center;
-                            min-height: 100vh;
-                        }
-
-                        /* --- Pasek narzędzi (Drukuj / Zamknij) --- */
-                        .print-controls {
-                            width: 100%;
-                            padding: 12px; 
-                            text-align: center; 
-                            background-color: #333;
-                            color: white;
-                            position: sticky; 
-                            top: 0; 
-                            z-index: 1000;
-                            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
-                        }
-                        .print-controls button {
-                            padding: 8px 20px; 
-                            font-size: 16px; 
-                            margin: 0 10px; 
-                            cursor: pointer; 
-                            border-radius: 6px; 
-                            border: 1px solid #777;
-                            font-family: 'Nunito', sans-serif; 
-                            font-weight: 600;
-                            transition: all 0.2s;
-                        }
-                        .print-controls .print-btn { 
-                            background-color: #4CAF50; 
-                            color: white; 
-                            border-color: #388E3C;
-                        }
+                        body { font-family: 'Nunito', sans-serif; margin: 0; padding: 0; background-color: #525659; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
+                        .print-controls { width: 100%; padding: 12px; text-align: center; background-color: #333; color: white; position: sticky; top: 0; z-index: 1000; box-shadow: 0 2px 10px rgba(0,0,0,0.3); }
+                        .print-controls button { padding: 8px 20px; font-size: 16px; margin: 0 10px; cursor: pointer; border-radius: 6px; border: 1px solid #777; font-family: 'Nunito', sans-serif; font-weight: 600; transition: all 0.2s; }
+                        .print-controls .print-btn { background-color: #4CAF50; color: white; border-color: #388E3C; }
                         .print-controls .print-btn:hover { background-color: #43A047; }
-
-                        .print-controls .close-btn { 
-                            background-color: #f44336; 
-                            color: white; 
-                            border-color: #D32F2F;
-                        }
+                        .print-controls .close-btn { background-color: #f44336; color: white; border-color: #D32F2F; }
                         .print-controls .close-btn:hover { background-color: #E53935; }
-                        
-                        /* --- Kartka Paragonu --- */
-                        .receipt-page {
-                            font-family: 'Courier New', Courier, monospace !important; /* Paragon musi być monospaced */
-                            font-size: 10pt !important;
-                            line-height: 1.3 !important;
-                            color: #000 !important;
-                            
-                            background-color: #ffffff; 
-                            width: 105mm; /* Szerokość 110mm minus marginesy */
-                            min-height: 150mm;
-                            
-                            margin: 30px auto; /* Odstęp od paska i dołu */
-                            padding: 5mm 35mm 5mm 5mm; /* Prawy margines 35mm (1/3 kartki) */
-                            
-                            box-sizing: border-box;
-                            box-shadow: 0 5px 25px rgba(0,0,0,0.5); /* Wyraźny cień */
-                        }
+                        .print-controls .btn-email { background: #34495e; color: white; border: 1px solid #7f8c8d; }
 
-                        /* Style wewnętrzne paragonu */
+                        .receipt-page { font-family: 'Courier New', Courier, monospace !important; font-size: 10pt !important; line-height: 1.3 !important; color: #000 !important; background-color: #ffffff; width: 105mm; min-height: 150mm; margin: 30px auto; padding: 5mm 35mm 5mm 5mm; box-sizing: border-box; box-shadow: 0 5px 25px rgba(0,0,0,0.5); }
+                        /* ... (Reszta stylów 110mm bez zmian) ... */
                         .receipt-page h2 { font-size: 11pt !important; margin: 0 0 10px 0; font-weight: bold; text-transform: uppercase; }
                         .receipt-page h3 { font-size: 10pt !important; font-weight: bold; margin-top: 15px; margin-bottom: 5px; border-bottom: 1px dashed #000; padding-bottom: 3px; }
                         .receipt-page p { margin: 2px 0; word-wrap: break-word; }
@@ -6089,123 +6037,42 @@ if (printFormat110 && receiptPrintContainer) {
                         .receipt-page .sig-box-110mm img { max-width: 180px; height: 60px; object-fit: contain; border: 1px solid #eee; margin-top: 5px; display: block; margin-left: 0; }
                         .receipt-page .footer-legend { margin-top: 20px; font-size: 8pt !important; border-top: 1px dashed #000; padding-top: 5px; }
 
-                        /* --- Ustawienia DRUKOWANIA --- */
                         @media print {
-                            body { 
-                                background-color: #ffffff !important; 
-                                display: block !important; /* Reset flexa */
-                            }
-                            .print-controls { 
-                                display: none !important; 
-                            }
-                            .receipt-page {
-                                width: 66mm !important; /* 2/3 szerokości dla drukarki */
-                                margin: 0 !important;
-                                padding: 0 !important; /* Marginesy zdefiniowane w @page */
-                                box-shadow: none !important;
-                                border: none !important;
-                                min-height: unset !important;
-                            }
-                            @page {
-                                size: 110mm auto; /* 110mm szerokości, auto wysokość */
-                                margin: 5mm;      /* Marginesy fizyczne drukarki */
-                                orientation: portrait;
+                            body { background-color: #ffffff !important; display: block !important; }
+                            .print-controls { display: none !important; }
+                            .receipt-page { width: 66mm !important; margin: 0 !important; padding: 0 !important; box-shadow: none !important; border: none !important; min-height: unset !important; }
+                            @page { size: 110mm auto; margin: 5mm; orientation: portrait; }
+                        }
+                    </style>
+                    <script>
+                        function handleEmailClick() {
+                            var defaultEmail = '${prefilledEmail}';
+                            var email = prompt('Podaj adres e-mail odbiorcy:', defaultEmail);
+                            if (email) {
+                                if (window.opener && window.opener.getCardMailtoLink) {
+                                    var link = window.opener.getCardMailtoLink(email);
+                                    if (link) {
+                                        window.location.href = link; // Otwórz w tym oknie
+                                    } else {
+                                        alert('Błąd: Brak ID karty w oknie głównym.');
+                                    }
+                                } else {
+                                    alert('Błąd: Utracono połączenie z oknem głównym aplikacji.');
+                                }
                             }
                         }
-                        /* --- STYLE SPOŁECZNOŚCI --- */
-
-/* Dymki czatu */
-.chat-msg {
-    max-width: 75%;
-    padding: 10px 15px;
-    border-radius: 18px;
-    font-size: 15px;
-    line-height: 1.4;
-    position: relative;
-    word-wrap: break-word;
-}
-.chat-msg-me {
-    align-self: flex-end;
-    background-color: #0084ff; /* Niebieski (Ja) */
-    color: white;
-    border-bottom-right-radius: 4px;
-}
-.chat-msg-other {
-    align-self: flex-start;
-    background-color: #e4e6eb; /* Szary (Inni) */
-    color: #050505;
-    border-bottom-left-radius: 4px;
-}
-.chat-author {
-    font-size: 11px;
-    color: #666;
-    margin-bottom: 2px;
-    margin-left: 5px;
-}
-.chat-time {
-    font-size: 10px;
-    opacity: 0.7;
-    text-align: right;
-    margin-top: 4px;
-}
-
-/* Kafelki Bazy Wiedzy */
-.knowledge-card {
-    background: #fff;
-    border: 1px solid #ddd;
-    border-radius: 8px;
-    padding: 15px;
-    margin-bottom: 15px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-}
-.knowledge-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    border-bottom: 1px solid #eee;
-    padding-bottom: 8px;
-    margin-bottom: 8px;
-}
-.knowledge-title { font-size: 18px; font-weight: bold; color: #2c3e50; }
-.knowledge-author { font-size: 12px; color: #777; }
-.knowledge-products { font-size: 13px; color: #444; margin-bottom: 10px; }
-.knowledge-likes { font-weight: bold; color: #e67e22; }
-                    /* Kolor fioletowy dla dashboardu */
-.dash-card.purple { border-bottom-color: #9b59b6; }
-
-/* Przycisk usuwania wiadomości (mały krzyżyk) */
-.btn-delete-msg {
-    background: none;
-    border: none;
-    color: #999;
-    font-size: 12px;
-    cursor: pointer;
-    margin-left: 5px;
-    padding: 0 4px;
-}
-.btn-delete-msg:hover {
-    color: #c0392b;
-    font-weight: bold;
-}
-/* Ukrycie przycisku "Dodaj nowego" w oknie wyszukiwania produktu */
-#productSearchAddNewBtn {
-    display: none !important;
-}
-                    </style>
+                    </script>
                 </head>
                 <body>
                     <div class="print-controls">
-                <button class="btn btn-print" onclick="window.print()">🖨️ Drukuj / PDF</button>
-                
-                <button class="btn btn-email" onclick="var em = prompt('Podaj adres e-mail odbiorcy:'); if(em) { if(window.opener) { window.opener.shareCurrentCardViaEmail(em); } else { alert('Błąd: Główne okno aplikacji zostało zamknięte.'); } }">📧 Wyślij E-mail</button>
-                
-                <button class="btn btn-close" onclick="window.close()">❌ Zamknij</button>
-            </div>
+                        <button class="print-btn" onclick="window.print()">🖨️ Drukuj</button>
+                        <button class="btn-email" onclick="handleEmailClick()">📧 Wyślij</button>
+                        <button class="close-btn" onclick="window.close()">Zamknij okno</button>
+                    </div>
                     
                     <div class="receipt-page">
                         ${receiptContentHTML}
                     </div>
- 
                 </body>
                 </html>
             `);
@@ -6214,8 +6081,8 @@ if (printFormat110 && receiptPrintContainer) {
             printWindow.focus();
 
         } catch (e) {
-            console.error("Błąd podczas generowania podglądu 110mm:", e);
-            showToast('Błąd generowania podglądu 110mm.', 'error');
+            console.error("Błąd podglądu 110mm:", e);
+            showToast('Błąd generowania podglądu.', 'error');
         }
     });
 }
@@ -19126,9 +18993,20 @@ const opis = opisInput ? opisInput.value : tr.cells[1].textContent;
     printWindow.focus();
 }
 /**
- * ✅ WSPÓLNY SZABLON HTML (ZAKTUALIZOWANY: POPRAWIONY GUZIK EMAIL DLA A4)
+ * ✅ WSPÓLNY SZABLON HTML (POPRAWKA v6: Działająca wysyłka Email z okna)
  */
 function getUnifiedPrintHTML(header, rowsHTML) {
+    
+    // Pobierz email z cache do prefillu (tak jak wcześniej)
+    let prefilledEmail = "";
+    try {
+        const currentClientName = document.getElementById('klientSelect').value;
+        if (typeof cachedClients !== 'undefined' && cachedClients) {
+            const clientObj = cachedClients.find(c => c.nazwa === currentClientName);
+            if (clientObj && clientObj.email) prefilledEmail = clientObj.email;
+        }
+    } catch (e) {}
+
     return `
         <!DOCTYPE html>
         <html lang="pl">
@@ -19138,115 +19016,67 @@ function getUnifiedPrintHTML(header, rowsHTML) {
             <title>Karta Leczenia</title>
             <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
             <style>
-                /* --- STYLE OGÓLNE (EKRAN) --- */
-                body { 
-                    font-family: 'Nunito', sans-serif; 
-                    background-color: #525659; 
-                    margin: 0; padding: 0; 
-                    display: block; overflow-x: auto; 
-                }
-
-                .print-controls {
-                    position: sticky; top: 0; left: 0; z-index: 1000;
-                    background: #333; color: #fff; padding: 10px;
-                    display: flex; justify-content: center; gap: 15px;
-                    width: 100%; min-width: 210mm; box-sizing: border-box;
-                }
+                body { font-family: 'Nunito', sans-serif; background-color: #525659; margin: 0; padding: 0; display: block; overflow-x: auto; }
+                .print-controls { position: sticky; top: 0; left: 0; z-index: 1000; background: #333; color: #fff; padding: 10px; display: flex; justify-content: center; gap: 15px; width: 100%; min-width: 210mm; box-sizing: border-box; }
                 .btn { padding: 8px 20px; cursor: pointer; border-radius: 4px; border:none; font-weight:bold; font-size: 16px; transition: 0.2s; }
                 .btn:hover { opacity: 0.9; }
-                
                 .btn-print { background: #4CAF50; color: white; }
                 .btn-close { background: #f44336; color: white; }
-                /* ✅ NOWY STYL DLA GUZIKA EMAIL */
                 .btn-email { background: #34495e; color: white; border: 1px solid #7f8c8d; }
 
-                /* KARTKA - Widok na Ekranie */
-                .page-sheet {
-                    background: white;
-                    width: fit-content;  
-                    min-width: 210mm;
-                    min-height: 297mm;
-                    margin: 20px auto; 
-                    padding: 10mm; 
-                    box-sizing: border-box;
-                    box-shadow: 0 0 15px rgba(0,0,0,0.2);
-                    display: block; 
-                }
-
-                /* --- STYLE TREŚCI --- */
-                h2 { 
-                    text-align: center; font-size: 12pt; 
-                    margin: 0 0 5px 0; 
-                    font-weight: 700; color: #000; text-transform: uppercase; line-height: 1.1;
-                }
-                
-                .top-section { 
-                    display: grid; 
-                    grid-template-columns: 1fr 1fr 1fr; 
-                    font-size: 9pt; 
-                    margin-bottom: 5px; 
-                    gap: 3px; 
-                    width: 100%;
-                }
+                .page-sheet { background: white; width: fit-content; min-width: 210mm; min-height: 297mm; margin: 20px auto; padding: 10mm; box-sizing: border-box; box-shadow: 0 0 15px rgba(0,0,0,0.2); display: block; }
+                h2 { text-align: center; font-size: 12pt; margin: 0 0 5px 0; font-weight: 700; color: #000; text-transform: uppercase; line-height: 1.1; }
+                .top-section { display: grid; grid-template-columns: 1fr 1fr 1fr; font-size: 9pt; margin-bottom: 5px; gap: 3px; width: 100%; }
                 .top-section div { padding: 3px 4px; border: 1px solid #000; word-wrap: break-word; }
                 .bold { font-weight: 700; }
-
                 table { border-collapse: collapse; width: 100%; font-size: 9pt; margin-bottom: 3px; }
                 th, td { border: 1px solid #000; padding: 2px 3px; text-align: left; vertical-align: middle; }
                 th { background-color: #EBF5E6; text-align: center; font-weight: bold; font-size: 8pt; }
                 .center-text { text-align: center; }
-                
                 p { font-size: 9pt; margin: 2px 0; }
-                
                 .signatures { display: flex; justify-content: space-between; margin-top: 10px; }
                 .sig-box { display: flex; flex-direction: column; align-items: center; width: 40%; }
                 .sig-label { font-weight: bold; margin-bottom: 0; font-size: 9pt; display: block; text-align: center; width: 100%; }
                 .sig-img { display: block; height: 35px; width: 100%; object-fit: contain; margin-top: 1px; }
                 .sig-name { margin-top: 0; font-size: 8pt; text-align: center; }
 
-                /* --- USTAWIENIA DRUKARKI (85%) --- */
                 @media print {
-                    html, body {
-                        background-color: white !important;
-                        margin: 0 !important; padding: 0 !important;
-                        height: 100%; width: 100%;
-                        overflow: hidden !important; 
-                    }
+                    html, body { background-color: white !important; margin: 0 !important; padding: 0 !important; height: 100%; width: 100%; overflow: hidden !important; }
                     .print-controls { display: none; }
-                    
-                    .page-sheet {
-                        margin: 0 !important; padding: 0 !important; 
-                        box-shadow: none !important; border: none !important;
-                        
-                        /* ✅ SKALA 85% */
-                        transform: scale(0.85); 
-                        transform-origin: top left;
-                        width: 117.6%; 
-                        
-                        page-break-after: avoid !important;
-                        page-break-before: avoid !important;
-                        break-inside: avoid;
-                    }
-                    
-                    @page {
-                        size: A4 landscape;
-                        margin: 0.5cm; 
-                    }
+                    .page-sheet { margin: 0 !important; padding: 0 !important; box-shadow: none !important; border: none !important; transform: scale(0.85); transform-origin: top left; width: 117.6%; page-break-after: avoid !important; page-break-before: avoid !important; break-inside: avoid; }
+                    @page { size: A4 landscape; margin: 0.5cm; }
                 }
             </style>
+            <script>
+                function handleEmailClick() {
+                    var defaultEmail = '${prefilledEmail}';
+                    var email = prompt('Podaj adres e-mail odbiorcy:', defaultEmail);
+                    if (email) {
+                        if (window.opener && window.opener.getCardMailtoLink) {
+                            var link = window.opener.getCardMailtoLink(email);
+                            if (link) {
+                                window.location.href = link; // ✅ Otwiera w TYM oknie (nie blokuje)
+                            } else {
+                                alert('Błąd: Brak ID karty w oknie głównym.');
+                            }
+                        } else {
+                            alert('Błąd: Utracono połączenie z oknem głównym aplikacji.');
+                        }
+                    }
+                }
+            </script>
         </head>
         <body>
             <div class="print-controls">
                 <button class="btn btn-print" onclick="window.print()">🖨️ Drukuj / PDF</button>
                 
-                <button class="btn btn-email" onclick="var em = prompt('Podaj adres e-mail odbiorcy:'); if(em) { if(window.opener) { window.opener.shareCurrentCardViaEmail(em); } else { alert('Błąd: Główne okno aplikacji zostało zamknięte.'); } }">📧 Wyślij E-mail</button>
+                <button class="btn btn-email" onclick="handleEmailClick()">📧 Wyślij E-mail</button>
                 
                 <button class="btn btn-close" onclick="window.close()">❌ Zamknij</button>
             </div>
 
             <div class="page-sheet">
                 <h2>KARTA LECZENIA ZWIERZĄT GOSPODARSKICH ORAZ ZWIERZĄT, Z KTÓRYCH POZYSKANE TKANKI LUB PRODUKTY SĄ PRZEZNACZONE DO SPOŻYCIA PRZEZ LUDZI / EWIDENCJA LECZENIA ZWIERZĄT</h2>
-                
                 <div class="top-section">
                     <div>
                         Nazwa i adres zakładu leczniczego dla zwierząt:<br>
@@ -19264,7 +19094,6 @@ function getUnifiedPrintHTML(header, rowsHTML) {
                         Nr dokumentu: <span class="bold" style="font-size: 10pt;">${header.nrDokumentu}</span>
                     </div>
                 </div>
-
                 <table>
                     <colgroup>
                         <col style="width: 30px;">
@@ -19298,9 +19127,7 @@ function getUnifiedPrintHTML(header, rowsHTML) {
                     </thead>
                     <tbody>${rowsHTML}</tbody>
                 </table>
-
                 <p><b>Oświadczam, że nabyte produkty lecznicze weterynaryjne/pasze lecznicze zostaną zastosowane zgodnie z zaleceniami lekarza weterynarii.</b></p>
-
                 <div class="signatures">
                     <div class="sig-box">
                         <span class="sig-label">Lekarz weterynarii</span>
@@ -21497,13 +21324,26 @@ if (btnUseNewAnimalDesc) {
     
     // ⬆️⬆️⬆️ KONIEC WKLEJANIA ⬆️⬆️⬆️
 /* ======================================================== */
-/* ✅ MODUŁ POPRAWIONY v5: Wysyłka LINKU (Obsługa z okienek) */
+/* ✅ MODUŁ POPRAWIONY v6: Wysyłka LINKU (Smart Logic)      */
 /* ======================================================== */
 
-// 1. Definicja globalnej funkcji
-// Dodano parametr emailFromPopup (domyślnie null)
-window.shareCurrentCardViaEmail = async function(emailFromPopup = null) {
-    // Ukryj modal wyboru (jeśli jest otwarty w oknie głównym)
+// 1. Funkcja pomocnicza: Generuje gotowy link mailto (używana przez okna druku i okno główne)
+window.getCardMailtoLink = function(targetEmail) {
+    if (!lastSavedDocId) return null; // Brak zapisu = brak linku
+
+    const baseUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
+    const linkDoKarty = `${baseUrl}?shareId=${lastSavedDocId}`;
+
+    const subject = encodeURIComponent("Karta leczenia z ostatniego leczenia weterynaryjnego");
+    const bodyText = `Dzień dobry,\n\nUdostępniam link do karty leczenia z ostatniego leczenia weterynaryjnego:\n${linkDoKarty}\n\nPozdrawiam,\nZespół Weterynaryjny`;
+    const body = encodeURIComponent(bodyText);
+
+    return `mailto:${targetEmail}?subject=${subject}&body=${body}`;
+};
+
+// 2. Główna funkcja wysyłki (dla przycisku w Generatorze Kart - okno główne)
+window.shareCurrentCardViaEmail = async function() {
+    // Ukryj modal wyboru
     const modal = document.getElementById('printFormatModal');
     if (modal) modal.style.display = 'none';
 
@@ -21513,68 +21353,44 @@ window.shareCurrentCardViaEmail = async function(emailFromPopup = null) {
         return;
     }
 
-    let emailToUse = emailFromPopup; // Jeśli podano e-mail z popupa (okna druku), użyj go od razu
+    // Smart Fetch - szukanie e-maila w bazie
+    const clientName = document.getElementById('klientSelect').value.trim();
+    let clientEmail = '';
 
-    // Jeśli NIE podano e-maila (czyli wywołano z głównego okna), uruchom "Smart Fetch"
-    if (!emailToUse) {
-        const clientName = document.getElementById('klientSelect').value.trim();
-        let clientEmail = '';
-
-        // --- ETAP 1: Szukanie w pamięci podręcznej ---
-        if (typeof cachedClients !== 'undefined' && cachedClients && cachedClients.length > 0) {
-            const clientObj = cachedClients.find(c => c.nazwa === clientName);
-            if (clientObj && clientObj.email) {
-                clientEmail = clientObj.email;
+    // Cache
+    if (typeof cachedClients !== 'undefined' && cachedClients) {
+        const clientObj = cachedClients.find(c => c.nazwa === clientName);
+        if (clientObj && clientObj.email) clientEmail = clientObj.email;
+    }
+    // Baza (jeśli brak w cache)
+    if (!clientEmail) {
+        showToast("Szukam adresu e-mail... ⏳", "info", 1500);
+        try {
+            const q = db.collection("klienci").where("nazwa", "==", clientName).limit(1);
+            const snapshot = await q.get();
+            if (!snapshot.empty && snapshot.docs[0].data().email) {
+                clientEmail = snapshot.docs[0].data().email;
             }
-        }
-
-        // --- ETAP 2: Szukanie w bazie ---
-        if (!clientEmail) {
-            showToast("Szukam adresu e-mail w bazie... ⏳", "info", 2000);
-            try {
-                const q = db.collection("klienci").where("nazwa", "==", clientName).limit(1);
-                const snapshot = await q.get();
-                if (!snapshot.empty) {
-                    const clientData = snapshot.docs[0].data();
-                    if (clientData.email) clientEmail = clientData.email;
-                }
-            } catch (err) {
-                console.error("Błąd pobierania emaila:", err);
-            }
-        }
-
-        // --- ETAP 3: Weryfikacja (Prompt w oknie głównym) ---
-        // Pytamy tylko, jeśli nie przekazano maila z zewnątrz
-        emailToUse = prompt("Zweryfikuj adres e-mail odbiorcy:", clientEmail);
+        } catch (e) { console.error(e); }
     }
 
-    // Jeśli anulowano (w którymkolwiek prompcie) lub puste
-    if (emailToUse === null || emailToUse.trim() === '') return; 
+    // Prompt w oknie głównym
+    const emailToUse = prompt("Zweryfikuj adres e-mail odbiorcy:", clientEmail);
+    if (emailToUse === null || emailToUse.trim() === '') return;
 
-    // 4. Generuj Link
-    const baseUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
-    const linkDoKarty = `${baseUrl}?shareId=${lastSavedDocId}`;
-
-    // 5. Treść
-    const subject = encodeURIComponent("Karta leczenia z ostatniego leczenia weterynaryjnego");
-    const bodyText = `Dzień dobry,\n\nUdostępniam link do karty leczenia z ostatniego leczenia weterynaryjnego:\n${linkDoKarty}\n\nPozdrawiam,\nZespół Weterynaryjny`;
-    const body = encodeURIComponent(bodyText);
-
-    // 6. Otwórz program pocztowy
-    const mailtoLink = `mailto:${emailToUse}?subject=${subject}&body=${body}`;
-    window.location.href = mailtoLink;
-    
-    showToast("Otwieranie programu pocztowego... 📧", "success");
+    // Generuj i otwórz
+    const mailtoLink = window.getCardMailtoLink(emailToUse);
+    if (mailtoLink) {
+        window.location.href = mailtoLink;
+        showToast("Otwieranie programu pocztowego... 📧", "success");
+    }
 };
 
-// 2. Podpięcie starego przycisku w modalu (wywołanie bez argumentów)
+// 3. Podpięcie starego przycisku w modalu (w oknie głównym)
 const printFormatShare = document.getElementById('printFormatShare');
 if (printFormatShare) {
-    // Używamy funkcji strzałkowej, żeby nie przekazać przypadkowych danych zdarzenia
-    printFormatShare.addEventListener('click', () => window.shareCurrentCardViaEmail());
+    printFormatShare.addEventListener('click', window.shareCurrentCardViaEmail);
 }
-
-/* ======================================================== */
 
 </script> 
 </body>
