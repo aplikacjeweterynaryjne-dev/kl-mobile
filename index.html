@@ -2559,6 +2559,16 @@ table {
         </div>
     </div>
 </div>
+<div id="systemMessageModal" class="product-search-modal" style="display: none; z-index: 20005;">
+    <div class="form-card" style="max-width: 500px; text-align: center;">
+        <div style="font-size: 50px; margin-bottom: 10px;">📨</div>
+        <h3 id="sysMsgTitle" style="margin-top: 0; color: #2b74e4;">Wiadomość od Administratora</h3>
+        <div id="sysMsgContent" style="font-size: 18px; line-height: 1.5; color: #333; margin: 20px 0; text-align: left; white-space: pre-wrap; background: #f9f9f9; padding: 15px; border-radius: 8px;"></div>
+        <div class="form-actions" style="justify-content: center;">
+            <button id="sysMsgCloseBtn" class="btn primary" style="width: 100%; font-size: 18px; padding: 12px;">Rozumiem / Przeczytano</button>
+        </div>
+    </div>
+</div>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
@@ -3078,6 +3088,7 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
 <label for="formNrDokumentu">Nr dokumentu</label>
 <input type="text" id="formNrDokumentu" placeholder="Numer dokumentu">
 </div>
+
 <div class="form-actions">
 <div class="left">
 <button id="closeForm" class="btn ghost small">Zakończ</button>
@@ -3850,6 +3861,25 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
         <input type="checkbox" id="konfigFormMozeDoladowac" style="width: auto; height: 20px; flex-shrink: 0;">
         Pozwól użytkownikowi na doładowywanie własnego magazynu
     </label>
+</div>
+    <div id="adminMessageFields" style="display: none; margin-top: 15px; padding-top: 15px; border-top: 2px dashed #ccc; background-color: #fff8e1; border-radius: 6px; padding: 10px;">
+    <h4 style="margin: 0 0 10px 0; color: #d35400;">📢 Wiadomość Powitalna (Widzi tylko ten użytkownik)</h4>
+    
+    <div class="form-row">
+        <label for="confMsgContent">Treść wiadomości (pozostaw puste, aby wyłączyć):</label>
+        <textarea id="confMsgContent" rows="3" placeholder="Wpisz treść, np. Cześć Janie, proszę o uzupełnienie..." style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box;"></textarea>
+    </div>
+
+    <div style="display: flex; gap: 10px;">
+        <div class="form-row" style="flex: 1;">
+            <label for="confMsgStart">Wyświetlaj OD:</label>
+            <input type="date" id="confMsgStart" style="width: 100%; box-sizing: border-box;">
+        </div>
+        <div class="form-row" style="flex: 1;">
+            <label for="confMsgEnd">Wyświetlaj DO:</label>
+            <input type="date" id="confMsgEnd" style="width: 100%; box-sizing: border-box;">
+        </div>
+    </div>
 </div>
 <div class="form-actions">
 <div class="left">
@@ -7005,7 +7035,11 @@ const konfiguracjaFormInicjaly = document.getElementById('konfiguracjaFormInicja
 const konfiguracjaFormIdLecznicy = document.getElementById('konfiguracjaFormIdLecznicy');
 const konfiguracjaFormNazwaLecznicy = document.getElementById('konfiguracjaFormNazwaLecznicy'); // ✅ DODANA ZMIENNA
 const konfiguracjaFormRola = document.getElementById('konfiguracjaFormRola'); // ✅ DODANA ZMIENNA
-
+// ✅ NOWE ZMIENNE: Wiadomości Administratora
+const adminMessageFields = document.getElementById('adminMessageFields');
+const confMsgContent = document.getElementById('confMsgContent');
+const confMsgStart = document.getElementById('confMsgStart');
+const confMsgEnd = document.getElementById('confMsgEnd');
 // Zmienna cache dla konfiguracji
 let cachedKonfiguracja = null;
     // ✅ POCZĄTEK: Moduł 6 - Zmienne dla podpisu lekarza
@@ -8584,6 +8618,12 @@ async function fetchUserProfile(uid) {
 
   // ✅ NAJWAŻNIEJSZE: Zawsze pokaż menu, jeśli profil został pobrany
   showMainMenu();
+    // ✅ Uruchom sprawdzanie wiadomości z profilu (Krok 7)
+    setTimeout(() => {
+        if (typeof checkUserProfileMessage === 'function') {
+            checkUserProfileMessage();
+        }
+    }, 1500); // 1.5 sekundy opóźnienia, żeby user zdążył zobaczyć pulpit
 }
 /**
  * ✅ MODUŁ 3: Wczytuje podkolekcję 'magazynOsobisty' danego użytkownika do globalnego 'magazynCache'.
@@ -9786,7 +9826,21 @@ if (zapisanyPodpisBase64) {
 
             // ✅ MODYFIKACJA: Dynamicznie wypełnij role PRZED ustawieniem wartości
             populateRolaSelect();
-            konfiguracjaFormRola.value = data.Rola || 'pracownik';
+           konfiguracjaFormRola.value = data.Rola || 'pracownik';
+
+        // ✅ LOGIKA WIADOMOŚCI ADMINA (Wklejony Krok 4)
+        // Pokazujemy sekcję tylko jeśli zalogowany jest Administrator
+        if (currentUserProfile && currentUserProfile.Rola === 'administrator') {
+            if (adminMessageFields) {
+                adminMessageFields.style.display = 'block';
+                // Wczytaj istniejącą wiadomość lub puste
+                confMsgContent.value = data.adminMessage || '';
+                confMsgStart.value = data.adminMessageStart || '';
+                confMsgEnd.value = data.adminMessageEnd || '';
+            }
+        } else {
+            if (adminMessageFields) adminMessageFields.style.display = 'none';
+        }
         // ✅ POCZĄTEK MODUŁU 2: Wczytywanie stanu checkboxów
         document.getElementById('konfigFormUzywaMagazynu').checked = data.uzywaStanowMagazynowych || false;
         document.getElementById('konfigFormMozeDoladowac').checked = data.mozeDoladowacWlasnyMagazyn || false;
@@ -9894,8 +9948,17 @@ if (saveKonfiguracjaBtn) {
       uzywaStanowMagazynowych: document.getElementById('konfigFormUzywaMagazynu')?.checked || false,
       mozeDoladowacWlasnyMagazyn: document.getElementById('konfigFormMozeDoladowac')?.checked || false
       // ✅ KONIEC MODUŁU 1
+       // ✅ Pola wiadomości (tylko jeśli admin je widzi i edytuje)
+        adminMessage: (currentUserProfile.Rola === 'administrator') ? document.getElementById('confMsgContent').value.trim() : (null),
+        adminMessageStart: (currentUserProfile.Rola === 'administrator') ? document.getElementById('confMsgStart').value : (null),
+        adminMessageEnd: (currentUserProfile.Rola === 'administrator') ? document.getElementById('confMsgEnd').value : (null)
     };
-
+// Usuwamy nulle, jeśli nie jesteśmy adminem, aby nie nadpisać istniejących danych (opcjonalne czyszczenie)
+    if (currentUserProfile.Rola !== 'administrator') {
+        delete konfiguracjaData.adminMessage;
+        delete konfiguracjaData.adminMessageStart;
+        delete konfiguracjaData.adminMessageEnd;
+    }
     if (!konfiguracjaData.Imie || !konfiguracjaData.Nazwisko) {
       alert('Imię i Nazwisko są wymagane.');
       return;
@@ -21583,7 +21646,55 @@ Zespół Weterynaryjny`;
     });
 }
 /* ======================================================== */
+/**
+ * ✅ NOWA FUNKCJA: Sprawdza wiadomość w profilu i wyświetla modal (Krok 6)
+ */
+function checkUserProfileMessage() {
+    if (!currentUserProfile) return;
 
+    // Pobierz dane z profilu
+    const msg = currentUserProfile.adminMessage;
+    const start = currentUserProfile.adminMessageStart;
+    const end = currentUserProfile.adminMessageEnd;
+
+    // 1. Czy jest treść?
+    if (!msg || msg === "") return;
+
+    // 2. Walidacja dat
+    const today = new Date().toISOString().split('T')[0]; // Format YYYY-MM-DD
+    
+    if (start && today < start) return; // Za wcześnie
+    if (end && today > end) return;     // Za późno
+
+    // 3. Sprawdź LocalStorage (czy user już to zamknął w tej sesji/dniu?)
+    // Używamy klucza opartego na treści, żeby po zmianie treści wiadomość pokazała się znowu.
+    // Używamy prostego hasha z długości i pierwszych 10 znaków.
+    const msgHash = msg.length + "_" + msg.substring(0, 10);
+    if (sessionStorage.getItem('seen_msg_' + msgHash)) return; 
+
+    // 4. Wyświetl Modal
+    const modal = document.getElementById('systemMessageModal');
+    const content = document.getElementById('sysMsgContent');
+    const closeBtn = document.getElementById('sysMsgCloseBtn');
+
+    if (modal && content) {
+        console.log("Wyświetlam wiadomość systemową dla użytkownika.");
+        content.textContent = msg; // Bezpieczne wstawianie tekstu
+        modal.style.display = 'flex';
+        
+        // Obsługa zamknięcia
+        // Klonujemy przycisk, aby usunąć stare listenery
+        const newCloseBtn = closeBtn.cloneNode(true);
+        closeBtn.parentNode.replaceChild(newCloseBtn, closeBtn);
+
+        newCloseBtn.onclick = () => {
+            modal.style.display = 'none';
+            // Zapamiętaj w sesji, że pokazano (po odświeżeniu strony pokaże się znowu,
+            // jeśli chcesz permanentnie do zmiany treści, użyj localStorage zamiast sessionStorage)
+            sessionStorage.setItem('seen_msg_' + msgHash, 'true');
+        };
+    }
+}
 </script> 
 </body>
 </html>
