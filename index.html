@@ -18993,17 +18993,19 @@ const opis = opisInput ? opisInput.value : tr.cells[1].textContent;
     printWindow.focus();
 }
 /**
- * ✅ WSPÓLNY SZABLON HTML (POPRAWKA v6: Działająca wysyłka Email z okna)
+ * ✅ WSPÓLNY SZABLON HTML (POPRAWKA v7: Guzik Email z obsługą z wewnątrz)
  */
 function getUnifiedPrintHTML(header, rowsHTML) {
     
-    // Pobierz email z cache do prefillu (tak jak wcześniej)
+    // --- 1. Szukamy e-maila klienta w pamięci aplikacji (cache) ---
     let prefilledEmail = "";
     try {
         const currentClientName = document.getElementById('klientSelect').value;
         if (typeof cachedClients !== 'undefined' && cachedClients) {
             const clientObj = cachedClients.find(c => c.nazwa === currentClientName);
-            if (clientObj && clientObj.email) prefilledEmail = clientObj.email;
+            if (clientObj && clientObj.email) {
+                prefilledEmail = clientObj.email;
+            }
         }
     } catch (e) {}
 
@@ -19016,15 +19018,36 @@ function getUnifiedPrintHTML(header, rowsHTML) {
             <title>Karta Leczenia</title>
             <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
             <style>
-                body { font-family: 'Nunito', sans-serif; background-color: #525659; margin: 0; padding: 0; display: block; overflow-x: auto; }
-                .print-controls { position: sticky; top: 0; left: 0; z-index: 1000; background: #333; color: #fff; padding: 10px; display: flex; justify-content: center; gap: 15px; width: 100%; min-width: 210mm; box-sizing: border-box; }
+                body { 
+                    font-family: 'Nunito', sans-serif; 
+                    background-color: #525659; 
+                    margin: 0; padding: 0; 
+                    display: block; overflow-x: auto; 
+                }
+                .print-controls {
+                    position: sticky; top: 0; left: 0; z-index: 1000;
+                    background: #333; color: #fff; padding: 10px;
+                    display: flex; justify-content: center; gap: 15px;
+                    width: 100%; min-width: 210mm; box-sizing: border-box;
+                }
                 .btn { padding: 8px 20px; cursor: pointer; border-radius: 4px; border:none; font-weight:bold; font-size: 16px; transition: 0.2s; }
                 .btn:hover { opacity: 0.9; }
                 .btn-print { background: #4CAF50; color: white; }
                 .btn-close { background: #f44336; color: white; }
                 .btn-email { background: #34495e; color: white; border: 1px solid #7f8c8d; }
 
-                .page-sheet { background: white; width: fit-content; min-width: 210mm; min-height: 297mm; margin: 20px auto; padding: 10mm; box-sizing: border-box; box-shadow: 0 0 15px rgba(0,0,0,0.2); display: block; }
+                .page-sheet {
+                    background: white;
+                    width: fit-content;  
+                    min-width: 210mm;
+                    min-height: 297mm;
+                    margin: 20px auto; 
+                    padding: 10mm; 
+                    box-sizing: border-box;
+                    box-shadow: 0 0 15px rgba(0,0,0,0.2);
+                    display: block; 
+                }
+
                 h2 { text-align: center; font-size: 12pt; margin: 0 0 5px 0; font-weight: 700; color: #000; text-transform: uppercase; line-height: 1.1; }
                 .top-section { display: grid; grid-template-columns: 1fr 1fr 1fr; font-size: 9pt; margin-bottom: 5px; gap: 3px; width: 100%; }
                 .top-section div { padding: 3px 4px; border: 1px solid #000; word-wrap: break-word; }
@@ -19043,7 +19066,11 @@ function getUnifiedPrintHTML(header, rowsHTML) {
                 @media print {
                     html, body { background-color: white !important; margin: 0 !important; padding: 0 !important; height: 100%; width: 100%; overflow: hidden !important; }
                     .print-controls { display: none; }
-                    .page-sheet { margin: 0 !important; padding: 0 !important; box-shadow: none !important; border: none !important; transform: scale(0.85); transform-origin: top left; width: 117.6%; page-break-after: avoid !important; page-break-before: avoid !important; break-inside: avoid; }
+                    .page-sheet {
+                        margin: 0 !important; padding: 0 !important; box-shadow: none !important; border: none !important;
+                        transform: scale(0.85); transform-origin: top left; width: 117.6%; 
+                        page-break-after: avoid !important; page-break-before: avoid !important; break-inside: avoid;
+                    }
                     @page { size: A4 landscape; margin: 0.5cm; }
                 }
             </style>
@@ -19055,7 +19082,7 @@ function getUnifiedPrintHTML(header, rowsHTML) {
                         if (window.opener && window.opener.getCardMailtoLink) {
                             var link = window.opener.getCardMailtoLink(email);
                             if (link) {
-                                window.location.href = link; // ✅ Otwiera w TYM oknie (nie blokuje)
+                                window.location.href = link; 
                             } else {
                                 alert('Błąd: Brak ID karty w oknie głównym.');
                             }
@@ -19069,14 +19096,13 @@ function getUnifiedPrintHTML(header, rowsHTML) {
         <body>
             <div class="print-controls">
                 <button class="btn btn-print" onclick="window.print()">🖨️ Drukuj / PDF</button>
-                
                 <button class="btn btn-email" onclick="handleEmailClick()">📧 Wyślij E-mail</button>
-                
                 <button class="btn btn-close" onclick="window.close()">❌ Zamknij</button>
             </div>
 
             <div class="page-sheet">
                 <h2>KARTA LECZENIA ZWIERZĄT GOSPODARSKICH ORAZ ZWIERZĄT, Z KTÓRYCH POZYSKANE TKANKI LUB PRODUKTY SĄ PRZEZNACZONE DO SPOŻYCIA PRZEZ LUDZI / EWIDENCJA LECZENIA ZWIERZĄT</h2>
+                
                 <div class="top-section">
                     <div>
                         Nazwa i adres zakładu leczniczego dla zwierząt:<br>
@@ -19094,6 +19120,7 @@ function getUnifiedPrintHTML(header, rowsHTML) {
                         Nr dokumentu: <span class="bold" style="font-size: 10pt;">${header.nrDokumentu}</span>
                     </div>
                 </div>
+
                 <table>
                     <colgroup>
                         <col style="width: 30px;">
@@ -19127,7 +19154,9 @@ function getUnifiedPrintHTML(header, rowsHTML) {
                     </thead>
                     <tbody>${rowsHTML}</tbody>
                 </table>
+
                 <p><b>Oświadczam, że nabyte produkty lecznicze weterynaryjne/pasze lecznicze zostaną zastosowane zgodnie z zaleceniami lekarza weterynarii.</b></p>
+
                 <div class="signatures">
                     <div class="sig-box">
                         <span class="sig-label">Lekarz weterynarii</span>
@@ -19145,6 +19174,13 @@ function getUnifiedPrintHTML(header, rowsHTML) {
         </html>
     `;
 }
+  /**
+ * ✅ NOWA FUNKCJA: Pobiera Karty Leczenia do raportu.
+ * Filtruje po dacie (wymaga pola 'createdAt' lub 'dataWykonania').
+ * Używamy 'dataWykonania' bo to jest data wizyty.
+ */
+async function fetchCardsForReport(dateStart, dateEnd, userId) {
+    console.log(`Pobieranie KART LECZENIA dla raportu: UserID: ${userId}, Date: ${dateStart} do ${dateEnd}`);
   /**
  * ✅ NOWA FUNKCJA: Pobiera Karty Leczenia do raportu.
  * Filtruje po dacie (wymaga pola 'createdAt' lub 'dataWykonania').
