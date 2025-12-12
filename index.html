@@ -6212,21 +6212,7 @@ if (printFormat110 && receiptPrintContainer) {
                     <div class="receipt-page">
                         ${receiptContentHTML}
                     </div>
- <div id="systemMessageModal" class="product-search-modal" style="display: none; z-index: 20005;">
-    <div class="form-card" style="max-width: 500px; text-align: center;">
-        <div style="font-size: 50px; margin-bottom: 10px;">📨</div>
-        
-        <h3 id="sysMsgTitle" style="margin-top: 0; color: #2b74e4;">Wiadomość od Administratora</h3>
-        
-        <div id="sysMsgContent" style="font-size: 16px; line-height: 1.6; color: #333; margin: 20px 0; text-align: left; white-space: pre-wrap;">
-            </div>
-
-        <div class="form-actions" style="justify-content: center; flex-direction: column; gap: 10px;">
-            <button id="sysMsgActionBtn" class="btn primary" style="width: 100%; display: none;">Skontaktuj się</button>
-            <button id="sysMsgCloseBtn" class="btn ghost" style="width: 100%;">Zamknij / Przeczytano</button>
-        </div>
-    </div>
-</div>
+ 
                 </body>
                 </html>
             `);
@@ -8598,12 +8584,6 @@ async function fetchUserProfile(uid) {
 
   // ✅ NAJWAŻNIEJSZE: Zawsze pokaż menu, jeśli profil został pobrany
   showMainMenu();
-    // ✅ Uruchom sprawdzanie wiadomości systemowych po załadowaniu profilu
-    setTimeout(() => {
-        if (typeof checkSystemMessages === 'function') {
-            checkSystemMessages();
-        }
-    }, 2000); // Małe opóźnienie, żeby najpierw załadował się dashboard
 }
 /**
  * ✅ MODUŁ 3: Wczytuje podkolekcję 'magazynOsobisty' danego użytkownika do globalnego 'magazynCache'.
@@ -21603,110 +21583,7 @@ Zespół Weterynaryjny`;
     });
 }
 /* ======================================================== */
-/* ======================================================== */
-/* ✅ MODUŁ: System Wiadomości do Użytkowników (Targetowany) */
-/* ======================================================== */
 
-const systemMessageModal = document.getElementById('systemMessageModal');
-const sysMsgTitle = document.getElementById('sysMsgTitle');
-const sysMsgContent = document.getElementById('sysMsgContent');
-const sysMsgCloseBtn = document.getElementById('sysMsgCloseBtn');
-const sysMsgActionBtn = document.getElementById('sysMsgActionBtn');
-
-/**
- * Funkcja sprawdzająca, czy są nowe wiadomości dla zalogowanego użytkownika.
- * Uruchamiana raz, po załadowaniu profilu (w fetchUserProfile).
- */
-async function checkSystemMessages() {
-    if (!currentUserProfile || !currentUserProfile.uid) return;
-
-    console.log("Sprawdzanie wiadomości systemowych...");
-
-    try {
-        // Pobierz wiadomości z kolekcji 'wiadomosci_systemowe'
-        // Pobieramy te, które są aktywne (nie wygasły)
-        // Sortujemy od najnowszych
-        const today = new Date().toISOString().split('T')[0];
-
-        // Uwaga: Wymaga utworzenia kolekcji 'wiadomosci_systemowe' w Firebase
-        const q = db.collection('wiadomosci_systemowe')
-                    .where('aktywna', '==', true)
-                    .orderBy('data_dodania', 'desc');
-
-        const snapshot = await q.get();
-        
-        if (snapshot.empty) return;
-
-        // Iterujemy, aby znaleźć pierwszą pasującą wiadomość, której user jeszcze nie zamknął
-        for (const doc of snapshot.docs) {
-            const msg = { id: doc.id, ...doc.data() };
-
-            // 1. Sprawdź, czy wiadomość jest dla tego użytkownika
-            // Pole 'odbiorca' może być: 'ALL' (wszyscy) lub konkretny e-mail/UID
-            const recipient = msg.odbiorca || 'ALL';
-            
-            // Jeśli wiadomość jest dla konkretnego maila, a to nie mój mail -> pomiń
-            if (recipient !== 'ALL' && recipient !== currentUserProfile['Adres email'] && recipient !== currentUserProfile.uid) {
-                continue;
-            }
-
-            // 2. Sprawdź, czy użytkownik już ją przeczytał (zapisujemy ID w localStorage)
-            const readKey = `msg_read_${msg.id}`;
-            if (localStorage.getItem(readKey)) {
-                continue; // Już widział tę wiadomość
-            }
-
-            // 3. JEŚLI PASUJE -> Pokaż wiadomość i przerwij pętlę (pokazujemy jedną na raz)
-            showSystemMessage(msg);
-            break; 
-        }
-
-    } catch (error) {
-        console.warn("Błąd systemu wiadomości (może brak kolekcji lub indeksu):", error);
-        // Nie blokujemy aplikacji błędem
-    }
-}
-
-function showSystemMessage(msg) {
-    if (!systemMessageModal) return;
-
-    sysMsgTitle.textContent = msg.tytul || "Wiadomość Systemowa";
-    sysMsgContent.textContent = msg.tresc || ""; // textContent jest bezpieczniejszy, ale nie obsługuje HTML.
-    // Jeśli chcesz HTML (np. pogrubienia), użyj: sysMsgContent.innerHTML = msg.tresc;
-
-    // Obsługa przycisku akcji (opcjonalna)
-    if (msg.link_akcji) {
-        sysMsgActionBtn.style.display = 'block';
-        sysMsgActionBtn.textContent = msg.tekst_przycisku || "Kliknij tutaj";
-        
-        // Usuwamy stary listener (poprzez klonowanie elementu)
-        const newBtn = sysMsgActionBtn.cloneNode(true);
-        sysMsgActionBtn.parentNode.replaceChild(newBtn, sysMsgActionBtn);
-        // Aktualizujemy referencję
-        const freshBtn = document.getElementById('sysMsgActionBtn');
-        
-        freshBtn.addEventListener('click', () => {
-            window.open(msg.link_akcji, '_blank');
-        });
-    } else {
-        document.getElementById('sysMsgActionBtn').style.display = 'none';
-    }
-
-    // Pokaż modal
-    systemMessageModal.style.display = 'flex';
-
-    // Obsługa zamknięcia
-    // Usuwamy stary listener
-    const newCloseBtn = sysMsgCloseBtn.cloneNode(true);
-    sysMsgCloseBtn.parentNode.replaceChild(newCloseBtn, sysMsgCloseBtn);
-    
-    document.getElementById('sysMsgCloseBtn').addEventListener('click', () => {
-        // 1. Ukryj modal
-        systemMessageModal.style.display = 'none';
-        // 2. Zapisz w LocalStorage, że przeczytano (żeby nie pokazywać ponownie)
-        localStorage.setItem(`msg_read_${msg.id}`, 'true');
-    });
-}
 </script> 
 </body>
 </html>
