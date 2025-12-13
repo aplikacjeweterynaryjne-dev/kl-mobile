@@ -4194,13 +4194,20 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
                 <canvas id="chartTopClients"></canvas>
             </div>
         </div>
-
+        
         <div style="flex: 1; min-width: 300px; background: white; padding: 15px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); border: 1px solid #e0e0e0;">
             <h4 style="text-align: center; margin-top: 0; color: #555;">💳 Struktura Płatności</h4>
             <div style="height: 250px; position: relative; display: flex; justify-content: center;">
                 <canvas id="chartPaymentStatus"></canvas>
             </div>
         </div>
+        <div style="background: white; padding: 15px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); border: 1px solid #e0e0e0;">
+        <h4 style="text-align: center; margin-top: 0; color: #555;">📊 Efektywność: Przychód (Słupek) vs Liczba Wizyt (Linia)</h4>
+        <div style="height: 300px;">
+            <canvas id="chartEfficiency"></canvas>
+        </div>
+        <p style="text-align:center; font-size:12px; color:#888; margin-top:5px;">Wykres pokazuje relację ilości pracy do generowanego przychodu.</p>
+    </div>
     </div>
 </div>
 <div id="kalendarzWizytSection" style="display: none; padding: 0 15px 80px 15px;">
@@ -21972,25 +21979,33 @@ function onShowAnaliza() {
 async function loadAnalyticsData() {
 
 // 4. Przeliczanie statystyk i Rysowanie Wykresów
+// 4. Przeliczanie statystyk i Rysowanie Wykresów (ZAKTUALIZOWANA v3)
 function processAndRenderCharts(data) {
     let totalRev = 0;
     let totalDebt = 0;
     
-    // Struktury danych do wykresów
-    const revenueByDate = {}; // { "2023-11-10": 500, ... }
-    const clientStats = {};   // { "Jan Kowalski": 1200, ... }
+    // Struktury danych
+    const revenueByDate = {}; 
+    const clientStats = {};   
+    const efficiencyStats = {}; // { "Jan Kowalski": { revenue: 0, count: 0 } }
+    
     let paidSum = 0;
     let debtSum = 0;
+
+    // Sprawdź, czy możemy pokazać dane w rozbiciu na nazwiska
+    // Warunek: Jestem Adminem/Właścicielem I wybrano filtr "Cała Lecznica" (ALL)
+    const isOwnerViewingAll = (currentUserProfile.Rola === 'administrator' || currentUserProfile.Rola === 'właściciel') 
+                              && (!analizaUserSelect || analizaUserSelect.value === 'ALL');
 
     // --- AGREGACJA DANYCH ---
     data.forEach(r => {
         const sum = parseFloat(r.suma) || 0;
-        const date = r.data; // Data YYYY-MM-DD
+        const date = r.data; 
         const client = r.klient || "Anonim";
+        const vetName = r.lekarz_nazwisko || "Nieznany";
         
         // Sumy ogólne
         totalRev += sum;
-        
         if (r.status === "Dług") {
             totalDebt += sum;
             debtSum += sum;
@@ -21998,14 +22013,32 @@ function processAndRenderCharts(data) {
             paidSum += sum;
         }
 
-        // 1. Dane do wykresu liniowego (Przychód w czasie)
+        // 1. Trend w czasie
         revenueByDate[date] = (revenueByDate[date] || 0) + sum;
 
-        // 2. Dane do rankingu klientów
+        // 2. Ranking Klientów
         clientStats[client] = (clientStats[client] || 0) + sum;
+
+        // 3. Efektywność (Nowa logika grupowania)
+        let keyName = vetName;
+
+        if (!isOwnerViewingAll) {
+            // Jeśli to nie jest właściciel patrzący na całość, to:
+            // A) Jeśli wybrano konkretną osobę (np. filtrowanie po sobie) -> Użyj jej nazwiska
+            // B) Jeśli wybrano "Cała Lecznica" przez pracownika -> Użyj nazwy "Cała Lecznica" (Anonimizacja)
+            if (analizaUserSelect && analizaUserSelect.value === 'ALL') {
+                keyName = "Cała Lecznica (Suma)";
+            }
+        }
+
+        if (!efficiencyStats[keyName]) {
+            efficiencyStats[keyName] = { revenue: 0, count: 0 };
+        }
+        efficiencyStats[keyName].revenue += sum;
+        efficiencyStats[keyName].count += 1; // Liczymy paragon jako wizytę
     });
 
-    // Aktualizacja kafelków liczbowych
+    // Aktualizacja kafelków
     if(document.getElementById('anTotalRevenue')) 
         document.getElementById('anTotalRevenue').textContent = totalRev.toFixed(2).replace('.', ',') + " zł";
     if(document.getElementById('anTotalDebt')) 
@@ -22013,15 +22046,13 @@ function processAndRenderCharts(data) {
 
     // --- RYSOWANIE WYKRESÓW ---
     
-    // A. Wykres Liniowy (Przychód)
+    // A. Wykres Liniowy (Przychód) - Bez zmian
     const sortedDates = Object.keys(revenueByDate).sort();
-    const trendData = sortedDates.map(d => revenueByDate[d]);
-    
     renderGenericChart('chartRevenueTrend', 'line', {
         labels: sortedDates,
         datasets: [{
             label: 'Przychód dzienny (zł)',
-            data: trendData,
+            data: sortedDates.map(d => revenueByDate[d]),
             borderColor: '#6A994E',
             backgroundColor: 'rgba(106, 153, 78, 0.1)',
             tension: 0.3,
@@ -22030,29 +22061,19 @@ function processAndRenderCharts(data) {
         }]
     });
 
-    // B. Wykres Słupkowy (Top Klienci)
-    // Sortuj klientów malejąco po kwocie i weź Top 5
-    const topClients = Object.entries(clientStats)
-        .sort(([,a], [,b]) => b - a)
-        .slice(0, 5);
-    
+    // B. Wykres Słupkowy (Top Klienci) - Bez zmian
+    const topClients = Object.entries(clientStats).sort(([,a], [,b]) => b - a).slice(0, 5);
     renderGenericChart('chartTopClients', 'bar', {
         labels: topClients.map(([name]) => name),
         datasets: [{
             label: 'Suma wydatków (zł)',
             data: topClients.map(([,val]) => val),
-            backgroundColor: [
-                'rgba(54, 162, 235, 0.7)',
-                'rgba(75, 192, 192, 0.7)',
-                'rgba(255, 206, 86, 0.7)',
-                'rgba(153, 102, 255, 0.7)',
-                'rgba(255, 159, 64, 0.7)'
-            ],
+            backgroundColor: 'rgba(54, 162, 235, 0.7)',
             borderWidth: 1
         }]
-    }, { indexAxis: 'y' }); // Poziomy wykres słupkowy
+    }, { indexAxis: 'y' });
 
-    // C. Wykres Kołowy (Płatności)
+    // C. Wykres Kołowy - Bez zmian
     renderGenericChart('chartPaymentStatus', 'doughnut', {
         labels: ['Zapłacone', 'Dług'],
         datasets: [{
@@ -22061,29 +22082,50 @@ function processAndRenderCharts(data) {
             hoverOffset: 4
         }]
     });
-}
 
-// Funkcja pomocnicza tworząca/aktualizująca wykres
-function renderGenericChart(canvasId, type, data, extraOptions = {}) {
-    const ctx = document.getElementById(canvasId);
-    if (!ctx) return;
-
-    // Jeśli wykres już istnieje na tym płótnie, zniszcz go
-    if (chartsInstances[canvasId]) {
-        chartsInstances[canvasId].destroy();
-    }
-
-    // Stwórz nowy wykres
-    chartsInstances[canvasId] = new Chart(ctx, {
-        type: type,
-        data: data,
-        options: {
-            responsive: true,
-            maintainAspectRatio: false, // Ważne, żeby wykres dopasował się do diva
-            plugins: {
-                legend: { position: 'bottom' }
+    // ✅ D. NOWY WYKRES: EFEKTYWNOŚĆ (Combo Chart: Bar + Line)
+    const sortedVets = Object.keys(efficiencyStats).sort();
+    
+    renderGenericChart('chartEfficiency', 'bar', {
+        labels: sortedVets,
+        datasets: [
+            {
+                label: 'Suma Paragonów (zł)',
+                data: sortedVets.map(v => efficiencyStats[v].revenue),
+                backgroundColor: 'rgba(46, 204, 113, 0.6)', // Zielony słupek
+                borderColor: '#27ae60',
+                borderWidth: 1,
+                order: 2,
+                yAxisID: 'y' // Lewa oś
             },
-            ...extraOptions
+            {
+                label: 'Liczba Wizyt',
+                data: sortedVets.map(v => efficiencyStats[v].count),
+                borderColor: '#e74c3c', // Czerwona linia
+                backgroundColor: '#e74c3c',
+                type: 'line', // Typ wykresu LINIA
+                tension: 0.1,
+                borderWidth: 3,
+                pointRadius: 5,
+                order: 1,
+                yAxisID: 'y1' // Prawa oś
+            }
+        ]
+    }, {
+        scales: {
+            y: {
+                type: 'linear',
+                display: true,
+                position: 'left',
+                title: { display: true, text: 'Przychód (PLN)' }
+            },
+            y1: {
+                type: 'linear',
+                display: true,
+                position: 'right',
+                title: { display: true, text: 'Liczba wizyt' },
+                grid: { drawOnChartArea: false } // Wyłącz siatkę dla prawej osi, żeby nie było bałaganu
+            }
         }
     });
 }
