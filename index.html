@@ -2345,6 +2345,150 @@ table {
     word-break: break-word !important;   /* Zabezpieczenie dla długich numerów */
     max-width: 250px;                    /* Sugestia szerokości, by przeglądarka wiedziała kiedy łamać */
 }
+    /* ======================================================== */
+/* ✅ TRYB DARK MODE - STYLE I PRZEŁĄCZNIK */
+/* ======================================================== */
+
+/* 1. Zmienne kolorów (Domyślne - Jasne) */
+:root {
+    --bg-body: #FAFBF8;
+    --bg-card: #ffffff;
+    --text-main: #333333;
+    --bg-input: #ffffff;
+    --border-color: #ccc;
+    --menu-bg: #F7F9F5;
+    --table-th: #EBF5E6;
+}
+
+/* 2. Zmienne dla Trybu Ciemnego */
+[data-theme="dark"] {
+    --bg-body: #121212;
+    --bg-card: #1e1e1e;
+    --text-main: #e0e0e0;
+    --bg-input: #2c2c2c;
+    --border-color: #444;
+    --menu-bg: #121212;
+    --table-th: #1f3a1f; /* Ciemna zieleń */
+}
+
+/* 3. Nadpisanie stylów globalnych gdy aktywny jest Dark Mode */
+[data-theme="dark"] body {
+    background-color: var(--bg-body) !important;
+    color: var(--text-main) !important;
+}
+
+[data-theme="dark"] .form-card, 
+[data-theme="dark"] .menu-btn,
+[data-theme="dark"] .visit-item,
+[data-theme="dark"] .schema-item,
+[data-theme="dark"] .knowledge-card,
+[data-theme="dark"] #archiveCardViewerModal > div {
+    background-color: var(--bg-card) !important;
+    color: var(--text-main) !important;
+    border-color: var(--border-color) !important;
+}
+
+[data-theme="dark"] input, 
+[data-theme="dark"] select, 
+[data-theme="dark"] textarea {
+    background-color: var(--bg-input) !important;
+    color: #fff !important;
+    border-color: var(--border-color) !important;
+}
+
+[data-theme="dark"] #mainMenuSection {
+    background-color: var(--menu-bg) !important;
+}
+
+[data-theme="dark"] th {
+    background-color: var(--table-th) !important;
+    color: #fff;
+}
+
+[data-theme="dark"] td {
+    border-color: #444 !important;
+    color: var(--text-main) !important;
+}
+
+/* Fix dla białych teł w sekcjach */
+[data-theme="dark"] #loginSection,
+[data-theme="dark"] #registerSection {
+    background-color: var(--bg-body) !important;
+}
+
+/* 4. Wygląd Przełącznika (Switch) w Menu */
+.dark-mode-toggle-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 20px;
+    padding: 10px;
+    background: rgba(0,0,0,0.05);
+    border-radius: 20px;
+    width: fit-content;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+[data-theme="dark"] .dark-mode-toggle-container {
+    background: rgba(255,255,255,0.1);
+}
+
+.dm-switch {
+  position: relative;
+  display: inline-block;
+  width: 50px;
+  height: 26px;
+}
+
+.dm-switch input { 
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.dm-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-color: #ccc;
+  transition: .4s;
+  border-radius: 34px;
+}
+
+.dm-slider:before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 4px;
+  bottom: 4px;
+  background-color: white;
+  transition: .4s;
+  border-radius: 50%;
+}
+
+input:checked + .dm-slider {
+  background-color: #2b74e4; /* Niebieski aktywny */
+}
+
+input:checked + .dm-slider:before {
+  transform: translateX(24px);
+}
+
+.dm-label {
+    font-weight: bold;
+    font-size: 14px;
+    color: inherit;
+}
+    /* Centrowanie przełącznika na dole */
+.dark-mode-toggle-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 10px;
+}
 </style>
     <div id="calcProductSearchModal" class="product-search-modal" style="display: none; z-index: 10003;">
     <div class="product-search-card">
@@ -2932,13 +3076,6 @@ background-color: #eef;
 </div>
 <div id="mainMenuSection" style="display: none; flex-direction: column; align-items: center; justify-content: flex-start; padding-top: 30px; width: 100%; box-sizing: border-box;">
   <h2 style="font-size: 24px; color: #333; margin-bottom: 25px;">Menu Główne</h2>
-  <div class="dark-mode-toggle-container">
-    <span class="dm-label">🌙 Tryb Ciemny</span>
-    <label class="dm-switch">
-        <input type="checkbox" id="darkModeCheckbox">
-        <span class="dm-slider"></span>
-    </label>
-</div>
   <button id="menuKalendarzBtn" class="menu-btn">🗓️ Kalendarz wizyt</button>
   <button id="menuKartaBtn" class="menu-btn">📝 Generator kart leczenia</button>
   <button id="menuKalkulatorBtn" class="menu-btn">🧮 Kalkulator wizyty</button>
@@ -2998,6 +3135,13 @@ background-color: #eef;
 <div style="text-align: center; margin-top: 5px; padding-bottom: 20px; position: relative; z-index: 10;">
         <a href="polityka.html" target="_blank" style="color: #777; font-size: 12px; text-decoration: underline;">Polityka Prywatności</a>
   </div>
+<div class="dark-mode-toggle-container">
+    <span class="dm-label">🌙 Tryb Ciemny</span>
+    <label class="dm-switch">
+        <input type="checkbox" id="darkModeCheckbox">
+        <span class="dm-slider"></span>
+    </label>
+</div>
 </div> <div id="mainTabBar" style="text-align: center; margin-bottom: 15px; border-bottom: 1px solid #ccc; padding-bottom: 10px; display: none; flex-wrap: wrap; justify-content: center; gap: 8px;">
 <button id="backToMenuBtn" class="btn ghost small" style="font-size: 16px;">⬅️ Menu</button>
 <button id="tabKalendarzBtn" class="btn">🗓️ Kalendarz</button>
@@ -4742,34 +4886,7 @@ firebase.firestore().enablePersistence()
 const db = firebase.firestore();
 const auth = firebase.auth();
 console.log("Firebase gotowy do działania.");
-/* ============================================== */
-/* ✅ LOGIKA DARK MODE (Pamięć i Przełączanie)    */
-/* ============================================== */
-document.addEventListener('DOMContentLoaded', () => {
-    const toggleSwitch = document.querySelector('#darkModeCheckbox');
-    const currentTheme = localStorage.getItem('theme');
 
-    // 1. Sprawdź zapisany motyw przy starcie
-    if (currentTheme) {
-        document.documentElement.setAttribute('data-theme', currentTheme);
-        if (currentTheme === 'dark' && toggleSwitch) {
-            toggleSwitch.checked = true;
-        }
-    }
-
-    // 2. Funkcja zmiany motywu
-    if (toggleSwitch) {
-        toggleSwitch.addEventListener('change', function(e) {
-            if (e.target.checked) {
-                document.documentElement.setAttribute('data-theme', 'dark');
-                localStorage.setItem('theme', 'dark');
-            } else {
-                document.documentElement.setAttribute('data-theme', 'light');
-                localStorage.setItem('theme', 'light');
-            }
-        });
-    }
-});
 /* ----- GŁÓWNE ZMIENNE APLIKACJI ----- */
 let mapaSerii = {}, mapaIlosci = {}, mapaKarencji = {}, nazwyLekow = [];
 let mapaCen = {};
@@ -12011,143 +12128,6 @@ if (archivePrintBtn) {
                             margin: 1cm;
                         }
                     }
-                    /* ======================================================== */
-/* ✅ TRYB DARK MODE - STYLE I PRZEŁĄCZNIK */
-/* ======================================================== */
-
-/* 1. Zmienne kolorów (Domyślne - Jasne) */
-:root {
-    --bg-body: #FAFBF8;
-    --bg-card: #ffffff;
-    --text-main: #333333;
-    --bg-input: #ffffff;
-    --border-color: #ccc;
-    --menu-bg: #F7F9F5;
-    --table-th: #EBF5E6;
-}
-
-/* 2. Zmienne dla Trybu Ciemnego */
-[data-theme="dark"] {
-    --bg-body: #121212;
-    --bg-card: #1e1e1e;
-    --text-main: #e0e0e0;
-    --bg-input: #2c2c2c;
-    --border-color: #444;
-    --menu-bg: #121212;
-    --table-th: #1f3a1f; /* Ciemna zieleń */
-}
-
-/* 3. Nadpisanie stylów globalnych gdy aktywny jest Dark Mode */
-[data-theme="dark"] body {
-    background-color: var(--bg-body) !important;
-    color: var(--text-main) !important;
-}
-
-[data-theme="dark"] .form-card, 
-[data-theme="dark"] .menu-btn,
-[data-theme="dark"] .visit-item,
-[data-theme="dark"] .schema-item,
-[data-theme="dark"] .knowledge-card,
-[data-theme="dark"] #archiveCardViewerModal > div {
-    background-color: var(--bg-card) !important;
-    color: var(--text-main) !important;
-    border-color: var(--border-color) !important;
-}
-
-[data-theme="dark"] input, 
-[data-theme="dark"] select, 
-[data-theme="dark"] textarea {
-    background-color: var(--bg-input) !important;
-    color: #fff !important;
-    border-color: var(--border-color) !important;
-}
-
-[data-theme="dark"] #mainMenuSection {
-    background-color: var(--menu-bg) !important;
-}
-
-[data-theme="dark"] th {
-    background-color: var(--table-th) !important;
-    color: #fff;
-}
-
-[data-theme="dark"] td {
-    border-color: #444 !important;
-    color: var(--text-main) !important;
-}
-
-/* Fix dla białych teł w sekcjach */
-[data-theme="dark"] #loginSection,
-[data-theme="dark"] #registerSection {
-    background-color: var(--bg-body) !important;
-}
-
-/* 4. Wygląd Przełącznika (Switch) w Menu */
-.dark-mode-toggle-container {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 10px;
-    margin-bottom: 20px;
-    padding: 10px;
-    background: rgba(0,0,0,0.05);
-    border-radius: 20px;
-    width: fit-content;
-    margin-left: auto;
-    margin-right: auto;
-}
-
-[data-theme="dark"] .dark-mode-toggle-container {
-    background: rgba(255,255,255,0.1);
-}
-
-.dm-switch {
-  position: relative;
-  display: inline-block;
-  width: 50px;
-  height: 26px;
-}
-
-.dm-switch input { 
-  opacity: 0;
-  width: 0;
-  height: 0;
-}
-
-.dm-slider {
-  position: absolute;
-  cursor: pointer;
-  top: 0; left: 0; right: 0; bottom: 0;
-  background-color: #ccc;
-  transition: .4s;
-  border-radius: 34px;
-}
-
-.dm-slider:before {
-  position: absolute;
-  content: "";
-  height: 18px;
-  width: 18px;
-  left: 4px;
-  bottom: 4px;
-  background-color: white;
-  transition: .4s;
-  border-radius: 50%;
-}
-
-input:checked + .dm-slider {
-  background-color: #2b74e4; /* Niebieski aktywny */
-}
-
-input:checked + .dm-slider:before {
-  transform: translateX(24px);
-}
-
-.dm-label {
-    font-weight: bold;
-    font-size: 14px;
-    color: inherit;
-}
                 </style>
             </head>
             <body>
@@ -21957,6 +21937,34 @@ document.addEventListener('DOMContentLoaded', updateNetworkStatus);
 
 // Dodatkowe zabezpieczenie: Sprawdź też po załadowaniu okna (czasami DOMContentLoaded jest za szybkie dla navigator.onLine w niektórych przeglądarkach)
 window.addEventListener('load', updateNetworkStatus);
+/* ============================================== */
+/* ✅ LOGIKA DARK MODE (Pamięć i Przełączanie)    */
+/* ============================================== */
+document.addEventListener('DOMContentLoaded', () => {
+    const toggleSwitch = document.querySelector('#darkModeCheckbox');
+    const currentTheme = localStorage.getItem('theme');
+
+    // 1. Sprawdź zapisany motyw przy starcie
+    if (currentTheme) {
+        document.documentElement.setAttribute('data-theme', currentTheme);
+        if (currentTheme === 'dark' && toggleSwitch) {
+            toggleSwitch.checked = true;
+        }
+    }
+
+    // 2. Funkcja zmiany motywu
+    if (toggleSwitch) {
+        toggleSwitch.addEventListener('change', function(e) {
+            if (e.target.checked) {
+                document.documentElement.setAttribute('data-theme', 'dark');
+                localStorage.setItem('theme', 'dark');
+            } else {
+                document.documentElement.setAttribute('data-theme', 'light');
+                localStorage.setItem('theme', 'light');
+            }
+        });
+    }
+});
 </script> 
 </body>
 </html>
