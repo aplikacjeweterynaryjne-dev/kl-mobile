@@ -2809,6 +2809,7 @@ z-index: 1;
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <style>
 .menu-btn {
@@ -2944,6 +2945,7 @@ background-color: #eef;
     <button id="menuMojMagazynBtn" class="submenu-btn">📦 Mój Magazyn</button>
   </div>
   <button id="menuRaportyBtn" class="menu-btn">📊 Raporty</button>
+  <button id="menuAnalizaBtn" class="menu-btn" style="background-color: #f0f4c3; border-color: #dce775;">📈 Analiza i Statystyki</button>
   <button id="menuArchiwumBtn" class="menu-btn">🗄️ Archiwum</button>
   <div id="archiwumSubMenu" style="display: none; width: 90%; max-width: 400px; margin-top: -10px; margin-bottom: 10px;">
     <button id="menuArchiwumKartyBtn" class="submenu-btn">📄 Karty leczenia</button>
@@ -4136,7 +4138,60 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
     </div>
 
 </div>
+<div id="analizaSection" style="display: none; padding: 0 15px 80px 15px;">
+    <h2>📈 Centrum Analiz Biznesowych</h2>
+    
+    <div style="margin-bottom: 20px; background: #fff; padding: 15px; border-radius: 8px; border: 1px solid #eee; text-align: center;">
+        <label style="font-weight:bold;">Zakres analizy:</label>
+        <select id="analizaRangeSelect" style="padding: 8px; font-size: 16px; margin-left: 10px; border-radius: 6px; border: 1px solid #ccc;">
+            <option value="30">Ostatnie 30 dni</option>
+            <option value="90">Ostatnie 3 miesiące</option>
+            <option value="180">Ostatnie pół roku</option>
+            <option value="365">Ostatni rok</option>
+        </select>
+        <button id="refreshAnalizaBtn" class="btn primary small" style="margin-left: 10px;">🔄 Odśwież</button>
+    </div>
 
+    <div class="dashboard-container" style="margin-bottom: 20px; justify-content: center; gap: 15px;">
+        <div class="dash-card blue" style="flex: 1;">
+            <span class="dash-icon">💰</span>
+            <div class="dash-info">
+                <span class="dash-label">Całkowity Przychód</span>
+                <strong id="anTotalRevenue" class="dash-value" style="font-size: 22px;">0 zł</strong>
+            </div>
+        </div>
+        <div class="dash-card red" style="flex: 1;">
+            <span class="dash-icon">📉</span>
+            <div class="dash-info">
+                <span class="dash-label">Niespłacony Dług</span>
+                <strong id="anTotalDebt" class="dash-value" style="font-size: 22px;">0 zł</strong>
+            </div>
+        </div>
+    </div>
+
+    <div style="background: white; padding: 15px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); border: 1px solid #e0e0e0;">
+        <h4 style="text-align: center; margin-top: 0; color: #555;">📊 Trend przychodów (Dzień po dniu)</h4>
+        <div style="height: 300px;">
+            <canvas id="chartRevenueTrend"></canvas>
+        </div>
+    </div>
+
+    <div style="display: flex; gap: 15px; flex-wrap: wrap;">
+        <div style="flex: 1; min-width: 300px; background: white; padding: 15px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); border: 1px solid #e0e0e0;">
+            <h4 style="text-align: center; margin-top: 0; color: #555;">🏆 Top 5 Klientów</h4>
+            <div style="height: 250px;">
+                <canvas id="chartTopClients"></canvas>
+            </div>
+        </div>
+
+        <div style="flex: 1; min-width: 300px; background: white; padding: 15px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); border: 1px solid #e0e0e0;">
+            <h4 style="text-align: center; margin-top: 0; color: #555;">💳 Struktura Płatności</h4>
+            <div style="height: 250px; position: relative; display: flex; justify-content: center;">
+                <canvas id="chartPaymentStatus"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
 <div id="kalendarzWizytSection" style="display: none; padding: 0 15px 80px 15px;">
     <h2>🗓️ Kalendarz wizyt</h2>
 
@@ -7172,13 +7227,13 @@ function showMainMenu() {
         (typeof kalendarzWizytSection !== 'undefined' ? kalendarzWizytSection : null),
         (typeof bazaSchematowSection !== 'undefined' ? bazaSchematowSection : null),
         (typeof mojMagazynSection !== 'undefined' ? mojMagazynSection : null),
-        (typeof zarzadzanieMagazynamiSection !== 'undefined' ? zarzadzanieMagazynamiSection : null)
+        (typeof zarzadzanieMagazynamiSection !== 'undefined' ? zarzadzanieMagazynamiSection : null),
+        (typeof analizaSection !== 'undefined' ? analizaSection : null)
     ];
 
     sectionsToHide.forEach(sec => {
         if (sec) sec.style.display = 'none';
     });
-
     // 2. Pokaż menu, ukryj pasek zakładek
     if (mainTabBar) mainTabBar.style.display = 'none';
     if (mainMenuSection) mainMenuSection.style.display = 'flex';
@@ -7240,6 +7295,7 @@ if (kalendarzWizytSection) kalendarzWizytSection.style.display = 'none'; // ✅ 
 if (bazaSchematowSection) bazaSchematowSection.style.display = 'none'; // <-- ✅ DODAJ TĘ LINIĘ
 if (mojMagazynSection) mojMagazynSection.style.display = 'none'; // ✅ MODUŁ 4: Dodaj tę linię
 if (zarzadzanieMagazynamiSection) zarzadzanieMagazynamiSection.style.display = 'none';
+if (typeof analizaSection !== 'undefined') analizaSection.style.display = 'none';
 // Odznacz wszystkie przyciski
   if (tabKartaBtn) tabKartaBtn.classList.remove('primary');
   if (tabKalkulatorBtn) tabKalkulatorBtn.classList.remove('primary');
@@ -7363,6 +7419,12 @@ loadArchiveReceiptUsers();
       // (nie ma zakładki do podświetlenia)
       onShowRaporty(); // Wywołaj funkcję inicjującą
   }
+// ✅ NOWA LOGIKA DLA ANALIZY
+  else if (sectionToShow === 'analiza' && typeof analizaSection !== 'undefined') {
+      analizaSection.style.display = 'block';
+      // Jeśli chcesz, by przycisk analizy (jeśli byłby w pasku) się świecił, tu dodaj klasę
+      onShowAnaliza(); // Wywołanie funkcji ładującej dane
+  }
     // ⬇️ ⬇️ ⬇️ WKLEJ TEN NOWY BLOK TUTAJ ⬇️ ⬇️ ⬇️
   else if (sectionToShow === 'kalendarz' && kalendarzWizytSection) {
       kalendarzWizytSection.style.display = 'block';
@@ -7382,6 +7444,14 @@ loadArchiveReceiptUsers();
       if (tabMojMagazynBtn) tabMojMagazynBtn.classList.add('primary');
       onShowMojMagazyn(); // Wywołaj funkcję startową
   }  
+      // ✅ WKLEJ TO (Pokazywanie sekcji Analizy):
+  else if (sectionToShow === 'analiza' && typeof analizaSection !== 'undefined') {
+      analizaSection.style.display = 'block';
+      // Wywołaj funkcję ładującą dane (zdefiniowaną w nowym kodzie JS)
+      if (typeof onShowAnaliza === 'function') {
+          onShowAnaliza();
+      }
+  }
     // ✅ KONIEC MODUŁU 4
 
   // ✅ POCZĄTEK MODUŁU 6: Dodaj ten blok
@@ -21786,6 +21856,211 @@ document.addEventListener('DOMContentLoaded', updateNetworkStatus);
 
 // Dodatkowe zabezpieczenie: Sprawdź też po załadowaniu okna (czasami DOMContentLoaded jest za szybkie dla navigator.onLine w niektórych przeglądarkach)
 window.addEventListener('load', updateNetworkStatus);
+/* ======================================================== */
+/* ✅ MODUŁ: ANALIZA DANYCH I WYKRESY (Chart.js)            */
+/* ======================================================== */
+
+// Zmienne globalne dla analizy
+const analizaSectionVar = document.getElementById('analizaSection');
+const menuAnalizaBtn = document.getElementById('menuAnalizaBtn');
+const refreshAnalizaBtn = document.getElementById('refreshAnalizaBtn');
+const analizaRangeSelect = document.getElementById('analizaRangeSelect');
+
+// Przechowujemy instancje wykresów, aby móc je niszczyć przed odświeżeniem
+let chartsInstances = {}; 
+
+// 1. Nawigacja - Listener przycisku w menu
+if (menuAnalizaBtn) {
+    menuAnalizaBtn.addEventListener('click', () => {
+        showSection('analiza');
+    });
+}
+
+if (refreshAnalizaBtn) {
+    refreshAnalizaBtn.addEventListener('click', loadAnalyticsData);
+}
+
+if (analizaRangeSelect) {
+    analizaRangeSelect.addEventListener('change', loadAnalyticsData);
+}
+
+// 2. Funkcja startowa (wywoływana z showSection)
+function onShowAnaliza() {
+    console.log("Wejście do sekcji Analiza.");
+    loadAnalyticsData();
+}
+
+// 3. Pobieranie i Przetwarzanie Danych
+async function loadAnalyticsData() {
+    if (!currentUserProfile) return;
+    
+    // Zablokuj przycisk na czas ładowania
+    if(refreshAnalizaBtn) {
+        refreshAnalizaBtn.disabled = true;
+        refreshAnalizaBtn.textContent = 'Pobieranie... ⏳';
+    }
+
+    const rangeDays = parseInt(analizaRangeSelect.value) || 30;
+    
+    // Oblicz datę graniczną
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - rangeDays);
+    const cutoffDateStr = cutoffDate.toISOString().split('T')[0]; // Format YYYY-MM-DD
+
+    console.log(`Analiza: Pobieranie danych od ${cutoffDateStr}...`);
+
+    try {
+        // --- Zapytanie do Firestore (Archiwum Paragonów) ---
+        let q = db.collection("archiwumParagony")
+                  .where("data", ">=", cutoffDateStr);
+
+        // Filtr uprawnień (Właściciel widzi wszystko, Pracownik tylko swoje)
+        if (currentUserProfile.Rola !== 'administrator' && currentUserProfile.Rola !== 'właściciel') {
+            q = q.where("lekarz_uid", "==", currentUserProfile.uid);
+        } else {
+             // Jeśli właściciel/admin, filtruj po ID lecznicy
+             if (currentUserProfile['ID lecznicy']) {
+                 q = q.where("id_lecznicy", "==", currentUserProfile['ID lecznicy']);
+             }
+        }
+
+        const snapshot = await q.get();
+        const receipts = snapshot.docs.map(doc => doc.data());
+        
+        console.log(`Analiza: Pobranno ${receipts.length} paragonów.`);
+        
+        // --- Przetwarzanie danych ---
+        processAndRenderCharts(receipts);
+
+    } catch (error) {
+        console.error("Błąd analizy:", error);
+        if (error.code === 'failed-precondition') {
+             alert("BŁĄD: Brak indeksu Firestore dla zapytań daty. Sprawdź konsolę (F12) i kliknij link.");
+        }
+    } finally {
+        if(refreshAnalizaBtn) {
+            refreshAnalizaBtn.disabled = false;
+            refreshAnalizaBtn.textContent = '🔄 Odśwież';
+        }
+    }
+}
+
+// 4. Przeliczanie statystyk i Rysowanie Wykresów
+function processAndRenderCharts(data) {
+    let totalRev = 0;
+    let totalDebt = 0;
+    
+    // Struktury danych do wykresów
+    const revenueByDate = {}; // { "2023-11-10": 500, ... }
+    const clientStats = {};   // { "Jan Kowalski": 1200, ... }
+    let paidSum = 0;
+    let debtSum = 0;
+
+    // --- AGREGACJA DANYCH ---
+    data.forEach(r => {
+        const sum = parseFloat(r.suma) || 0;
+        const date = r.data; // Data YYYY-MM-DD
+        const client = r.klient || "Anonim";
+        
+        // Sumy ogólne
+        totalRev += sum;
+        
+        if (r.status === "Dług") {
+            totalDebt += sum;
+            debtSum += sum;
+        } else {
+            paidSum += sum;
+        }
+
+        // 1. Dane do wykresu liniowego (Przychód w czasie)
+        revenueByDate[date] = (revenueByDate[date] || 0) + sum;
+
+        // 2. Dane do rankingu klientów
+        clientStats[client] = (clientStats[client] || 0) + sum;
+    });
+
+    // Aktualizacja kafelków liczbowych
+    if(document.getElementById('anTotalRevenue')) 
+        document.getElementById('anTotalRevenue').textContent = totalRev.toFixed(2).replace('.', ',') + " zł";
+    if(document.getElementById('anTotalDebt')) 
+        document.getElementById('anTotalDebt').textContent = totalDebt.toFixed(2).replace('.', ',') + " zł";
+
+    // --- RYSOWANIE WYKRESÓW ---
+    
+    // A. Wykres Liniowy (Przychód)
+    const sortedDates = Object.keys(revenueByDate).sort();
+    const trendData = sortedDates.map(d => revenueByDate[d]);
+    
+    renderGenericChart('chartRevenueTrend', 'line', {
+        labels: sortedDates,
+        datasets: [{
+            label: 'Przychód dzienny (zł)',
+            data: trendData,
+            borderColor: '#6A994E',
+            backgroundColor: 'rgba(106, 153, 78, 0.1)',
+            tension: 0.3,
+            fill: true,
+            pointRadius: 4
+        }]
+    });
+
+    // B. Wykres Słupkowy (Top Klienci)
+    // Sortuj klientów malejąco po kwocie i weź Top 5
+    const topClients = Object.entries(clientStats)
+        .sort(([,a], [,b]) => b - a)
+        .slice(0, 5);
+    
+    renderGenericChart('chartTopClients', 'bar', {
+        labels: topClients.map(([name]) => name),
+        datasets: [{
+            label: 'Suma wydatków (zł)',
+            data: topClients.map(([,val]) => val),
+            backgroundColor: [
+                'rgba(54, 162, 235, 0.7)',
+                'rgba(75, 192, 192, 0.7)',
+                'rgba(255, 206, 86, 0.7)',
+                'rgba(153, 102, 255, 0.7)',
+                'rgba(255, 159, 64, 0.7)'
+            ],
+            borderWidth: 1
+        }]
+    }, { indexAxis: 'y' }); // Poziomy wykres słupkowy
+
+    // C. Wykres Kołowy (Płatności)
+    renderGenericChart('chartPaymentStatus', 'doughnut', {
+        labels: ['Zapłacone', 'Dług'],
+        datasets: [{
+            data: [paidSum, debtSum],
+            backgroundColor: ['#27ae60', '#c0392b'],
+            hoverOffset: 4
+        }]
+    });
+}
+
+// Funkcja pomocnicza tworząca/aktualizująca wykres
+function renderGenericChart(canvasId, type, data, extraOptions = {}) {
+    const ctx = document.getElementById(canvasId);
+    if (!ctx) return;
+
+    // Jeśli wykres już istnieje na tym płótnie, zniszcz go
+    if (chartsInstances[canvasId]) {
+        chartsInstances[canvasId].destroy();
+    }
+
+    // Stwórz nowy wykres
+    chartsInstances[canvasId] = new Chart(ctx, {
+        type: type,
+        data: data,
+        options: {
+            responsive: true,
+            maintainAspectRatio: false, // Ważne, żeby wykres dopasował się do diva
+            plugins: {
+                legend: { position: 'bottom' }
+            },
+            ...extraOptions
+        }
+    });
+}
 </script> 
 </body>
 </html>
