@@ -4141,15 +4141,26 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
 <div id="analizaSection" style="display: none; padding: 0 15px 80px 15px;">
     <h2>📈 Centrum Analiz Biznesowych</h2>
     
-    <div style="margin-bottom: 20px; background: #fff; padding: 15px; border-radius: 8px; border: 1px solid #eee; text-align: center;">
-        <label style="font-weight:bold;">Zakres analizy:</label>
-        <select id="analizaRangeSelect" style="padding: 8px; font-size: 16px; margin-left: 10px; border-radius: 6px; border: 1px solid #ccc;">
-            <option value="30">Ostatnie 30 dni</option>
-            <option value="90">Ostatnie 3 miesiące</option>
-            <option value="180">Ostatnie pół roku</option>
-            <option value="365">Ostatni rok</option>
-        </select>
-        <button id="refreshAnalizaBtn" class="btn primary small" style="margin-left: 10px;">🔄 Odśwież</button>
+<div style="margin-bottom: 20px; background: #fff; padding: 15px; border-radius: 8px; border: 1px solid #eee; text-align: center; display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; align-items: center;">
+        
+        <div>
+            <label style="font-weight:bold;">Okres:</label>
+            <select id="analizaRangeSelect" style="padding: 8px; font-size: 16px; border-radius: 6px; border: 1px solid #ccc;">
+                <option value="30">Ostatnie 30 dni</option>
+                <option value="90">Ostatnie 3 miesiące</option>
+                <option value="180">Ostatnie pół roku</option>
+                <option value="365">Ostatni rok</option>
+            </select>
+        </div>
+
+        <div>
+            <label style="font-weight:bold;">Analizuj:</label>
+            <select id="analizaUserSelect" style="padding: 8px; font-size: 16px; border-radius: 6px; border: 1px solid #ccc; min-width: 150px;">
+                <option value="ALL">Cała Lecznica</option>
+                </select>
+        </div>
+
+        <button id="refreshAnalizaBtn" class="btn primary small">🔄 Odśwież</button>
     </div>
 
     <div class="dashboard-container" style="margin-bottom: 20px; justify-content: center; gap: 15px;">
@@ -21865,6 +21876,7 @@ const analizaSectionVar = document.getElementById('analizaSection');
 const menuAnalizaBtn = document.getElementById('menuAnalizaBtn');
 const refreshAnalizaBtn = document.getElementById('refreshAnalizaBtn');
 const analizaRangeSelect = document.getElementById('analizaRangeSelect');
+const analizaUserSelect = document.getElementById('analizaUserSelect'); // ✅ NOWA ZMIENNA
 
 // Przechowujemy instancje wykresów, aby móc je niszczyć przed odświeżeniem
 let chartsInstances = {}; 
@@ -21883,67 +21895,81 @@ if (refreshAnalizaBtn) {
 if (analizaRangeSelect) {
     analizaRangeSelect.addEventListener('change', loadAnalyticsData);
 }
+// ✅ NOWY LISTENER:
+if (analizaUserSelect) {
+    analizaUserSelect.addEventListener('change', loadAnalyticsData);
+}
+    /**
+ * ✅ NOWA FUNKCJA: Wczytuje listę do filtra analizy zależnie od uprawnień.
+ * - Admin/Właściciel: Widzi "Cała Lecznica" + wszystkich pracowników.
+ * - Pracownik: Widzi "Cała Lecznica" + "Moje Wyniki" (bez nazwisk innych).
+ */
+async function loadAnalizaUsersList() {
+    if (!analizaUserSelect || !currentUserProfile) return;
 
+    // Jeśli lista ma już więcej niż 1 opcję (np. została załadowana), nie ładuj ponownie
+    if (analizaUserSelect.options.length > 1) return;
+
+    analizaUserSelect.innerHTML = ''; // Reset
+
+    // 1. Zawsze dodaj opcję "Cała Lecznica" (Sumaryczna)
+    analizaUserSelect.add(new Option("🏥 Cała Lecznica (Suma)", "ALL"));
+
+    const myId = currentUserProfile.uid;
+    const myName = `${currentUserProfile.Imie} ${currentUserProfile.Nazwisko}`;
+
+    // 2. Logika dla PRACOWNIKA
+    if (currentUserProfile.Rola === 'pracownik') {
+        // Pracownik widzi tylko siebie do wyboru
+        analizaUserSelect.add(new Option(`👤 Moje Wyniki (${myName})`, myId));
+        
+        // Domyślnie ustaw na "Moje Wyniki" (żeby od razu widział siebie)
+        analizaUserSelect.value = myId; 
+        return;
+    }
+
+    // 3. Logika dla WŁAŚCICIELA / ADMINA
+    // Pobieramy listę wszystkich z lecznicy
+    let query;
+    if (currentUserProfile.Rola === 'administrator') {
+        query = db.collection("konfiguracja").orderBy("Nazwisko");
+    } else {
+        const userClinicId = currentUserProfile['ID lecznicy'];
+        if (!userClinicId) return;
+        query = db.collection("konfiguracja").where("ID lecznicy", "==", userClinicId).orderBy("Nazwisko");
+    }
+
+    try {
+        const snapshot = await query.get();
+        snapshot.docs.forEach(doc => {
+            const user = doc.data();
+            // Pomiń wyświetlanie administratora na liście pracowników (opcjonalne)
+            if (currentUserProfile.Rola === 'właściciel' && user.Rola === 'administrator') return;
+
+            const label = `${user.Imie} ${user.Nazwisko}`;
+            analizaUserSelect.add(new Option(label, user.uid));
+        });
+        
+        // Domyślnie zostaw "ALL" (Cała Lecznica) dla właściciela
+        analizaUserSelect.value = "ALL";
+
+    } catch (e) {
+        console.error("Błąd ładowania listy do analizy:", e);
+    }
+}
 // 2. Funkcja startowa (wywoływana z showSection)
 function onShowAnaliza() {
     console.log("Wejście do sekcji Analiza.");
-    loadAnalyticsData();
+    
+    // ✅ Wywołaj ładowanie listy użytkowników
+    loadAnalizaUsersList().then(() => {
+        // Dopiero jak lista się załaduje (lub jest w cache), pobierz dane
+        loadAnalyticsData();
+    });
 }
 
 // 3. Pobieranie i Przetwarzanie Danych
 async function loadAnalyticsData() {
-    if (!currentUserProfile) return;
-    
-    // Zablokuj przycisk na czas ładowania
-    if(refreshAnalizaBtn) {
-        refreshAnalizaBtn.disabled = true;
-        refreshAnalizaBtn.textContent = 'Pobieranie... ⏳';
-    }
-
-    const rangeDays = parseInt(analizaRangeSelect.value) || 30;
-    
-    // Oblicz datę graniczną
-    const cutoffDate = new Date();
-    cutoffDate.setDate(cutoffDate.getDate() - rangeDays);
-    const cutoffDateStr = cutoffDate.toISOString().split('T')[0]; // Format YYYY-MM-DD
-
-    console.log(`Analiza: Pobieranie danych od ${cutoffDateStr}...`);
-
-    try {
-        // --- Zapytanie do Firestore (Archiwum Paragonów) ---
-        let q = db.collection("archiwumParagony")
-                  .where("data", ">=", cutoffDateStr);
-
-        // Filtr uprawnień (Właściciel widzi wszystko, Pracownik tylko swoje)
-        if (currentUserProfile.Rola !== 'administrator' && currentUserProfile.Rola !== 'właściciel') {
-            q = q.where("lekarz_uid", "==", currentUserProfile.uid);
-        } else {
-             // Jeśli właściciel/admin, filtruj po ID lecznicy
-             if (currentUserProfile['ID lecznicy']) {
-                 q = q.where("id_lecznicy", "==", currentUserProfile['ID lecznicy']);
-             }
-        }
-
-        const snapshot = await q.get();
-        const receipts = snapshot.docs.map(doc => doc.data());
-        
-        console.log(`Analiza: Pobranno ${receipts.length} paragonów.`);
-        
-        // --- Przetwarzanie danych ---
-        processAndRenderCharts(receipts);
-
-    } catch (error) {
-        console.error("Błąd analizy:", error);
-        if (error.code === 'failed-precondition') {
-             alert("BŁĄD: Brak indeksu Firestore dla zapytań daty. Sprawdź konsolę (F12) i kliknij link.");
-        }
-    } finally {
-        if(refreshAnalizaBtn) {
-            refreshAnalizaBtn.disabled = false;
-            refreshAnalizaBtn.textContent = '🔄 Odśwież';
-        }
-    }
-}
 
 // 4. Przeliczanie statystyk i Rysowanie Wykresów
 function processAndRenderCharts(data) {
