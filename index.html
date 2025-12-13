@@ -2569,6 +2569,7 @@ table {
         </div>
     </div>
 </div>
+<div id="networkStatusBadge" class="network-badge" style="display: none;"></div>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
@@ -2694,6 +2695,48 @@ margin-bottom: 20px; /* ✅ Dodany mały odstęp od dołu */
 /* Ukryj przy druku */
 @media print {
     #installFloatingBtn { display: none !important; }
+}
+/* --- Wskaźnik Statusu Sieci (Online/Offline) --- */
+.network-badge {
+    position: fixed;
+    bottom: 20px;
+    left: 20px; /* Lewy dolny róg, żeby nie zasłaniać przycisków akcji po prawej */
+    padding: 10px 15px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: bold;
+    color: white;
+    z-index: 21000; /* Bardzo wysoki Z-Index, żeby był nad wszystkim (nawet nad modalem) */
+    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: opacity 0.5s ease-in-out;
+}
+
+/* Styl dla braku sieci */
+.network-badge.offline {
+    background-color: #c0392b; /* Czerwony */
+    border: 2px solid #992d22;
+    animation: pulse-red 2s infinite;
+}
+
+/* Styl dla powrotu sieci */
+.network-badge.online {
+    background-color: #27ae60; /* Zielony */
+    border: 2px solid #1e8449;
+}
+
+/* Animacja pulsowania dla trybu offline, żeby rzucało się w oczy */
+@keyframes pulse-red {
+    0% { box-shadow: 0 0 0 0 rgba(192, 57, 43, 0.7); }
+    70% { box-shadow: 0 0 0 10px rgba(192, 57, 43, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(192, 57, 43, 0); }
+}
+
+/* Ukryj przy drukowaniu */
+@media print {
+    .network-badge { display: none !important; }
 }
 </style>
 <style>
@@ -21695,6 +21738,54 @@ function checkUserProfileMessage() {
         };
     }
 }
+/* ======================================================== */
+/* ✅ MODUŁ: Monitorowanie Statusu Sieci (Online/Offline)   */
+/* ======================================================== */
+
+const networkBadge = document.getElementById('networkStatusBadge');
+
+function updateNetworkStatus() {
+    if (!networkBadge) return;
+
+    if (navigator.onLine) {
+        // --- JESTEŚMY ONLINE ---
+        
+        // Jeśli wcześniej byliśmy offline (czyli badge jest widoczny i czerwony), pokaż zielony komunikat "Powrót"
+        if (networkBadge.classList.contains('offline')) {
+            networkBadge.className = 'network-badge online';
+            networkBadge.innerHTML = '🟢 Odzyskano połączenie';
+            networkBadge.style.display = 'flex';
+
+            // Ukryj komunikat po 4 sekundach
+            setTimeout(() => {
+                networkBadge.style.display = 'none';
+                networkBadge.className = 'network-badge'; // Reset klas
+            }, 4000);
+        } else {
+            // Jeśli od początku jesteśmy online, po prostu ukryj badge
+            networkBadge.style.display = 'none';
+        }
+
+    } else {
+        // --- JESTEŚMY OFFLINE ---
+        networkBadge.className = 'network-badge offline';
+        networkBadge.innerHTML = '📡 Tryb Offline (Brak Sieci)';
+        networkBadge.style.display = 'flex';
+        
+        // Opcjonalnie: Zapisz w konsoli log
+        console.warn("Aplikacja przeszła w tryb offline.");
+    }
+}
+
+// Nasłuchuj zmian systemowych
+window.addEventListener('online', updateNetworkStatus);
+window.addEventListener('offline', updateNetworkStatus);
+
+// Uruchom sprawdzenie przy starcie aplikacji
+document.addEventListener('DOMContentLoaded', updateNetworkStatus);
+
+// Dodatkowe zabezpieczenie: Sprawdź też po załadowaniu okna (czasami DOMContentLoaded jest za szybkie dla navigator.onLine w niektórych przeglądarkach)
+window.addEventListener('load', updateNetworkStatus);
 </script> 
 </body>
 </html>
