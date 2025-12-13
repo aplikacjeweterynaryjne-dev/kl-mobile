@@ -21883,7 +21883,7 @@ const analizaSectionVar = document.getElementById('analizaSection');
 const menuAnalizaBtn = document.getElementById('menuAnalizaBtn');
 const refreshAnalizaBtn = document.getElementById('refreshAnalizaBtn');
 const analizaRangeSelect = document.getElementById('analizaRangeSelect');
-const analizaUserSelect = document.getElementById('analizaUserSelect'); // ✅ NOWA ZMIENNA
+const analizaUserSelect = document.getElementById('analizaUserSelect');
 
 // Przechowujemy instancje wykresów, aby móc je niszczyć przed odświeżeniem
 let chartsInstances = {}; 
@@ -21902,24 +21902,23 @@ if (refreshAnalizaBtn) {
 if (analizaRangeSelect) {
     analizaRangeSelect.addEventListener('change', loadAnalyticsData);
 }
-// ✅ NOWY LISTENER:
+
 if (analizaUserSelect) {
     analizaUserSelect.addEventListener('change', loadAnalyticsData);
 }
-    /**
- * ✅ NOWA FUNKCJA: Wczytuje listę do filtra analizy zależnie od uprawnień.
- * - Admin/Właściciel: Widzi "Cała Lecznica" + wszystkich pracowników.
- * - Pracownik: Widzi "Cała Lecznica" + "Moje Wyniki" (bez nazwisk innych).
+
+/**
+ * Wczytuje listę do filtra analizy zależnie od uprawnień.
  */
 async function loadAnalizaUsersList() {
     if (!analizaUserSelect || !currentUserProfile) return;
 
-    // Jeśli lista ma już więcej niż 1 opcję (np. została załadowana), nie ładuj ponownie
+    // Jeśli lista ma już więcej niż 1 opcję, nie ładuj ponownie
     if (analizaUserSelect.options.length > 1) return;
 
     analizaUserSelect.innerHTML = ''; // Reset
 
-    // 1. Zawsze dodaj opcję "Cała Lecznica" (Sumaryczna)
+    // 1. Zawsze dodaj opcję "Cała Lecznica"
     analizaUserSelect.add(new Option("🏥 Cała Lecznica (Suma)", "ALL"));
 
     const myId = currentUserProfile.uid;
@@ -21927,16 +21926,13 @@ async function loadAnalizaUsersList() {
 
     // 2. Logika dla PRACOWNIKA
     if (currentUserProfile.Rola === 'pracownik') {
-        // Pracownik widzi tylko siebie do wyboru
+        // Pracownik widzi tylko siebie + Całą Lecznicę (anonimową)
         analizaUserSelect.add(new Option(`👤 Moje Wyniki (${myName})`, myId));
-        
-        // Domyślnie ustaw na "Moje Wyniki" (żeby od razu widział siebie)
         analizaUserSelect.value = myId; 
         return;
     }
 
     // 3. Logika dla WŁAŚCICIELA / ADMINA
-    // Pobieramy listę wszystkich z lecznicy
     let query;
     if (currentUserProfile.Rola === 'administrator') {
         query = db.collection("konfiguracja").orderBy("Nazwisko");
@@ -21950,50 +21946,98 @@ async function loadAnalizaUsersList() {
         const snapshot = await query.get();
         snapshot.docs.forEach(doc => {
             const user = doc.data();
-            // Pomiń wyświetlanie administratora na liście pracowników (opcjonalne)
+            // Pomiń admina na liście pracowników (opcjonalne)
             if (currentUserProfile.Rola === 'właściciel' && user.Rola === 'administrator') return;
 
             const label = `${user.Imie} ${user.Nazwisko}`;
             analizaUserSelect.add(new Option(label, user.uid));
         });
         
-        // Domyślnie zostaw "ALL" (Cała Lecznica) dla właściciela
+        // Domyślnie "ALL" dla właściciela
         analizaUserSelect.value = "ALL";
 
     } catch (e) {
         console.error("Błąd ładowania listy do analizy:", e);
     }
 }
-// 2. Funkcja startowa (wywoływana z showSection)
+
+// 2. Funkcja startowa
 function onShowAnaliza() {
     console.log("Wejście do sekcji Analiza.");
-    
-    // ✅ Wywołaj ładowanie listy użytkowników
     loadAnalizaUsersList().then(() => {
-        // Dopiero jak lista się załaduje (lub jest w cache), pobierz dane
         loadAnalyticsData();
     });
 }
 
-// 3. Pobieranie i Przetwarzanie Danych
+// 3. Pobieranie i Przetwarzanie Danych (TO TEGO BRAKOWAŁO)
 async function loadAnalyticsData() {
+    if (!currentUserProfile) return;
+    
+    if(refreshAnalizaBtn) {
+        refreshAnalizaBtn.disabled = true;
+        refreshAnalizaBtn.textContent = 'Pobieranie... ⏳';
+    }
+
+    const rangeDays = parseInt(analizaRangeSelect.value) || 30;
+    const selectedUserFilter = analizaUserSelect ? analizaUserSelect.value : "ALL";
+
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - rangeDays);
+    const cutoffDateStr = cutoffDate.toISOString().split('T')[0];
+
+    console.log(`Analiza: Pobieranie (Filter: ${selectedUserFilter}, Dni: ${rangeDays})...`);
+
+    try {
+        let q = db.collection("archiwumParagony")
+                  .where("data", ">=", cutoffDateStr);
+
+        // 1. Filtr ID Lecznicy (Dla wszystkich poza globalnym Adminem)
+        if (currentUserProfile.Rola !== 'administrator') {
+             const clinicId = currentUserProfile['ID lecznicy'];
+             if (clinicId) {
+                 q = q.where("id_lecznicy", "==", clinicId);
+             }
+        }
+
+        // 2. Filtr użytkownika
+        if (selectedUserFilter !== "ALL") {
+            q = q.where("lekarz_uid", "==", selectedUserFilter);
+        }
+
+        const snapshot = await q.get();
+        const receipts = snapshot.docs.map(doc => doc.data());
+        
+        console.log(`Analiza: Pobrano ${receipts.length} paragonów.`);
+        
+        processAndRenderCharts(receipts);
+
+    } catch (error) {
+        console.error("Błąd analizy:", error);
+        if (error.code === 'failed-precondition') {
+             alert("BŁĄD BAZY: Wymagany nowy indeks Firestore (id_lecznicy + data). Sprawdź konsolę F12.");
+        }
+    } finally {
+        if(refreshAnalizaBtn) {
+            refreshAnalizaBtn.disabled = false;
+            refreshAnalizaBtn.textContent = '🔄 Odśwież';
+        }
+    }
+}
 
 // 4. Przeliczanie statystyk i Rysowanie Wykresów
-// 4. Przeliczanie statystyk i Rysowanie Wykresów (ZAKTUALIZOWANA v3)
 function processAndRenderCharts(data) {
     let totalRev = 0;
     let totalDebt = 0;
     
     // Struktury danych
     const revenueByDate = {}; 
-    const clientStats = {};   
-    const efficiencyStats = {}; // { "Jan Kowalski": { revenue: 0, count: 0 } }
+    const clientStats = {};    
+    const efficiencyStats = {}; // { "Nazwisko": { revenue: 0, count: 0 } }
     
     let paidSum = 0;
     let debtSum = 0;
 
-    // Sprawdź, czy możemy pokazać dane w rozbiciu na nazwiska
-    // Warunek: Jestem Adminem/Właścicielem I wybrano filtr "Cała Lecznica" (ALL)
+    // Sprawdź uprawnienia do podglądu nazwisk
     const isOwnerViewingAll = (currentUserProfile.Rola === 'administrator' || currentUserProfile.Rola === 'właściciel') 
                               && (!analizaUserSelect || analizaUserSelect.value === 'ALL');
 
@@ -22019,23 +22063,23 @@ function processAndRenderCharts(data) {
         // 2. Ranking Klientów
         clientStats[client] = (clientStats[client] || 0) + sum;
 
-        // 3. Efektywność (Nowa logika grupowania)
+        // 3. Efektywność (Grupowanie)
         let keyName = vetName;
 
         if (!isOwnerViewingAll) {
-            // Jeśli to nie jest właściciel patrzący na całość, to:
-            // A) Jeśli wybrano konkretną osobę (np. filtrowanie po sobie) -> Użyj jej nazwiska
-            // B) Jeśli wybrano "Cała Lecznica" przez pracownika -> Użyj nazwy "Cała Lecznica" (Anonimizacja)
+            // Jeśli to nie jest właściciel patrzący na całość...
             if (analizaUserSelect && analizaUserSelect.value === 'ALL') {
+                // ...i wybrano "Cała Lecznica", to anonimizuj dane (jedna wielka suma)
                 keyName = "Cała Lecznica (Suma)";
             }
+            // Jeśli wybrano konkretne ID (np. moje własne), zostaje nazwisko
         }
 
         if (!efficiencyStats[keyName]) {
             efficiencyStats[keyName] = { revenue: 0, count: 0 };
         }
         efficiencyStats[keyName].revenue += sum;
-        efficiencyStats[keyName].count += 1; // Liczymy paragon jako wizytę
+        efficiencyStats[keyName].count += 1; 
     });
 
     // Aktualizacja kafelków
@@ -22046,7 +22090,7 @@ function processAndRenderCharts(data) {
 
     // --- RYSOWANIE WYKRESÓW ---
     
-    // A. Wykres Liniowy (Przychód) - Bez zmian
+    // A. Wykres Liniowy (Przychód)
     const sortedDates = Object.keys(revenueByDate).sort();
     renderGenericChart('chartRevenueTrend', 'line', {
         labels: sortedDates,
@@ -22061,7 +22105,7 @@ function processAndRenderCharts(data) {
         }]
     });
 
-    // B. Wykres Słupkowy (Top Klienci) - Bez zmian
+    // B. Wykres Słupkowy (Top Klienci)
     const topClients = Object.entries(clientStats).sort(([,a], [,b]) => b - a).slice(0, 5);
     renderGenericChart('chartTopClients', 'bar', {
         labels: topClients.map(([name]) => name),
@@ -22073,7 +22117,7 @@ function processAndRenderCharts(data) {
         }]
     }, { indexAxis: 'y' });
 
-    // C. Wykres Kołowy - Bez zmian
+    // C. Wykres Kołowy (Płatności)
     renderGenericChart('chartPaymentStatus', 'doughnut', {
         labels: ['Zapłacone', 'Dług'],
         datasets: [{
@@ -22083,7 +22127,7 @@ function processAndRenderCharts(data) {
         }]
     });
 
-    // ✅ D. NOWY WYKRES: EFEKTYWNOŚĆ (Combo Chart: Bar + Line)
+    // D. Wykres Efektywności (Słupki + Linia) 
     const sortedVets = Object.keys(efficiencyStats).sort();
     
     renderGenericChart('chartEfficiency', 'bar', {
@@ -22096,19 +22140,19 @@ function processAndRenderCharts(data) {
                 borderColor: '#27ae60',
                 borderWidth: 1,
                 order: 2,
-                yAxisID: 'y' // Lewa oś
+                yAxisID: 'y' 
             },
             {
                 label: 'Liczba Wizyt',
                 data: sortedVets.map(v => efficiencyStats[v].count),
                 borderColor: '#e74c3c', // Czerwona linia
                 backgroundColor: '#e74c3c',
-                type: 'line', // Typ wykresu LINIA
+                type: 'line', 
                 tension: 0.1,
                 borderWidth: 3,
                 pointRadius: 5,
                 order: 1,
-                yAxisID: 'y1' // Prawa oś
+                yAxisID: 'y1' 
             }
         ]
     }, {
@@ -22124,11 +22168,40 @@ function processAndRenderCharts(data) {
                 display: true,
                 position: 'right',
                 title: { display: true, text: 'Liczba wizyt' },
-                grid: { drawOnChartArea: false } // Wyłącz siatkę dla prawej osi, żeby nie było bałaganu
+                grid: { drawOnChartArea: false }
             }
         }
     });
 }
-</script> 
+
+// Funkcja pomocnicza tworząca/aktualizująca wykres (TEGO TEŻ BRAKOWAŁO!)
+function renderGenericChart(canvasId, type, data, extraOptions = {}) {
+    const ctx = document.getElementById(canvasId);
+    if (!ctx) return;
+
+    // Jeśli wykres już istnieje, zniszcz go
+    if (chartsInstances[canvasId]) {
+        chartsInstances[canvasId].destroy();
+    }
+
+    // Stwórz nowy
+    chartsInstances[canvasId] = new Chart(ctx, {
+        type: type,
+        data: data,
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { position: 'bottom' }
+            },
+            ...extraOptions
+        }
+    });
+}
+/* ======================================================== */
+/* KONIEC SKRYPTU */
+/* ======================================================== */
+
+</script>
 </body>
 </html>
