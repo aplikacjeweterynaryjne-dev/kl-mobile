@@ -22062,6 +22062,9 @@ function onShowAnaliza() {
     loadAnalizaUsersList().then(() => {
         loadAnalyticsData();
     });
+    if (typeof initClientAnalysisSelectors === 'function') {
+        initClientAnalysisSelectors(); 
+    }
 }
 
 // 3. Pobieranie i Przetwarzanie Danych (TO TEGO BRAKOWAŁO)
@@ -22349,12 +22352,22 @@ async function initClientAnalysisSelectors() {
 // Wywołaj to przy wejściu do sekcji "Analiza" (dodaj to do funkcji onShowAnaliza)
 // (Instrukcja niżej wyjaśni gdzie to wpiąć)
 
-// 2. Główna funkcja analityczna
 if (btnRunClientAnalysis) {
     btnRunClientAnalysis.addEventListener('click', async () => {
         const clientName = anClientInput.value.trim();
         const selectedVetId = anCompareUserSelect.value;
-        const selectedVetName = anCompareUserSelect.options[anCompareUserSelect.selectedIndex].text;
+        
+        // ✅ POPRAWKA: Zabezpieczenie przed brakiem wyboru
+        let selectedVetName = "Nieznany";
+        if (anCompareUserSelect.selectedIndex !== -1) {
+            selectedVetName = anCompareUserSelect.options[anCompareUserSelect.selectedIndex].text;
+        } else {
+            // Jeśli lista jest pusta, spróbujmy ją załadować i przerwijmy
+            console.warn("Lista lekarzy pusta. Próba przeładowania...");
+            await initClientAnalysisSelectors(); // Spróbuj załadować
+            alert("Lista lekarzy była pusta. Spróbuj kliknąć ponownie.");
+            return;
+        }
 
         if (!clientName) {
             alert("Wybierz klienta do analizy.");
