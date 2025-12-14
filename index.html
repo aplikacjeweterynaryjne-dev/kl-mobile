@@ -4225,7 +4225,7 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
             </div>
 
             <div style="flex: 1; min-width: 250px;">
-                <label for="anCompareUserSelect" style="font-weight: bold; display: block; margin-bottom: 5px;">2. Porównaj z (Lekarz):</label>
+                <label for="anCompareUserSelect" style="font-weight: bold; display: block; margin-bottom: 5px;">2. Porównaj z:</label>
                 <select id="anCompareUserSelect" style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 16px;">
                     </select>
             </div>
@@ -22123,19 +22123,20 @@ async function loadAnalyticsData() {
 }
 
 // 4. Przeliczanie statystyk i Rysowanie Wykresów
+// 4. Przeliczanie statystyk i Rysowanie Wykresów (ZMODYFIKOWANA WERSJA)
 function processAndRenderCharts(data) {
     let totalRev = 0;
     let totalDebt = 0;
     
     // Struktury danych
-    const revenueByDate = {}; 
-    const clientStats = {};    
-    const efficiencyStats = {}; // { "Nazwisko": { revenue: 0, count: 0 } }
+    const revenueByDate = {}; // Suma przychodu na dzień
+    const countByDate = {};   // Liczba paragonów na dzień
+    const clientStats = {};     
+    const efficiencyStats = {}; 
     
     let paidSum = 0;
     let debtSum = 0;
 
-    // Sprawdź uprawnienia do podglądu nazwisk
     const isOwnerViewingAll = (currentUserProfile.Rola === 'administrator' || currentUserProfile.Rola === 'właściciel') 
                               && (!analizaUserSelect || analizaUserSelect.value === 'ALL');
 
@@ -22155,22 +22156,19 @@ function processAndRenderCharts(data) {
             paidSum += sum;
         }
 
-        // 1. Trend w czasie
+        // 1. Trend w czasie (Przychód + Licznik)
         revenueByDate[date] = (revenueByDate[date] || 0) + sum;
+        countByDate[date] = (countByDate[date] || 0) + 1; // Zliczamy paragony
 
         // 2. Ranking Klientów
         clientStats[client] = (clientStats[client] || 0) + sum;
 
-        // 3. Efektywność (Grupowanie)
+        // 3. Efektywność
         let keyName = vetName;
-
         if (!isOwnerViewingAll) {
-            // Jeśli to nie jest właściciel patrzący na całość...
             if (analizaUserSelect && analizaUserSelect.value === 'ALL') {
-                // ...i wybrano "Cała Lecznica", to anonimizuj dane (jedna wielka suma)
                 keyName = "Cała Lecznica (Suma)";
             }
-            // Jeśli wybrano konkretne ID (np. moje własne), zostaje nazwisko
         }
 
         if (!efficiencyStats[keyName]) {
@@ -22180,27 +22178,100 @@ function processAndRenderCharts(data) {
         efficiencyStats[keyName].count += 1; 
     });
 
-    // Aktualizacja kafelków
+    // Aktualizacja kafelków (bez zmian)
     if(document.getElementById('anTotalRevenue')) 
         document.getElementById('anTotalRevenue').textContent = totalRev.toFixed(2).replace('.', ',') + " zł";
     if(document.getElementById('anTotalDebt')) 
         document.getElementById('anTotalDebt').textContent = totalDebt.toFixed(2).replace('.', ',') + " zł";
 
+    // --- PRZYGOTOWANIE DANYCH DO WYKRESU TRENDU ---
+    const sortedDates = Object.keys(revenueByDate).sort();
+    
+    // Obliczanie średniej ilości paragonów (linia prosta - benchmark)
+    const totalCount = Object.values(countByDate).reduce((a, b) => a + b, 0);
+    const averageCount = sortedDates.length > 0 ? (totalCount / sortedDates.length) : 0;
+    const averageCountData = sortedDates.map(() => averageCount); // Linia pozioma
+
+    // Obliczanie średniego przychodu na paragon (Dzień po dniu)
+    const dailyAverageRevenue = sortedDates.map(d => {
+        const rev = revenueByDate[d] || 0;
+        const cnt = countByDate[d] || 1; // Zabezpieczenie przed dzieleniem przez 0
+        return cnt > 0 ? (rev / cnt) : 0;
+    });
+
     // --- RYSOWANIE WYKRESÓW ---
     
-    // A. Wykres Liniowy (Przychód)
-    const sortedDates = Object.keys(revenueByDate).sort();
+    // A. Wykres Liniowy Rozbudowany (Przychód + Ilość + Średnie)
     renderGenericChart('chartRevenueTrend', 'line', {
         labels: sortedDates,
-        datasets: [{
-            label: 'Przychód dzienny (zł)',
-            data: sortedDates.map(d => revenueByDate[d]),
-            borderColor: '#6A994E',
-            backgroundColor: 'rgba(106, 153, 78, 0.1)',
-            tension: 0.3,
-            fill: true,
-            pointRadius: 4
-        }]
+        datasets: [
+            {
+                label: 'Przychód dzienny (zł)',
+                data: sortedDates.map(d => revenueByDate[d]),
+                borderColor: '#6A994E', // Zielony
+                backgroundColor: 'rgba(106, 153, 78, 0.1)',
+                tension: 0.3,
+                fill: true,
+                pointRadius: 4,
+                yAxisID: 'y', // Lewa oś (PLN)
+                order: 2
+            },
+            {
+                label: 'Średni Przychód / Paragon (zł)',
+                data: dailyAverageRevenue,
+                borderColor: '#2980b9', // Niebieski
+                backgroundColor: 'transparent',
+                borderDash: [5, 5], // Linia przerywana
+                tension: 0.3,
+                pointRadius: 0, // Ukryj punkty, sama linia trendu
+                borderWidth: 2,
+                yAxisID: 'y', // Lewa oś (PLN)
+                order: 3
+            },
+            {
+                label: 'Liczba Paragonów',
+                data: sortedDates.map(d => countByDate[d]),
+                borderColor: '#e67e22', // Pomarańczowy
+                backgroundColor: 'rgba(230, 126, 34, 0.1)',
+                tension: 0.3,
+                fill: false,
+                pointRadius: 3,
+                yAxisID: 'y1', // Prawa oś (Sztuki)
+                order: 1
+            },
+            {
+                label: 'Średnia Ilość Paragonów (Poziom)',
+                data: averageCountData,
+                borderColor: '#c0392b', // Czerwony
+                backgroundColor: 'transparent',
+                borderWidth: 1,
+                pointRadius: 0,
+                yAxisID: 'y1', // Prawa oś (Sztuki)
+                order: 4
+            }
+        ]
+    }, {
+        scales: {
+            y: {
+                type: 'linear',
+                display: true,
+                position: 'left',
+                title: { display: true, text: 'Kwota (PLN)' },
+                beginAtZero: true
+            },
+            y1: {
+                type: 'linear',
+                display: true,
+                position: 'right',
+                title: { display: true, text: 'Liczba (Szt.)' },
+                grid: { drawOnChartArea: false }, // Ukryj siatkę dla drugiej osi, żeby było czytelniej
+                beginAtZero: true
+            }
+        },
+        interaction: {
+            mode: 'index',
+            intersect: false,
+        }
     });
 
     // B. Wykres Słupkowy (Top Klienci)
