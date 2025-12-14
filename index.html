@@ -3766,15 +3766,16 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
         <tr>
             <th>Nazwa</th>
             <th>PLU</th>
-            <th>Nr Serii</th> <th>Cena (zł)</th>
+            <th>Nr Serii</th>
+            <th>Cena (zł)</th>
             <th>J.m. / Dawkowanie</th>
             <th>Karencja</th>
-            <th>Stan mag.</th>
-            <th class="col-akcje" style="width: 130px;">Akcje</th>
+            <th>Mój Stan</th>
+            <th style="background-color: #fff3cd;">Globalny Stan (Lecznica)</th> <th class="col-akcje" style="width: 130px;">Akcje</th>
         </tr>
     </thead>
     <tbody id="produktTableBody">
-        <tr><td colspan="8" style="text-align: center; padding: 20px; color: #777; font-size: 1.1em;"><i>Proszę czekać...</i><br><br>Kliknij <i class="bi bi-box-arrow-in-down"></i> <b>Wczytaj bazę produktów</b>, aby rozpocząć.</td></tr>
+        <tr><td colspan="9" style="text-align: center; padding: 20px; color: #777; font-size: 1.1em;"><i>Proszę czekać...</i><br><br>Kliknij <i class="bi bi-box-arrow-in-down"></i> <b>Wczytaj bazę produktów</b>, aby rozpocząć.</td></tr>
     </tbody>
 </table>
   </div> </div> <div id="productFormModal" aria-hidden="true" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.48); display: none; z-index: 10003; justify-content: center; align-items: center; overflow: hidden;">
@@ -4141,10 +4142,9 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
 <div id="analizaSection" style="display: none; padding: 0 15px 80px 15px;">
     <h2>📈 Centrum Analiz Biznesowych</h2>
     
-<div style="margin-bottom: 20px; background: #fff; padding: 15px; border-radius: 8px; border: 1px solid #eee; text-align: center; display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; align-items: center;">
-        
+    <div style="margin-bottom: 20px; background: #fff; padding: 15px; border-radius: 8px; border: 1px solid #eee; display: flex; flex-wrap: wrap; justify-content: center; gap: 15px; align-items: flex-end;">
         <div>
-            <label style="font-weight:bold;">Okres:</label>
+            <label style="font-weight:bold; display:block; margin-bottom:5px;">Okres:</label>
             <select id="analizaRangeSelect" style="padding: 8px; font-size: 16px; border-radius: 6px; border: 1px solid #ccc;">
                 <option value="30">Ostatnie 30 dni</option>
                 <option value="90">Ostatnie 3 miesiące</option>
@@ -4152,62 +4152,101 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
                 <option value="365">Ostatni rok</option>
             </select>
         </div>
-
         <div>
-            <label style="font-weight:bold;">Analizuj:</label>
-            <select id="analizaUserSelect" style="padding: 8px; font-size: 16px; border-radius: 6px; border: 1px solid #ccc; min-width: 150px;">
+            <label style="font-weight:bold; display:block; margin-bottom:5px;">Analizuj Lekarza:</label>
+            <select id="analizaUserSelect" style="padding: 8px; font-size: 16px; border-radius: 6px; border: 1px solid #ccc; min-width: 200px;">
                 <option value="ALL">Cała Lecznica</option>
-                </select>
+            </select>
         </div>
-
-        <button id="refreshAnalizaBtn" class="btn primary small">🔄 Odśwież</button>
+        <button id="refreshAnalizaBtn" class="btn primary">🔄 Odśwież Dane</button>
     </div>
 
     <div class="dashboard-container" style="margin-bottom: 20px; justify-content: center; gap: 15px;">
         <div class="dash-card blue" style="flex: 1;">
             <span class="dash-icon">💰</span>
             <div class="dash-info">
-                <span class="dash-label">Całkowity Przychód</span>
+                <span class="dash-label">Przychód (Wybrany okres)</span>
                 <strong id="anTotalRevenue" class="dash-value" style="font-size: 22px;">0 zł</strong>
             </div>
         </div>
         <div class="dash-card red" style="flex: 1;">
             <span class="dash-icon">📉</span>
             <div class="dash-info">
-                <span class="dash-label">Niespłacony Dług</span>
+                <span class="dash-label">Niespłacony Dług (Ogółem)</span>
                 <strong id="anTotalDebt" class="dash-value" style="font-size: 22px;">0 zł</strong>
             </div>
         </div>
     </div>
 
-    <div style="background: white; padding: 15px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); border: 1px solid #e0e0e0;">
-        <h4 style="text-align: center; margin-top: 0; color: #555;">📊 Trend przychodów (Dzień po dniu)</h4>
-        <div style="height: 300px;">
+    <div style="background: white; padding: 15px; border-radius: 12px; margin-bottom: 30px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); border: 1px solid #e0e0e0;">
+        <h4 style="text-align: center; margin-top: 0; color: #555;">📊 Trend Finansowy i Operacyjny</h4>
+        <div style="height: 350px;">
             <canvas id="chartRevenueTrend"></canvas>
         </div>
     </div>
 
-    <div style="display: flex; gap: 15px; flex-wrap: wrap;">
-        <div style="flex: 1; min-width: 300px; background: white; padding: 15px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); border: 1px solid #e0e0e0;">
-            <h4 style="text-align: center; margin-top: 0; color: #555;">🏆 Top 5 Klientów</h4>
+    <hr style="border: 0; border-top: 2px dashed #ccc; margin: 30px 0;">
+
+    <div style="background: #f9fbff; padding: 20px; border-radius: 12px; border: 1px solid #d0e1f9;">
+        <h3 style="margin-top: 0; color: #2b74e4; text-align: center;">👤 Analiza Szczegółowa Klienta (360°)</h3>
+        
+        <div style="display: flex; justify-content: center; margin-bottom: 20px;">
+            <div style="width: 100%; max-width: 500px;">
+                <label style="font-weight:bold; display:block; margin-bottom:5px;">Wybierz Klienta do analizy:</label>
+                <input list="klientList" id="analizaClientInput" placeholder="Wpisz nazwisko klienta..." style="width: 100%; padding: 10px; font-size: 16px; border: 1px solid #ccc; border-radius: 6px;">
+            </div>
+        </div>
+
+        <div id="clientAnalysisResult" style="display: none;">
+            
+            <div class="dashboard-container" style="justify-content: center; gap: 10px; margin-bottom: 20px;">
+                <div class="dash-card green">
+                    <span class="dash-label">LTV (Całkowity Przychód)</span>
+                    <strong id="caLTV" class="dash-value">0 zł</strong>
+                </div>
+                <div class="dash-card orange">
+                    <span class="dash-label">Średni Koszyk</span>
+                    <strong id="caAvgTicket" class="dash-value">0 zł</strong>
+                </div>
+                <div class="dash-card purple">
+                    <span class="dash-label">Częstotliwość Wizyt</span>
+                    <strong id="caFreq" class="dash-value">co -- dni</strong>
+                </div>
+                <div class="dash-card red">
+                    <span class="dash-label">Aktualne Zadłużenie</span>
+                    <strong id="caDebt" class="dash-value">0 zł</strong>
+                </div>
+            </div>
+
+            <div style="display: flex; flex-wrap: wrap; gap: 20px;">
+                <div style="flex: 1; min-width: 300px; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.1);">
+                    <h4 style="text-align: center; margin: 0 0 10px 0;">Twój udział w obsłudze klienta</h4>
+                    <div style="height: 250px;">
+                        <canvas id="chartClientComparison"></canvas>
+                    </div>
+                </div>
+                <div style="flex: 1; min-width: 300px; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.1);">
+                     <h4 style="text-align: center; margin: 0 0 10px 0;">Top Usługi / Produkty tego klienta</h4>
+                     <ul id="caTopProductsList" style="list-style: none; padding: 0; margin: 0; font-size: 14px;"></ul>
+                </div>
+            </div>
+        </div>
+        <div id="clientAnalysisEmpty" style="text-align: center; color: #888; padding: 20px;">Wybierz klienta powyżej, aby zobaczyć jego statystyki.</div>
+    </div>
+
+    <div style="display: flex; gap: 15px; flex-wrap: wrap; margin-top: 30px;">
+        <div style="flex: 1; min-width: 300px; background: white; padding: 15px; border-radius: 12px; border: 1px solid #e0e0e0;">
+            <h4 style="text-align: center; margin-top: 0; color: #555;">🏆 Top 5 Klientów (Globalnie)</h4>
             <div style="height: 250px;">
                 <canvas id="chartTopClients"></canvas>
             </div>
         </div>
-        
-        <div style="flex: 1; min-width: 300px; background: white; padding: 15px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); border: 1px solid #e0e0e0;">
+        <div style="flex: 1; min-width: 300px; background: white; padding: 15px; border-radius: 12px; border: 1px solid #e0e0e0;">
             <h4 style="text-align: center; margin-top: 0; color: #555;">💳 Struktura Płatności</h4>
-            <div style="height: 250px; position: relative; display: flex; justify-content: center;">
+            <div style="height: 250px; display: flex; justify-content: center;">
                 <canvas id="chartPaymentStatus"></canvas>
             </div>
         </div>
-        <div style="background: white; padding: 15px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); border: 1px solid #e0e0e0;">
-        <h4 style="text-align: center; margin-top: 0; color: #555;">📊 Efektywność: Przychód (Słupek) vs Liczba Wizyt (Linia)</h4>
-        <div style="height: 300px;">
-            <canvas id="chartEfficiency"></canvas>
-        </div>
-        <p style="text-align:center; font-size:12px; color:#888; margin-top:5px;">Wykres pokazuje relację ilości pracy do generowanego przychodu.</p>
-    </div>
     </div>
 </div>
 <div id="kalendarzWizytSection" style="display: none; padding: 0 15px 80px 15px;">
@@ -8878,56 +8917,123 @@ if(productUnitDisplay) productUnitDisplay.textContent = '';
 * Renderuje tabelę produktów na podstawie przekazanej tablicy danych.
 * Zawiera sortowanie wg nazwy.
 */
-function renderProductTable(productsData) {
+/**
+ * Renderuje tabelę produktów z kolumną Globalny Stan.
+ */
+async function renderProductTable(productsData) {
     if (!produktTableBody) return;
-    produktTableBody.innerHTML = ''; // Wyczyść tabelę
+    produktTableBody.innerHTML = '';
 
     if (!productsData || productsData.length === 0) {
-        // ✅ ZMIANA: colspan z 7 na 8
-        produktTableBody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 10px;">Brak produktów w bazie danych.</td></tr>';
+        produktTableBody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 10px;">Brak produktów w bazie danych.</td></tr>';
         return;
     }
 
-    // Sortuj dane wg nazwy (polskie znaki)
-    console.log("Sortowanie produktów przed renderowaniem...");
+    // Sortowanie
     productsData.sort((a, b) => {
         const nameA = a.nazwa || '';
         const nameB = b.nazwa || '';
         return nameA.localeCompare(nameB, 'pl', { sensitivity: 'base' });
     });
-    console.log("Sortowanie zakończone.");
 
-    // Generuj wiersze
-    console.log("Renderowanie tabeli produktów...");
+    // --- LOGIKA GLOBALNEGO STANU ---
+    // Pobierzemy stany globalne w tle, żeby nie blokować renderowania tabeli
+    // Tworzymy mapę ID Produktu -> Promise
+    const globalStockPromises = new Map();
+    if (currentUserProfile && (currentUserProfile.Rola === 'administrator' || currentUserProfile.Rola === 'właściciel')) {
+         // Dla Admina/Właściciela: Zainicjuj pobieranie stanów globalnych
+         // (Funkcja fetchGlobalStock zdefiniowana niżej)
+    }
+
     productsData.forEach(produkt => {
         const tr = document.createElement('tr');
-        tr.dataset.id = produkt.id; // ID dokumentu z Firestore
+        tr.dataset.id = produkt.id;
 
-        // Formatowanie ceny
         const cenaFormatted = formatPrice(parseFloat(produkt.cena) || 0);
+
+        // Komórka Globalnego Stanu (placeholder na start)
+        const globalStockCellId = `global-stock-${produkt.id}`;
 
         tr.innerHTML = `
             <td data-label="Nazwa">${produkt.nazwa || 'Brak nazwy'}</td>
             <td data-label="PLU">${produkt.plu || ''}</td>
-            <td data-label="Nr Serii">${produkt.nrSerii || ''}</td> <td data-label="Cena (zł)" style="text-align: right;">${cenaFormatted}</td>
+            <td data-label="Nr Serii">${produkt.nrSerii || ''}</td> 
+            <td data-label="Cena (zł)" style="text-align: right;">${cenaFormatted}</td>
             <td data-label="J.m. / Dawkowanie">${produkt.dawkowanie || ''}</td>
             <td data-label="Karencja">${produkt.karencja || ''}</td>
-            <td data-label="Stan mag." style="text-align: center;">${produkt.stanMagazynowy || '0'}</td>
+            <td data-label="Mój Stan" style="text-align: center; font-weight:bold;">${produkt.stanMagazynowy || '0'}</td>
+            
+            <td data-label="Globalny Stan" style="text-align: center; background-color: #fffbe6;" id="${globalStockCellId}">
+                <span style="color:#aaa; font-size:12px;">...</span>
+            </td>
+
             <td class="col-akcje">
-                <button class="btn btn-edit-product" data-id="${produkt.id}" title="Edytuj produkt">Edytuj</button>
-                <button class="btn warn btn-delete-product" data-id="${produkt.id}" title="Usuń produkt">Usuń</button>
+                <button class="btn btn-edit-product" data-id="${produkt.id}">Edytuj</button>
+                <button class="btn warn btn-delete-product" data-id="${produkt.id}">Usuń</button>
             </td>
         `;
         produktTableBody.appendChild(tr);
-    });
-    console.log("Renderowanie tabeli produktów zakończone.");
 
-    // Pokaż powiązane UI po renderowaniu
+        // Uruchom asynchroniczne pobieranie stanu globalnego dla tego wiersza
+        calculateGlobalStockForProduct(produkt.id, globalStockCellId);
+    });
+
+    // Pokaż UI
     if(productSearchRow) productSearchRow.style.display = 'block';
     if(addNewProductBtn) addNewProductBtn.style.display = 'inline-block';
     if(productImportActionsContainer) productImportActionsContainer.style.display = 'flex';
     if(loadProductsBtn) loadProductsBtn.style.display = 'none';
     if(refreshProductsBtn) refreshProductsBtn.style.display = 'inline-block';
+}
+
+/**
+ * Helper: Oblicza stan globalny produktu sumując magazyny wszystkich pracowników.
+ */
+async function calculateGlobalStockForProduct(productId, cellId) {
+    // Tę funkcję dodaj gdzieś obok renderProductTable
+    if (!currentUserProfile || !productId) return;
+
+    try {
+        // Pobierz wszystkich użytkowników z tej samej lecznicy
+        const userClinicId = currentUserProfile['ID lecznicy'];
+        if (!userClinicId) return;
+
+        // UWAGA: To zapytanie może być kosztowne przy dużej bazie.
+        // Optymalizacja: Pobrać raz wszystkich userów do cache przy wejściu do zakładki.
+        // Tutaj robimy wersję uproszczoną iterującą po userach z cache jeśli są.
+        
+        // 1. Pobierz listę userów (jeśli nie ma w cache)
+        if (!zarzadzanieUzytkownicyCache || zarzadzanieUzytkownicyCache.length === 0) {
+             const qUsers = db.collection("konfiguracja").where("ID lecznicy", "==", userClinicId);
+             const snapUsers = await qUsers.get();
+             zarzadzanieUzytkownicyCache = snapUsers.docs.map(d => ({ docId: d.id, ...d.data() }));
+        }
+
+        let totalStock = 0;
+        const promises = zarzadzanieUzytkownicyCache.map(async (user) => {
+            if (user.uzywaStanowMagazynowych) {
+                 const docRef = db.collection("konfiguracja").doc(user.docId).collection("magazynOsobisty").doc(productId);
+                 const docSnap = await docRef.get();
+                 if (docSnap.exists) {
+                     return (docSnap.data().stan || 0);
+                 }
+            }
+            return 0;
+        });
+
+        const results = await Promise.all(promises);
+        totalStock = results.reduce((a, b) => a + b, 0);
+
+        // Aktualizuj komórkę
+        const cell = document.getElementById(cellId);
+        if (cell) {
+            cell.innerHTML = `<strong style="color: #d35400;">${totalStock}</strong>`;
+            cell.title = "Suma stanów wszystkich pracowników";
+        }
+
+    } catch (e) {
+        console.error("Błąd obliczania stanu globalnego:", e);
+    }
 }
 
 /**
@@ -22043,19 +22149,20 @@ async function loadAnalyticsData() {
 }
 
 // 4. Przeliczanie statystyk i Rysowanie Wykresów
+// ZASTĄP CAŁĄ FUNKCJĘ processAndRenderCharts TĄ WERSJĄ:
+
 function processAndRenderCharts(data) {
     let totalRev = 0;
     let totalDebt = 0;
     
     // Struktury danych
-    const revenueByDate = {}; 
-    const clientStats = {};    
-    const efficiencyStats = {}; // { "Nazwisko": { revenue: 0, count: 0 } }
+    const statsByDate = {}; // { "2023-10-20": { revenue: 0, count: 0 } }
+    const clientStats = {};     
+    const efficiencyStats = {}; 
     
     let paidSum = 0;
     let debtSum = 0;
 
-    // Sprawdź uprawnienia do podglądu nazwisk
     const isOwnerViewingAll = (currentUserProfile.Rola === 'administrator' || currentUserProfile.Rola === 'właściciel') 
                               && (!analizaUserSelect || analizaUserSelect.value === 'ALL');
 
@@ -22075,54 +22182,118 @@ function processAndRenderCharts(data) {
             paidSum += sum;
         }
 
-        // 1. Trend w czasie
-        revenueByDate[date] = (revenueByDate[date] || 0) + sum;
+        // 1. Trend w czasie (Rozbudowany)
+        if (!statsByDate[date]) {
+            statsByDate[date] = { revenue: 0, count: 0 };
+        }
+        statsByDate[date].revenue += sum;
+        statsByDate[date].count += 1;
 
         // 2. Ranking Klientów
         clientStats[client] = (clientStats[client] || 0) + sum;
 
-        // 3. Efektywność (Grupowanie)
+        // 3. Efektywność
         let keyName = vetName;
-
         if (!isOwnerViewingAll) {
-            // Jeśli to nie jest właściciel patrzący na całość...
-            if (analizaUserSelect && analizaUserSelect.value === 'ALL') {
-                // ...i wybrano "Cała Lecznica", to anonimizuj dane (jedna wielka suma)
-                keyName = "Cała Lecznica (Suma)";
-            }
-            // Jeśli wybrano konkretne ID (np. moje własne), zostaje nazwisko
+            if (analizaUserSelect && analizaUserSelect.value === 'ALL') keyName = "Cała Lecznica (Suma)";
         }
-
-        if (!efficiencyStats[keyName]) {
-            efficiencyStats[keyName] = { revenue: 0, count: 0 };
-        }
+        if (!efficiencyStats[keyName]) efficiencyStats[keyName] = { revenue: 0, count: 0 };
         efficiencyStats[keyName].revenue += sum;
         efficiencyStats[keyName].count += 1; 
     });
 
     // Aktualizacja kafelków
     if(document.getElementById('anTotalRevenue')) 
-        document.getElementById('anTotalRevenue').textContent = totalRev.toFixed(2).replace('.', ',') + " zł";
+        document.getElementById('anTotalRevenue').textContent = formatPrice(totalRev);
     if(document.getElementById('anTotalDebt')) 
-        document.getElementById('anTotalDebt').textContent = totalDebt.toFixed(2).replace('.', ',') + " zł";
+        document.getElementById('anTotalDebt').textContent = formatPrice(totalDebt);
 
-    // --- RYSOWANIE WYKRESÓW ---
+    // --- PRZYGOTOWANIE DANYCH DO WYKRESU TRENDU ---
+    const sortedDates = Object.keys(statsByDate).sort();
+    const dataRevenue = sortedDates.map(d => statsByDate[d].revenue);
+    const dataCount = sortedDates.map(d => statsByDate[d].count);
     
-    // A. Wykres Liniowy (Przychód)
-    const sortedDates = Object.keys(revenueByDate).sort();
+    // Obliczanie średnich
+    const dataAvgRev = sortedDates.map(d => statsByDate[d].count > 0 ? (statsByDate[d].revenue / statsByDate[d].count) : 0);
+    
+    // Średnia liczba paragonów (Benchmark - linia prosta)
+    const totalReceipts = dataCount.reduce((a,b)=>a+b, 0);
+    const avgCountTotal = sortedDates.length > 0 ? (totalReceipts / sortedDates.length) : 0;
+    const dataAvgCountLine = new Array(sortedDates.length).fill(avgCountTotal);
+
+    // --- RYSOWANIE WYKRESU TRENDU (DUAL AXIS) ---
     renderGenericChart('chartRevenueTrend', 'line', {
         labels: sortedDates,
-        datasets: [{
-            label: 'Przychód dzienny (zł)',
-            data: sortedDates.map(d => revenueByDate[d]),
-            borderColor: '#6A994E',
-            backgroundColor: 'rgba(106, 153, 78, 0.1)',
-            tension: 0.3,
-            fill: true,
-            pointRadius: 4
-        }]
+        datasets: [
+            {
+                label: 'Przychód (PLN)',
+                data: dataRevenue,
+                borderColor: '#6A994E', // Zielony
+                backgroundColor: 'rgba(106, 153, 78, 0.1)',
+                yAxisID: 'y',
+                type: 'line',
+                tension: 0.3,
+                fill: true,
+                order: 2
+            },
+            {
+                label: 'Śr. Przychód / Paragon',
+                data: dataAvgRev,
+                borderColor: '#2980b9', // Niebieski
+                borderDash: [5, 5],
+                yAxisID: 'y', // Też na osi PLN
+                type: 'line',
+                tension: 0.1,
+                pointRadius: 0,
+                borderWidth: 2,
+                hidden: true // Domyślnie ukryte, kliknij legendę aby pokazać
+            },
+            {
+                label: 'Liczba Paragonów',
+                data: dataCount,
+                borderColor: '#e67e22', // Pomarańczowy
+                backgroundColor: 'rgba(230, 126, 34, 0.2)',
+                yAxisID: 'y1', // Prawa oś
+                type: 'bar', // Słupki dla ilości
+                barThickness: 10,
+                order: 3
+            },
+            {
+                label: 'Śr. Ilość Paragonów (Benchmark)',
+                data: dataAvgCountLine,
+                borderColor: '#c0392b', // Czerwony
+                borderWidth: 1,
+                pointRadius: 0,
+                yAxisID: 'y1',
+                type: 'line',
+                order: 1
+            }
+        ]
+    }, {
+        scales: {
+            y: {
+                type: 'linear',
+                display: true,
+                position: 'left',
+                title: { display: true, text: 'Wartość (PLN)' }
+            },
+            y1: {
+                type: 'linear',
+                display: true,
+                position: 'right',
+                title: { display: true, text: 'Ilość (Szt)' },
+                grid: { drawOnChartArea: false } // Ukryj siatkę dla prawej osi dla czytelności
+            }
+        },
+        interaction: {
+            mode: 'index',
+            intersect: false,
+        }
     });
 
+    // ... (Reszta wykresów bez zmian: Top Klienci, Płatności) ...
+    // Skopiuj resztę kodu ze starej funkcji (Top Klienci, Płatności) tutaj
+    
     // B. Wykres Słupkowy (Top Klienci)
     const topClients = Object.entries(clientStats).sort(([,a], [,b]) => b - a).slice(0, 5);
     renderGenericChart('chartTopClients', 'bar', {
@@ -22144,77 +22315,203 @@ function processAndRenderCharts(data) {
             hoverOffset: 4
         }]
     });
+}
+    /* ======================================================== */
+/* ✅ MODUŁ: ANALIZA KLIENTA 360° (Szczegóły)               */
+/* ======================================================== */
 
-    // D. Wykres Efektywności (Słupki + Linia) 
-    const sortedVets = Object.keys(efficiencyStats).sort();
-    
-    renderGenericChart('chartEfficiency', 'bar', {
-        labels: sortedVets,
-        datasets: [
-            {
-                label: 'Suma Paragonów (zł)',
-                data: sortedVets.map(v => efficiencyStats[v].revenue),
-                backgroundColor: 'rgba(46, 204, 113, 0.6)', // Zielony słupek
-                borderColor: '#27ae60',
-                borderWidth: 1,
-                order: 2,
-                yAxisID: 'y' 
-            },
-            {
-                label: 'Liczba Wizyt',
-                data: sortedVets.map(v => efficiencyStats[v].count),
-                borderColor: '#e74c3c', // Czerwona linia
-                backgroundColor: '#e74c3c',
-                type: 'line', 
-                tension: 0.1,
-                borderWidth: 3,
-                pointRadius: 5,
-                order: 1,
-                yAxisID: 'y1' 
-            }
-        ]
-    }, {
-        scales: {
-            y: {
-                type: 'linear',
-                display: true,
-                position: 'left',
-                title: { display: true, text: 'Przychód (PLN)' }
-            },
-            y1: {
-                type: 'linear',
-                display: true,
-                position: 'right',
-                title: { display: true, text: 'Liczba wizyt' },
-                grid: { drawOnChartArea: false }
-            }
-        }
+const analizaClientInput = document.getElementById('analizaClientInput');
+const clientAnalysisResult = document.getElementById('clientAnalysisResult');
+const clientAnalysisEmpty = document.getElementById('clientAnalysisEmpty');
+
+// Listener zmiany klienta
+if (analizaClientInput) {
+    analizaClientInput.addEventListener('input', (e) => {
+        // Działaj tylko gdy wybrano konkretną opcję (lub wciśnięto Enter)
+        // Dla uproszczenia: debounce lub na zdarzenie 'change'
+        const val = e.target.value;
+        // Sprawdź czy klient jest na liście (opcjonalne)
+        analyzeClient360(val);
     });
 }
 
-// Funkcja pomocnicza tworząca/aktualizująca wykres (TEGO TEŻ BRAKOWAŁO!)
-function renderGenericChart(canvasId, type, data, extraOptions = {}) {
-    const ctx = document.getElementById(canvasId);
-    if (!ctx) return;
-
-    // Jeśli wykres już istnieje, zniszcz go
-    if (chartsInstances[canvasId]) {
-        chartsInstances[canvasId].destroy();
+async function analyzeClient360(clientName) {
+    if (!clientName) {
+        clientAnalysisResult.style.display = 'none';
+        clientAnalysisEmpty.style.display = 'block';
+        return;
     }
 
-    // Stwórz nowy
-    chartsInstances[canvasId] = new Chart(ctx, {
-        type: type,
-        data: data,
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: { position: 'bottom' }
-            },
-            ...extraOptions
+    // Pokaż, że coś się dzieje
+    clientAnalysisEmpty.textContent = "Analizowanie danych klienta... ⏳";
+    
+    // 1. Pobierz wszystkie dane (Paragony i Karty) dla tego klienta
+    // Nie ograniczamy datą, bo to analiza historyczna (LTV)
+    try {
+        const qParagony = db.collection("archiwumParagony").where("klient", "==", clientName);
+        const qKarty = db.collection("archiwumKarty").where("klient_nazwa", "==", clientName);
+
+        // Dodaj filtr lecznicy
+        const userClinicId = currentUserProfile['ID lecznicy'];
+        let finalQParagony = qParagony;
+        let finalQKarty = qKarty;
+        
+        if (currentUserProfile.Rola !== 'administrator') {
+             finalQParagony = qParagony.where("id_lecznicy", "==", userClinicId);
+             finalQKarty = qKarty.where("id_lecznicy", "==", userClinicId);
         }
-    });
+
+        const [snapP, snapK] = await Promise.all([finalQParagony.get(), finalQKarty.get()]);
+        
+        const receipts = snapP.docs.map(d => d.data());
+        const cards = snapK.docs.map(d => d.data());
+
+        if (receipts.length === 0 && cards.length === 0) {
+            clientAnalysisEmpty.textContent = "Brak danych dla tego klienta.";
+            clientAnalysisResult.style.display = 'none';
+            clientAnalysisEmpty.style.display = 'block';
+            return;
+        }
+
+        // --- OBLICZENIA STATYSTYK ---
+
+        // A. Statystyki Ogólne (Cała Lecznica)
+        let totalRevenue = 0;
+        let totalDebt = 0;
+        let receiptCount = receipts.length;
+        let cardCount = cards.length;
+        
+        // Mapa produktów (Tag cloud)
+        const productFrequency = {};
+
+        receipts.forEach(r => {
+            totalRevenue += parseFloat(r.suma) || 0;
+            if (r.status === 'Dług') totalDebt += parseFloat(r.suma) || 0;
+            
+            // Zliczaj produkty
+            if (r.pozycje) {
+                r.pozycje.forEach(p => {
+                    productFrequency[p.name] = (productFrequency[p.name] || 0) + (parseFloat(p.quantity) || 1);
+                });
+            }
+        });
+
+        // Częstotliwość (Dni między pierwszą a ostatnią wizytą / liczbę wizyt)
+        let frequencyText = "Jednorazowo";
+        if (receiptCount > 1) {
+            // Sortuj daty
+            const dates = receipts.map(r => new Date(r.data)).sort((a,b) => a-b);
+            const firstDate = dates[0];
+            const lastDate = dates[dates.length - 1];
+            const diffDays = (lastDate - firstDate) / (1000 * 60 * 60 * 24);
+            const avgDays = Math.round(diffDays / (receiptCount - 1));
+            frequencyText = `co ${avgDays} dni`;
+        }
+
+        // B. Statystyki dla Wybranego Lekarza (Z listy głównej Analizy)
+        const selectedLekarzId = document.getElementById('analizaUserSelect').value;
+        const isAll = selectedLekarzId === 'ALL';
+        
+        let myRevenue = 0;
+        let myReceipts = 0;
+
+        if (!isAll) {
+            receipts.forEach(r => {
+                if (r.lekarz_uid === selectedLekarzId) {
+                    myRevenue += parseFloat(r.suma) || 0;
+                    myReceipts++;
+                }
+            });
+        } else {
+            // Jeśli wybrano "Cała Lecznica", to "Twoje" = "Wszystkie"
+            myRevenue = totalRevenue;
+            myReceipts = receiptCount;
+        }
+
+        // --- WYPEŁNIANIE UI ---
+        
+        // Kafelki
+        document.getElementById('caLTV').textContent = formatPrice(totalRevenue);
+        document.getElementById('caAvgTicket').textContent = receiptCount > 0 ? formatPrice(totalRevenue / receiptCount) : "0 zł";
+        document.getElementById('caFreq').textContent = frequencyText;
+        
+        const debtEl = document.getElementById('caDebt');
+        debtEl.textContent = formatPrice(totalDebt);
+        debtEl.style.color = totalDebt > 0 ? "red" : "green";
+
+        // Top Produkty
+        const topProducts = Object.entries(productFrequency)
+                                  .sort(([,a], [,b]) => b - a)
+                                  .slice(0, 5); // Top 5
+        const topProdList = document.getElementById('caTopProductsList');
+        topProdList.innerHTML = '';
+        topProducts.forEach(([name, count]) => {
+             topProdList.innerHTML += `<li>🔹 <b>${name}</b> (${count}x)</li>`;
+        });
+
+        // Wykres Porównawczy (Ty vs Reszta)
+        // Jeśli wybrano "Cała Lecznica", nie ma sensu porównywać (100% vs 100%), więc pokażmy np. Leczenie vs Sprzedaż
+        // Ale trzymajmy się planu: Wybrany Lekarz vs Cała Lecznica
+        
+        const ctx = document.getElementById('chartClientComparison');
+        
+        // Zniszcz stary wykres jeśli istnieje
+        if (chartsInstances['chartClientComparison']) {
+            chartsInstances['chartClientComparison'].destroy();
+        }
+
+        const labelLekarz = isAll ? "Cała Lecznica" : "Wybrany Lekarz";
+        const valLekarz = myRevenue;
+        const valReszta = totalRevenue - myRevenue;
+
+        chartsInstances['chartClientComparison'] = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: ['Przychód od Klienta'],
+                datasets: [
+                    {
+                        label: labelLekarz,
+                        data: [valLekarz],
+                        backgroundColor: '#6A994E'
+                    },
+                    {
+                        label: 'Reszta Zespołu',
+                        data: [valReszta],
+                        backgroundColor: '#bdc3c7',
+                        hidden: isAll // Ukryj, jeśli wybrano "Cała Lecznica"
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: { stacked: true },
+                    y: { stacked: true, title: { display: true, text: 'PLN' } }
+                },
+                plugins: {
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.dataset.label || '';
+                                if (label) label += ': ';
+                                label += formatPrice(context.raw);
+                                return label;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        // Pokaż panel
+        clientAnalysisEmpty.style.display = 'none';
+        clientAnalysisResult.style.display = 'block';
+
+    } catch (e) {
+        console.error("Błąd analizy klienta:", e);
+        clientAnalysisEmpty.textContent = "Błąd pobierania danych.";
+    }
 }
 /* ======================================================== */
 /* KONIEC SKRYPTU */
