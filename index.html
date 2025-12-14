@@ -4209,6 +4209,83 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
         <p style="text-align:center; font-size:12px; color:#888; margin-top:5px;">Wykres pokazuje relację ilości pracy do generowanego przychodu.</p>
     </div>
     </div>
+    <hr style="margin: 40px 0; border: 0; border-top: 2px dashed #ccc;">
+
+    <div style="background: #fff; padding: 20px; border-radius: 12px; border: 1px solid #e0e0e0; box-shadow: 0 4px 15px rgba(0,0,0,0.05);">
+        <h3 style="margin-top: 0; color: #2c3e50; text-align: center;">🔍 Szczegółowa Analiza Klienta (360°)</h3>
+        <p style="text-align: center; color: #666; font-size: 14px; margin-bottom: 20px;">
+            Porównaj wyniki wybranego lekarza na tle całej lecznicy dla konkretnego klienta.
+        </p>
+
+        <div style="display: flex; flex-wrap: wrap; gap: 15px; justify-content: center; align-items: flex-end; margin-bottom: 25px; background: #f9f9f9; padding: 15px; border-radius: 8px;">
+            
+            <div style="flex: 1; min-width: 250px;">
+                <label for="anClientInput" style="font-weight: bold; display: block; margin-bottom: 5px;">1. Wybierz Klienta:</label>
+                <input list="klientList" id="anClientInput" placeholder="Wpisz nazwisko klienta..." style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 16px;">
+            </div>
+
+            <div style="flex: 1; min-width: 250px;">
+                <label for="anCompareUserSelect" style="font-weight: bold; display: block; margin-bottom: 5px;">2. Porównaj z (Lekarz):</label>
+                <select id="anCompareUserSelect" style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 16px;">
+                    </select>
+            </div>
+
+            <button id="btnRunClientAnalysis" class="btn primary" style="padding: 10px 20px; font-size: 16px;">📊 Generuj Raport</button>
+        </div>
+
+        <div id="clientAnalysisResults" style="display: none;">
+            
+            <div class="dashboard-container" style="justify-content: space-between; margin-bottom: 30px;">
+                <div class="dash-card blue" style="flex: 1; min-width: 140px;">
+                    <span class="dash-icon">🧾</span>
+                    <div class="dash-info">
+                        <span class="dash-label">Liczba Wizyt (Paragony)</span>
+                        <strong id="caVisits" class="dash-value" style="font-size: 18px;">0 / 0</strong>
+                        <small style="color: #666; font-size: 11px;">(Wybrany / Lecznica)</small>
+                    </div>
+                </div>
+                
+                <div class="dash-card purple" style="flex: 1; min-width: 140px;">
+                    <span class="dash-icon">📝</span>
+                    <div class="dash-info">
+                        <span class="dash-label">Karty Leczenia</span>
+                        <strong id="caCards" class="dash-value" style="font-size: 18px;">0 / 0</strong>
+                        <small style="color: #666; font-size: 11px;">(Wybrany / Lecznica)</small>
+                    </div>
+                </div>
+
+                <div class="dash-card green" style="flex: 1; min-width: 140px;">
+                    <span class="dash-icon">💰</span>
+                    <div class="dash-info">
+                        <span class="dash-label">Suma Przychodów</span>
+                        <strong id="caRevenue" class="dash-value" style="font-size: 18px;">0zł / 0zł</strong>
+                        <small style="color: #666; font-size: 11px;">(Wybrany / Lecznica)</small>
+                    </div>
+                </div>
+
+                 <div class="dash-card red" style="flex: 1; min-width: 140px;">
+                    <span class="dash-icon">📉</span>
+                    <div class="dash-info">
+                        <span class="dash-label">Zadłużenie Klienta</span>
+                        <strong id="caDebt" class="dash-value" style="font-size: 18px; color: #c0392b;">0 zł</strong>
+                        <small style="color: #666; font-size: 11px;">(Całkowite dla lecznicy)</small>
+                    </div>
+                </div>
+            </div>
+
+            <div style="display: flex; flex-wrap: wrap; gap: 20px;">
+                <div style="flex: 1; min-width: 300px; height: 300px;">
+                    <h4 style="text-align: center; margin-bottom: 10px;">📊 Aktywność (Liczba dokumentów)</h4>
+                    <canvas id="chartClientActivity"></canvas>
+                </div>
+                <div style="flex: 1; min-width: 300px; height: 300px;">
+                    <h4 style="text-align: center; margin-bottom: 10px;">💸 Finanse (Przychód od klienta)</h4>
+                    <canvas id="chartClientFinance"></canvas>
+                </div>
+            </div>
+
+        </div>
+    </div>
 </div>
 <div id="kalendarzWizytSection" style="display: none; padding: 0 15px 80px 15px;">
     <h2>🗓️ Kalendarz wizyt</h2>
@@ -22213,6 +22290,277 @@ function renderGenericChart(canvasId, type, data, extraOptions = {}) {
                 legend: { position: 'bottom' }
             },
             ...extraOptions
+        }
+    });
+}
+    /* ======================================================== */
+/* ✅ MODUŁ: SZCZEGÓŁOWA ANALIZA KLIENTA (360°)             */
+/* ======================================================== */
+
+// Zmienne
+const anClientInput = document.getElementById('anClientInput');
+const anCompareUserSelect = document.getElementById('anCompareUserSelect');
+const btnRunClientAnalysis = document.getElementById('btnRunClientAnalysis');
+const clientAnalysisResults = document.getElementById('clientAnalysisResults');
+
+// Instancje wykresów (do niszczenia przed odświeżeniem)
+let chartClientActivityInstance = null;
+let chartClientFinanceInstance = null;
+
+// 1. Funkcja inicjująca listę lekarzy w tej sekcji
+async function initClientAnalysisSelectors() {
+    if (!anCompareUserSelect || !currentUserProfile) return;
+    
+    anCompareUserSelect.innerHTML = '';
+    
+    // Jeśli pracownik -> widzi tylko siebie
+    if (currentUserProfile.Rola === 'pracownik') {
+        const name = `${currentUserProfile.Imie} ${currentUserProfile.Nazwisko}`;
+        anCompareUserSelect.add(new Option(name, currentUserProfile.uid));
+        anCompareUserSelect.disabled = true; 
+        return;
+    }
+
+    // Jeśli Admin/Właściciel -> widzi wszystkich z lecznicy
+    const userClinicId = currentUserProfile['ID lecznicy'];
+    if (!userClinicId) return;
+
+    try {
+        const q = db.collection("konfiguracja")
+            .where("ID lecznicy", "==", userClinicId)
+            .orderBy("Nazwisko");
+        
+        const snap = await q.get();
+        snap.forEach(doc => {
+            const u = doc.data();
+            const label = `${u.Imie} ${u.Nazwisko}`;
+            const opt = new Option(label, u.uid);
+            anCompareUserSelect.add(opt);
+        });
+
+        // Domyślnie zaznacz aktualnie zalogowanego (siebie)
+        anCompareUserSelect.value = currentUserProfile.uid;
+
+    } catch (e) {
+        console.error("Błąd ładowania lekarzy do analizy klienta:", e);
+    }
+}
+
+// Wywołaj to przy wejściu do sekcji "Analiza" (dodaj to do funkcji onShowAnaliza)
+// (Instrukcja niżej wyjaśni gdzie to wpiąć)
+
+// 2. Główna funkcja analityczna
+if (btnRunClientAnalysis) {
+    btnRunClientAnalysis.addEventListener('click', async () => {
+        const clientName = anClientInput.value.trim();
+        const selectedVetId = anCompareUserSelect.value;
+        const selectedVetName = anCompareUserSelect.options[anCompareUserSelect.selectedIndex].text;
+
+        if (!clientName) {
+            alert("Wybierz klienta do analizy.");
+            return;
+        }
+
+        btnRunClientAnalysis.disabled = true;
+        btnRunClientAnalysis.textContent = 'Analizowanie... ⏳';
+        clientAnalysisResults.style.display = 'none';
+
+        try {
+            const clinicId = currentUserProfile['ID lecznicy'];
+
+            // A. Pobierz WSZYSTKIE Paragony tego klienta w tej lecznicy
+            // (Pobieramy całość, a potem filtrujemy w JS dla wybranego lekarza vs reszty)
+            const receiptsSnap = await db.collection("archiwumParagony")
+                .where("id_lecznicy", "==", clinicId)
+                .where("klient", "==", clientName)
+                .get();
+
+            // B. Pobierz WSZYSTKIE Karty tego klienta w tej lecznicy
+            const cardsSnap = await db.collection("archiwumKarty")
+                .where("id_lecznicy", "==", clinicId)
+                .where("klient_nazwa", "==", clientName)
+                .get();
+
+            // --- PRZELICZANIE DANYCH ---
+            
+            // 1. Statystyki CAŁEJ LECZNICY
+            const clinicStats = {
+                receiptsCount: receiptsSnap.size,
+                cardsCount: cardsSnap.size,
+                totalRevenue: 0,
+                totalDebt: 0
+            };
+
+            // 2. Statystyki WYBRANEGO LEKARZA
+            const vetStats = {
+                receiptsCount: 0,
+                cardsCount: 0,
+                totalRevenue: 0,
+                totalDebt: 0 // Dług jest zwykle globalny, ale policzymy ile "wygenerował" długu
+            };
+
+            // Iteracja Paragonów
+            receiptsSnap.forEach(doc => {
+                const r = doc.data();
+                const suma = parseFloat(r.suma) || 0;
+                
+                // Suma Lecznicy
+                clinicStats.totalRevenue += suma;
+                if (r.status === 'Dług') clinicStats.totalDebt += suma;
+
+                // Suma Wybranego Lekarza
+                if (r.lekarz_uid === selectedVetId) {
+                    vetStats.receiptsCount++;
+                    vetStats.totalRevenue += suma;
+                    // Dług generowany przez tego lekarza (opcjonalne, bo dług spłaca się w kasie)
+                    if (r.status === 'Dług') vetStats.totalDebt += suma;
+                }
+            });
+
+            // Iteracja Kart
+            cardsSnap.forEach(doc => {
+                const c = doc.data();
+                if (c.lekarz_uid === selectedVetId) {
+                    vetStats.cardsCount++;
+                }
+            });
+
+            // --- AKTUALIZACJA DOM (Kafelki) ---
+            
+            // Wizyty
+            document.getElementById('caVisits').innerHTML = 
+                `<span style="color:#2b74e4">${vetStats.receiptsCount}</span> / ${clinicStats.receiptsCount}`;
+            
+            // Karty
+            document.getElementById('caCards').innerHTML = 
+                `<span style="color:#9b59b6">${vetStats.cardsCount}</span> / ${clinicStats.cardsCount}`;
+
+            // Finanse
+            const vetRevStr = formatPrice(vetStats.totalRevenue);
+            const clinicRevStr = formatPrice(clinicStats.totalRevenue);
+            document.getElementById('caRevenue').innerHTML = 
+                `<span style="color:#27ae60">${vetRevStr}</span> / ${clinicRevStr}`;
+
+            // Dług (Zawsze globalny dla klienta)
+            document.getElementById('caDebt').textContent = formatPrice(clinicStats.totalDebt);
+
+
+            // --- RYSOWANIE WYKRESÓW ---
+            renderClientComparisonCharts(selectedVetName, vetStats, clinicStats);
+
+            clientAnalysisResults.style.display = 'block';
+
+        } catch (error) {
+            console.error("Błąd analizy klienta:", error);
+            if (error.code === 'failed-precondition') {
+                 alert("BŁĄD BAZY: Wymagany indeks Firestore (id_lecznicy + klient). Sprawdź konsolę.");
+            } else {
+                 alert("Nie znaleziono danych dla tego klienta lub wystąpił błąd.");
+            }
+        } finally {
+            btnRunClientAnalysis.disabled = false;
+            btnRunClientAnalysis.textContent = '📊 Generuj Raport';
+        }
+    });
+}
+
+function renderClientComparisonCharts(vetName, vetStats, clinicStats) {
+    // 1. Wykres Aktywności (Słupkowy grupowany)
+    const ctxActivity = document.getElementById('chartClientActivity').getContext('2d');
+    if (chartClientActivityInstance) chartClientActivityInstance.destroy();
+
+    chartClientActivityInstance = new Chart(ctxActivity, {
+        type: 'bar',
+        data: {
+            labels: ['Liczba Wizyt (Paragony)', 'Liczba Kart Leczenia'],
+            datasets: [
+                {
+                    label: vetName, // Wybrany lekarz
+                    data: [vetStats.receiptsCount, vetStats.cardsCount],
+                    backgroundColor: 'rgba(54, 162, 235, 0.7)', // Niebieski
+                    borderColor: '#36a2eb',
+                    borderWidth: 1
+                },
+                {
+                    label: 'Reszta Lecznicy', // (Całość - Lekarz) dla lepszego porównania w stacked, ale tu zrobimy obok
+                    data: [
+                        clinicStats.receiptsCount - vetStats.receiptsCount, 
+                        clinicStats.cardsCount - vetStats.cardsCount
+                    ],
+                    backgroundColor: 'rgba(201, 203, 207, 0.7)', // Szary
+                    borderColor: '#c9cbcf',
+                    borderWidth: 1
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                x: { stacked: true }, // Stacked (jeden na drugim) pokazuje udział lekarza w całości
+                y: { stacked: true, beginAtZero: true }
+            },
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        footer: (tooltipItems) => {
+                            let sum = 0;
+                            tooltipItems.forEach(function(tooltipItem) {
+                                sum += tooltipItem.parsed.y;
+                            });
+                            return 'Razem w lecznicy: ' + sum;
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    // 2. Wykres Finansowy (Pie chart - Udział lekarza w przychodzie od klienta)
+    const ctxFinance = document.getElementById('chartClientFinance').getContext('2d');
+    if (chartClientFinanceInstance) chartClientFinanceInstance.destroy();
+
+    const otherRevenue = clinicStats.totalRevenue - vetStats.totalRevenue;
+
+    // Zabezpieczenie przed zerami (żeby wykres nie był pusty)
+    let chartData = [vetStats.totalRevenue, otherRevenue];
+    let bgColors = ['rgba(46, 204, 113, 0.8)', 'rgba(224, 224, 224, 0.8)']; // Zielony vs Szary
+
+    if (clinicStats.totalRevenue === 0) {
+        chartData = [1]; // Dummy data
+        bgColors = ['#f0f0f0'];
+    }
+
+    chartClientFinanceInstance = new Chart(ctxFinance, {
+        type: 'doughnut',
+        data: {
+            labels: [vetName, 'Reszta Lecznicy'],
+            datasets: [{
+                data: chartData,
+                backgroundColor: bgColors,
+                hoverOffset: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                title: {
+                    display: true,
+                    text: `Łączny przychód: ${formatPrice(clinicStats.totalRevenue)}`
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            if (clinicStats.totalRevenue === 0) return "Brak przychodu";
+                            let label = context.label || '';
+                            let value = context.raw || 0;
+                            let percentage = ((value / clinicStats.totalRevenue) * 100).toFixed(1) + '%';
+                            return `${label}: ${formatPrice(value)} (${percentage})`;
+                        }
+                    }
+                }
+            }
         }
     });
 }
