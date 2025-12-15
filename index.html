@@ -6285,7 +6285,7 @@ if (printFormatA4) {
 
 // ⬇️ ⬇️ ⬇️ WKLEJ TEN NOWY BLOK W MIEJSCE STAREGO ⬇️ ⬇️ ⬇️
 
-// 4. Listener dla przycisku "110mm" (WERSJA v12 - Safe Width 104mm + Justify + Legal Style)
+// 4. Listener dla przycisku "110mm" (WERSJA v13 - FIX MARGINESÓW)
 if (printFormat110 && receiptPrintContainer) {
     printFormat110.addEventListener('click', () => {
         
@@ -6300,10 +6300,10 @@ if (printFormat110 && receiptPrintContainer) {
         showToast('Generowanie podglądu 110mm...', 'info', 1000);
 
         try {
-            // Generuj treść HTML (używając nowej funkcji v12)
+            // Generuj treść HTML (Używamy funkcji v12, którą masz już w kodzie - jest OK)
             const receiptContentHTML = generate110mmReceiptHTML();
             
-            const printWindow = window.open('', '_blank', 'width=500,height=700,scrollbars=yes,resizable=yes');
+            const printWindow = window.open('', '_blank', 'width=550,height=700,scrollbars=yes,resizable=yes');
             
             if (!printWindow) {
                 showToast('Zablokowano okno pop-up. Zezwól na okna dla tej strony.', 'error');
@@ -6326,7 +6326,7 @@ if (printFormat110 && receiptPrintContainer) {
                             min-height: 100vh;
                         }
 
-                        /* Pasek kontrolny */
+                        /* Pasek kontrolny (nie drukuje się) */
                         .print-controls {
                             width: 100%; padding: 10px; text-align: center; background-color: #333; 
                             position: sticky; top: 0; z-index: 1000;
@@ -6338,26 +6338,28 @@ if (printFormat110 && receiptPrintContainer) {
                         .print-btn { background-color: #4CAF50; color: white; }
                         .close-btn { background-color: #f44336; color: white; }
 
-                        /* --- STYL KARTKI DLA 110mm --- */
+                        /* --- STYL KARTKI DLA 110mm (POPRAWIONY MARGINES) --- */
                         .receipt-page {
-                            /* Czcionka bezszeryfowa, 8pt (optymalna) */
+                            /* Czcionka 8pt - czytelna i oszczędna */
                             font-family: 'Nunito', sans-serif !important;
                             font-size: 8pt !important;
                             line-height: 1.25 !important;
                             color: #000 !important;
                             background-color: #ffffff;
                             
-                            /* BEZPIECZNA SZEROKOŚĆ DLA ROLKI 110MM */
-                            /* 110mm - (3mm marginesu lewego + 3mm prawego) = 104mm */
-                            width: 104mm !important; 
-                            max-width: 104mm !important;
+                            /* --- TU JEST KLUCZOWA ZMIANA --- */
+                            /* Zmniejszamy szerokość z 104mm na 86mm, aby "uciec" przed ucięciem */
+                            width: 86mm !important; 
+                            max-width: 86mm !important;
                             
-                            margin: 20px auto;
-                            padding: 2mm !important; /* Mały padding wewnętrzny */
+                            /* Ustawiamy na sztywno przy lewej krawędzi (z małym odstępem) */
+                            margin: 20px 0 20px 1mm !important;
+                            
+                            padding: 0 !important; /* Usuwamy wewnętrzny padding kontenera */
                             
                             box-sizing: border-box;
                             
-                            /* JUSTOWANIE TEKSTU */
+                            /* Justowanie tekstu */
                             text-align: justify !important; 
                             text-justify: inter-word !important;
                             
@@ -6367,13 +6369,7 @@ if (printFormat110 && receiptPrintContainer) {
                         /* Style elementów wewnątrz */
                         .receipt-page h2 { font-size: 10pt !important; font-weight: 800; text-transform: uppercase; }
                         .receipt-page h3 { font-size: 9pt !important; font-weight: bold; }
-                        
-                        /* Ważne: zapewnienie łamania długich słów i tytułów */
-                        .receipt-page p, .receipt-page div { 
-                            margin: 1px 0; 
-                            word-wrap: break-word; 
-                            overflow-wrap: break-word;
-                        }
+                        .receipt-page p { margin: 1px 0; }
                         .receipt-page strong { font-weight: 700; }
                         
                         /* Obrazki podpisów */
@@ -6390,16 +6386,16 @@ if (printFormat110 && receiptPrintContainer) {
                             .print-controls { display: none !important; }
                             
                             .receipt-page {
-                                width: 100% !important; /* Drukarka użyje zdefiniowanego rozmiaru strony */
-                                max-width: none !important;
-                                margin: 0 !important;
-                                padding: 0 !important; /* Marginesy robi sterownik/hardware */
+                                /* Wymuszamy szerokość przy druku */
+                                width: 86mm !important; 
+                                max-width: 86mm !important;
+                                margin-left: 1mm !important; /* Mały margines od lewej */
                                 box-shadow: none !important;
                             }
                             
                             @page {
                                 size: 110mm auto; /* Rozmiar papieru */
-                                margin: 0mm;      /* Marginesy zerowe - sterujemy szerokością diva */
+                                margin: 0mm;      /* Marginesy zerowe - sterujemy div'em .receipt-page */
                             }
                         }
                     </style>
