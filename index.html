@@ -5321,6 +5321,7 @@ document.getElementById('formNrStada').value = opt.dataset.nrstada || '';
 
 /* ---- kopiowanie do wiersza 10 i przewinięcie + podświetlenie ---- */
 /* ---- Kopiowanie wierszy 1-3 do 10-12 (NOWA WERSJA) ---- */
+/* ---- Kopiowanie wierszy 1-3 do 10-12 (POPRAWIONA WERSJA - Obsługa Inputów) ---- */
 function copyRows123To101112() {
     const logicalRows = rowsEditable();
     if (logicalRows.length < 12) {
@@ -5338,20 +5339,28 @@ function copyRows123To101112() {
         const src = sources[i];
         const target = targets[i];
 
-        // Sprawdzamy, czy wiersz źródłowy ma jakiekolwiek dane (używamy istniejącej funkcji)
+        // Sprawdzamy, czy wiersz źródłowy ma jakiekolwiek dane
         if (typeof isRowEmpty === 'function' && !isRowEmpty(src)) {
             
-            // Kopiuj Kolumnę 2 (cells[1] - Opis)
-            target.cells[1].textContent = src.cells[1].textContent;
+            // 1. Kopiuj Kolumnę 2 (Opis zwierzęcia) - ✅ POPRAWKA TUTAJ
+            const srcOpisInput = src.cells[1].querySelector('input');
+            const srcOpisValue = srcOpisInput ? srcOpisInput.value : src.cells[1].textContent;
             
-            // Kopiuj Kolumnę 3 (cells[2] - Liczba)
+            const tgtOpisInput = target.cells[1].querySelector('input');
+            if (tgtOpisInput) {
+                tgtOpisInput.value = srcOpisValue;
+            } else {
+                target.cells[1].textContent = srcOpisValue;
+            }
+            
+            // 2. Kopiuj Kolumnę 3 (Liczba)
             const srcLiczbaInput = src.cells[2].querySelector('input');
             const tgtLiczbaInput = target.cells[2].querySelector('input');
             if (srcLiczbaInput && tgtLiczbaInput) {
                 tgtLiczbaInput.value = srcLiczbaInput.value;
             }
             
-            // Kopiuj Kolumnę 4 (cells[3] - Rozpoznanie)
+            // 3. Kopiuj Kolumnę 4 (Rozpoznanie)
             const srcRozpInput = src.cells[3].querySelector('input');
             const tgtRozpInput = target.cells[3].querySelector('input');
             if (srcRozpInput && tgtRozpInput) {
@@ -6523,25 +6532,17 @@ if (printFormat110 && receiptPrintContainer) {
  * NOWA FUNKCJA (v5): Poprawki kosmetyczne (B/N, schemat, podtytuły, nr karty, przyciski).
  * @returns {string} - Surowy HTML do wstrzyknięcia.
  */
+/**
+ * NOWA FUNKCJA (v7): Fix pobierania danych (input vs text), Arial, 118mm, Justowanie.
+ */
 function generate110mmReceiptHTML() {
-    console.log("Rozpoczynam generowanie HTML dla 110mm (v5 - Poprawki)...");
+    console.log("Generowanie HTML dla 110mm (v7 - Fix Danych)...");
 
     // --- 1. FUNKCJE POMOCNICZE ---
-
-    /**
-     * Pobiera informacje o produkcie z danego wiersza <tr> tabeli.
-     * POPRAWKA: Zmieniono 'B/N' na 'Brak danych'.
-     */
-   /**
-     * Pobiera informacje o produkcie z danego wiersza <tr> tabeli.
-     * POPRAWKA: Prawidłowe odczytywanie Karencji/Zaleceń (Smart Cell).
-     */
     const getProductInfo = (row) => {
         try {
             const produkt = row.cells[4]?.querySelector('input')?.value.trim() || '';
-            if (!produkt) {
-                return null;
-            }
+            if (!produkt) return null;
 
             const seria = row.cells[5]?.textContent.trim() || 'Brak danych';
             
@@ -6553,39 +6554,36 @@ function generate110mmReceiptHTML() {
             }
             const iloscDawka = [ilosc, dawkaText].filter(Boolean).join(' ') || 'Brak danych';
             
-            // ✅ POPRAWKA DLA KARENCJI / ZALECEŃ (Kolumna 8)
-            // Sprawdzamy, czy jest tam input (nasz Smart Cell)
+            // Smart Cell Karencji
             const karencjaInput = row.cells[7]?.querySelector('input');
-            let karencja = '';
-            
-            if (karencjaInput) {
-                // Jeśli jest input, bierzemy jego wartość
-                karencja = karencjaInput.value.trim();
-            } else {
-                // Jeśli to zwykły tekst, bierzemy textContent
-                karencja = row.cells[7]?.textContent.trim();
-            }
-            
+            let karencja = karencjaInput ? karencjaInput.value.trim() : row.cells[7]?.textContent.trim();
             if (!karencja) karencja = 'Brak danych';
 
             return { produkt, seria, iloscDawka, karencja };
         } catch (e) {
-            console.error("Błąd w getProductInfo dla wiersza:", row, e);
             return null;
         }
     };
 
-    /**
-     * Przetwarza listę wierszy (z tabeli A4) i grupuje je logicznie. (Bez zmian z v4)
-     */
     const groupRows = (rows) => {
         const grupy = [];
         let currentGroup = null;
 
         for (const row of rows) {
-            const opis = row.cells[1]?.textContent.trim() || '';
-            const liczba = row.cells[2]?.querySelector('input')?.value.trim() || '';
-            const rozpoznanie = row.cells[3]?.querySelector('input')?.value.trim() || '';
+            // ✅ POPRAWKA: Pobieranie wartości z INPUTÓW zamiast textContent
+            
+            // Kolumna 2: Opis
+            const opisInput = row.cells[1]?.querySelector('input');
+            const opis = opisInput ? opisInput.value.trim() : (row.cells[1]?.textContent.trim() || '');
+
+            // Kolumna 3: Liczba
+            const liczbaInput = row.cells[2]?.querySelector('input');
+            const liczba = liczbaInput ? liczbaInput.value.trim() : (row.cells[2]?.textContent.trim() || '');
+
+            // Kolumna 4: Rozpoznanie
+            const rozpInput = row.cells[3]?.querySelector('input');
+            const rozpoznanie = rozpInput ? rozpInput.value.trim() : (row.cells[3]?.textContent.trim() || '');
+
             const productInfo = getProductInfo(row);
 
             const isHeaderRow = (opis && opis !== '---') || (liczba && liczba !== '---') || (rozpoznanie && rozpoznanie !== '---');
@@ -6611,7 +6609,7 @@ function generate110mmReceiptHTML() {
         return grupy.filter(g => (g.opis && g.opis !== '---') || (g.liczba && g.liczba !== '---') || (g.rozpoznanie && g.rozpoznanie !== '---') || g.products.length > 0);
     };
 
-    // --- 2. POBIERZ DANE NAGŁÓWKA ---
+    // --- 2. POBIERZ DANE ---
     const nrKL = document.getElementById('nrDokumentu')?.value || 'Brak danych';
     const lecznica = document.getElementById('nazwaLecznicy')?.textContent || 'Brak danych';
     const klient = document.getElementById('klientSelect')?.value || 'Brak danych';
@@ -6619,34 +6617,28 @@ function generate110mmReceiptHTML() {
     const nrStada = document.getElementById('nrStada')?.textContent || 'Brak danych';
     const dataWizyty = document.getElementById('dataWykonania')?.value || 'Brak danych';
 
-    // --- 3. POBIERZ PODPISY ---
     const podpisLekarzaImg = document.getElementById('doctor-signature')?.src || '';
     const podpisLekarzaLinia = document.getElementById('doctor-signature-name')?.textContent || '';
     const podpisKlientaImg = document.getElementById('canvasPosiadacz')?.toDataURL() || '';
 
-    // --- 4. POBIERZ I POGRUPUJ WIERSZE ---
     const logicalRows = rowsEditable();
     const leczenieNaMiejscuRows = logicalRows.slice(0, 9);
     const leczeniePozostawioneRows = logicalRows.slice(9);
     const leczenieGrupy = groupRows(leczenieNaMiejscuRows);
     const pozostawioneGrupy = groupRows(leczeniePozostawioneRows);
     
-    // Zmienna na tekst schematu
     const schematText = "<strong>SCHEMAT:</strong> nazwa zastosowanego produktu** / nr serii*** / zastosowana ilość(dawkowanie)**** / karencja, zalecenia *****";
 
-
-    // --- 5. BUDOWANIE FINALNEGO HTML ---
+    // --- 3. BUDOWANIE HTML ---
     let html = '';
 
-    // Nagłówek paragonu (POPRAWKA: Nr Karty przeniesiony)
     html += `
         <div>
-            <h2 style="text-align: left; font-size: 10pt !important; line-height: 1.2; display: inline; margin: 0; vertical-align: middle;">KARTA LECZENIA ZWIERZĄT GOSPODARSKICH ORAZ ZWIERZĄT, Z KTÓRYCH POZYSKANE TKANKI LUB PRODUKTY SĄ PRZEZNACZONE DO SPOŻYCIA PRZEZ LUDZI / EWIDENCJA LECZENIA ZWIERZĄT</h2>
-            <strong style="font-size: 11pt; white-space: nowrap; margin-left: 20px; vertical-align: middle;">KARTA NR: ${nrKL}</strong>
+            <h2 style="text-align: center; font-size: 11pt !important; line-height: 1.2; display: inline; margin: 0; vertical-align: middle;">KARTA LECZENIA ZWIERZĄT GOSPODARSKICH ORAZ ZWIERZĄT, Z KTÓRYCH POZYSKANE TKANKI LUB PRODUKTY SĄ PRZEZNACZONE DO SPOŻYCIA PRZEZ LUDZI / EWIDENCJA LECZENIA ZWIERZĄT</h2>
+            <div style="text-align: center; margin-top: 5px;"><strong style="font-size: 12pt;">KARTA NR: ${nrKL}</strong></div>
         </div>
     `;
 
-    // Bloki 1, 2, 3 (Dane lecznicy, klienta, data) (bez zmian)
     html += `
         <div class="data-block" style="padding-top: 10px;">
             <h3>1. Nazwa i adres zakładu leczniczego dla zwierząt:</h3>
@@ -6664,31 +6656,25 @@ function generate110mmReceiptHTML() {
         </div>
     `;
 
-    // === NOWA SEKCJA: Leczenie na Miejscu (Scalone) ===
-    html += `<div class="data-block" style="border-top: 1px dashed #000; padding-top: 5px;">`;
+    // === Leczenie na Miejscu ===
+    html += `<div class="data-block" style="border-top: 2px solid #000; padding-top: 5px;">`;
     html += `  <h3 style="margin: 0 0 5px 0;">Leczenie na miejscu</h3>`;
 
-    // 4. Opis zwierzęcia (Scalone)
     const allOpisLNM = leczenieGrupy.map(g => g.opis).filter(Boolean).join(', ');
     html += `  <p><strong>4.Nazwa siedziby stada i opis leczonego zwierzęcia (gatunek, płeć numer identyfikacyjny, sposób oznakowania, wiek, masa ciała):</strong><br>${allOpisLNM || 'Brak danych'}</p>`;
 
-    // 5. Liczba leczonych (Suma)
     const allLiczbaLNM = leczenieGrupy.reduce((sum, g) => sum + (parseInt(g.liczba, 10) || 0), 0);
     html += `  <p><strong>5. Liczba leczonych zwierząt:</strong> ${allLiczbaLNM > 0 ? allLiczbaLNM : 'Brak danych'}</p>`;
 
-    // 6. Rozpoznanie (Scalone)
     const allRozpoznanieLNM = leczenieGrupy.map(g => g.rozpoznanie).filter(Boolean).join(', ');
     html += `  <p><strong>6. Rozpoznanie albo wstępne rozpoznanie choroby:</strong><br>${allRozpoznanieLNM || 'Brak danych'}</p>`;
 
-    // 7. Zastosowane produkty (Lista z podtytułami)
     html += `  <p><strong>7. Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posiadacza zwierzęcia produkty lecznicze weterynaryjne lub pasze lecznicze:</strong></p>`;
-    // POPRAWKA: Wstawiono tekst SCHEMATU
     html += `  <p style="font-size: 9pt; padding-left: 10px;">${schematText}</p>`;
     
     let globalProductCounterLNM = 1;
     for (const group of leczenieGrupy) {
         if (group.products.length > 0) {
-            // POPRAWKA: Format podtytułu
             let podtytulParts = [];
             if (group.opis) podtytulParts.push(`Nazwa: ${group.opis}`);
             if (group.rozpoznanie) podtytulParts.push(`Rozpoznanie: ${group.rozpoznanie}`);
@@ -6707,36 +6693,28 @@ function generate110mmReceiptHTML() {
     if (globalProductCounterLNM === 1) {
          html += `<p style="padding-left: 10px;">--- Brak produktów ---</p>`;
     }
-    html += `</div>`; // Koniec .data-block dla Leczenia na Miejscu
+    html += `</div>`;
 
-    // === ✅ NOWY NAGŁÓWEK: Produkty pozostawione ===
+    // === Produkty pozostawione ===
     html += `<div class="data-block" style="border-top: 2px solid #000; padding-top: 5px;">`;
-    // ✅ 2. DODANO TEN TYTUŁ:
     html += `  <h3 style="margin: 0 0 5px 0;">Produkty pozostawione</h3>`;
     html += `  <h3 style="margin: 5px 0 5px 0; font-size: 10pt;">8. Potwierdzenie nabycia produktu leczniczego weterynaryjnego / paszy leczniczej</h3>`;
-    // POPRAWKA: Usunięto stary tekst SCHEMAT stąd
 
-    // 8.1 Opis zwierzęcia (Scalone)
     const allOpisLP = pozostawioneGrupy.map(g => g.opis).filter(Boolean).join(', ');
     html += `  <p><strong>8.1 Nazwa siedziby stada i opis leczonego zwierzęcia (gatunek, płeć numer identyfikacyjny, sposób oznakowania, wiek, masa ciała):</strong><br>${allOpisLP || 'Brak danych'}</p>`;
 
-    // 8.2 Liczba leczonych (Suma)
     const allLiczbaLP = pozostawioneGrupy.reduce((sum, g) => sum + (parseInt(g.liczba, 10) || 0), 0);
     html += `  <p><strong>8.2 Liczba leczonych zwierząt:</strong> ${allLiczbaLP > 0 ? allLiczbaLP : 'Brak danych'}</p>`;
 
-    // 8.3 Rozpoznanie (Scalone)
     const allRozpoznanieLP = pozostawioneGrupy.map(g => g.rozpoznanie).filter(Boolean).join(', ');
     html += `  <p><strong>8.3 Rozpoznanie albo wstępne rozpoznanie choroby:</strong><br>${allRozpoznanieLP || 'Brak danych'}</p>`;
 
-    // 8.4 Zastosowane produkty (Lista z podtytułami)
     html += `  <p><strong>8.4 Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posiadacza zwierzęcia produkty lecznicze weterynaryjne lub pasze lecznicze:</strong></p>`;
-    // POPRAWKA: Wstawiono tekst SCHEMATU
     html += `  <p style="font-size: 9pt; padding-left: 10px;">${schematText}</p>`;
     
     let globalProductCounterLP = 1;
     for (const group of pozostawioneGrupy) {
         if (group.products.length > 0) {
-            // POPRAWKA: Format podtytułu
             let podtytulParts = [];
             if (group.opis) podtytulParts.push(`Nazwa: ${group.opis}`);
             if (group.rozpoznanie) podtytulParts.push(`Rozpoznanie: ${group.rozpoznanie}`);
@@ -6755,9 +6733,8 @@ function generate110mmReceiptHTML() {
     if (globalProductCounterLP === 1) {
          html += `<p style="padding-left: 10px;">--- Brak produktów ---</p>`;
     }
-    html += `</div>`; // Koniec .data-block dla Potwierdzenia Nabycia
+    html += `</div>`;
 
-    // Bloki Podpisów i Stopki (bez zmian)
     html += `
         <div class="signatures-110mm">
             <div class="sig-box-110mm">
@@ -6780,9 +6757,9 @@ function generate110mmReceiptHTML() {
         </div>
     `;
 
-    console.log("Generowanie HTML 110mm (v5 - Poprawki) zakończone.");
+    console.log("Generowanie HTML 110mm (v7 - Fix Danych) zakończone.");
     return html;
-}
+        }
 
 /* ⬆️ ⬆️ ⬆️ KONIEC ZASTĘPOWANIA ⬆️ ⬆️ ⬆️ */
 // Elementy e-mail
