@@ -6285,232 +6285,127 @@ if (printFormatA4) {
 
 // ⬇️ ⬇️ ⬇️ WKLEJ TEN NOWY BLOK W MIEJSCE STAREGO ⬇️ ⬇️ ⬇️
 
-// 4. Listener dla przycisku "110mm" (Wersja z ładnym podglądem)
+// 4. Listener dla przycisku "110mm" (WERSJA BEZPIECZNA 104mm SZEROKOŚCI)
 if (printFormat110 && receiptPrintContainer) {
     printFormat110.addEventListener('click', () => {
         
-        // ✅ POCZĄTEK MODUŁU 7: Blokada druku
+        // Walidacja stanów (Moduł 7)
         if (typeof isCardStockValid !== 'undefined' && !isCardStockValid) {
-            showToast("Nie można drukować karty. Wykryto błędy w stanach magazynowych (czerwone pola).", "error", 4000);
+            showToast("Nie można drukować karty. Wykryto błędy w stanach magazynowych.", "error", 4000);
             printFormatModal.style.display = 'none';
             return;
         }
-        // ✅ KONIEC MODUŁU 7
 
-        printFormatModal.style.display = 'none'; // Ukryj modal wyboru
+        printFormatModal.style.display = 'none'; // Ukryj modal
         showToast('Generowanie podglądu 110mm...', 'info', 1000);
 
         try {
-            // Generuj treść HTML
+            // Generuj treść HTML (używając nowej funkcji v10)
             const receiptContentHTML = generate110mmReceiptHTML();
             
-            // Otwórz nowe okno
             const printWindow = window.open('', '_blank', 'width=500,height=700,scrollbars=yes,resizable=yes');
             
             if (!printWindow) {
-                showToast('Nie udało się otworzyć nowego okna. Wyłącz blokowanie wyskakujących okienek.', 'error');
+                showToast('Zablokowano okno pop-up. Zezwól na okna dla tej strony.', 'error');
                 return;
             }
 
-            // Wpisz strukturę HTML (Stylizowaną tak jak Raporty)
             printWindow.document.write(`
                 <!DOCTYPE html>
                 <html lang="pl">
                 <head>
                     <meta charset="utf-8">
-                    <title>Podgląd 110mm</title>
+                    <title>Wydruk 110mm</title>
                     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
                     <style>
                         body { 
-                            font-family: 'Nunito', sans-serif; /* Tło ma zwykłą czcionkę */
-                            margin: 0; 
-                            padding: 0; 
-                            background-color: #525659; /* Ciemnoszare tło jak w profesjonalnych podglądach PDF */
-                            display: flex;
-                            flex-direction: column;
-                            align-items: center;
+                            font-family: 'Nunito', sans-serif; 
+                            background-color: #525659; 
+                            margin: 0; padding: 0; 
+                            display: flex; flex-direction: column; align-items: center; 
                             min-height: 100vh;
                         }
 
-                        /* --- Pasek narzędzi (Drukuj / Zamknij) --- */
+                        /* Pasek kontrolny */
                         .print-controls {
-                            width: 100%;
-                            padding: 12px; 
-                            text-align: center; 
-                            background-color: #333;
-                            color: white;
-                            position: sticky; 
-                            top: 0; 
-                            z-index: 1000;
-                            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+                            width: 100%; padding: 10px; text-align: center; background-color: #333; 
+                            position: sticky; top: 0; z-index: 1000;
                         }
                         .print-controls button {
-                            padding: 8px 20px; 
-                            font-size: 16px; 
-                            margin: 0 10px; 
-                            cursor: pointer; 
-                            border-radius: 6px; 
-                            border: 1px solid #777;
-                            font-family: 'Nunito', sans-serif; 
-                            font-weight: 600;
-                            transition: all 0.2s;
+                            padding: 8px 20px; font-size: 16px; margin: 0 10px; cursor: pointer; 
+                            border-radius: 6px; border: 1px solid #777; font-weight: bold;
                         }
-                        .print-controls .print-btn { 
-                            background-color: #4CAF50; 
-                            color: white; 
-                            border-color: #388E3C;
-                        }
-                        .print-controls .print-btn:hover { background-color: #43A047; }
+                        .print-btn { background-color: #4CAF50; color: white; }
+                        .close-btn { background-color: #f44336; color: white; }
 
-                        .print-controls .close-btn { 
-                            background-color: #f44336; 
-                            color: white; 
-                            border-color: #D32F2F;
-                        }
-                        .print-controls .close-btn:hover { background-color: #E53935; }
-                        
-                        /* --- Kartka Paragonu --- */
+                        /* --- STYL KARTKI DLA 110mm --- */
                         .receipt-page {
-                            font-family: 'Courier New', Courier, monospace !important; /* Paragon musi być monospaced */
-                            font-size: 10pt !important;
-                            line-height: 1.3 !important;
+                            /* Czcionka bezszeryfowa, 8pt (-2pkt od poprzedniej) */
+                            font-family: 'Nunito', sans-serif !important;
+                            font-size: 8pt !important;
+                            line-height: 1.25 !important;
                             color: #000 !important;
+                            background-color: #ffffff;
                             
-                            background-color: #ffffff; 
-                            width: 105mm; /* Szerokość 110mm minus marginesy */
-                            min-height: 150mm;
+                            /* BEZPIECZNA SZEROKOŚĆ */
+                            /* 110mm papieru - 3mm marginesu z lewej - 3mm marginesu z prawej = 104mm */
+                            width: 104mm !important; 
+                            max-width: 104mm !important;
                             
-                            margin: 30px auto; /* Odstęp od paska i dołu */
-                            padding: 5mm 35mm 5mm 5mm; /* Prawy margines 35mm (1/3 kartki) */
+                            margin: 20px auto;
+                            padding: 2mm !important; /* Mały padding wewnętrzny */
                             
                             box-sizing: border-box;
-                            box-shadow: 0 5px 25px rgba(0,0,0,0.5); /* Wyraźny cień */
+                            text-align: justify !important; /* Wyjustowanie tekstu */
+                            text-justify: inter-word !important; /* Lepsze justowanie */
+                            
+                            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
                         }
 
-                        /* Style wewnętrzne paragonu */
-                        .receipt-page h2 { font-size: 11pt !important; margin: 0 0 10px 0; font-weight: bold; text-transform: uppercase; }
-                        .receipt-page h3 { font-size: 10pt !important; font-weight: bold; margin-top: 15px; margin-bottom: 5px; border-bottom: 1px dashed #000; padding-bottom: 3px; }
-                        .receipt-page p { margin: 2px 0; word-wrap: break-word; }
-                        .receipt-page .data-block { margin-bottom: 10px; }
-                        .receipt-page .signatures-110mm { margin-top: 25px; display: flex; flex-direction: column; align-items: flex-start; }
-                        .receipt-page .sig-box-110mm { margin-top: 10px; text-align: left !important; }
-                        .receipt-page .sig-box-110mm img { max-width: 180px; height: 60px; object-fit: contain; border: 1px solid #eee; margin-top: 5px; display: block; margin-left: 0; }
-                        .receipt-page .footer-legend { margin-top: 20px; font-size: 8pt !important; border-top: 1px dashed #000; padding-top: 5px; }
+                        /* Style elementów wewnątrz */
+                        .receipt-page h2 { font-size: 10pt !important; font-weight: 800; text-transform: uppercase; }
+                        .receipt-page h3 { font-size: 9pt !important; font-weight: bold; }
+                        .receipt-page p { margin: 1px 0; }
+                        .receipt-page strong { font-weight: 700; }
+                        
+                        /* Obrazki podpisów */
+                        .receipt-page img { display: block; max-width: 100%; height: auto; }
 
-                        /* --- Ustawienia DRUKOWANIA --- */
+                        /* --- WYMUSZENIE DRUKU --- */
                         @media print {
                             body { 
                                 background-color: #ffffff !important; 
-                                display: block !important; /* Reset flexa */
-                            }
-                            .print-controls { 
-                                display: none !important; 
-                            }
-                            .receipt-page {
-                                width: 66mm !important; /* 2/3 szerokości dla drukarki */
+                                display: block !important; 
                                 margin: 0 !important;
-                                padding: 0 !important; /* Marginesy zdefiniowane w @page */
-                                box-shadow: none !important;
-                                border: none !important;
-                                min-height: unset !important;
+                                padding: 0 !important;
                             }
+                            .print-controls { display: none !important; }
+                            
+                            .receipt-page {
+                                width: 100% !important; /* Drukarka użyje zdefiniowanego rozmiaru strony */
+                                max-width: none !important;
+                                margin: 0 !important;
+                                padding: 0 !important; /* Marginesy robi sterownik/hardware */
+                                box-shadow: none !important;
+                            }
+                            
                             @page {
-                                size: 110mm auto; /* 110mm szerokości, auto wysokość */
-                                margin: 5mm;      /* Marginesy fizyczne drukarki */
-                                orientation: portrait;
+                                size: 110mm auto; /* Rozmiar papieru */
+                                margin: 0mm;      /* Marginesy zerowe - sterujemy szerokością diva */
                             }
                         }
-                        /* --- STYLE SPOŁECZNOŚCI --- */
-
-/* Dymki czatu */
-.chat-msg {
-    max-width: 75%;
-    padding: 10px 15px;
-    border-radius: 18px;
-    font-size: 15px;
-    line-height: 1.4;
-    position: relative;
-    word-wrap: break-word;
-}
-.chat-msg-me {
-    align-self: flex-end;
-    background-color: #0084ff; /* Niebieski (Ja) */
-    color: white;
-    border-bottom-right-radius: 4px;
-}
-.chat-msg-other {
-    align-self: flex-start;
-    background-color: #e4e6eb; /* Szary (Inni) */
-    color: #050505;
-    border-bottom-left-radius: 4px;
-}
-.chat-author {
-    font-size: 11px;
-    color: #666;
-    margin-bottom: 2px;
-    margin-left: 5px;
-}
-.chat-time {
-    font-size: 10px;
-    opacity: 0.7;
-    text-align: right;
-    margin-top: 4px;
-}
-
-/* Kafelki Bazy Wiedzy */
-.knowledge-card {
-    background: #fff;
-    border: 1px solid #ddd;
-    border-radius: 8px;
-    padding: 15px;
-    margin-bottom: 15px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-}
-.knowledge-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    border-bottom: 1px solid #eee;
-    padding-bottom: 8px;
-    margin-bottom: 8px;
-}
-.knowledge-title { font-size: 18px; font-weight: bold; color: #2c3e50; }
-.knowledge-author { font-size: 12px; color: #777; }
-.knowledge-products { font-size: 13px; color: #444; margin-bottom: 10px; }
-.knowledge-likes { font-weight: bold; color: #e67e22; }
-                    /* Kolor fioletowy dla dashboardu */
-.dash-card.purple { border-bottom-color: #9b59b6; }
-
-/* Przycisk usuwania wiadomości (mały krzyżyk) */
-.btn-delete-msg {
-    background: none;
-    border: none;
-    color: #999;
-    font-size: 12px;
-    cursor: pointer;
-    margin-left: 5px;
-    padding: 0 4px;
-}
-.btn-delete-msg:hover {
-    color: #c0392b;
-    font-weight: bold;
-}
-/* Ukrycie przycisku "Dodaj nowego" w oknie wyszukiwania produktu */
-#productSearchAddNewBtn {
-    display: none !important;
-}
                     </style>
                 </head>
                 <body>
                     <div class="print-controls">
-                        <button class="print-btn" onclick="window.print();">🖨️ Drukuj</button>
-                        <button class="close-btn" onclick="window.close();">Zamknij okno</button>
+                        <button class="print-btn" onclick="window.print()">🖨️ Drukuj</button>
+                        <button class="close-btn" onclick="window.close()">Zamknij</button>
                     </div>
                     
                     <div class="receipt-page">
                         ${receiptContentHTML}
                     </div>
- 
+
                 </body>
                 </html>
             `);
@@ -6519,21 +6414,23 @@ if (printFormat110 && receiptPrintContainer) {
             printWindow.focus();
 
         } catch (e) {
-            console.error("Błąd podczas generowania podglądu 110mm:", e);
+            console.error("Błąd generowania podglądu 110mm:", e);
             showToast('Błąd generowania podglądu 110mm.', 'error');
         }
     });
-}
+        }
 
 // ⬆️ ⬆️ ⬆️ KONIEC NOWEGO BLOKU ⬆️ ⬆️ ⬆️
 /* ⬇️ ⬇️ ⬇️ ZASTĄP CAŁĄ FUNKCJĘ "generate110mmReceiptHTML" TĄ NOWĄ WERSJĄ ⬇️ ⬇️ ⬇️ */
 
 /**
- * NOWA FUNKCJA (v8): Compact 8pt Font.
- * Zmniejszono czcionki o 2pkt dla oszczędności papieru.
+ * NOWA FUNKCJA (v10): Safe 110mm Layout.
+ * - Czcionka 8pt.
+ * - Struktura przygotowana pod bezpieczną szerokość 104mm.
+ * - Justowanie tekstu (od krawędzi do krawędzi).
  */
 function generate110mmReceiptHTML() {
-    console.log("Generowanie HTML dla 110mm (v8 - Compact 8pt)...");
+    console.log("Generowanie HTML dla 110mm (v10 - Safe Width)...");
 
     // --- 1. FUNKCJE POMOCNICZE (Bez zmian) ---
     const getProductInfo = (row) => {
@@ -6541,19 +6438,18 @@ function generate110mmReceiptHTML() {
             const produkt = row.cells[4]?.querySelector('input')?.value.trim() || '';
             if (!produkt) return null;
 
-            const seria = row.cells[5]?.textContent.trim() || 'Brak danych';
-            
+            const seria = row.cells[5]?.textContent.trim() || '-';
             const iloscInput = row.cells[6]?.querySelector('input[type="number"]');
             const ilosc = iloscInput?.value.trim() || '';
             let dawkaText = '';
             if (iloscInput && iloscInput.nextSibling && iloscInput.nextSibling.nodeType === Node.TEXT_NODE) {
                 dawkaText = iloscInput.nextSibling.textContent.trim();
             }
-            const iloscDawka = [ilosc, dawkaText].filter(Boolean).join(' ') || 'Brak danych';
+            const iloscDawka = [ilosc, dawkaText].filter(Boolean).join(' ') || '-';
             
             const karencjaInput = row.cells[7]?.querySelector('input');
             let karencja = karencjaInput ? karencjaInput.value.trim() : row.cells[7]?.textContent.trim();
-            if (!karencja) karencja = 'Brak danych';
+            if (!karencja) karencja = '-';
 
             return { produkt, seria, iloscDawka, karencja };
         } catch (e) {
@@ -6566,7 +6462,6 @@ function generate110mmReceiptHTML() {
         let currentGroup = null;
 
         for (const row of rows) {
-            // Pobieranie wartości z INPUTÓW
             const opisInput = row.cells[1]?.querySelector('input');
             const opis = opisInput ? opisInput.value.trim() : (row.cells[1]?.textContent.trim() || '');
 
@@ -6577,7 +6472,6 @@ function generate110mmReceiptHTML() {
             const rozpoznanie = rozpInput ? rozpInput.value.trim() : (row.cells[3]?.textContent.trim() || '');
 
             const productInfo = getProductInfo(row);
-
             const isHeaderRow = (opis && opis !== '---') || (liczba && liczba !== '---') || (rozpoznanie && rozpoznanie !== '---');
 
             if (isHeaderRow) {
@@ -6602,12 +6496,12 @@ function generate110mmReceiptHTML() {
     };
 
     // --- 2. POBIERZ DANE ---
-    const nrKL = document.getElementById('nrDokumentu')?.value || 'Brak danych';
-    const lecznica = document.getElementById('nazwaLecznicy')?.textContent || 'Brak danych';
-    const klient = document.getElementById('klientSelect')?.value || 'Brak danych';
-    const adres = document.getElementById('adresKlienta')?.textContent || 'Brak danych';
-    const nrStada = document.getElementById('nrStada')?.textContent || 'Brak danych';
-    const dataWizyty = document.getElementById('dataWykonania')?.value || 'Brak danych';
+    const nrKL = document.getElementById('nrDokumentu')?.value || '---';
+    const lecznica = document.getElementById('nazwaLecznicy')?.textContent || '---';
+    const klient = document.getElementById('klientSelect')?.value || '---';
+    const adres = document.getElementById('adresKlienta')?.textContent || '---';
+    const nrStada = document.getElementById('nrStada')?.textContent || '---';
+    const dataWizyty = document.getElementById('dataWykonania')?.value || '---';
 
     const podpisLekarzaImg = document.getElementById('doctor-signature')?.src || '';
     const podpisLekarzaLinia = document.getElementById('doctor-signature-name')?.textContent || '';
@@ -6619,140 +6513,100 @@ function generate110mmReceiptHTML() {
     const leczenieGrupy = groupRows(leczenieNaMiejscuRows);
     const pozostawioneGrupy = groupRows(leczeniePozostawioneRows);
     
-    // Schemat mniejszą czcionką (7pt)
-    const schematText = "<strong>SCHEMAT:</strong> nazwa zastosowanego produktu** / nr serii*** / zastosowana ilość(dawkowanie)**** / karencja, zalecenia *****";
+    // Legenda (skrócona)
+    const schematText = "Produkt / Seria / Ilość / Karencja";
 
-    // --- 3. BUDOWANIE HTML (Zaktualizowane font-size inline) ---
+    // --- 3. BUDOWANIE HTML ---
     let html = '';
 
     html += `
-        <div>
-            <h2 style="text-align: center; font-size: 10pt !important; line-height: 1.2; display: inline; margin: 0; vertical-align: middle;">KARTA LECZENIA ZWIERZĄT GOSPODARSKICH ORAZ ZWIERZĄT, Z KTÓRYCH POZYSKANE TKANKI LUB PRODUKTY SĄ PRZEZNACZONE DO SPOŻYCIA PRZEZ LUDZI / EWIDENCJA LECZENIA ZWIERZĄT</h2>
-            <div style="text-align: center; margin-top: 4px;"><strong style="font-size: 10pt;">KARTA NR: ${nrKL}</strong></div>
+        <div style="text-align: center; border-bottom: 2px solid #000; padding-bottom: 5px; margin-bottom: 5px;">
+            <h2 style="font-size: 10pt !important; margin: 0; line-height: 1.1;">KARTA LECZENIA ZWIERZĄT</h2>
+            <div style="font-size: 9pt; margin-top: 2px;">NR: <strong>${nrKL}</strong></div>
         </div>
     `;
 
     html += `
-        <div class="data-block" style="padding-top: 8px;">
-            <h3>1. Nazwa i adres zakładu leczniczego dla zwierząt:</h3>
-            <p>${lecznica.replace('<br>', '\n')}</p>
-        </div>
         <div class="data-block">
-            <h3>2. Imię, nazwisko i adres albo nazwa siedziby i adres posiadacza zwierzęcia:</h3>
+            <p><strong>Lecznica:</strong> ${lecznica}</p>
             <p><strong>Klient:</strong> ${klient}</p>
             <p><strong>Adres:</strong> ${adres}</p>
-            <p><strong>Nr stada:</strong> ${nrStada}</p>
-        </div>
-        <div class="data-block">
-            <h3>3. Wykonanie czynności lekarsko-weterynaryjnych data</h3>
-            <p>${dataWizyty}</p>
+            <p><strong>Stado:</strong> ${nrStada} | <strong>Data:</strong> ${dataWizyty}</p>
         </div>
     `;
 
-    // === Leczenie na Miejscu ===
-    html += `<div class="data-block" style="border-top: 2px solid #000; padding-top: 4px;">`;
-    html += `  <h3 style="margin: 0 0 4px 0;">Leczenie na miejscu</h3>`;
+    // Funkcja generująca sekcję
+    const generateSection = (title, groups) => {
+        let sectionHtml = `<div class="data-block" style="border-top: 1px solid #000; margin-top: 4px; padding-top: 2px;">`;
+        sectionHtml += `<h3 style="margin: 0 0 2px 0; font-size: 9pt; text-transform: uppercase; background: #eee; padding: 1px;">${title}</h3>`;
+        
+        let hasContent = false;
 
-    const allOpisLNM = leczenieGrupy.map(g => g.opis).filter(Boolean).join(', ');
-    html += `  <p><strong>4.Nazwa siedziby stada i opis leczonego zwierzęcia (gatunek, płeć numer identyfikacyjny, sposób oznakowania, wiek, masa ciała):</strong><br>${allOpisLNM || 'Brak danych'}</p>`;
-
-    const allLiczbaLNM = leczenieGrupy.reduce((sum, g) => sum + (parseInt(g.liczba, 10) || 0), 0);
-    html += `  <p><strong>5. Liczba leczonych zwierząt:</strong> ${allLiczbaLNM > 0 ? allLiczbaLNM : 'Brak danych'}</p>`;
-
-    const allRozpoznanieLNM = leczenieGrupy.map(g => g.rozpoznanie).filter(Boolean).join(', ');
-    html += `  <p><strong>6. Rozpoznanie albo wstępne rozpoznanie choroby:</strong><br>${allRozpoznanieLNM || 'Brak danych'}</p>`;
-
-    html += `  <p><strong>7. Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posiadacza zwierzęcia produkty lecznicze weterynaryjne lub pasze lecznicze:</strong></p>`;
-    // Mniejsza czcionka dla schematu
-    html += `  <p style="font-size: 7pt; padding-left: 8px; color: #333;">${schematText}</p>`;
-    
-    let globalProductCounterLNM = 1;
-    for (const group of leczenieGrupy) {
-        if (group.products.length > 0) {
-            let podtytulParts = [];
-            if (group.opis) podtytulParts.push(`Nazwa: ${group.opis}`);
-            if (group.rozpoznanie) podtytulParts.push(`Rozpoznanie: ${group.rozpoznanie}`);
-            const podtytul = podtytulParts.join(' , ');
-            
-            if (podtytul) {
-                // Podtytuł też lekko zmniejszony margines
-                html += `<p style="font-size: 8pt; font-weight: bold; margin-top: 4px; margin-bottom: 1px; padding-left: 4px;">${podtytul}</p>`;
+        for (const group of groups) {
+            hasContent = true;
+            // Nagłówek grupy (Zwierzę + Diagnoza)
+            if (group.opis || group.rozpoznanie) {
+                sectionHtml += `<div style="margin-top: 4px; margin-bottom: 2px; font-weight: bold; border-bottom: 1px dashed #999;">`;
+                if(group.opis) sectionHtml += `<span>Zw: ${group.opis}</span> `;
+                if(group.liczba && group.liczba != '0') sectionHtml += `<span>(Il: ${group.liczba})</span> `;
+                if(group.rozpoznanie) sectionHtml += `<br><span>Diag: ${group.rozpoznanie}</span>`;
+                sectionHtml += `</div>`;
             }
-            
-            for (const p of group.products) {
-                html += `<p style="padding-left: 8px;">${globalProductCounterLNM}. ${p.produkt} / ${p.seria} / ${p.iloscDawka} / ${p.karencja}</p>`;
-                globalProductCounterLNM++;
-            }
-        }
-    }
-    if (globalProductCounterLNM === 1) {
-         html += `<p style="padding-left: 8px;">--- Brak produktów ---</p>`;
-    }
-    html += `</div>`;
 
-    // === Produkty pozostawione ===
-    html += `<div class="data-block" style="border-top: 2px solid #000; padding-top: 4px;">`;
-    html += `  <h3 style="margin: 0 0 4px 0;">Produkty pozostawione</h3>`;
-    html += `  <h3 style="margin: 4px 0 4px 0; font-size: 9pt;">8. Potwierdzenie nabycia produktu leczniczego weterynaryjnego / paszy leczniczej</h3>`;
-
-    const allOpisLP = pozostawioneGrupy.map(g => g.opis).filter(Boolean).join(', ');
-    html += `  <p><strong>8.1 Nazwa siedziby stada i opis leczonego zwierzęcia (gatunek, płeć numer identyfikacyjny, sposób oznakowania, wiek, masa ciała):</strong><br>${allOpisLP || 'Brak danych'}</p>`;
-
-    const allLiczbaLP = pozostawioneGrupy.reduce((sum, g) => sum + (parseInt(g.liczba, 10) || 0), 0);
-    html += `  <p><strong>8.2 Liczba leczonych zwierząt:</strong> ${allLiczbaLP > 0 ? allLiczbaLP : 'Brak danych'}</p>`;
-
-    const allRozpoznanieLP = pozostawioneGrupy.map(g => g.rozpoznanie).filter(Boolean).join(', ');
-    html += `  <p><strong>8.3 Rozpoznanie albo wstępne rozpoznanie choroby:</strong><br>${allRozpoznanieLP || 'Brak danych'}</p>`;
-
-    html += `  <p><strong>8.4 Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posiadacza zwierzęcia produkty lecznicze weterynaryjne lub pasze lecznicze:</strong></p>`;
-    html += `  <p style="font-size: 7pt; padding-left: 8px; color: #333;">${schematText}</p>`;
-    
-    let globalProductCounterLP = 1;
-    for (const group of pozostawioneGrupy) {
-        if (group.products.length > 0) {
-            let podtytulParts = [];
-            if (group.opis) podtytulParts.push(`Nazwa: ${group.opis}`);
-            if (group.rozpoznanie) podtytulParts.push(`Rozpoznanie: ${group.rozpoznanie}`);
-            const podtytul = podtytulParts.join(' , ');
-
-            if (podtytul) {
-                html += `<p style="font-size: 8pt; font-weight: bold; margin-top: 4px; margin-bottom: 1px; padding-left: 4px;">${podtytul}</p>`;
-            }
-            
-            for (const p of group.products) {
-                html += `<p style="padding-left: 8px;">${globalProductCounterLP}. ${p.produkt} / ${p.seria} / ${p.iloscDawka} / ${p.karencja}</p>`;
-                globalProductCounterLP++;
+            // Produkty
+            if (group.products.length > 0) {
+                sectionHtml += `<div style="font-size: 8pt;">`;
+                // Nagłówek kolumn dla produktów
+                sectionHtml += `<div style="font-style: italic; font-size: 7pt; color: #555; margin-bottom: 2px;">${schematText}</div>`;
+                
+                group.products.forEach((p, idx) => {
+                    sectionHtml += `
+                        <div style="margin-bottom: 3px; padding-left: 2px;">
+                           <div><strong>${idx + 1}. ${p.produkt}</strong></div>
+                           <div style="padding-left: 8px;">Seria: ${p.seria}</div>
+                           <div style="display: flex; justify-content: space-between; padding-left: 8px;">
+                                <span>Il: <strong>${p.iloscDawka}</strong></span>
+                                <span>Kar: ${p.karencja}</span>
+                           </div>
+                        </div>
+                    `;
+                });
+                sectionHtml += `</div>`;
             }
         }
-    }
-    if (globalProductCounterLP === 1) {
-         html += `<p style="padding-left: 8px;">--- Brak produktów ---</p>`;
-    }
-    html += `</div>`;
+        
+        if (!hasContent) {
+            sectionHtml += `<p style="font-style:italic; text-align:center; font-size: 8pt;">-</p>`;
+        }
+        
+        sectionHtml += `</div>`;
+        return sectionHtml;
+    };
+
+    html += generateSection("I. Leczenie na miejscu", leczenieGrupy);
+    html += generateSection("II. Produkty pozostawione", pozostawioneGrupy);
 
     html += `
-        <div class="signatures-110mm">
-            <div class="sig-box-110mm">
-                <strong>Podpis lekarza weterynarii:</strong>
-                <img src="${podpisLekarzaImg}" alt="Podpis lekarza">
-                <p>${podpisLekarzaLinia}</p>
+        <div class="footer-legend" style="margin-top: 8px; border-top: 1px solid #000; padding-top: 2px;">
+            <p style="font-size: 7pt; text-align: justify;">Oświadczam, że nabyte produkty zostaną zastosowane zgodnie z zaleceniami lekarza weterynarii.</p>
+        </div>
+    `;
+
+    // Podpisy
+    html += `
+        <div class="signatures-110mm" style="margin-top: 8px;">
+            <div class="sig-box-110mm" style="margin-bottom: 5px;">
+                <strong>Lekarz weterynarii:</strong>
+                <img src="${podpisLekarzaImg}" alt="Podpis lekarza" style="height: 30px; margin: 1px 0;">
+                <div style="font-size: 7pt;">${podpisLekarzaLinia}</div>
             </div>
             <div class="sig-box-110mm">
-                <strong>Podpis posiadacza zwierzęcia:</strong>
-                <img src="${podpisKlientaImg}" alt="Podpis klienta">
+                <strong>Posiadacz zwierzęcia:</strong>
+                <img src="${podpisKlientaImg}" alt="Podpis klienta" style="height: 30px; margin: 1px 0;">
             </div>
         </div>
     `;
-    html += `
-        <div class="footer-legend">
-            <p>*Nazwa produktu leczniczego/ produktu leczniczego weterynaryjnego/ paszy leczniczej<br>
-            **Numer serii produktu leczniczego lub produktu leczniczego weterynaryjnego<br>
-            ***Ilość, dawkowanie zastosowanego produktu leczniczego lub ilość, dawkowanie i okres stosowanie nabytego produktu leczniczego, weterynaryjnego/paszy leczniczej<br>
-            ****Okres karencji oraz zabieg leczniczy lub profilaktyczne zalecenia lekarskie oraz uwagi</p>
-        </div>
-    `;
 
-    console.log("Generowanie HTML 110mm (v8 - Compact 8pt) zakończone.");
     return html;
 }
 
