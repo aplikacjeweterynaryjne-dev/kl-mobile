@@ -6285,7 +6285,7 @@ if (printFormatA4) {
 
 // ⬇️ ⬇️ ⬇️ WKLEJ TEN NOWY BLOK W MIEJSCE STAREGO ⬇️ ⬇️ ⬇️
 
-// 4. Listener dla przycisku "110mm" (WERSJA BEZPIECZNA 104mm SZEROKOŚCI)
+// 4. Listener dla przycisku "110mm" (WERSJA v11 - Safe Width 104mm + Justify)
 if (printFormat110 && receiptPrintContainer) {
     printFormat110.addEventListener('click', () => {
         
@@ -6300,7 +6300,7 @@ if (printFormat110 && receiptPrintContainer) {
         showToast('Generowanie podglądu 110mm...', 'info', 1000);
 
         try {
-            // Generuj treść HTML (używając nowej funkcji v10)
+            // Generuj treść HTML (używając nowej funkcji v11)
             const receiptContentHTML = generate110mmReceiptHTML();
             
             const printWindow = window.open('', '_blank', 'width=500,height=700,scrollbars=yes,resizable=yes');
@@ -6340,15 +6340,15 @@ if (printFormat110 && receiptPrintContainer) {
 
                         /* --- STYL KARTKI DLA 110mm --- */
                         .receipt-page {
-                            /* Czcionka bezszeryfowa, 8pt (-2pkt od poprzedniej) */
+                            /* Czcionka bezszeryfowa, 8pt (optymalna) */
                             font-family: 'Nunito', sans-serif !important;
                             font-size: 8pt !important;
                             line-height: 1.25 !important;
                             color: #000 !important;
                             background-color: #ffffff;
                             
-                            /* BEZPIECZNA SZEROKOŚĆ */
-                            /* 110mm papieru - 3mm marginesu z lewej - 3mm marginesu z prawej = 104mm */
+                            /* BEZPIECZNA SZEROKOŚĆ DLA ROLKI 110MM */
+                            /* 110mm - (3mm marginesu lewego + 3mm prawego) = 104mm */
                             width: 104mm !important; 
                             max-width: 104mm !important;
                             
@@ -6356,8 +6356,10 @@ if (printFormat110 && receiptPrintContainer) {
                             padding: 2mm !important; /* Mały padding wewnętrzny */
                             
                             box-sizing: border-box;
-                            text-align: justify !important; /* Wyjustowanie tekstu */
-                            text-justify: inter-word !important; /* Lepsze justowanie */
+                            
+                            /* JUSTOWANIE TEKSTU */
+                            text-align: justify !important; 
+                            text-justify: inter-word !important;
                             
                             box-shadow: 0 5px 15px rgba(0,0,0,0.3);
                         }
@@ -6418,19 +6420,19 @@ if (printFormat110 && receiptPrintContainer) {
             showToast('Błąd generowania podglądu 110mm.', 'error');
         }
     });
-        }
+}
 
 // ⬆️ ⬆️ ⬆️ KONIEC NOWEGO BLOKU ⬆️ ⬆️ ⬆️
 /* ⬇️ ⬇️ ⬇️ ZASTĄP CAŁĄ FUNKCJĘ "generate110mmReceiptHTML" TĄ NOWĄ WERSJĄ ⬇️ ⬇️ ⬇️ */
 
 /**
- * NOWA FUNKCJA (v10): Safe 110mm Layout.
- * - Czcionka 8pt.
- * - Struktura przygotowana pod bezpieczną szerokość 104mm.
- * - Justowanie tekstu (od krawędzi do krawędzi).
+ * NOWA FUNKCJA (v11): Safe 110mm + LEGAL TITLES.
+ * - Czcionka 8pt (oszczędność miejsca).
+ * - Pełne tytuły prawne i legenda (zgodność z przepisami).
+ * - Szerokość 104mm (bezpieczny margines).
  */
 function generate110mmReceiptHTML() {
-    console.log("Generowanie HTML dla 110mm (v10 - Safe Width)...");
+    console.log("Generowanie HTML dla 110mm (v11 - Legal + Optimized)...");
 
     // --- 1. FUNKCJE POMOCNICZE (Bez zmian) ---
     const getProductInfo = (row) => {
@@ -6464,10 +6466,8 @@ function generate110mmReceiptHTML() {
         for (const row of rows) {
             const opisInput = row.cells[1]?.querySelector('input');
             const opis = opisInput ? opisInput.value.trim() : (row.cells[1]?.textContent.trim() || '');
-
             const liczbaInput = row.cells[2]?.querySelector('input');
             const liczba = liczbaInput ? liczbaInput.value.trim() : (row.cells[2]?.textContent.trim() || '');
-
             const rozpInput = row.cells[3]?.querySelector('input');
             const rozpoznanie = rozpInput ? rozpInput.value.trim() : (row.cells[3]?.textContent.trim() || '');
 
@@ -6512,62 +6512,62 @@ function generate110mmReceiptHTML() {
     const leczeniePozostawioneRows = logicalRows.slice(9);
     const leczenieGrupy = groupRows(leczenieNaMiejscuRows);
     const pozostawioneGrupy = groupRows(leczeniePozostawioneRows);
-    
-    // Legenda (skrócona)
-    const schematText = "Produkt / Seria / Ilość / Karencja";
 
     // --- 3. BUDOWANIE HTML ---
     let html = '';
 
+    // Tytuł prawny (pełny)
     html += `
         <div style="text-align: center; border-bottom: 2px solid #000; padding-bottom: 5px; margin-bottom: 5px;">
-            <h2 style="font-size: 10pt !important; margin: 0; line-height: 1.1;">KARTA LECZENIA ZWIERZĄT</h2>
-            <div style="font-size: 9pt; margin-top: 2px;">NR: <strong>${nrKL}</strong></div>
+            <h2 style="font-size: 9pt !important; margin: 0; line-height: 1.2; font-weight: 800;">KARTA LECZENIA ZWIERZĄT GOSPODARSKICH ORAZ ZWIERZĄT, Z KTÓRYCH POZYSKANE TKANKI LUB PRODUKTY SĄ PRZEZNACZONE DO SPOŻYCIA PRZEZ LUDZI / EWIDENCJA LECZENIA ZWIERZĄT</h2>
+            <div style="font-size: 10pt; margin-top: 4px;">NR: <strong>${nrKL}</strong></div>
         </div>
     `;
 
+    // Nagłówek danych
     html += `
         <div class="data-block">
-            <p><strong>Lecznica:</strong> ${lecznica}</p>
-            <p><strong>Klient:</strong> ${klient}</p>
-            <p><strong>Adres:</strong> ${adres}</p>
-            <p><strong>Stado:</strong> ${nrStada} | <strong>Data:</strong> ${dataWizyty}</p>
+            <p><strong>1. Zakład leczniczy:</strong> ${lecznica}</p>
+            <p><strong>2. Posiadacz zwierzęcia:</strong> ${klient}</p>
+            <p style="padding-left: 12px;">Adres: ${adres}</p>
+            <p style="padding-left: 12px;">Nr stada: <strong>${nrStada}</strong></p>
+            <p><strong>3. Data wykonania:</strong> ${dataWizyty}</p>
         </div>
     `;
 
     // Funkcja generująca sekcję
     const generateSection = (title, groups) => {
-        let sectionHtml = `<div class="data-block" style="border-top: 1px solid #000; margin-top: 4px; padding-top: 2px;">`;
-        sectionHtml += `<h3 style="margin: 0 0 2px 0; font-size: 9pt; text-transform: uppercase; background: #eee; padding: 1px;">${title}</h3>`;
+        // Tytuł sekcji na szarym tle
+        let sectionHtml = `<div class="data-block" style="border-top: 2px solid #000; margin-top: 8px; padding-top: 4px;">`;
+        sectionHtml += `<h3 style="margin: 0 0 4px 0; font-size: 8pt; font-weight: 800; text-transform: uppercase; background: #eee; padding: 2px;">${title}</h3>`;
         
         let hasContent = false;
 
         for (const group of groups) {
             hasContent = true;
-            // Nagłówek grupy (Zwierzę + Diagnoza)
+            // Dane zwierzęcia i diagnozy
             if (group.opis || group.rozpoznanie) {
-                sectionHtml += `<div style="margin-top: 4px; margin-bottom: 2px; font-weight: bold; border-bottom: 1px dashed #999;">`;
-                if(group.opis) sectionHtml += `<span>Zw: ${group.opis}</span> `;
-                if(group.liczba && group.liczba != '0') sectionHtml += `<span>(Il: ${group.liczba})</span> `;
-                if(group.rozpoznanie) sectionHtml += `<br><span>Diag: ${group.rozpoznanie}</span>`;
+                sectionHtml += `<div style="margin-top: 5px; margin-bottom: 3px; font-weight: bold; border-bottom: 1px dashed #999;">`;
+                // Numeracja zgodna z oryginałem (4, 5, 6)
+                if(group.opis) sectionHtml += `<span>4. Zwierzę: ${group.opis}</span> `;
+                if(group.liczba && group.liczba != '0') sectionHtml += `<span>(5. Ilość: ${group.liczba})</span> `;
+                if(group.rozpoznanie) sectionHtml += `<br><span>6. Diagnoza: ${group.rozpoznanie}</span>`;
                 sectionHtml += `</div>`;
             }
 
-            // Produkty
+            // Produkty (Sekcja 7 lub 8)
             if (group.products.length > 0) {
                 sectionHtml += `<div style="font-size: 8pt;">`;
-                // Nagłówek kolumn dla produktów
-                sectionHtml += `<div style="font-style: italic; font-size: 7pt; color: #555; margin-bottom: 2px;">${schematText}</div>`;
                 
                 group.products.forEach((p, idx) => {
                     sectionHtml += `
-                        <div style="margin-bottom: 3px; padding-left: 2px;">
-                           <div><strong>${idx + 1}. ${p.produkt}</strong></div>
-                           <div style="padding-left: 8px;">Seria: ${p.seria}</div>
-                           <div style="display: flex; justify-content: space-between; padding-left: 8px;">
-                                <span>Il: <strong>${p.iloscDawka}</strong></span>
-                                <span>Kar: ${p.karencja}</span>
+                        <div style="margin-bottom: 4px; padding-left: 2px; border-bottom: 1px dotted #ccc; padding-bottom: 2px;">
+                           <div><strong>${idx + 1}. ${p.produkt} *</strong></div>
+                           <div style="display: flex; justify-content: space-between;">
+                                <span>Seria: ${p.seria} **</span>
+                                <span>Il: <strong>${p.iloscDawka} ***</strong></span>
                            </div>
+                           <div style="font-style: italic;">Kar: ${p.karencja} ****</div>
                         </div>
                     `;
                 });
@@ -6583,33 +6583,48 @@ function generate110mmReceiptHTML() {
         return sectionHtml;
     };
 
-    html += generateSection("I. Leczenie na miejscu", leczenieGrupy);
-    html += generateSection("II. Produkty pozostawione", pozostawioneGrupy);
+    // Sekcja I
+    html += generateSection("I. Leczenie na miejscu / Zastosowane produkty (7)", leczenieGrupy);
+    
+    // Sekcja II (z pełnym tytułem prawnym)
+    html += generateSection("II. Produkty pozostawione / Potwierdzenie nabycia (8)", pozostawioneGrupy);
 
+    // Stopka prawna
     html += `
-        <div class="footer-legend" style="margin-top: 8px; border-top: 1px solid #000; padding-top: 2px;">
-            <p style="font-size: 7pt; text-align: justify;">Oświadczam, że nabyte produkty zostaną zastosowane zgodnie z zaleceniami lekarza weterynarii.</p>
+        <div class="footer-legend" style="margin-top: 10px; border-top: 1px solid #000; padding-top: 4px;">
+            <p style="font-weight: bold; text-align: center; margin-bottom: 5px;">Oświadczam, że nabyte produkty lecznicze weterynaryjne/pasze lecznicze zostaną zastosowane zgodnie z zaleceniami lekarza weterynarii.</p>
         </div>
     `;
 
     // Podpisy
     html += `
-        <div class="signatures-110mm" style="margin-top: 8px;">
-            <div class="sig-box-110mm" style="margin-bottom: 5px;">
+        <div class="signatures-110mm" style="margin-top: 10px;">
+            <div class="sig-box-110mm" style="margin-bottom: 8px;">
                 <strong>Lekarz weterynarii:</strong>
-                <img src="${podpisLekarzaImg}" alt="Podpis lekarza" style="height: 30px; margin: 1px 0;">
+                <img src="${podpisLekarzaImg}" alt="Podpis lekarza" style="height: 35px; margin: 2px 0;">
                 <div style="font-size: 7pt;">${podpisLekarzaLinia}</div>
             </div>
             <div class="sig-box-110mm">
-                <strong>Posiadacz zwierzęcia:</strong>
-                <img src="${podpisKlientaImg}" alt="Podpis klienta" style="height: 30px; margin: 1px 0;">
+                <strong>Podpis posiadacza zwierzęcia:</strong>
+                <img src="${podpisKlientaImg}" alt="Podpis klienta" style="height: 35px; margin: 2px 0;">
             </div>
         </div>
     `;
 
+    // Legenda (Gwiazdki)
+    html += `
+        <div style="margin-top: 15px; font-size: 6pt; border-top: 1px dotted #000; padding-top: 5px; color: #444;">
+            <p>* Nazwa produktu leczniczego/ produktu leczniczego weterynaryjnego/ paszy leczniczej</p>
+            <p>** Numer serii produktu leczniczego lub produktu leczniczego weterynaryjnego</p>
+            <p>*** Ilość, dawkowanie zastosowanego produktu leczniczego lub ilość, dawkowanie i okres stosowanie nabytego produktu leczniczego, weterynaryjnego/paszy leczniczej</p>
+            <p>**** Okres karencji oraz zabieg leczniczy lub profilaktyczne zalecenia lekarskie oraz uwagi</p>
+            <p>***** Wyniki badań uzupełniających (jeśli dotyczy)</p>
+        </div>
+    `;
+
+    console.log("Generowanie HTML 110mm (v11) zakończone.");
     return html;
 }
-
 /* ⬆️ ⬆️ ⬆️ KONIEC ZASTĘPOWANIA ⬆️ ⬆️ ⬆️ */
 // Elementy e-mail
 const emailInput = document.getElementById('userEmail');
