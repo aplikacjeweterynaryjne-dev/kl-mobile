@@ -6285,7 +6285,7 @@ if (printFormatA4) {
 
 // ⬇️ ⬇️ ⬇️ WKLEJ TEN NOWY BLOK W MIEJSCE STAREGO ⬇️ ⬇️ ⬇️
 
-// 4. Listener dla przycisku "110mm" (WERSJA v11 - Safe Width 104mm + Justify)
+// 4. Listener dla przycisku "110mm" (WERSJA v12 - Safe Width 104mm + Justify + Legal Style)
 if (printFormat110 && receiptPrintContainer) {
     printFormat110.addEventListener('click', () => {
         
@@ -6300,7 +6300,7 @@ if (printFormat110 && receiptPrintContainer) {
         showToast('Generowanie podglądu 110mm...', 'info', 1000);
 
         try {
-            // Generuj treść HTML (używając nowej funkcji v11)
+            // Generuj treść HTML (używając nowej funkcji v12)
             const receiptContentHTML = generate110mmReceiptHTML();
             
             const printWindow = window.open('', '_blank', 'width=500,height=700,scrollbars=yes,resizable=yes');
@@ -6367,7 +6367,13 @@ if (printFormat110 && receiptPrintContainer) {
                         /* Style elementów wewnątrz */
                         .receipt-page h2 { font-size: 10pt !important; font-weight: 800; text-transform: uppercase; }
                         .receipt-page h3 { font-size: 9pt !important; font-weight: bold; }
-                        .receipt-page p { margin: 1px 0; }
+                        
+                        /* Ważne: zapewnienie łamania długich słów i tytułów */
+                        .receipt-page p, .receipt-page div { 
+                            margin: 1px 0; 
+                            word-wrap: break-word; 
+                            overflow-wrap: break-word;
+                        }
                         .receipt-page strong { font-weight: 700; }
                         
                         /* Obrazki podpisów */
@@ -6426,13 +6432,13 @@ if (printFormat110 && receiptPrintContainer) {
 /* ⬇️ ⬇️ ⬇️ ZASTĄP CAŁĄ FUNKCJĘ "generate110mmReceiptHTML" TĄ NOWĄ WERSJĄ ⬇️ ⬇️ ⬇️ */
 
 /**
- * NOWA FUNKCJA (v11): Safe 110mm + LEGAL TITLES.
- * - Czcionka 8pt (oszczędność miejsca).
- * - Pełne tytuły prawne i legenda (zgodność z przepisami).
- * - Szerokość 104mm (bezpieczny margines).
+ * NOWA FUNKCJA (v12): Safe 110mm + FULL LEGAL TITLES + VERTICAL PRODUCTS.
+ * - Czcionka 8pt.
+ * - Pełne, długie tytuły prawne.
+ * - Produkty: Seria, Ilość, Karencja w nowych liniach (jeden pod drugim).
  */
 function generate110mmReceiptHTML() {
-    console.log("Generowanie HTML dla 110mm (v11 - Legal + Optimized)...");
+    console.log("Generowanie HTML dla 110mm (v12 - Legal + Vertical)...");
 
     // --- 1. FUNKCJE POMOCNICZE (Bez zmian) ---
     const getProductInfo = (row) => {
@@ -6516,7 +6522,7 @@ function generate110mmReceiptHTML() {
     // --- 3. BUDOWANIE HTML ---
     let html = '';
 
-    // Tytuł prawny (pełny)
+    // Tytuł główny
     html += `
         <div style="text-align: center; border-bottom: 2px solid #000; padding-bottom: 5px; margin-bottom: 5px;">
             <h2 style="font-size: 9pt !important; margin: 0; line-height: 1.2; font-weight: 800;">KARTA LECZENIA ZWIERZĄT GOSPODARSKICH ORAZ ZWIERZĄT, Z KTÓRYCH POZYSKANE TKANKI LUB PRODUKTY SĄ PRZEZNACZONE DO SPOŻYCIA PRZEZ LUDZI / EWIDENCJA LECZENIA ZWIERZĄT</h2>
@@ -6524,50 +6530,60 @@ function generate110mmReceiptHTML() {
         </div>
     `;
 
-    // Nagłówek danych
+    // Nagłówek danych (Pełne nazwy pól)
     html += `
         <div class="data-block">
-            <p><strong>1. Zakład leczniczy:</strong> ${lecznica}</p>
-            <p><strong>2. Posiadacz zwierzęcia:</strong> ${klient}</p>
-            <p style="padding-left: 12px;">Adres: ${adres}</p>
+            <p><strong>1. Nazwa i adres zakładu leczniczego dla zwierząt:</strong><br>${lecznica}</p>
+            <p style="margin-top: 4px;"><strong>2. Imię, nazwisko i adres albo nazwa siedziby i adres posiadacza zwierzęcia:</strong><br>${klient}, ${adres}</p>
             <p style="padding-left: 12px;">Nr stada: <strong>${nrStada}</strong></p>
-            <p><strong>3. Data wykonania:</strong> ${dataWizyty}</p>
+            <p style="margin-top: 4px;"><strong>3. Wykonanie czynności lekarsko-weterynaryjnych dnia:</strong> ${dataWizyty}</p>
         </div>
     `;
 
     // Funkcja generująca sekcję
     const generateSection = (title, groups) => {
-        // Tytuł sekcji na szarym tle
+        // Tytuł sekcji (pełny, wyjustowany)
         let sectionHtml = `<div class="data-block" style="border-top: 2px solid #000; margin-top: 8px; padding-top: 4px;">`;
-        sectionHtml += `<h3 style="margin: 0 0 4px 0; font-size: 8pt; font-weight: 800; text-transform: uppercase; background: #eee; padding: 2px;">${title}</h3>`;
+        sectionHtml += `<h3 style="margin: 0 0 4px 0; font-size: 8pt; font-weight: 800; text-transform: uppercase; background: #eee; padding: 4px; text-align: justify;">${title}</h3>`;
         
         let hasContent = false;
 
         for (const group of groups) {
             hasContent = true;
-            // Dane zwierzęcia i diagnozy
+            // Dane zwierzęcia i diagnozy (Pełne nazwy punktów 4, 5, 6)
             if (group.opis || group.rozpoznanie) {
-                sectionHtml += `<div style="margin-top: 5px; margin-bottom: 3px; font-weight: bold; border-bottom: 1px dashed #999;">`;
-                // Numeracja zgodna z oryginałem (4, 5, 6)
-                if(group.opis) sectionHtml += `<span>4. Zwierzę: ${group.opis}</span> `;
-                if(group.liczba && group.liczba != '0') sectionHtml += `<span>(5. Ilość: ${group.liczba})</span> `;
-                if(group.rozpoznanie) sectionHtml += `<br><span>6. Diagnoza: ${group.rozpoznanie}</span>`;
+                sectionHtml += `<div style="margin-top: 8px; margin-bottom: 4px; font-weight: bold; border-bottom: 1px solid #000;">`;
+                
+                if(group.opis) sectionHtml += `
+                    <p style="margin: 2px 0;"><strong>4. Nazwa siedziby stada i opis leczonego zwierzęcia (gatunek, płeć numer identyfikacyjny, sposób oznakowania, wiek, masa ciała):</strong><br>
+                    <span style="font-weight: normal; margin-left: 5px;">${group.opis}</span></p>`;
+                
+                if(group.liczba && group.liczba != '0') sectionHtml += `
+                    <p style="margin: 2px 0;"><strong>5. Liczba leczonych zwierząt:</strong> <span style="font-weight: normal;">${group.liczba}</span></p>`;
+                
+                if(group.rozpoznanie) sectionHtml += `
+                    <p style="margin: 2px 0;"><strong>6. Rozpoznanie albo wstępne rozpoznanie choroby:</strong><br>
+                    <span style="font-weight: normal; margin-left: 5px;">${group.rozpoznanie}</span></p>`;
+                
                 sectionHtml += `</div>`;
             }
 
-            // Produkty (Sekcja 7 lub 8)
+            // Produkty (Układ PIONOWY - jedna pod drugą)
             if (group.products.length > 0) {
                 sectionHtml += `<div style="font-size: 8pt;">`;
                 
                 group.products.forEach((p, idx) => {
                     sectionHtml += `
-                        <div style="margin-bottom: 4px; padding-left: 2px; border-bottom: 1px dotted #ccc; padding-bottom: 2px;">
-                           <div><strong>${idx + 1}. ${p.produkt} *</strong></div>
-                           <div style="display: flex; justify-content: space-between;">
-                                <span>Seria: ${p.seria} **</span>
-                                <span>Il: <strong>${p.iloscDawka} ***</strong></span>
+                        <div style="margin-bottom: 6px; border-bottom: 1px dotted #ccc; padding-bottom: 4px;">
+                           
+                           <div style="margin-bottom: 2px;"><strong>${idx + 1}. ${p.produkt} *</strong></div>
+                           
+                           <div style="padding-left: 10px; font-size: 8pt;">
+                               <div>Seria: ${p.seria} **</div>
+                               <div>Ilość: <strong>${p.iloscDawka} ***</strong></div>
+                               <div style="font-style: italic;">Karencja: ${p.karencja} ****</div>
                            </div>
-                           <div style="font-style: italic;">Kar: ${p.karencja} ****</div>
+
                         </div>
                     `;
                 });
@@ -6583,23 +6599,23 @@ function generate110mmReceiptHTML() {
         return sectionHtml;
     };
 
-    // Sekcja I
-    html += generateSection("I. Leczenie na miejscu / Zastosowane produkty (7)", leczenieGrupy);
+    // Sekcja I (Pełny tytuł)
+    html += generateSection("I. Leczenie na miejscu / Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posiadacza zwierzęcia produkty lecznicze weterynaryjne lub pasze lecznicze", leczenieGrupy);
     
-    // Sekcja II (z pełnym tytułem prawnym)
-    html += generateSection("II. Produkty pozostawione / Potwierdzenie nabycia (8)", pozostawioneGrupy);
+    // Sekcja II (Pełny tytuł)
+    html += generateSection("II. Produkty pozostawione / Potwierdzenie nabycia produktu leczniczego weterynaryjnego/paszy leczniczej", pozostawioneGrupy);
 
     // Stopka prawna
     html += `
         <div class="footer-legend" style="margin-top: 10px; border-top: 1px solid #000; padding-top: 4px;">
-            <p style="font-weight: bold; text-align: center; margin-bottom: 5px;">Oświadczam, że nabyte produkty lecznicze weterynaryjne/pasze lecznicze zostaną zastosowane zgodnie z zaleceniami lekarza weterynarii.</p>
+            <p style="font-weight: bold; text-align: justify; margin-bottom: 5px;">Oświadczam, że nabyte produkty lecznicze weterynaryjne/pasze lecznicze zostaną zastosowane zgodnie z zaleceniami lekarza weterynarii.</p>
         </div>
     `;
 
     // Podpisy
     html += `
         <div class="signatures-110mm" style="margin-top: 10px;">
-            <div class="sig-box-110mm" style="margin-bottom: 8px;">
+            <div class="sig-box-110mm" style="margin-bottom: 10px;">
                 <strong>Lekarz weterynarii:</strong>
                 <img src="${podpisLekarzaImg}" alt="Podpis lekarza" style="height: 35px; margin: 2px 0;">
                 <div style="font-size: 7pt;">${podpisLekarzaLinia}</div>
@@ -6611,18 +6627,18 @@ function generate110mmReceiptHTML() {
         </div>
     `;
 
-    // Legenda (Gwiazdki)
+    // Legenda (Pełna, z gwiazdkami)
     html += `
-        <div style="margin-top: 15px; font-size: 6pt; border-top: 1px dotted #000; padding-top: 5px; color: #444;">
-            <p>* Nazwa produktu leczniczego/ produktu leczniczego weterynaryjnego/ paszy leczniczej</p>
-            <p>** Numer serii produktu leczniczego lub produktu leczniczego weterynaryjnego</p>
-            <p>*** Ilość, dawkowanie zastosowanego produktu leczniczego lub ilość, dawkowanie i okres stosowanie nabytego produktu leczniczego, weterynaryjnego/paszy leczniczej</p>
-            <p>**** Okres karencji oraz zabieg leczniczy lub profilaktyczne zalecenia lekarskie oraz uwagi</p>
-            <p>***** Wyniki badań uzupełniających (jeśli dotyczy)</p>
+        <div style="margin-top: 15px; font-size: 6pt; border-top: 1px dotted #000; padding-top: 5px; color: #000; text-align: justify;">
+            <p style="margin: 2px 0;">* Nazwa produktu leczniczego/ produktu leczniczego weterynaryjnego/ paszy leczniczej</p>
+            <p style="margin: 2px 0;">** Numer serii produktu leczniczego lub produktu leczniczego weterynaryjnego</p>
+            <p style="margin: 2px 0;">*** Ilość, dawkowanie zastosowanego produktu leczniczego lub ilość, dawkowanie i okres stosowanie nabytego produktu leczniczego, weterynaryjnego/paszy leczniczej</p>
+            <p style="margin: 2px 0;">**** Okres karencji oraz zabieg leczniczy lub profilaktyczne zalecenia lekarskie oraz uwagi</p>
+            <p style="margin: 2px 0;">***** Wyniki badań uzupełniających (jeśli dotyczy)</p>
         </div>
     `;
 
-    console.log("Generowanie HTML 110mm (v11) zakończone.");
+    console.log("Generowanie HTML 110mm (v12) zakończone.");
     return html;
 }
 /* ⬆️ ⬆️ ⬆️ KONIEC ZASTĘPOWANIA ⬆️ ⬆️ ⬆️ */
