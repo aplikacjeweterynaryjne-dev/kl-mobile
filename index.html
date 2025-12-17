@@ -2399,6 +2399,18 @@ table {
     word-break: break-word !important;   /* Zabezpieczenie dla długich numerów */
     max-width: 250px;                    /* Sugestia szerokości, by przeglądarka wiedziała kiedy łamać */
 }
+    /* ✅ MODUŁ 3: Szare tło dla wypełnionych wierszy */
+tr.filled-row td {
+    background-color: #f0f0f0; /* Jasnoszary kolor na ekranie */
+}
+
+/* Przy druku tło musi zniknąć */
+@media print {
+    tr.filled-row td {
+        background-color: transparent !important;
+        -webkit-print-color-adjust: exact;
+    }
+}
 </style>
     <div id="calcProductSearchModal" class="product-search-modal" style="display: none; z-index: 10003;">
     <div class="product-search-card">
@@ -5233,9 +5245,15 @@ function generateRows(){
         }
         tbody.appendChild(row);
     }
-    populateRowSelect();
+   populateRowSelect();
+    
     if (typeof updateTablePlaceholders === 'function') {
         updateTablePlaceholders();
+    }
+
+    // ✅ MODUŁ 3: Odśwież style wierszy przy generowaniu
+    if (typeof updateRowStyles === 'function') {
+        updateRowStyles();
     }
 }
 
@@ -13634,12 +13652,18 @@ try {
         });
     }
 // ✅ POCZĄTEK MODUŁU 7: Listenery dla tabeli (Walidacja Ilości i Podgląd Stanu)
-if (kartaTableBody) {
-    // Listener dla ZMIANY ILOŚCI
+// Listener dla ZMIANY DANYCH W TABELI (Walidacja + Style)
     kartaTableBody.addEventListener('input', (e) => {
-        // Sprawdź, czy zdarzenie pochodzi z inputu ilości
+        
+        // 1. Walidacja stanu (Moduł 7) - tylko dla ilości
         if (e.target && e.target.classList.contains('small-input')) {
-            if (typeof validateCardStock === 'function') validateCardStock(); // Uruchom walidację
+            if (typeof validateCardStock === 'function') validateCardStock(); 
+        }
+
+        // 2. ✅ MODUŁ 3: Aktualizacja tła wiersza (Szary jeśli pełny)
+        // Uruchamiamy przy każdej zmianie w tabeli
+        if (typeof updateRowStyles === 'function') {
+            updateRowStyles();
         }
     });
 
@@ -20744,7 +20768,32 @@ if (archTableBody) {
         }
     });
 }
+/**
+ * ✅ MODUŁ 3: Aktualizuje styl wierszy (szare tło, jeśli wypełnione).
+ */
+function updateRowStyles() {
+    const rows = document.querySelectorAll('#karta tbody tr');
+    rows.forEach(row => {
+        // Ignoruj wiersz nagłówkowy sekcji II (ten z colspan) lub zbyt krótkie
+        if (row.cells.length < 8) return; 
 
+        // Sprawdź czy cokolwiek jest wpisane w kluczowe pola:
+        // 1. Opis zwierzęcia (Kolumna 2 -> index 1)
+        const cellOpis = row.cells[1];
+        const valOpis = cellOpis.querySelector('input') ? cellOpis.querySelector('input').value : cellOpis.textContent;
+
+        // 2. Produkt leczniczy (Kolumna 5 -> index 4)
+        const cellLek = row.cells[4];
+        const valLek = cellLek.querySelector('input') ? cellLek.querySelector('input').value : '';
+
+        // Jeśli któryś z nich ma treść -> dodaj klasę
+        if ((valOpis && valOpis.trim() !== '') || (valLek && valLek.trim() !== '')) {
+            row.classList.add('filled-row');
+        } else {
+            row.classList.remove('filled-row');
+        }
+    });
+                    }
 // 2. Funkcja pokazująca modal
 function showQrModal(cardId, cardNr, cardDate) {
     if (!qrModal) {
