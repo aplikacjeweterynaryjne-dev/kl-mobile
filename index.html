@@ -13514,12 +13514,35 @@ try {
         productSearchListModal.innerHTML = ''; 
         let foundItems = 0;
         
-        nazwyLekow.forEach(lekName => {
+      nazwyLekow.forEach(lekName => {
             if (filterText === '' || lekName.toLowerCase().includes(filterText)) {
                 const itemDiv = document.createElement('div');
                 itemDiv.className = 'product-search-item';
                 itemDiv.textContent = lekName;
                 itemDiv.dataset.lekName = lekName;
+
+                // --- ✅ POCZĄTEK ZMIANY (KOLOROWANIE STANU) ---
+                if (currentUserProfile && currentUserProfile.uzywaStanowMagazynowych) {
+                     // 1. Pobierz ID produktu z nazwy
+                     const prodId = typeof produktyGlowneCache !== 'undefined' ? produktyGlowneCache.get(lekName) : null;
+                     
+                     if (prodId) {
+                         // 2. Pobierz stan z cache magazynu
+                         const stanData = typeof magazynCache !== 'undefined' ? magazynCache.get(prodId) : null;
+                         const stan = stanData ? (stanData.stan || 0) : 0;
+
+                         if (stan > 0) {
+                             // 3. Stylizuj na zielono
+                             itemDiv.style.color = '#27ae60'; 
+                             itemDiv.style.fontWeight = '800'; // Mocne pogrubienie
+                             itemDiv.style.backgroundColor = '#f0fff4'; // Bardzo jasne tło dla kontrastu
+                             // Opcjonalnie: Pokaż stan w nawiasie
+                             itemDiv.textContent = `${lekName} (Stan: ${stan})`;
+                         }
+                     }
+                }
+                // --- KONIEC ZMIANY ---
+
                 itemDiv.addEventListener('click', () => { selectProductFromModal(lekName); });
                 productSearchListModal.appendChild(itemDiv);
                 foundItems++;
@@ -14077,12 +14100,30 @@ try {
 
         let foundItems = 0;
 
-        nazwyLekow.forEach(lekName => {
+       nazwyLekow.forEach(lekName => {
             if (filterText === '' || lekName.toLowerCase().includes(filterText)) {
                 const itemDiv = document.createElement('div');
                 itemDiv.className = 'product-search-item';
                 itemDiv.textContent = lekName;
                 itemDiv.dataset.lekName = lekName;
+
+                // --- ✅ POCZĄTEK ZMIANY (KOLOROWANIE STANU) ---
+                if (currentUserProfile && currentUserProfile.uzywaStanowMagazynowych) {
+                     const prodId = typeof produktyGlowneCache !== 'undefined' ? produktyGlowneCache.get(lekName) : null;
+                     if (prodId) {
+                         const stanData = typeof magazynCache !== 'undefined' ? magazynCache.get(prodId) : null;
+                         const stan = stanData ? (stanData.stan || 0) : 0;
+
+                         if (stan > 0) {
+                             itemDiv.style.color = '#27ae60'; 
+                             itemDiv.style.fontWeight = '800';
+                             itemDiv.style.backgroundColor = '#f0fff4';
+                             itemDiv.textContent = `${lekName} (Stan: ${stan})`;
+                         }
+                     }
+                }
+                // --- KONIEC ZMIANY ---
+
                 itemDiv.addEventListener('click', () => {
                     selectFormProduct(lekName);
                 });
