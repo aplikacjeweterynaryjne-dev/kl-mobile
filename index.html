@@ -11776,12 +11776,14 @@ if (archiveCardTableBody) {
         const target = e.target; // Cel kliknięcia
 
         // --- ✅ NOWA LOGIKA: BEZPOŚREDNIE OTWARCIE OKNA PODGLĄDU ---
+// --- ✅ NOWA LOGIKA: PODGLĄD (WYBÓR FORMATU) ---
         if (target.classList.contains('btn-view-archived-card')) {
             const cardId = target.dataset.cardId;
             const originalText = target.textContent;
+            
             target.textContent = 'Ładowanie...';
             target.disabled = true;
-            
+
             try {
                 // 1. Pobierz dane z Firebase
                 const doc = await db.collection("archiwumKarty").doc(cardId).get();
@@ -11790,10 +11792,48 @@ if (archiveCardTableBody) {
                     return;
                 }
                 const cardData = doc.data();
+
+                // 2. Stwórz Okienko Wyboru (A4 czy 110mm)
+                const choiceOverlay = document.createElement('div');
+                choiceOverlay.style.cssText = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:20000;display:flex;justify-content:center;align-items:center;";
                 
-                // 2. Otwórz bezpośrednio okno druku (omijamy modal)
-                openDirectPrintWindow(cardData);
-                
+                choiceOverlay.innerHTML = `
+                    <div class="form-card" style="width:320px; text-align:center; padding:25px; background:white; border-radius:12px; box-shadow:0 10px 30px rgba(0,0,0,0.3);">
+                        <h3 style="margin-top:0; margin-bottom:20px; color:#333;">Wybierz format podglądu</h3>
+                        
+                        <button id="previewA4" class="btn primary" style="width:100%; margin-bottom:10px; padding:12px; font-size:16px;">
+                            📄 Format A4 (Standard)
+                        </button>
+                        
+                        <button id="preview110" class="btn" style="width:100%; margin-bottom:20px; padding:12px; font-size:16px; background-color:#34495e; color:white;">
+                            🧾 Format 110mm (Termiczny)
+                        </button>
+                        
+                        <button id="previewCancel" class="btn ghost small" style="width:100%;">Anuluj</button>
+                    </div>
+                `;
+                document.body.appendChild(choiceOverlay);
+
+                // Obsługa przycisków
+                const closeChoice = () => { document.body.removeChild(choiceOverlay); };
+                document.getElementById('previewCancel').onclick = closeChoice;
+
+                document.getElementById('previewA4').onclick = () => {
+                    closeChoice();
+                    // Wywołaj istniejącą funkcję druku A4
+                    openDirectPrintWindow(cardData); 
+                };
+
+                document.getElementById('preview110').onclick = () => {
+                    closeChoice();
+                    // Wywołaj nową funkcję druku 110mm (dodamy ją w następnym kroku instrukcji, jeśli jeszcze jej nie ma)
+                    if (typeof openDirectPrintWindow110mm === 'function') {
+                        openDirectPrintWindow110mm(cardData); 
+                    } else {
+                        alert("Błąd: Funkcja druku 110mm nie została jeszcze dodana do kodu.");
+                    }
+                };
+
             } catch (error) {
                 console.error("Błąd wczytywania karty do podglądu:", error);
                 alert("Błąd wczytywania karty.");
@@ -11803,26 +11843,107 @@ if (archiveCardTableBody) {
             }
         } 
 
-        // --- Usuwanie Karty (Bez zmian) ---
+        // --- ✅ NOWA LOGIKA: USUWANIE (Z PRZYWRACANIEM STANU) ---
         else if (target.classList.contains('btn-delete-archived-card')) {
             const cardId = target.dataset.cardId;
             const cardNr = target.dataset.cardNr;
-            
+
+            // Sprawdź czy użytkownik ma włączony magazyn
+            const useStock = currentUserProfile && currentUserProfile.uzywaStanowMagazynowych;
+
             if (confirm(`Czy na pewno chcesz trwale usunąć kartę nr: ${cardNr}?`)) {
+                
+                let restoreStock = false;
+                // Jeśli ma magazyn, zapytaj o zwrot
+                if (useStock) {
+                    restoreStock = confirm("Czy przywrócić zużyte produkty na stan magazynowy?");
+                }
+
                 target.textContent = 'Usuwanie...';
-                try {
-                    await db.collection("archiwumKarty").doc(cardId).delete();
-                    target.closest('tr').remove(); 
-                    alert('Karta została usunięta.');
-                } catch (error) {
-                    console.error("Błąd usuwania karty:", error);
+                target.disabled = true;
+
+                // Pobieramy dane karty, aby wiedzieć co oddać
+                db.collection("archiwumKarty").doc(cardId).get().then(async (doc) => {
+                    if (!doc.exists) return;
+                    const cardData = doc.data();
+
+                    const batch = db.batch();
+                    const cardRef = db.collection("archiwumKarty").doc(cardId);
+                    batch.delete(cardRef); // Usuń kartę
+
+                    // --- LOGIKA ZWROTU STANU (MODUŁ 5) ---
+                    if (restoreStock && cardData.table) {
+                        const changesLog = [];
+                        
+                        // Przejdź przez produkty w karcie
+                        cardData.table.forEach(row => {
+                            // Wyciągnij ilość (często zapisana jako HTML <input value="5">)
+                            let qty = 0;
+                            if (row.iloscDawka && row.iloscDawka.includes('value="')) {
+                                 const match = row.iloscDawka.match(/value="([\d\.]+)"/);
+                                 if (match) qty = parseFloat(match[1]);
+                            } else {
+                                 // Jeśli to czysta liczba
+                                 qty = parseFloat(row.iloscDawka) || 0;
+                            }
+
+                            const productName = (row.lek || '').trim();
+
+                            if (qty > 0 && productName) {
+                                // Znajdź ID produktu w cache
+                                const prodId = typeof produktyGlowneCache !== 'undefined' ? produktyGlowneCache.get(productName) : null;
+                                
+                                if (prodId) {
+                                    // Zwiększ stan w magazynie (FieldValue.increment)
+                                    const stockRef = db.collection("konfiguracja").doc(currentUserProfile.id).collection("magazynOsobisty").doc(prodId);
+                                    batch.set(stockRef, { 
+                                        stan: firebase.firestore.FieldValue.increment(qty) 
+                                    }, { merge: true });
+
+                                    changesLog.push({
+                                        id_produktu: prodId,
+                                        nazwa_produktu: productName,
+                                        ilosc: qty, // dodatnia ilość = zwrot
+                                        typ: "zwrot_usuniecie"
+                                    });
+                                }
+                            }
+                        });
+                        
+                        // Dodaj wpis do historii (logów)
+                        if (changesLog.length > 0) {
+                             const logRef = db.collection("konfiguracja").doc(currentUserProfile.id).collection("magazynOsobistyLog").doc();
+                             batch.set(logRef, {
+                                 typ: "zwrot_usuniecie",
+                                 data: firebase.firestore.FieldValue.serverTimestamp(),
+                                 kto_uid: currentUserProfile.uid,
+                                 kto_nazwa: "System (Usunięcie Karty)",
+                                 zmiany: changesLog,
+                                 nr_karty: cardNr
+                             });
+                        }
+                    }
+
+                    // Wykonaj wszystkie operacje
+                    await batch.commit();
+                    
+                    // Usuń wiersz z tabeli
+                    target.closest('tr').remove();
+                    showToast("Karta usunięta.", "success");
+                    
+                    // Odśwież cache magazynu w tle
+                    if (restoreStock && typeof loadMagazynCache === 'function') {
+                        loadMagazynCache(currentUserProfile.uid);
+                    }
+
+                }).catch(error => {
+                    console.error("Błąd usuwania:", error);
                     alert("Wystąpił błąd podczas usuwania.");
                     target.textContent = 'Usuń';
-                }
+                    target.disabled = false;
+                });
             }
         }
-    });
-}
 
 /**
  * Pkt 6: Funkcja pomocnicza budująca HTML dla podglądu
