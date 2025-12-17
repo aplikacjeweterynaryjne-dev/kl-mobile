@@ -18220,26 +18220,38 @@ if (adminZarzadzajBtn) {
     /* ======================================================== */
 /* ✅ KOREKTA: Funkcja otwierająca podgląd wydruku Raportu */
 /* ======================================================== */
+/* ======================================================== */
+/* ✅ KOREKTA: Funkcja otwierająca podgląd wydruku Raportu */
+/* ======================================================== */
 function openReportPrintWindow() {
     console.log("Otwieranie okna podglądu raportu...");
 
-    // 1. Pobierz zawartość HTML wygenerowanego raportu
+    // --- 1. POPRAWKA (FIX): "Zapiekanie" wartości kosztów w HTML ---
+    // Musimy ręcznie przepisać wartość widoczną w polu do atrybutu HTML,
+    // aby przeniosła się do nowego okna.
+    const fuelInput = document.getElementById('reportFuelCost');
+    if (fuelInput) {
+        fuelInput.setAttribute('value', fuelInput.value);
+    }
+    // -------------------------------------------------------------
+
+    // 2. Pobierz zawartość HTML wygenerowanego raportu
     const reportContentEl = document.getElementById('reportResultArea');
     if (!reportContentEl) {
         showToast("Błąd: Nie znaleziono treści raportu (reportResultArea).", "error");
         return;
     }
-    // Pobieramy "wewnętrzny" HTML, aby uniknąć zagnieżdżenia
+    // Pobieramy "wewnętrzny" HTML
     const reportHTML = reportContentEl.innerHTML;
 
-    // 2. Otwórz nowe okno
+    // 3. Otwórz nowe okno
     const printWindow = window.open('', '_blank', 'width=800,height=700,scrollbars=yes,resizable=yes');
     if (!printWindow) {
         showToast('Nie udało się otworzyć nowego okna. Wyłącz blokowanie wyskakujących okienek.', 'error');
         return;
     }
 
-    // 3. Wygeneruj pełny HTML dla nowego okna
+    // 4. Wygeneruj pełny HTML dla nowego okna
     printWindow.document.write(`
         <!DOCTYPE html>
         <html lang="pl">
@@ -18270,30 +18282,36 @@ function openReportPrintWindow() {
                 .print-controls .print-btn { background-color: #4CAF50; color: white; border-color: #388E3C;}
                 .print-controls .close-btn { background-color: #f44336; color: white; border-color: #D32F2F;}
 
-                /* "Kartka" A4 do podglądu */
-               /* "Kartka" do podglądu (Elastyczna szerokość) */
+                /* "Kartka" do podglądu (Elastyczna szerokość) */
                 .page-preview {
-                    width: auto; /* ✅ ZMIANA: Dopasuj do zawartości */
-                    min-width: 210mm; /* Minimalnie jak A4 */
-                    max-width: 98%; /* Nie wychodź poza ekran */
+                    width: auto; 
+                    min-width: 210mm; 
+                    max-width: 98%; 
                     min-height: 297mm; 
                     padding: 1cm; 
                     margin: 20px auto; 
                     background-color: #ffffff; 
                     box-sizing: border-box;
                     box-shadow: 0 0 10px rgba(0,0,0,0.15);
-                    /* Centrowanie, jeśli węższe niż ekran */
                     display: table; 
                 }
 
                 /* Style dla treści raportu (skopiowane z Twoich styli @media print) */
-                /* Upewniamy się, że wszystko w raporcie jest widoczne */
                 .report-summary-header div {
                     background: none !important; padding: 0 !important; border: none !important;
                     box-shadow: none !important;
                 }
-                /* Ukrywamy elementy, których nie chcesz na wydruku */
-               
+                
+                /* Style dla pola kosztów w wydruku - usuwamy ramkę inputa żeby wyglądało jak tekst */
+                input[type="number"] {
+                    border: none;
+                    background: transparent;
+                    font-weight: bold;
+                    font-size: 16px;
+                    color: #c0392b;
+                    width: auto;
+                    text-align: right;
+                }
 
                 table { 
                     border-collapse: collapse; width: 100%; font-size: 10pt; 
@@ -18301,9 +18319,9 @@ function openReportPrintWindow() {
                 }
                 th, td { 
                     border: 1px solid #ddd; padding: 4px; text-align: left; 
-                    white-space: nowrap; word-break: keep-all; /* Zachowaj style tabeli raportów */
+                    white-space: nowrap; word-break: keep-all; 
                 }
-                th { background: #f2f2f2 !important; } /* Wymuś tło nagłówków */
+                th { background: #f2f2f2 !important; } 
                 #reportWizytyTable .col-zuzycia ul { 
                     margin: 0; padding-left: 18px; font-size: 10pt; 
                 }
@@ -18319,10 +18337,9 @@ function openReportPrintWindow() {
                         padding: 0 !important;
                         box-shadow: none !important;
                     }
-                    /* Ustawienia strony (rozwiązuje problem marginesów na mobilkach) */
                     @page {
-                        size: A4 portrait; /* Wymuś portret */
-                        margin: 1cm; /* Ustaw marginesy strony */
+                        size: A4 portrait; 
+                        margin: 1cm; 
                     }
                 }
             </style>
