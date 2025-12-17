@@ -11776,14 +11776,12 @@ if (archiveCardTableBody) {
         const target = e.target; // Cel kliknięcia
 
         // --- ✅ NOWA LOGIKA: BEZPOŚREDNIE OTWARCIE OKNA PODGLĄDU ---
-// --- ✅ NOWA LOGIKA: PODGLĄD (WYBÓR FORMATU) ---
         if (target.classList.contains('btn-view-archived-card')) {
             const cardId = target.dataset.cardId;
             const originalText = target.textContent;
-            
             target.textContent = 'Ładowanie...';
             target.disabled = true;
-
+            
             try {
                 // 1. Pobierz dane z Firebase
                 const doc = await db.collection("archiwumKarty").doc(cardId).get();
@@ -11792,48 +11790,10 @@ if (archiveCardTableBody) {
                     return;
                 }
                 const cardData = doc.data();
-
-                // 2. Stwórz Okienko Wyboru (A4 czy 110mm)
-                const choiceOverlay = document.createElement('div');
-                choiceOverlay.style.cssText = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:20000;display:flex;justify-content:center;align-items:center;";
                 
-                choiceOverlay.innerHTML = `
-                    <div class="form-card" style="width:320px; text-align:center; padding:25px; background:white; border-radius:12px; box-shadow:0 10px 30px rgba(0,0,0,0.3);">
-                        <h3 style="margin-top:0; margin-bottom:20px; color:#333;">Wybierz format podglądu</h3>
-                        
-                        <button id="previewA4" class="btn primary" style="width:100%; margin-bottom:10px; padding:12px; font-size:16px;">
-                            📄 Format A4 (Standard)
-                        </button>
-                        
-                        <button id="preview110" class="btn" style="width:100%; margin-bottom:20px; padding:12px; font-size:16px; background-color:#34495e; color:white;">
-                            🧾 Format 110mm (Termiczny)
-                        </button>
-                        
-                        <button id="previewCancel" class="btn ghost small" style="width:100%;">Anuluj</button>
-                    </div>
-                `;
-                document.body.appendChild(choiceOverlay);
-
-                // Obsługa przycisków
-                const closeChoice = () => { document.body.removeChild(choiceOverlay); };
-                document.getElementById('previewCancel').onclick = closeChoice;
-
-                document.getElementById('previewA4').onclick = () => {
-                    closeChoice();
-                    // Wywołaj istniejącą funkcję druku A4
-                    openDirectPrintWindow(cardData); 
-                };
-
-                document.getElementById('preview110').onclick = () => {
-                    closeChoice();
-                    // Wywołaj nową funkcję druku 110mm (dodamy ją w następnym kroku instrukcji, jeśli jeszcze jej nie ma)
-                    if (typeof openDirectPrintWindow110mm === 'function') {
-                        openDirectPrintWindow110mm(cardData); 
-                    } else {
-                        alert("Błąd: Funkcja druku 110mm nie została jeszcze dodana do kodu.");
-                    }
-                };
-
+                // 2. Otwórz bezpośrednio okno druku (omijamy modal)
+                openDirectPrintWindow(cardData);
+                
             } catch (error) {
                 console.error("Błąd wczytywania karty do podglądu:", error);
                 alert("Błąd wczytywania karty.");
@@ -11843,107 +11803,26 @@ if (archiveCardTableBody) {
             }
         } 
 
-        // --- ✅ NOWA LOGIKA: USUWANIE (Z PRZYWRACANIEM STANU) ---
+        // --- Usuwanie Karty (Bez zmian) ---
         else if (target.classList.contains('btn-delete-archived-card')) {
             const cardId = target.dataset.cardId;
             const cardNr = target.dataset.cardNr;
-
-            // Sprawdź czy użytkownik ma włączony magazyn
-            const useStock = currentUserProfile && currentUserProfile.uzywaStanowMagazynowych;
-
+            
             if (confirm(`Czy na pewno chcesz trwale usunąć kartę nr: ${cardNr}?`)) {
-                
-                let restoreStock = false;
-                // Jeśli ma magazyn, zapytaj o zwrot
-                if (useStock) {
-                    restoreStock = confirm("Czy przywrócić zużyte produkty na stan magazynowy?");
-                }
-
                 target.textContent = 'Usuwanie...';
-                target.disabled = true;
-
-                // Pobieramy dane karty, aby wiedzieć co oddać
-                db.collection("archiwumKarty").doc(cardId).get().then(async (doc) => {
-                    if (!doc.exists) return;
-                    const cardData = doc.data();
-
-                    const batch = db.batch();
-                    const cardRef = db.collection("archiwumKarty").doc(cardId);
-                    batch.delete(cardRef); // Usuń kartę
-
-                    // --- LOGIKA ZWROTU STANU (MODUŁ 5) ---
-                    if (restoreStock && cardData.table) {
-                        const changesLog = [];
-                        
-                        // Przejdź przez produkty w karcie
-                        cardData.table.forEach(row => {
-                            // Wyciągnij ilość (często zapisana jako HTML <input value="5">)
-                            let qty = 0;
-                            if (row.iloscDawka && row.iloscDawka.includes('value="')) {
-                                 const match = row.iloscDawka.match(/value="([\d\.]+)"/);
-                                 if (match) qty = parseFloat(match[1]);
-                            } else {
-                                 // Jeśli to czysta liczba
-                                 qty = parseFloat(row.iloscDawka) || 0;
-                            }
-
-                            const productName = (row.lek || '').trim();
-
-                            if (qty > 0 && productName) {
-                                // Znajdź ID produktu w cache
-                                const prodId = typeof produktyGlowneCache !== 'undefined' ? produktyGlowneCache.get(productName) : null;
-                                
-                                if (prodId) {
-                                    // Zwiększ stan w magazynie (FieldValue.increment)
-                                    const stockRef = db.collection("konfiguracja").doc(currentUserProfile.id).collection("magazynOsobisty").doc(prodId);
-                                    batch.set(stockRef, { 
-                                        stan: firebase.firestore.FieldValue.increment(qty) 
-                                    }, { merge: true });
-
-                                    changesLog.push({
-                                        id_produktu: prodId,
-                                        nazwa_produktu: productName,
-                                        ilosc: qty, // dodatnia ilość = zwrot
-                                        typ: "zwrot_usuniecie"
-                                    });
-                                }
-                            }
-                        });
-                        
-                        // Dodaj wpis do historii (logów)
-                        if (changesLog.length > 0) {
-                             const logRef = db.collection("konfiguracja").doc(currentUserProfile.id).collection("magazynOsobistyLog").doc();
-                             batch.set(logRef, {
-                                 typ: "zwrot_usuniecie",
-                                 data: firebase.firestore.FieldValue.serverTimestamp(),
-                                 kto_uid: currentUserProfile.uid,
-                                 kto_nazwa: "System (Usunięcie Karty)",
-                                 zmiany: changesLog,
-                                 nr_karty: cardNr
-                             });
-                        }
-                    }
-
-                    // Wykonaj wszystkie operacje
-                    await batch.commit();
-                    
-                    // Usuń wiersz z tabeli
-                    target.closest('tr').remove();
-                    showToast("Karta usunięta.", "success");
-                    
-                    // Odśwież cache magazynu w tle
-                    if (restoreStock && typeof loadMagazynCache === 'function') {
-                        loadMagazynCache(currentUserProfile.uid);
-                    }
-
-                }).catch(error => {
-                    console.error("Błąd usuwania:", error);
+                try {
+                    await db.collection("archiwumKarty").doc(cardId).delete();
+                    target.closest('tr').remove(); 
+                    alert('Karta została usunięta.');
+                } catch (error) {
+                    console.error("Błąd usuwania karty:", error);
                     alert("Wystąpił błąd podczas usuwania.");
                     target.textContent = 'Usuń';
-                    target.disabled = false;
-                });
+                }
             }
         }
+    });
+}
 
 /**
  * Pkt 6: Funkcja pomocnicza budująca HTML dla podglądu
@@ -19287,153 +19166,6 @@ function openDirectPrintWindow(card) {
     if (!printWindow) { alert('Zablokowano okno.'); return; }
 
     printWindow.document.write(getUnifiedPrintHTML(header, rowsHTML));
-    printWindow.document.close();
-    printWindow.focus();
-}
-        /**
- * ✅ MODUŁ 4: Otwiera podgląd karty w formacie 110mm (Drukarka termiczna).
- * Generuje HTML identyczny jak w module druku na żywo, ale z danych archiwalnych.
- */
-function openDirectPrintWindow110mm(card) {
-    const header = card.header || {};
-    // Podpisy
-    const imgLekarz = header.podpisLekarzaImg || '';
-    const liniaLekarz = header.podpisLekarzaLinia || '';
-    const imgPosiadacz = card.podpisPosiadacza || ''; // Podpis klienta jest w głównym obiekcie
-
-    let productsHtml = '';
-    const savedRows = card.table || [];
-    const savedRowsSorted = savedRows.sort((a,b) => a.logicalIndex - b.logicalIndex);
-
-    // Iterujemy po wierszach i budujemy pionowy układ (jak w paragonie 110mm)
-    savedRowsSorted.forEach((row, idx) => {
-        // Pomijamy puste wiersze techniczne, chyba że to separator
-        if (row.logicalIndex === 9) { // To jest wiersz separatora w starej logice (czasami)
-             // Opcjonalnie dodaj nagłówek sekcji II
-        }
-
-        const nazwa = row.lek || row.opis || '';
-        if (!nazwa && !row.liczba && !row.rozpoznanie) return;
-
-        // Sekcja danych zwierzęcia (jeśli są w tym wierszu)
-        let animalInfo = '';
-        if (row.opis || row.liczba || row.rozpoznanie) {
-             animalInfo = `
-                <div style="border-bottom: 1px solid #ccc; margin-bottom: 2px; padding-bottom: 2px; font-size: 7pt; background:#f9f9f9;">
-                    ${row.opis ? `<div>Opis: ${row.opis}</div>` : ''}
-                    ${row.liczba ? `<div>Szt: ${row.liczba}</div>` : ''}
-                    ${row.rozpoznanie ? `<div>Diag: ${row.rozpoznanie}</div>` : ''}
-                </div>
-             `;
-        }
-
-        // Sekcja leku (jeśli jest)
-        let drugInfo = '';
-        if (row.lek) {
-            // Parsowanie ilości z HTML (jeśli zapisana jako HTML) lub czysty tekst
-            let iloscTxt = row.iloscDawka;
-            if (iloscTxt && iloscTxt.includes('value="')) {
-                 const match = iloscTxt.match(/value="([^"]+)"/);
-                 const val = match ? match[1] : '';
-                 const text = iloscTxt.replace(/<[^>]*>/g, '').trim();
-                 iloscTxt = val + ' ' + text;
-            }
-
-            // Czyszczenie karencji z ikony
-            let karTxt = (row.karencja || '').replace('📅', '').trim();
-
-            drugInfo = `
-                <div style="padding-left: 2px;">
-                    <div style="font-weight: bold;">${row.lek}</div>
-                    <div style="font-size: 8pt;">
-                       Seria: ${row.seria || '-'} | Ilość: <strong>${iloscTxt || '-'}</strong>
-                    </div>
-                    ${karTxt ? `<div style="font-size:7pt; font-style:italic;">Karencja: ${karTxt}</div>` : ''}
-                </div>
-            `;
-        }
-
-        productsHtml += `
-            <div style="border-bottom: 1px dotted #000; padding: 4px 0;">
-                <div style="font-size:7pt; color:#555;">Poz. ${idx + 1}</div>
-                ${animalInfo}
-                ${drugInfo}
-            </div>
-        `;
-    });
-
-    const htmlContent = `
-        <div style="font-family: 'Nunito', sans-serif; font-size: 8pt; line-height: 1.25; color: #000; width: 80mm; margin: 0 auto;">
-            
-            <div style="text-align:center; border-bottom:2px solid #000; padding-bottom:5px; margin-bottom:10px;">
-                <h2 style="font-size:10pt; margin:0; font-weight:800;">KARTA LECZENIA (KOPIA)</h2>
-                <div style="font-size:9pt;">NR: <strong>${header.nrDokumentu}</strong></div>
-            </div>
-
-            <div style="margin-bottom: 10px;">
-                <p style="margin:1px 0;"><strong>Lecznica:</strong><br>${header.nazwaLecznicy}</p>
-                <p style="margin:1px 0; margin-top:5px;"><strong>Klient:</strong><br>${header.klient}</p>
-                <p style="margin:1px 0;">${header.adresKlienta}</p>
-                <p style="margin:1px 0;">Nr stada: <strong>${header.nrStada}</strong></p>
-                <p style="margin:1px 0; margin-top:5px;"><strong>Data wykonania:</strong> ${header.dataWykonania}</p>
-            </div>
-
-            <div style="border-top:2px solid #000; padding-top:5px;">
-                <h3 style="font-size:9pt; margin:0 0 5px 0; background:#eee; padding:2px;">POZYCJE:</h3>
-                ${productsHtml}
-            </div>
-
-            <div style="margin-top: 15px; font-size: 7pt; text-align: justify; border-top: 1px solid #000; padding-top: 5px;">
-                Oświadczam, że nabyte produkty lecznicze weterynaryjne/pasze lecznicze zostaną zastosowane zgodnie z zaleceniami lekarza weterynarii.
-            </div>
-
-            <div style="margin-top: 20px;">
-                <div style="margin-bottom: 15px; text-align: center;">
-                    <strong>Lekarz weterynarii:</strong><br>
-                    ${imgLekarz ? `<img src="${imgLekarz}" style="height: 35px; margin: 2px auto; display:block;">` : ''}
-                    <div>${liniaLekarz}</div>
-                </div>
-                <div style="text-align: center;">
-                    <strong>Posiadacz zwierzęcia:</strong><br>
-                    ${imgPosiadacz ? `<img src="${imgPosiadacz}" style="height: 35px; margin: 2px auto; display:block;">` : '(Brak podpisu)'}
-                </div>
-            </div>
-        </div>
-    `;
-
-    const printWindow = window.open('', '_blank', 'width=450,height=700,scrollbars=yes,resizable=yes');
-    if (!printWindow) { alert("Zablokowano okno."); return; }
-
-    printWindow.document.write(`
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>Podgląd 110mm</title>
-            <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
-            <style>
-                body { background-color: #525659; margin: 0; padding: 0; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
-                .receipt-container { background: white; padding: 5mm; width: 80mm; margin: 20px auto; box-shadow: 0 0 15px rgba(0,0,0,0.5); box-sizing: border-box; }
-                .print-controls { width: 100%; padding: 10px; background: #333; text-align: center; position: sticky; top: 0; }
-                button { padding: 8px 20px; cursor: pointer; font-weight: bold; margin: 0 5px; }
-                @media print {
-                    body { background: white; margin: 0; display: block; }
-                    .print-controls { display: none; }
-                    .receipt-container { width: 100%; margin: 0; box-shadow: none; padding: 0; }
-                    @page { size: 110mm auto; margin: 0; }
-                }
-            </style>
-        </head>
-        <body>
-            <div class="print-controls">
-                <button onclick="window.print()" style="background:#4CAF50; color:white; border:none;">🖨️ Drukuj</button>
-                <button onclick="window.close()" style="background:#f44336; color:white; border:none;">❌ Zamknij</button>
-            </div>
-            <div class="receipt-container">
-                ${htmlContent}
-            </div>
-        </body>
-        </html>
-    `);
     printWindow.document.close();
     printWindow.focus();
 }
