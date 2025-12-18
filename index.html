@@ -23513,17 +23513,47 @@ function loadCardForEditing(cardData) {
                 // Kolumna 6 (Seria)
                 tr.cells[5].textContent = savedRow.seria || '';
 
-                // ✅ FIX KOLUMNA 7 (Ilość/Dawka)
-                const iloscInput = tr.cells[6].querySelector('input');
+         // ✅ FIX KOLUMNA 7 (Ilość/Dawka) - WERSJA POPRAWIONA
+                const cellIlosc = tr.cells[6];
+                const iloscInput = cellIlosc.querySelector('input');
+                
                 if (iloscInput) {
+                    let savedHtml = savedRow.iloscDawka || '';
                     let qtyVal = '';
-                    if(savedRow.iloscDawka && savedRow.iloscDawka.includes('value="')) {
-                         const m = savedRow.iloscDawka.match(/value="([\d\.]+)"/);
-                         if(m) qtyVal = m[1];
-                    } else {
-                        qtyVal = parseFloat(savedRow.iloscDawka) || '';
+                    let doseText = '';
+
+                    // Metoda 1: Parsowanie HTML (najdokładniejsza)
+                    if (savedHtml.includes('<input')) {
+                        const tempDiv = document.createElement('div');
+                        tempDiv.innerHTML = savedHtml;
+                        
+                        const tempInp = tempDiv.querySelector('input');
+                        if (tempInp) qtyVal = tempInp.value; // Wyciągnij wartość z value=""
+                        
+                        // Wyciągnij tekst (dawkowanie/jednostkę) ignorując sam input
+                        doseText = tempDiv.textContent.trim(); 
+                    } 
+                    // Metoda 2: Fallback dla danych zapisanych jako czysty tekst
+                    else {
+                        qtyVal = parseFloat(savedHtml) || '';
+                        doseText = savedHtml.replace(qtyVal, '').trim();
                     }
+
+                    // A. Wpisz liczbę do inputa
                     iloscInput.value = qtyVal;
+
+                    // B. Wpisz tekst dawkowania obok inputa
+                    // Szukamy istniejącego węzła tekstowego, żeby go zaktualizować
+                    let textNode = null;
+                    cellIlosc.childNodes.forEach(node => {
+                        if (node.nodeType === Node.TEXT_NODE) textNode = node;
+                    });
+
+                    if (textNode) {
+                        textNode.textContent = ' ' + doseText;
+                    } else {
+                        cellIlosc.appendChild(document.createTextNode(' ' + doseText));
+                    }
                 }
 
                 // ✅ FIX KOLUMNA 8 (Karencja/Smart Cell)
