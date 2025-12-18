@@ -4937,6 +4937,23 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
         </div>
     </div>
 </div>
+    <div id="correctionCardSearchModal" class="product-search-modal" style="display: none; z-index: 10050;">
+    <div class="product-search-card" style="max-width: 500px;">
+        <h3>Wybierz kartę do korekty</h3>
+        <p style="font-size: 14px; color: #666; text-align: center; margin-bottom: 10px;">
+            Klient: <strong id="correctionClientNameDisplay">...</strong>
+        </p>
+        
+        <input type="search" id="correctionCardSearchInput" placeholder="Filtruj po numerze lub dacie..." style="margin-bottom: 10px;">
+        
+        <div id="correctionCardSearchList" class="product-search-list" style="max-height: 400px; overflow-y: auto;">
+            </div>
+        
+        <div class="form-actions" style="justify-content: flex-end; margin-top: 10px;">
+            <button id="correctionCardSearchCloseBtn" class="btn ghost">Anuluj</button>
+        </div>
+    </div>
+</div>
     <script>
 /* ----- Inicjalizacja Firebase (Uruchamia się na starcie) ----- */
 // ... reszta kodu pierwszego bloku script ...
@@ -16735,7 +16752,7 @@ function clearKartaLeczenia(skipGenNumber = false) {
     
     const corrBtn = document.getElementById('correctionModeBtn');
     if (corrBtn) {
-        corrBtn.style.display = 'none'; // Ukryj przycisk korekty (bo to nowa karta)
+         // Ukryj przycisk korekty (bo to nowa karta)
     }
     // ----------------------------------------------
     
@@ -22211,67 +22228,92 @@ let currentAnimalDescTargetInput = null; // Gdzie wpisać wynik (input w tabeli 
 let animalDescCache = []; // Cache historii dla danego klienta
 
 // 1. Otwieranie Modala
+// --- POPRAWIONA OBSŁUGA HISTORII ZWIERZĄT ---
+
 function openAnimalDescModal(targetInput) {
+    // 1. Pobierz AKTUALNIE wybranego klienta z nagłówka
     const clientName = document.getElementById('klientSelect').value;
     
-    if (!clientName || clientName === "Kliknij, aby wybrać klienta...") {
-        alert("Najpierw wybierz klienta w nagłówku karty.");
+    // Walidacja: Czy klient jest wybrany?
+    if (!clientName || clientName === "Kliknij, aby wybrać klienta..." || clientName.trim() === "") {
+        alert("Najpierw wybierz klienta w nagłówku karty (pole 'Posiadacz zwierzęcia'), aby system wiedział czyją historię pokazać.");
         return;
     }
 
     currentAnimalDescTargetInput = targetInput;
+    
+    // Ustaw tytuł w modalu
     if(animalDescClientNameLabel) animalDescClientNameLabel.textContent = clientName;
     
-    // Wpisz obecną wartość z pola do wyszukiwarki
+    // Wpisz to co już jest w komórce do wyszukiwarki
     if(animalDescInput) animalDescInput.value = targetInput.value;
 
     // Pokaż modal
     if (animalDescModal) {
         animalDescModal.style.display = 'flex';
-        // Pobierz historię
+        // Pobierz historię DLA TEGO KLIENTA
         fetchAndRenderAnimalHistory(clientName);
         
         setTimeout(() => animalDescInput.focus(), 50);
     }
 }
 
-// 2. Pobieranie i renderowanie historii
 async function fetchAndRenderAnimalHistory(clientName) {
     if(!animalDescList) return;
     animalDescList.innerHTML = '<div style="padding:20px; text-align:center; color:#999;">Ładowanie historii... ⏳</div>';
     
-    // Oblicz datę graniczną (180 dni)
+    // Oblicz datę (180 dni temu) w formacie string YYYY-MM-DD
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - 180);
     const cutoffDateString = cutoffDate.toISOString().split('T')[0];
 
     try {
         let q = db.collection("archiwumKarty")
-            .where("klient_nazwa", "==", clientName)
+            .where("klient_nazwa", "==", clientName) // 🔥 Kluczowe filtrowanie po nazwie
             .orderBy("dataWykonania", "desc")
-            .limit(50);
-            
-        // Filtr lecznicy (jeśli nie admin)
+            .limit(30); // Ostatnie 30 wizyt wystarczy
+
+        // Opcjonalnie filtr ID lecznicy (jeśli nie admin)
         if (currentUserProfile && currentUserProfile.Rola !== 'administrator') {
              const userClinicId = currentUserProfile['ID lecznicy'];
              if (userClinicId) q = q.where("id_lecznicy", "==", userClinicId);
         }
 
         const snapshot = await q.get();
-        const descriptions = new Set();
+        const descriptions = new Set(); // Set zapewnia unikalność
 
         snapshot.docs.forEach(doc => {
             const data = doc.data();
-            // Sprawdź datę (JS filter)
+            // Sprawdź datę (manualnie w JS, bo mieszanie > i == w Firestore wymaga indeksu, którego może nie być)
             if (data.dataWykonania >= cutoffDateString) {
                 if (data.table && Array.isArray(data.table)) {
                     data.table.forEach(row => {
                         const desc = (row.opis || '').trim();
-                        if (desc && desc.length > 2 && desc !== '---') {
+                        // Dodaj, jeśli ma sensowną długość i nie jest kreską
+                        if (desc && desc.length > 2 && !desc.includes('---')) {
                             descriptions.add(desc);
                         }
                     });
                 }
+            }
+        });
+
+        animalDescCache = Array.from(descriptions);
+        filterAnimalDescList(); // Wyświetl
+
+    } catch (error) {
+        console.error("Błąd historii zwierząt:", error);
+        // Fallback w przypadku braku indeksu
+        animalDescCache = []; 
+        filterAnimalDescList();
+        
+        if (error.code === 'failed-precondition') {
+             // Jeśli brakuje indeksu, to prawdopodobnie dlatego, że użyliśmy orderBy z where.
+             // W konsoli pojawi się link do utworzenia indeksu.
+             console.warn("Brakuje indeksu dla historii zwierząt (klient_nazwa + dataWykonania).");
+        }
+    }
+}
             }
         });
 
@@ -23244,129 +23286,221 @@ function renderClientComparisonCharts(vetName, vetStats, clinicStats) {
         }
     });
 }
-    /* ✅ OBSŁUGA PRZYCISKU TRYB KOREKTY */
-const correctionModeBtn = document.getElementById('correctionModeBtn');
+/* ======================================================== */
+/* ✅ POPRAWIONY MODUŁ KOREKTY (Lista kart + Pełne wczytanie) */
+/* ======================================================== */
 
+const correctionModeBtn = document.getElementById('correctionModeBtn');
+const correctionModal = document.getElementById('correctionCardSearchModal');
+const correctionList = document.getElementById('correctionCardSearchList');
+const correctionInput = document.getElementById('correctionCardSearchInput');
+const correctionCloseBtn = document.getElementById('correctionCardSearchCloseBtn');
+const correctionClientNameDisplay = document.getElementById('correctionClientNameDisplay');
+
+let correctionCardsCache = []; // Cache na karty klienta
+
+// A. Pokaż przycisk korekty ZAWSZE (lub przynajmniej gdy jest klient)
+// Wklej to np. w initData lub po prostu na końcu skryptu, aby nadpisać style
+if (correctionModeBtn) {
+    correctionModeBtn.style.display = 'inline-block'; 
+}
+
+// B. Kliknięcie w "Tryb Korekty"
 if (correctionModeBtn) {
     correctionModeBtn.addEventListener('click', async () => {
-        
-        let nrDoKorekty = document.getElementById('nrDokumentu').value.trim();
-        
-        // Jeśli pole puste, zapytaj
-        if (!nrDoKorekty) {
-            nrDoKorekty = prompt("Wpisz numer karty leczenia, którą chcesz skorygować:");
+        // 1. Sprawdź, czy wybrano klienta w nagłówku
+        const selectedClient = document.getElementById('klientSelect').value;
+        if (!selectedClient || selectedClient === "Kliknij, aby wybrać klienta...") {
+            alert("Najpierw wybierz klienta w nagłówku karty, aby zobaczyć jego historię leczenia.");
+            return;
         }
 
-        if (!nrDoKorekty) return;
+        // 2. Otwórz modal
+        if (correctionClientNameDisplay) correctionClientNameDisplay.textContent = selectedClient;
+        if (correctionModal) correctionModal.style.display = 'flex';
+        
+        // 3. Pobierz karty tego klienta
+        await fetchCardsForCorrectionList(selectedClient);
+    });
+}
 
-        // 1. Znajdź kartę w archiwum
-        try {
-            showToast("Szukam karty do korekty...", "info");
-            const q = db.collection("archiwumKarty")
-                .where("lekarz_uid", "==", currentUserProfile.uid)
-                .where("nrDokumentu", "==", nrDoKorekty)
-                .limit(1);
-            
-            const snap = await q.get();
+// C. Pobieranie kart do listy
+async function fetchCardsForCorrectionList(clientName) {
+    if (!correctionList) return;
+    correctionList.innerHTML = '<div style="padding:20px; text-align:center;">Ładowanie kart... ⏳</div>';
 
-            if (snap.empty) {
-                alert("Nie znaleziono karty o takim numerze w Twoim archiwum.");
-                return;
-            }
+    try {
+        let q = db.collection("archiwumKarty")
+            .where("klient_nazwa", "==", clientName)
+            .orderBy("createdAt", "desc") // Najnowsze na górze
+            .limit(20); // Ostatnie 20 kart
 
-            const doc = snap.docs[0];
-            const oldData = doc.data();
-            
-            // 2. Wczytaj dane do formularza (używamy Twojej funkcji podglądu, ale musimy przenieść dane do inputów)
-            // Najprościej: Wyczyść i wypełnij od nowa
-            clearKartaLeczenia(true); // true = bez generowania nowego numeru
+        // Filtr po lecznicy (dla bezpieczeństwa)
+        if (currentUserProfile.Rola !== 'administrator') {
+             q = q.where("id_lecznicy", "==", currentUserProfile['ID lecznicy']);
+        }
 
-            // Wypełnij nagłówek
-            document.getElementById('klientSelect').value = oldData.header.klient || '';
-            document.getElementById('adresKlienta').textContent = oldData.header.adresKlienta || '';
-            document.getElementById('nrStada').textContent = oldData.header.nrStada || '';
-            document.getElementById('dataWykonania').value = oldData.header.dataWykonania || '';
-            document.getElementById('dataZgloszenia').value = oldData.header.dataZgloszenia || '';
+        const snapshot = await q.get();
+        correctionCardsCache = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-            // Wypełnij tabelę (uproszczona logika odtwarzania wierszy)
-            const rows = document.querySelectorAll('#karta tbody tr');
-            if (oldData.table) {
-                oldData.table.forEach(savedRow => {
-                    // Znajdź odpowiedni wiersz w HTML (bazując na logicalIndex)
-                    // Musimy przeliczyć index logiczny na fizyczny w tabeli HTML (omijając wiersz 10 nagłówkowy)
-                    let domRowIndex = -1;
-                    if (savedRow.logicalIndex < 9) domRowIndex = savedRow.logicalIndex; // Wiersze 1-9
-                    else domRowIndex = savedRow.logicalIndex + 1; // Wiersze 10-12 (przeskok przez nagłówek)
+        renderCorrectionCardList();
 
-                    const tr = rows[domRowIndex];
-                    if (tr) {
-                        // Wpisz dane
-                        const opisInput = tr.cells[1].querySelector('input');
-                        if (opisInput) opisInput.value = savedRow.opis || '';
-                        else tr.cells[1].textContent = savedRow.opis || '';
+    } catch (error) {
+        console.error("Błąd pobierania kart do korekty:", error);
+        correctionList.innerHTML = '<div style="padding:20px; color:red;">Błąd pobierania (sprawdź konsolę/indeksy).</div>';
+    }
+}
 
-                        const liczbaInput = tr.cells[2].querySelector('input');
-                        if (liczbaInput) liczbaInput.value = savedRow.liczba || '';
+// D. Renderowanie listy kart
+function renderCorrectionCardList() {
+    const filter = correctionInput ? correctionInput.value.toLowerCase() : "";
+    correctionList.innerHTML = '';
 
-                        const rozpInput = tr.cells[3].querySelector('input');
-                        if (rozpInput) rozpInput.value = savedRow.rozpoznanie || '';
+    if (correctionCardsCache.length === 0) {
+        correctionList.innerHTML = '<div style="padding:20px; text-align:center;">Brak zapisanych kart dla tego klienta.</div>';
+        return;
+    }
 
-                        const lekInput = tr.cells[4].querySelector('input');
-                        if (lekInput) lekInput.value = savedRow.lek || '';
+    correctionCardsCache.forEach(card => {
+        const nr = card.nrDokumentu || "Brak nr";
+        const data = card.dataWykonania || "Brak daty";
+        const searchStr = `${nr} ${data}`.toLowerCase();
 
-                        tr.cells[5].textContent = savedRow.seria || '';
+        if (searchStr.includes(filter)) {
+            const item = document.createElement('div');
+            item.className = 'product-search-item'; // Używamy stylu listy produktów
+            item.style.borderBottom = "1px solid #eee";
+            item.style.padding = "10px";
+            item.style.cursor = "pointer";
 
-                        const iloscInput = tr.cells[6].querySelector('input');
-                        // Parsowanie ilości (czasem zapisana jako HTML)
-                        let qtyVal = '';
-                        if(savedRow.iloscDawka && savedRow.iloscDawka.includes('value="')) {
-                             const m = savedRow.iloscDawka.match(/value="([\d\.]+)"/);
-                             if(m) qtyVal = m[1];
-                        }
-                        if (iloscInput) iloscInput.value = qtyVal;
+            item.innerHTML = `
+                <div style="font-weight:bold; color:#2b74e4;">${nr}</div>
+                <div style="font-size:12px; color:#555;">Data: ${data}</div>
+            `;
 
-                        const karInput = tr.cells[7].querySelector('input');
-                        if (karInput) karInput.value = savedRow.karencja || '';
-                        
-                        tr.classList.add('filled-row');
-                    }
-                });
-            }
+            // Kliknięcie w kartę -> Wczytanie do edycji
+            item.addEventListener('click', () => {
+                loadCorrectionCardToTable(card);
+                if (correctionModal) correctionModal.style.display = 'none';
+            });
 
-            // 3. Ustawienia Korekty
-            originalCardIdForCorrection = doc.id; // ZAPAMIĘTAJ ID STAREJ KARTY
-            
-            // Dodaj dopisek "KOREKTA" jeśli go nie ma
-            let newNr = oldData.nrDokumentu;
-            if (!newNr.toUpperCase().includes("KOREKTA")) {
-                newNr += " - KOREKTA";
-            }
-            document.getElementById('nrDokumentu').value = newNr;
-
-            // 4. Wyczyść podpis (wymuś ponowne podpisanie)
-            const canvas = document.getElementById('canvasPosiadacz');
-            const ctx = canvas.getContext('2d');
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-            // 5. Odblokuj interfejs
-            isCardLocked = false;
-            isCurrentCardSaved = false; // Żeby wymusić zapis
-            toggleCardInputs(true); // Odblokuj pola
-
-            const saveBtn = document.getElementById('saveCardToArchiveBtn');
-            saveBtn.disabled = false;
-            saveBtn.textContent = '💾 Zapisz KOREKTĘ (Podmień)';
-            saveBtn.classList.add('warn'); // Zmień kolor na ostrzegawczy
-
-            correctionModeBtn.style.display = 'none'; // Ukryj przycisk korekty (jesteśmy w niej)
-
-            alert("Jesteś w trybie korekty.\n\n1. Popraw dane w tabeli.\n2. Poproś klienta o PONOWNY podpis.\n3. Kliknij 'Zapisz Korektę', aby podmienić dokumenty i zaktualizować magazyn.");
-
-        } catch (e) {
-            console.error("Błąd trybu korekty:", e);
-            alert("Wystąpił błąd podczas pobierania karty.");
+            correctionList.appendChild(item);
         }
     });
+}
+
+// E. Filtrowanie w modalu
+if (correctionInput) {
+    correctionInput.addEventListener('input', renderCorrectionCardList);
+}
+if (correctionCloseBtn) {
+    correctionCloseBtn.addEventListener('click', () => { if(correctionModal) correctionModal.style.display = 'none'; });
+}
+
+// F. GŁÓWNA FUNKCJA WCZYTUJĄCA (Naprawiająca brakujące kolumny)
+function loadCorrectionCardToTable(cardData) {
+    console.log("Wczytywanie karty do korekty...", cardData);
+
+    // 1. Wyczyść stół (bez generowania numeru, bo bierzemy stary)
+    clearKartaLeczenia(true);
+
+    // 2. Ustaw flagi korekty
+    originalCardIdForCorrection = cardData.id; 
+    
+    // Dopisz "KOREKTA" do numeru, jeśli nie ma
+    let nr = cardData.nrDokumentu;
+    if (!nr.toUpperCase().includes("KOREKTA")) nr += " - KOREKTA";
+    document.getElementById('nrDokumentu').value = nr;
+
+    // 3. Wypełnij nagłówek
+    const h = cardData.header;
+    document.getElementById('klientSelect').value = h.klient || '';
+    document.getElementById('adresKlienta').textContent = h.adresKlienta || '';
+    document.getElementById('nrStada').textContent = h.nrStada || '';
+    document.getElementById('dataWykonania').value = h.dataWykonania || '';
+    document.getElementById('dataZgloszenia').value = h.dataZgloszenia || '';
+
+    // 4. Wypełnij TABELĘ (Kluczowa poprawka)
+    const rows = document.querySelectorAll('#karta tbody tr');
+    
+    if (cardData.table && Array.isArray(cardData.table)) {
+        cardData.table.forEach(savedRow => {
+            // Przelicz indeks logiczny na fizyczny (omijając wiersz nagłówkowy nr 10)
+            let domRowIndex = -1;
+            if (savedRow.logicalIndex < 9) domRowIndex = savedRow.logicalIndex;
+            else domRowIndex = savedRow.logicalIndex + 1;
+
+            const tr = rows[domRowIndex];
+            if (tr) {
+                // Kolumna 2: Opis
+                const opisInput = tr.cells[1].querySelector('input');
+                if (opisInput) opisInput.value = savedRow.opis || '';
+                else tr.cells[1].textContent = savedRow.opis || '';
+
+                // Kolumna 3: Liczba
+                const liczbaInput = tr.cells[2].querySelector('input');
+                if (liczbaInput) liczbaInput.value = savedRow.liczba || '';
+
+                // Kolumna 4: Rozpoznanie
+                const rozpInput = tr.cells[3].querySelector('input');
+                if (rozpInput) rozpInput.value = savedRow.rozpoznanie || '';
+
+                // Kolumna 5: Lek
+                const lekInput = tr.cells[4].querySelector('input');
+                if (lekInput) lekInput.value = savedRow.lek || '';
+
+                // Kolumna 6: Seria
+                tr.cells[5].textContent = savedRow.seria || '';
+
+                // --- 🔴 POPRAWKA KOLUMNY 7 (Ilość) ---
+                // W bazie zapisujemy HTML np. `<input value="5"> ml`. Musimy wyciągnąć wartość.
+                const iloscInput = tr.cells[6].querySelector('input');
+                let qtyVal = '';
+                // Jeśli w zapisanym stringu jest value="...", wyciągnij to
+                if (savedRow.iloscDawka && savedRow.iloscDawka.includes('value="')) {
+                    const m = savedRow.iloscDawka.match(/value="([\d\.]+)"/);
+                    if (m) qtyVal = m[1];
+                } else {
+                    // Fallback: spróbuj sparsować float z tekstu
+                    qtyVal = parseFloat(savedRow.iloscDawka) || '';
+                }
+                if (iloscInput) iloscInput.value = qtyVal;
+                // Odtwórz jednostkę/dawkowanie (tekst obok inputa)
+                // Usuwamy tagi HTML z zapisanego stringa, żeby dostać sam tekst (np. "ml")
+                const textOnly = savedRow.iloscDawka.replace(/<[^>]*>/g, '').trim();
+                if(textOnly) {
+                    // Usuń stare text nody
+                    Array.from(tr.cells[6].childNodes).forEach(n => { if(n.nodeType===Node.TEXT_NODE) n.remove(); });
+                    tr.cells[6].appendChild(document.createTextNode(' ' + textOnly));
+                }
+
+                // --- 🔴 POPRAWKA KOLUMNY 8 (Karencja/Smart Cell) ---
+                // Tutaj wartość może być w inpucie, textarea lub jako tekst
+                const karInput = tr.cells[7].querySelector('input, textarea'); // Smart cell ma input klasa .karencja-input
+                
+                if (karInput) {
+                    // Jeśli to Smart Cell, wpisz wartość do inputa
+                    karInput.value = savedRow.karencja || '';
+                } else {
+                    // Jeśli zwykła, wpisz tekst (usuwając ikonę kalendarza jeśli się zapisała)
+                    tr.cells[7].textContent = (savedRow.karencja || '').replace('📅','').trim();
+                }
+
+                // Oznacz jako wypełniony
+                tr.classList.add('filled-row');
+            }
+        });
+    }
+
+    showToast("Wczytano kartę do korekty. Możesz edytować.", "info");
+    
+    // Pokaż przycisk zapisu z odpowiednim tekstem
+    const saveBtn = document.getElementById('saveCardToArchiveBtn');
+    if(saveBtn) {
+        saveBtn.textContent = '💾 Zapisz KOREKTĘ (Podmień)';
+        saveBtn.classList.add('warn');
+        saveBtn.disabled = false;
+    }
 }
 /* ======================================================== */
 /* KONIEC SKRYPTU */
