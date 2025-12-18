@@ -19354,152 +19354,236 @@ function createSmartDosageCell(cell, row) {
     cell.appendChild(textInput);
     cell.appendChild(calIcon);
 }
-    /**
- * ✅ MODUŁ 4: Otwiera podgląd karty z Archiwum w formacie 110mm (Termiczny).
+/**
+ * ✅ MODUŁ 4 (POPRAWKA FINALNA): Podgląd 110mm z Archiwum.
+ * Wersja 1:1 zgodna z Generatorem (Tytuły prawne, Sekcje I/II, Legenda, Układ).
  */
 function openDirectPrintWindow110mm(card) {
     const header = card.header || {};
-    // Podpisy (jeśli są zapisane jako base64)
+    
+    // Dane podpisów
     const imgLekarz = header.podpisLekarzaImg || '';
     const liniaLekarz = header.podpisLekarzaLinia || '';
     const imgPosiadacz = card.podpisPosiadacza || ''; 
 
-    let productsHtml = '';
-    const savedRows = card.table || [];
-    
-    // Sortujemy wiersze, żeby wyświetlały się po kolei (1, 2, 3...)
-    const savedRowsSorted = savedRows.sort((a,b) => a.logicalIndex - b.logicalIndex);
+    // Rozdzielamy wiersze na Sekcję I (0-8) i Sekcję II (9-11)
+    const rows = card.table || [];
+    const rowsSec1 = rows.filter(r => r.logicalIndex < 9).sort((a,b) => a.logicalIndex - b.logicalIndex);
+    const rowsSec2 = rows.filter(r => r.logicalIndex >= 9).sort((a,b) => a.logicalIndex - b.logicalIndex);
 
-    // Pętla tworząca listę produktów w pionie
-    savedRowsSorted.forEach((row, idx) => {
-        // Pomijamy puste wiersze
-        const nazwa = row.lek || row.opis || '';
-        if (!nazwa && !row.liczba && !row.rozpoznanie) return;
+    // --- Funkcja pomocnicza generująca HTML dla grupy wierszy (identyczna jak w generatorze) ---
+    const generateSectionHTML = (rowsList) => {
+        let html = '';
+        
+        // W archiwum wiersze są płaskie. Musimy sprawdzić, czy wiersz ma dane.
+        rowsList.forEach((row, idx) => {
+            const nazwa = row.lek || '';
+            const opis = row.opis || '';
+            const liczba = row.liczba || '';
+            const rozp = row.rozpoznanie || '';
 
-        // Sekcja: Dane zwierzęcia (jeśli są w tym wierszu)
-        let animalInfo = '';
-        if (row.opis || row.liczba || row.rozpoznanie) {
-             animalInfo = `
-                <div style="background:#f9f9f9; padding:2px; font-size:7pt; border-bottom:1px dashed #ccc;">
-                    ${row.opis ? `<div><strong>Opis:</strong> ${row.opis}</div>` : ''}
-                    ${row.liczba ? `<div><strong>Szt:</strong> ${row.liczba}</div>` : ''}
-                    ${row.rozpoznanie ? `<div><strong>Diag:</strong> ${row.rozpoznanie}</div>` : ''}
-                </div>
-             `;
-        }
+            // Pomiń, jeśli wiersz jest zupełnie pusty
+            if (!nazwa && !opis && !liczba && !rozp) return;
 
-        // Sekcja: Lek (jeśli jest w tym wierszu)
-        let drugInfo = '';
-        if (row.lek) {
-            // Czyścimy ilość z ewentualnego HTML-a (jeśli zapisano jako <input>)
-            let iloscTxt = row.iloscDawka;
-            if (iloscTxt && iloscTxt.includes('value="')) {
-                 const match = iloscTxt.match(/value="([^"]+)"/);
-                 const val = match ? match[1] : '';
-                 // Dodaj resztę tekstu (jednostkę)
-                 const text = iloscTxt.replace(/<[^>]*>/g, '').trim(); 
-                 iloscTxt = val + ' ' + text;
+            // 1. Blok danych zwierzęcia (jeśli są) - Pełne nazwy punktów 4, 5, 6
+            if (opis || liczba || rozp) {
+                html += `<div style="border-bottom: 1px solid #000; margin-bottom: 5px; padding-bottom: 5px;">`;
+                
+                if (opis && opis !== '---') {
+                    html += `<p style="margin: 2px 0;"><strong>4. Nazwa siedziby stada i opis leczonego zwierzęcia (gatunek, płeć numer identyfikacyjny, sposób oznakowania, wiek, masa ciała):</strong><br><span style="font-weight: normal; margin-left: 5px;">${opis}</span></p>`;
+                }
+                if (liczba && liczba !== '0') {
+                    html += `<p style="margin: 2px 0;"><strong>5. Liczba leczonych zwierząt:</strong> <span style="font-weight: normal;">${liczba}</span></p>`;
+                }
+                if (rozp && rozp !== '---') {
+                    html += `<p style="margin: 2px 0;"><strong>6. Rozpoznanie albo wstępne rozpoznanie choroby:</strong><br><span style="font-weight: normal; margin-left: 5px;">${rozp}</span></p>`;
+                }
+                html += `</div>`;
             }
 
-            // Czyszczenie karencji z ikony kalendarza
-            let karTxt = (row.karencja || '').replace('📅', '').trim();
+            // 2. Produkt (jeśli jest)
+            if (nazwa) {
+                // Czyszczenie ilości z HTML
+                let iloscTxt = row.iloscDawka || '-';
+                if (iloscTxt.includes('value="')) {
+                     const match = iloscTxt.match(/value="([^"]+)"/);
+                     const val = match ? match[1] : '';
+                     const txt = iloscTxt.replace(/<[^>]*>/g, '').trim();
+                     iloscTxt = val + ' ' + txt;
+                }
+                // Czyszczenie karencji
+                let karTxt = (row.karencja || '-').replace('📅', '').trim();
 
-            drugInfo = `
-                <div style="padding: 2px 0;">
-                    <div style="font-weight: bold; font-size: 8pt;">${row.lek}</div>
-                    <div style="font-size: 8pt;">
-                       Seria: ${row.seria || '-'} <br> 
-                       Ilość: <strong>${iloscTxt || '-'}</strong>
+                html += `
+                    <div style="margin-bottom: 6px; border-bottom: 1px dotted #ccc; padding-bottom: 4px; font-size: 8pt;">
+                        <div style="margin-bottom: 2px;"><strong>${idx + 1}. ${nazwa} *</strong></div>
+                        <div style="padding-left: 10px;">
+                            <div>Seria: ${row.seria || '-'} **</div>
+                            <div>Ilość: <strong>${iloscTxt} ***</strong></div>
+                            <div style="font-style: italic;">Karencja: ${karTxt} ****</div>
+                        </div>
                     </div>
-                    ${karTxt ? `<div style="font-size:7pt; font-style:italic; margin-top:1px;">Karencja: ${karTxt}</div>` : ''}
-                </div>
-            `;
-        }
+                `;
+            }
+        });
 
-        // Łączymy wiersz
-        productsHtml += `
-            <div style="border-bottom: 1px solid #000; margin-bottom: 4px; padding-bottom: 4px;">
-                <div style="font-size:7pt; color:#555;">Poz. ${idx + 1}</div>
-                ${animalInfo}
-                ${drugInfo}
-            </div>
-        `;
-    });
+        if (html === '') html = `<p style="font-style:italic; text-align:center;">-</p>`;
+        return html;
+    };
 
-    // Składamy cały HTML strony
-    const htmlContent = `
-        <div style="font-family: 'Nunito', sans-serif; font-size: 8pt; line-height: 1.3; color: #000; width: 80mm; margin: 0 auto;">
-            
-            <div style="text-align:center; border-bottom:2px solid #000; padding-bottom:5px; margin-bottom:10px;">
-                <h2 style="font-size:10pt; margin:0; font-weight:800;">KARTA LECZENIA (KOPIA)</h2>
-                <div style="font-size:9pt;">NR: <strong>${header.nrDokumentu}</strong></div>
-            </div>
-
-            <div style="margin-bottom: 10px; border-bottom:1px solid #000; padding-bottom:5px;">
-                <p style="margin:2px 0;"><strong>Lecznica:</strong><br>${header.nazwaLecznicy}</p>
-                <p style="margin:2px 0;"><strong>Klient:</strong><br>${header.klient}</p>
-                <p style="margin:2px 0; font-size:7pt;">${header.adresKlienta}</p>
-                <p style="margin:2px 0;">Nr stada: <strong>${header.nrStada}</strong></p>
-                <p style="margin:2px 0;"><strong>Data wykonania:</strong> ${header.dataWykonania}</p>
-            </div>
-
-            <div>
-                <h3 style="font-size:9pt; margin:0 0 5px 0; background:#eee; padding:2px; text-align:center;">POZYCJE</h3>
-                ${productsHtml}
-            </div>
-
-            <div style="margin-top: 15px; font-size: 7pt; text-align: justify; border-top: 1px solid #000; padding-top: 5px;">
-                Oświadczam, że nabyte produkty lecznicze weterynaryjne/pasze lecznicze zostaną zastosowane zgodnie z zaleceniami lekarza weterynarii.
-            </div>
-
-            <div style="margin-top: 20px;">
-                <div style="margin-bottom: 15px; text-align: center;">
-                    <strong>Lekarz weterynarii:</strong><br>
-                    ${imgLekarz ? `<img src="${imgLekarz}" style="height: 40px; margin: 2px auto; display:block;">` : ''}
-                    <div>${liniaLekarz}</div>
-                </div>
-                <div style="text-align: center;">
-                    <strong>Posiadacz zwierzęcia:</strong><br>
-                    ${imgPosiadacz ? `<img src="${imgPosiadacz}" style="height: 40px; margin: 2px auto; display:block;">` : '(Brak podpisu)'}
-                </div>
-            </div>
-        </div>
-    `;
+    // Generuj treść sekcji
+    const htmlSec1 = generateSectionHTML(rowsSec1);
+    const htmlSec2 = generateSectionHTML(rowsSec2);
 
     // Otwieramy okno
-    const printWindow = window.open('', '_blank', 'width=450,height=700,scrollbars=yes,resizable=yes');
+    const printWindow = window.open('', '_blank', 'width=550,height=700,scrollbars=yes,resizable=yes');
     if (!printWindow) { alert("Zablokowano okno."); return; }
 
+    // --- BUDOWANIE CAŁEGO HTML (CSS + TREŚĆ) ---
     printWindow.document.write(`
         <!DOCTYPE html>
-        <html>
+        <html lang="pl">
         <head>
-            <title>Podgląd 110mm</title>
+            <meta charset="utf-8">
+            <title>Wydruk 110mm (Archiwum)</title>
             <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
             <style>
-                body { background-color: #525659; margin: 0; padding: 0; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
-                .receipt-container { background: white; padding: 5mm; width: 80mm; margin: 20px auto; box-shadow: 0 0 15px rgba(0,0,0,0.5); box-sizing: border-box; }
-                .print-controls { width: 100%; padding: 10px; background: #333; text-align: center; position: sticky; top: 0; }
-                button { padding: 8px 20px; cursor: pointer; font-weight: bold; margin: 0 5px; border-radius: 4px; border:none; }
+                body { 
+                    font-family: Arial, Helvetica, sans-serif; /* IDENTYCZNA CZCIONKA */
+                    background-color: #525659; 
+                    margin: 0; padding: 0; 
+                    display: flex; flex-direction: column; align-items: center; 
+                    min-height: 100vh;
+                }
+
+                /* Kontrolki (nie drukują się) */
+                .print-controls {
+                    width: 100%; padding: 10px; text-align: center; background-color: #333; 
+                    position: sticky; top: 0; z-index: 1000;
+                }
+                .print-controls button {
+                    padding: 8px 20px; font-size: 16px; margin: 0 10px; cursor: pointer; 
+                    border-radius: 6px; border: 1px solid #777; font-weight: bold;
+                }
+                .print-btn { background-color: #4CAF50; color: white; }
+                .close-btn { background-color: #f44336; color: white; }
+
+                /* --- STYL KARTKI 110mm (Identyczny jak w Generatorze) --- */
+                .receipt-page {
+                    font-family: Arial, Helvetica, sans-serif !important;
+                    font-size: 8pt !important;
+                    line-height: 1.25 !important;
+                    color: #000 !important;
+                    background-color: #ffffff;
+                    
+                    width: 80mm !important; 
+                    max-width: 80mm !important;
+                    
+                    margin: 20px 0 20px 1mm !important;
+                    padding: 0 !important; 
+                    padding-right: 2mm !important;
+                    
+                    box-sizing: border-box;
+                    text-align: justify !important; 
+                    text-justify: inter-word !important;
+                    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+                }
+
+                /* Elementy */
+                h2 { font-size: 10pt !important; font-weight: 800; text-transform: uppercase; text-align: center; margin: 0 0 8px 0; }
+                h3 { 
+                    font-size: 9pt !important; 
+                    font-weight: 800; 
+                    text-transform: uppercase; 
+                    background: #eee; 
+                    padding: 4px; 
+                    text-align: justify;
+                    margin: 10px 0 4px 0;
+                    border-bottom: 1px solid #000;
+                }
+                p { margin: 1px 0; }
+                strong { font-weight: 700; }
+                
+                .data-block { margin-bottom: 8px; width: 100%; }
+
+                /* Podpisy - Lewa strona (zgodnie z życzeniem) */
+                .signatures-110mm { margin-top: 15px; width: 100%; }
+                .sig-box-110mm { margin-top: 10px; width: 100%; text-align: left; } /* ZMIANA NA LEFT */
+                .sig-box-110mm img { max-width: 150px; height: 40px; display: block; margin-top: 2px; }
+                
+                /* Legenda */
+                .footer-legend { 
+                    margin-top: 15px; font-size: 6pt !important; 
+                    border-top: 1px dotted #000; padding-top: 5px; 
+                    text-align: justify !important; 
+                }
+
                 @media print {
-                    body { background: white; margin: 0; display: block; }
-                    .print-controls { display: none; }
-                    .receipt-container { width: 100%; margin: 0; box-shadow: none; padding: 0; }
-                    @page { size: 110mm auto; margin: 0; }
+                    body { background-color: #ffffff !important; display: block !important; margin: 0 !important; padding: 0 !important; }
+                    .print-controls { display: none !important; }
+                    .receipt-page {
+                        width: 100% !important; max-width: 100% !important;
+                        margin: 0 !important; box-shadow: none !important;
+                    }
+                    @page { margin: 2mm !important; size: 110mm auto; }
                 }
             </style>
         </head>
         <body>
             <div class="print-controls">
-                <button onclick="window.print()" style="background:#4CAF50; color:white;">🖨️ Drukuj</button>
-                <button onclick="window.close()" style="background:#f44336; color:white;">❌ Zamknij</button>
+                <button class="print-btn" onclick="window.print()">🖨️ Drukuj</button>
+                <button class="close-btn" onclick="window.close()">Zamknij</button>
             </div>
-            <div class="receipt-container">
-                ${htmlContent}
+            
+            <div class="receipt-page">
+                
+                <div style="text-align: center; border-bottom: 2px solid #000; padding-bottom: 5px; margin-bottom: 5px;">
+                    <h2>KARTA LECZENIA ZWIERZĄT GOSPODARSKICH ORAZ ZWIERZĄT, Z KTÓRYCH POZYSKANE TKANKI LUB PRODUKTY SĄ PRZEZNACZONE DO SPOŻYCIA PRZEZ LUDZI / EWIDENCJA LECZENIA ZWIERZĄT</h2>
+                    <div style="font-size: 10pt; margin-top: 4px;">NR: <strong>${header.nrDokumentu}</strong></div>
+                </div>
+
+                <div class="data-block">
+                    <p><strong>1. Nazwa i adres zakładu leczniczego dla zwierząt:</strong><br>${header.nazwaLecznicy}</p>
+                    <p style="margin-top: 4px;"><strong>2. Imię, nazwisko i adres albo nazwa siedziby i adres posiadacza zwierzęcia:</strong><br>${header.klient}, ${header.adresKlienta}</p>
+                    <p style="padding-left: 12px;">Nr stada: <strong>${header.nrStada}</strong></p>
+                    <p style="margin-top: 4px;"><strong>3. Wykonanie czynności lekarsko-weterynaryjnych dnia:</strong> ${header.dataWykonania}</p>
+                </div>
+
+                <h3>I. Leczenie na miejscu / Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posiadacza zwierzęcia produkty lecznicze weterynaryjne lub pasze lecznicze</h3>
+                ${htmlSec1}
+
+                <h3>II. Produkty pozostawione/Potwierdzenie nabycia produktu leczniczego weterynaryjnego/paszy leczniczej</h3>
+                ${htmlSec2}
+
+                <div style="margin-top: 15px; font-size: 7pt; border-top: 2px solid #000; padding-top: 4px; text-align: justify;">
+                    <p style="font-weight: bold;">Oświadczam, że nabyte produkty lecznicze weterynaryjne/pasze lecznicze zostaną zastosowane zgodnie z zaleceniami lekarza weterynarii.</p>
+                </div>
+
+                <div class="signatures-110mm">
+                    <div class="sig-box-110mm">
+                        <strong>Lekarz weterynarii:</strong>
+                        ${imgLekarz ? `<img src="${imgLekarz}">` : ''}
+                        <div style="font-size: 7pt;">${liniaLekarz}</div>
+                    </div>
+                    <div class="sig-box-110mm" style="margin-top: 15px;">
+                        <strong>Podpis posiadacza zwierzęcia:</strong>
+                        ${imgPosiadacz ? `<img src="${imgPosiadacz}">` : '(Brak podpisu)'}
+                    </div>
+                </div>
+
+                <div class="footer-legend">
+                    <p style="margin: 2px 0;">* Nazwa produktu leczniczego/ produktu leczniczego weterynaryjnego/ paszy leczniczej</p>
+                    <p style="margin: 2px 0;">** Numer serii produktu leczniczego lub produktu leczniczego weterynaryjnego</p>
+                    <p style="margin: 2px 0;">*** Ilość, dawkowanie zastosowanego produktu leczniczego lub ilość, dawkowanie i okres stosowanie nabytego produktu leczniczego, weterynaryjnego/paszy leczniczej</p>
+                    <p style="margin: 2px 0;">**** Okres karencji oraz zabieg leczniczy lub profilaktyczne zalecenia lekarskie oraz uwagi</p>
+                    <p style="margin: 2px 0;">***** Wyniki badań uzupełniających (jeśli dotyczy)</p>
+                </div>
+
             </div>
         </body>
         </html>
     `);
+
     printWindow.document.close();
     printWindow.focus();
 }
