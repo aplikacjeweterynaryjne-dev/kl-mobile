@@ -13181,14 +13181,10 @@ async function fetchReceiptsForReport(dateStart, dateEnd, userId) {
 }
 
 /**
- * Generuje Raporty Wizyt (Typ 1, 2, 3) - ZMODYFIKOWANA WERSJA
- * Zmiany: 
- * 1. Raport Kasowy pokazuje też Długi (informacyjnie).
- * 2. Sortowanie: Wydatki -> Wpłaty -> Długi.
- * 3. Suma liczy tylko 'Zapłacone'.
+ * Generuje Raporty Wizyt (Typ 1, 2, 3) - WERSJA 6 (Poprawione sumowanie i Raport Ogólny)
  */
 function generateWizytyReport(allReceipts, filters) {
-    console.log("Generowanie raportu wizyt (v5 - Sortowanie priorytetowe)...");
+    console.log("Generowanie raportu wizyt (v6 - Fix Ogólny + Koszty)...");
 
     // --- 1. Filtrowanie wstępne (Klient) ---
     let filteredReceipts = [...allReceipts];
@@ -13199,19 +13195,22 @@ function generateWizytyReport(allReceipts, filters) {
 
     // --- 2. Konfiguracja Typu Raportu ---
     let reportTitle = "Raport Ogólny";
-    let sumTitle = "Suma przychodu (tylko dodatnie)";
+    let sumLabelText = "Suma przychodu:"; // Domyślna etykieta
 
     if (filters.type === "gotowka") {
-        // Raport Kasowy: Pokazujemy 'Zapłacone' (Wpływy/Wydatki) ORAZ 'Dług' (Informacyjnie)
+        // Raport Kasowy: Lista zawiera Zapłacone i Długi
         filteredReceipts = filteredReceipts.filter(r => r.status === "Zapłacone" || r.status === "Dług");
-        reportTitle = "Raport Kasowy (Przepływ gotówki + Lista Długów)";
+        reportTitle = "Raport Kasowy (Przepływ gotówki)";
+        sumLabelText = "Suma przyjętej gotówki (Wpłaty):";
     } else if (filters.type === "dluznicy") {
+        // Dłużnicy: Tylko Długi
         filteredReceipts = filteredReceipts.filter(r => r.status === "Dług");
         reportTitle = "Raport Dłużników";
-        sumTitle = "Suma zadłużenia";
+        sumLabelText = "Suma zadłużenia:";
     } else if (filters.type === "ogolny") {
-        // Ogólny pokazuje wszystko
+        // Ogólny: Wszystko
         reportTitle = "Raport Ogólny (Wszystkie wizyty)";
+        sumLabelText = "Raport sumaryczny wszystkich wizyt:"; // ✅ ZMIANA NAZWY WG PROŚBY
     }
 
     // --- 3. SORTOWANIE (Priorytety: Wydatki -> Wpłaty -> Długi) ---
@@ -13229,40 +13228,57 @@ function generateWizytyReport(allReceipts, filters) {
             // Priorytet 3: Dług (Informacyjnie na końcu)
             if (status === 'Dług') return 3;
 
-            return 4; // Inne (zabezpieczenie)
+            return 4; // Inne
         };
 
         const priorityA = getPriority(a);
         const priorityB = getPriority(b);
 
-        // Najpierw sortuj po priorytecie
         if (priorityA !== priorityB) {
             return priorityA - priorityB;
         }
-
-        // Jeśli priorytet ten sam, sortuj po dacie (rosnąco)
         return a.data.localeCompare(b.data);
     });
 
-
-    // --- 4. OBLICZANIE SUM (Tylko dla 'Zapłacone') ---
-    let totalPositiveSum = 0; // Suma tego co zarobiłeś (gotówka w ręku)
-    let totalNegativeSum = 0; // Suma tego co wydałeś (gotówka z ręki)
-    let totalDebtSum = 0;     // Suma długów (tylko do wyświetlenia w tytule jeśli trzeba)
+    // --- 4. OBLICZANIE SUM (Matematyka) ---
+    let totalRevenue = 0; // Przychód (Zielony) - Tylko wartości dodatnie
+    let totalExpenses = 0; // Koszty (Czerwony) - Wartość absolutna z minusów
+    
+    // Zmienna tylko dla raportu dłużników (żeby wyświetlić sumę długu jako główną)
+    let debtsOnlySum = 0; 
 
     filteredReceipts.forEach(r => {
-        const suma = parseFloat(r.suma) || 0;
-        
-        if (r.status === 'Zapłacone') {
-            if (suma < 0) {
-                totalNegativeSum += Math.abs(suma); 
-            } else {
-                totalPositiveSum += suma;
+        const val = parseFloat(r.suma) || 0;
+        const status = r.status;
+
+        // Logika dla Raportu KASOWEGO (Gotówka)
+        if (filters.type === "gotowka") {
+            // Liczymy TYLKO to, co ma status 'Zapłacone'
+            if (status === 'Zapłacone') {
+                if (val < 0) {
+                    totalExpenses += Math.abs(val); // Dodaj do kosztów
+                } else {
+                    totalRevenue += val; // Dodaj do przychodu
+                }
             }
-        } else if (r.status === 'Dług') {
-            totalDebtSum += suma;
-            // WAŻNE: Nie dodajemy długu do totalPositiveSum ani totalNegativeSum,
-            // bo raport dotyczy "Przyjętej Gotówki".
+            // Długi są na liście, ale nie wpływają na sumy kasowe
+        } 
+        // Logika dla Raportu OGÓLNEGO
+        else if (filters.type === "ogolny") {
+            // Liczymy WSZYSTKO (Zapłacone i Długi)
+            if (val < 0) {
+                // Jeśli ujemne (zwykle to status Zapłacone), to koszt
+                totalExpenses += Math.abs(val);
+            } else {
+                // Jeśli dodatnie (Zapłacone lub Dług), to przychód całkowity
+                totalRevenue += val;
+            }
+        }
+        // Logika dla DŁUŻNIKÓW
+        else if (filters.type === "dluznicy") {
+            if (status === 'Dług') {
+                debtsOnlySum += val;
+            }
         }
     });
 
@@ -13274,7 +13290,7 @@ function generateWizytyReport(allReceipts, filters) {
         const isExpense = (receipt.status === 'Zapłacone' && suma < 0);
         const isDebt = (receipt.status === 'Dług');
 
-        // Formatowanie listy produktów
+        // Zużycia
         let zuzyciaHtml = '';
         if (receipt.pozycje && receipt.pozycje.length > 0) {
             const produkty = receipt.pozycje.filter(p => p.name.toLowerCase() !== 'wyrównanie');
@@ -13287,23 +13303,20 @@ function generateWizytyReport(allReceipts, filters) {
             }
         }
         
-        // --- Style wierszy ---
+        // Style wierszy
         let rowStyle = "";
         let statusColor = "#555";
         let sumaColor = "#000";
 
         if (isExpense) {
-            // WYDATEK: Czerwone tło wiersza
             rowStyle = "background-color: #ffe6e6;"; 
             sumaColor = "#c0392b";
-            statusColor = "green"; // Technicznie 'Zapłacone'
+            statusColor = "green";
         } else if (isDebt) {
-            // DŁUG: Lekko żółte tło, żeby odróżnić od wpłat
             rowStyle = "background-color: #fffde7; border-left: 4px solid #f39c12;";
-            statusColor = "#c0392b"; // Napis "Dług" na czerwono
-            sumaColor = "#7f8c8d";   // Kwota długu na szaro (bo nie wpływa na kasę)
+            statusColor = "#c0392b";
+            sumaColor = "#7f8c8d";
         } else {
-            // WPŁATA: Standardowe białe tło
             statusColor = "green";
         }
 
@@ -13328,39 +13341,40 @@ function generateWizytyReport(allReceipts, filters) {
     reportWizytyTableContainer.style.display = 'block';
     reportZuzyciaTableContainer.style.display = 'none';
     
-    // Pokaż ramkę kosztów w trybie gotówkowym (nawet jak koszty = 0, żeby było widać strukturę)
-    const showCosts = (filters.type === "gotowka");
+    // --- KONFIGURACJA PODSUMOWANIA ---
     
-    reportFuelSection.style.display = showCosts ? 'flex' : 'none';
-    reportNetSumContainer.style.display = showCosts ? 'inline' : 'none';
-
-    // Aktualizacja tekstów nagłówkowych
+    // Etykiety
     reportMainTitle.textContent = reportTitle;
     reportDateDisplay.textContent = `Okres: ${filters.dateStart} do ${filters.dateEnd}`;
     reportUserDisplay.textContent = `Pracownik: ${filters.userName}`;
-    
-    // Jeśli raport dłużników - pokaż sumę długu, jeśli gotówka - pokaż sumę wpłat
+    reportSumTitle.textContent = sumLabelText;
+
+    // Specjalny przypadek: Raport Dłużników (prosty)
     if (filters.type === "dluznicy") {
-        reportSumTitle.textContent = "Suma zadłużenia:";
-        reportCalculatedSum.textContent = formatPrice(totalDebtSum);
-    } else {
-        reportSumTitle.textContent = "Suma przyjętej gotówki (Wpłaty):";
-        reportCalculatedSum.textContent = formatPrice(totalPositiveSum);
+        reportCalculatedSum.textContent = formatPrice(debtsOnlySum);
+        reportFuelSection.style.display = 'none';
+        reportNetSumContainer.style.display = 'none';
+    } 
+    else {
+        // Raport Gotówka i Ogólny (Złożone)
+        
+        // 1. Zielona liczba (Całkowity Przychód - bez odejmowania kosztów)
+        reportCalculatedSum.textContent = formatPrice(totalRevenue);
+        
+        // 2. Czerwone pole (Koszty) - Pokazujemy ZAWSZE dla Gotówki i Ogólnego
+        reportFuelSection.style.display = 'flex';
+        const costInput = document.getElementById('reportFuelCost');
+        if(costInput) {
+            costInput.value = totalExpenses.toFixed(2);
+            costInput.readOnly = true; 
+        }
+
+        // 3. Niebieska liczba (Wynik Netto / Saldo)
+        // Matematyka: Przychód (Zielone) - Koszty (Czerwone)
+        const netSum = totalRevenue - totalExpenses;
+        if(reportNetSum) reportNetSum.textContent = formatPrice(netSum);
+        reportNetSumContainer.style.display = 'inline';
     }
-    
-    // Obsługa pola "Koszty" (input)
-    const costInput = document.getElementById('reportFuelCost');
-    if(costInput) {
-        // Wpisujemy sumę wydatków (bez minusa)
-        costInput.value = totalNegativeSum.toFixed(2);
-        // Pola nie blokujemy całkowicie, jeśli chcesz móc ręcznie korygować, 
-        // ale w tym scenariuszu wylicza się samo, więc readOnly jest ok.
-        costInput.readOnly = true; 
-    }
-    
-    // Obliczanie NETTO (Wpływy - Wydatki)
-    const netSum = totalPositiveSum - totalNegativeSum;
-    if(reportNetSum) reportNetSum.textContent = formatPrice(netSum);
 }
 
 /**
