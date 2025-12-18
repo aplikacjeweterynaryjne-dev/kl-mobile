@@ -11776,50 +11776,76 @@ if (archiveCardTableBody) {
         const target = e.target; // Cel kliknięcia
 
         // --- ✅ NOWA LOGIKA: BEZPOŚREDNIE OTWARCIE OKNA PODGLĄDU ---
+// --- ✅ MODUŁ 4: Podgląd Karty (Wybór Formatu) ---
         if (target.classList.contains('btn-view-archived-card')) {
             const cardId = target.dataset.cardId;
             const originalText = target.textContent;
+            
+            // Zmieniamy tekst przycisku na chwilę, żeby user wiedział, że coś się dzieje
             target.textContent = 'Ładowanie...';
             target.disabled = true;
-            
+
             try {
-                // 1. Pobierz dane z Firebase
+                // 1. Pobierz dane tej konkretnej karty z Firebase
                 const doc = await db.collection("archiwumKarty").doc(cardId).get();
                 if (!doc.exists) {
                     alert("Błąd: Nie znaleziono tej karty w archiwum.");
                     return;
                 }
                 const cardData = doc.data();
+
+                // 2. Stwórz Okienko Wyboru (Dynamiczny Modal)
+                const choiceOverlay = document.createElement('div');
+                // Styl okienka (na środku ekranu, ciemne tło)
+                choiceOverlay.style.cssText = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:20000;display:flex;justify-content:center;align-items:center;";
                 
-                // 2. Otwórz bezpośrednio okno druku (omijamy modal)
-                openDirectPrintWindow(cardData);
+                choiceOverlay.innerHTML = `
+                    <div class="form-card" style="width:320px; text-align:center; padding:25px; background:white; border-radius:12px; box-shadow:0 10px 30px rgba(0,0,0,0.3);">
+                        <h3 style="margin-top:0; margin-bottom:20px; color:#333;">Wybierz format podglądu</h3>
+                        
+                        <button id="previewA4" class="btn primary" style="width:100%; margin-bottom:10px; padding:12px; font-size:16px;">
+                            📄 Format A4 (Standard)
+                        </button>
+                        
+                        <button id="preview110" class="btn" style="width:100%; margin-bottom:20px; padding:12px; font-size:16px; background-color:#34495e; color:white;">
+                            🧾 Format 110mm (Termiczny)
+                        </button>
+                        
+                        <button id="previewCancel" class="btn ghost small" style="width:100%;">Anuluj</button>
+                    </div>
+                `;
+                document.body.appendChild(choiceOverlay);
+
+                // --- Obsługa przycisków w tym nowym okienku ---
                 
+                // Zamknij
+                const closeChoice = () => { 
+                    if(choiceOverlay.parentNode) choiceOverlay.parentNode.removeChild(choiceOverlay); 
+                };
+
+                document.getElementById('previewCancel').onclick = closeChoice;
+
+                // Wybór A4 -> Uruchom starą funkcję
+                document.getElementById('previewA4').onclick = () => {
+                    closeChoice();
+                    openDirectPrintWindow(cardData); 
+                };
+
+                // Wybór 110mm -> Uruchom nową funkcję z Kroku 1
+                document.getElementById('preview110').onclick = () => {
+                    closeChoice();
+                    openDirectPrintWindow110mm(cardData);
+                };
+
             } catch (error) {
                 console.error("Błąd wczytywania karty do podglądu:", error);
                 alert("Błąd wczytywania karty.");
             } finally {
+                // Przywróć przycisk "Podgląd" do stanu używalności
                 target.textContent = originalText;
                 target.disabled = false;
             }
-        } 
-
-        // --- Usuwanie Karty (Bez zmian) ---
-        else if (target.classList.contains('btn-delete-archived-card')) {
-            const cardId = target.dataset.cardId;
-            const cardNr = target.dataset.cardNr;
-            
-            if (confirm(`Czy na pewno chcesz trwale usunąć kartę nr: ${cardNr}?`)) {
-                target.textContent = 'Usuwanie...';
-                try {
-                    await db.collection("archiwumKarty").doc(cardId).delete();
-                    target.closest('tr').remove(); 
-                    alert('Karta została usunięta.');
-                } catch (error) {
-                    console.error("Błąd usuwania karty:", error);
-                    alert("Wystąpił błąd podczas usuwania.");
-                    target.textContent = 'Usuń';
-                }
-            }
+        }
         }
     });
 }
@@ -19328,6 +19354,155 @@ function createSmartDosageCell(cell, row) {
 
     cell.appendChild(textInput);
     cell.appendChild(calIcon);
+}
+    /**
+ * ✅ MODUŁ 4: Otwiera podgląd karty z Archiwum w formacie 110mm (Termiczny).
+ */
+function openDirectPrintWindow110mm(card) {
+    const header = card.header || {};
+    // Podpisy (jeśli są zapisane jako base64)
+    const imgLekarz = header.podpisLekarzaImg || '';
+    const liniaLekarz = header.podpisLekarzaLinia || '';
+    const imgPosiadacz = card.podpisPosiadacza || ''; 
+
+    let productsHtml = '';
+    const savedRows = card.table || [];
+    
+    // Sortujemy wiersze, żeby wyświetlały się po kolei (1, 2, 3...)
+    const savedRowsSorted = savedRows.sort((a,b) => a.logicalIndex - b.logicalIndex);
+
+    // Pętla tworząca listę produktów w pionie
+    savedRowsSorted.forEach((row, idx) => {
+        // Pomijamy puste wiersze
+        const nazwa = row.lek || row.opis || '';
+        if (!nazwa && !row.liczba && !row.rozpoznanie) return;
+
+        // Sekcja: Dane zwierzęcia (jeśli są w tym wierszu)
+        let animalInfo = '';
+        if (row.opis || row.liczba || row.rozpoznanie) {
+             animalInfo = `
+                <div style="background:#f9f9f9; padding:2px; font-size:7pt; border-bottom:1px dashed #ccc;">
+                    ${row.opis ? `<div><strong>Opis:</strong> ${row.opis}</div>` : ''}
+                    ${row.liczba ? `<div><strong>Szt:</strong> ${row.liczba}</div>` : ''}
+                    ${row.rozpoznanie ? `<div><strong>Diag:</strong> ${row.rozpoznanie}</div>` : ''}
+                </div>
+             `;
+        }
+
+        // Sekcja: Lek (jeśli jest w tym wierszu)
+        let drugInfo = '';
+        if (row.lek) {
+            // Czyścimy ilość z ewentualnego HTML-a (jeśli zapisano jako <input>)
+            let iloscTxt = row.iloscDawka;
+            if (iloscTxt && iloscTxt.includes('value="')) {
+                 const match = iloscTxt.match(/value="([^"]+)"/);
+                 const val = match ? match[1] : '';
+                 // Dodaj resztę tekstu (jednostkę)
+                 const text = iloscTxt.replace(/<[^>]*>/g, '').trim(); 
+                 iloscTxt = val + ' ' + text;
+            }
+
+            // Czyszczenie karencji z ikony kalendarza
+            let karTxt = (row.karencja || '').replace('📅', '').trim();
+
+            drugInfo = `
+                <div style="padding: 2px 0;">
+                    <div style="font-weight: bold; font-size: 8pt;">${row.lek}</div>
+                    <div style="font-size: 8pt;">
+                       Seria: ${row.seria || '-'} <br> 
+                       Ilość: <strong>${iloscTxt || '-'}</strong>
+                    </div>
+                    ${karTxt ? `<div style="font-size:7pt; font-style:italic; margin-top:1px;">Karencja: ${karTxt}</div>` : ''}
+                </div>
+            `;
+        }
+
+        // Łączymy wiersz
+        productsHtml += `
+            <div style="border-bottom: 1px solid #000; margin-bottom: 4px; padding-bottom: 4px;">
+                <div style="font-size:7pt; color:#555;">Poz. ${idx + 1}</div>
+                ${animalInfo}
+                ${drugInfo}
+            </div>
+        `;
+    });
+
+    // Składamy cały HTML strony
+    const htmlContent = `
+        <div style="font-family: 'Nunito', sans-serif; font-size: 8pt; line-height: 1.3; color: #000; width: 80mm; margin: 0 auto;">
+            
+            <div style="text-align:center; border-bottom:2px solid #000; padding-bottom:5px; margin-bottom:10px;">
+                <h2 style="font-size:10pt; margin:0; font-weight:800;">KARTA LECZENIA (KOPIA)</h2>
+                <div style="font-size:9pt;">NR: <strong>${header.nrDokumentu}</strong></div>
+            </div>
+
+            <div style="margin-bottom: 10px; border-bottom:1px solid #000; padding-bottom:5px;">
+                <p style="margin:2px 0;"><strong>Lecznica:</strong><br>${header.nazwaLecznicy}</p>
+                <p style="margin:2px 0;"><strong>Klient:</strong><br>${header.klient}</p>
+                <p style="margin:2px 0; font-size:7pt;">${header.adresKlienta}</p>
+                <p style="margin:2px 0;">Nr stada: <strong>${header.nrStada}</strong></p>
+                <p style="margin:2px 0;"><strong>Data wykonania:</strong> ${header.dataWykonania}</p>
+            </div>
+
+            <div>
+                <h3 style="font-size:9pt; margin:0 0 5px 0; background:#eee; padding:2px; text-align:center;">POZYCJE</h3>
+                ${productsHtml}
+            </div>
+
+            <div style="margin-top: 15px; font-size: 7pt; text-align: justify; border-top: 1px solid #000; padding-top: 5px;">
+                Oświadczam, że nabyte produkty lecznicze weterynaryjne/pasze lecznicze zostaną zastosowane zgodnie z zaleceniami lekarza weterynarii.
+            </div>
+
+            <div style="margin-top: 20px;">
+                <div style="margin-bottom: 15px; text-align: center;">
+                    <strong>Lekarz weterynarii:</strong><br>
+                    ${imgLekarz ? `<img src="${imgLekarz}" style="height: 40px; margin: 2px auto; display:block;">` : ''}
+                    <div>${liniaLekarz}</div>
+                </div>
+                <div style="text-align: center;">
+                    <strong>Posiadacz zwierzęcia:</strong><br>
+                    ${imgPosiadacz ? `<img src="${imgPosiadacz}" style="height: 40px; margin: 2px auto; display:block;">` : '(Brak podpisu)'}
+                </div>
+            </div>
+        </div>
+    `;
+
+    // Otwieramy okno
+    const printWindow = window.open('', '_blank', 'width=450,height=700,scrollbars=yes,resizable=yes');
+    if (!printWindow) { alert("Zablokowano okno."); return; }
+
+    printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Podgląd 110mm</title>
+            <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
+            <style>
+                body { background-color: #525659; margin: 0; padding: 0; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
+                .receipt-container { background: white; padding: 5mm; width: 80mm; margin: 20px auto; box-shadow: 0 0 15px rgba(0,0,0,0.5); box-sizing: border-box; }
+                .print-controls { width: 100%; padding: 10px; background: #333; text-align: center; position: sticky; top: 0; }
+                button { padding: 8px 20px; cursor: pointer; font-weight: bold; margin: 0 5px; border-radius: 4px; border:none; }
+                @media print {
+                    body { background: white; margin: 0; display: block; }
+                    .print-controls { display: none; }
+                    .receipt-container { width: 100%; margin: 0; box-shadow: none; padding: 0; }
+                    @page { size: 110mm auto; margin: 0; }
+                }
+            </style>
+        </head>
+        <body>
+            <div class="print-controls">
+                <button onclick="window.print()" style="background:#4CAF50; color:white;">🖨️ Drukuj</button>
+                <button onclick="window.close()" style="background:#f44336; color:white;">❌ Zamknij</button>
+            </div>
+            <div class="receipt-container">
+                ${htmlContent}
+            </div>
+        </body>
+        </html>
+    `);
+    printWindow.document.close();
+    printWindow.focus();
 }
     /**
  * ✅ NOWA FUNKCJA: Generuje podgląd A4 (Poziomo, 90%) z aktualnych danych na ekranie.
