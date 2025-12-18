@@ -23513,49 +23513,57 @@ function loadCardForEditing(cardData) {
                 // Kolumna 6 (Seria)
                 tr.cells[5].textContent = savedRow.seria || '';
 
-         // ✅ FIX KOLUMNA 7 (Ilość/Dawka) - WERSJA POPRAWIONA
+        // ✅ FIX KOLUMNA 7 (Ilość/Dawka) - METODA "TWARDY RESET"
                 const cellIlosc = tr.cells[6];
-                const iloscInput = cellIlosc.querySelector('input');
                 
-                if (iloscInput) {
-                    let savedHtml = savedRow.iloscDawka || '';
-                    let qtyVal = '';
-                    let doseText = '';
+                // 1. Pobierz surowe dane z bazy (to może być HTML lub tekst)
+                const rawData = savedRow.iloscDawka || '';
+                
+                // Debugowanie: Zobacz w konsoli (F12) co dokładnie przychodzi z bazy
+                console.log(`Wczytywanie wiersza ${domRowIndex}, Ilość Raw:`, rawData);
 
-                    // Metoda 1: Parsowanie HTML (najdokładniejsza)
-                    if (savedHtml.includes('<input')) {
-                        const tempDiv = document.createElement('div');
-                        tempDiv.innerHTML = savedHtml;
-                        
-                        const tempInp = tempDiv.querySelector('input');
-                        if (tempInp) qtyVal = tempInp.value; // Wyciągnij wartość z value=""
-                        
-                        // Wyciągnij tekst (dawkowanie/jednostkę) ignorując sam input
-                        doseText = tempDiv.textContent.trim(); 
-                    } 
-                    // Metoda 2: Fallback dla danych zapisanych jako czysty tekst
-                    else {
-                        qtyVal = parseFloat(savedHtml) || '';
-                        doseText = savedHtml.replace(qtyVal, '').trim();
+                // 2. Przygotuj zmienne na liczbę i tekst
+                let qtyVal = '';
+                let doseText = '';
+
+                // 3. Parsowanie "wirtualne"
+                if (rawData.includes('<input')) {
+                    // Stwórz wirtualny element, żeby przeglądarka sama to "przeczytała"
+                    const tempDiv = document.createElement('div');
+                    tempDiv.innerHTML = rawData;
+                    
+                    const tempInp = tempDiv.querySelector('input');
+                    if (tempInp) {
+                        // Pobierz wartość z atrybutu value="" lub właściwości .value
+                        qtyVal = tempInp.getAttribute('value') || tempInp.value;
                     }
-
-                    // A. Wpisz liczbę do inputa
-                    iloscInput.value = qtyVal;
-
-                    // B. Wpisz tekst dawkowania obok inputa
-                    // Szukamy istniejącego węzła tekstowego, żeby go zaktualizować
-                    let textNode = null;
-                    cellIlosc.childNodes.forEach(node => {
-                        if (node.nodeType === Node.TEXT_NODE) textNode = node;
-                    });
-
-                    if (textNode) {
-                        textNode.textContent = ' ' + doseText;
-                    } else {
-                        cellIlosc.appendChild(document.createTextNode(' ' + doseText));
-                    }
+                    // Tekst to wszystko co nie jest inputem
+                    doseText = tempDiv.textContent.trim();
+                } else {
+                    // Jeśli to stary format (sam tekst np. "100 ml")
+                    qtyVal = parseFloat(rawData) || '';
+                    doseText = rawData.replace(qtyVal, '').trim();
                 }
 
+                // 4. WYCZYŚĆ KOMÓRKĘ I ZBUDUJ OD NOWA (To naprawi problem braku inputa)
+                cellIlosc.innerHTML = ''; 
+
+                // Stwórz nowy input
+                const newInput = document.createElement('input');
+                newInput.type = 'number';
+                newInput.className = 'small-input'; // Ważne dla stylów i walidacji
+                newInput.style.width = '40px';      // Przywróć styl
+                newInput.style.display = 'inline-block';
+                newInput.style.marginRight = '3px';
+                newInput.value = qtyVal;            // Wpisz odczytaną wartość
+
+                // Wstaw input do komórki
+                cellIlosc.appendChild(newInput);
+
+                // Wstaw tekst (jednostkę) do komórki
+                if (doseText) {
+                    cellIlosc.appendChild(document.createTextNode(' ' + doseText));
+                }
                 // ✅ FIX KOLUMNA 8 (Karencja/Smart Cell)
                 const karInput = tr.cells[7].querySelector('.karencja-input') || tr.cells[7].querySelector('input');
                 if (karInput) {
