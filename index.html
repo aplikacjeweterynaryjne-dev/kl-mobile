@@ -15893,7 +15893,7 @@ function checkSchemaFit(schema, startingIndex) {
  * NAPRAWIONY BŁĄD: Zapobiega czyszczeniu pól Opis i Liczba w wierszu kontrolującym schemat.
  */
 /* ======================================================== */
-/* ✅ ZAKTUALIZOWANA LOGIKA applySchema (Moduł 4.2)       */
+/* ✅ MODUŁ 1: ZAKTUALIZOWANA LOGIKA applySchema (v5)       */
 /* ======================================================== */
 function applySchema(event) {
     const input = event.target;
@@ -15929,7 +15929,7 @@ function applySchema(event) {
     }
     if (currentIndex === -1) currentIndex = 0;
 
-    // 4. Znajdź wolne miejsce (Logika bez zmian)
+    // 4. Znajdź wolne miejsce
     let actualStartingIndex = -1;
     for (let i = currentIndex; i < logicalRows.length; i++) {
         if (i === currentIndex || isRowEmpty(logicalRows[i])) {
@@ -15949,32 +15949,29 @@ function applySchema(event) {
         return;
     }
 
-    // --- ✅ NOWOŚĆ: Logika dynamicznego przeliczania ---
-    
-    // 5. Znajdź pole "Liczba leczonych zwierząt" w wierszu sterującym
-    const controllerRow = logicalRows[currentIndex]; // Wiersz, w którym wpisano diagnozę
+    // --- PRZYGOTOWANIE KONTROLERA (LICZBA ZWIERZĄT) ---
+    const controllerRow = logicalRows[currentIndex];
     const liczbaInput = controllerRow.cells[2].querySelector('input[type="number"]');
+    
+    // Ustal ID dla kontrolera (jeśli nie ma)
+    const liczbaInputId = 'liczba-zwierzat-' + currentIndex;
     
     // Pobierz aktualny mnożnik (jeśli puste to 1)
     let liczbaZwierzaDlaSchematu = 1;
-    if (liczbaInput && liczbaInput.value.trim() !== '') {
-        const parsed = parseInt(liczbaInput.value, 10);
-        if (!isNaN(parsed) && parsed > 0) liczbaZwierzaDlaSchematu = parsed;
-    }
     
-    // Nadaj unikalne ID dla inputa liczby (jeśli nie ma), aby powiązać go z inputami ilości
-    // Używamy indeksu wiersza, żeby było unikalne
-    const liczbaInputId = 'liczba-zwierzat-' + currentIndex;
     if (liczbaInput) {
         liczbaInput.id = liczbaInputId;
+        // ✅ Dodajemy klasę, żeby globalny listener wiedział, że to pole sterujące
+        liczbaInput.classList.add('schema-quantity-controller'); 
         
-        // Usuń stary listener (aby nie dublować) i dodaj nowy
-        liczbaInput.removeEventListener('input', handleLiczbaChange);
-        liczbaInput.addEventListener('input', handleLiczbaChange);
+        if (liczbaInput.value.trim() !== '') {
+            const parsed = parseInt(liczbaInput.value, 10);
+            if (!isNaN(parsed) && parsed > 0) liczbaZwierzaDlaSchematu = parsed;
+        }
     }
     // ----------------------------------------------------
 
-    // 6. Wpisz diagnozę (Bez zmian)
+    // 5. Wpisz diagnozę
     const firstLeczenieProduct = schema.produkty.filter(p => p.wierszDocelowy < 9).sort((a, b) => a.wierszDocelowy - b.wierszDocelowy)[0];
     const firstPozostawioneProduct = schema.produkty.filter(p => p.wierszDocelowy >= 9).sort((a, b) => a.wierszDocelowy - b.wierszDocelowy)[0];
 
@@ -15987,7 +15984,7 @@ function applySchema(event) {
         if (targetIndex < logicalRows.length) logicalRows[targetIndex].cells[3].querySelector('input').value = schema.rozpoznanie;
     }
 
-    // 7. Wypełnij produkty (Z AKTUALIZACJĄ ILOŚCI)
+    // 6. Wypełnij produkty i podepnij je pod kontroler
     schema.produkty.forEach(p => {
         const targetRowIndex = actualStartingIndex + p.wierszDocelowy;
 
@@ -16002,14 +15999,11 @@ function applySchema(event) {
                 // Seria
                 row.cells[5].textContent = p.seria || '';
 
-                // --- ✅ NOWOŚĆ: Obliczanie i Tagowanie Ilości ---
+                // --- Obliczanie Ilości ---
                 const iloscInput = row.cells[6].querySelector('input[type="number"]');
-                
-                // Bazowa ilość ze schematu (dla 1 sztuki)
                 let schemaIlosc = 0;
                 if (p.ilosc) schemaIlosc = parseFloat(String(p.ilosc).replace(',', '.')) || 0;
                 
-                // Oblicz ilość początkową (Bazowa * Liczba Zwierząt)
                 const finalIlosc = schemaIlosc * liczbaZwierzaDlaSchematu;
 
                 if (iloscInput) {
@@ -16018,18 +16012,15 @@ function applySchema(event) {
                     
                     iloscInput.value = finalValue > 0 ? String(finalValue) : '';
                     
-                    // ZAPISZ METADANE DO AUTOMATYZACJI:
-                    // 1. Ile leku idzie na 1 sztukę?
+                    // ✅ ZAPISZ METADANE (Więź z kontrolerem)
                     iloscInput.dataset.schemaBaseQty = String(schemaIlosc);
-                    // 2. Kto steruje tą ilością? (ID inputa z liczbą zwierząt)
                     iloscInput.dataset.schemaControllerId = liczbaInputId;
                     
-                    // Dodaj listener na wypadek ręcznego nadpisania przez użytkownika
-                    // (Jeśli użytkownik wpisze coś ręcznie, przerywamy automatyzację dla tego pola)
+                    // Listener na ręczne zerwanie więzi
                     iloscInput.removeEventListener('keydown', handleIloscOverride);
                     iloscInput.addEventListener('keydown', handleIloscOverride);
                 }
-                // ------------------------------------------------
+                // --------------------------
 
                 // Dawkowanie (tekst)
                 const dawkaText = p.dawkowanie || '';
@@ -16040,8 +16031,8 @@ function applySchema(event) {
                     row.cells[6].appendChild(document.createTextNode(' ' + dawkaText));
                 }
 
-                // Karencja (Fix Smart Cell)
-                const smartInput = row.cells[7].querySelector('input.karencja-input');
+                // Karencja
+                const smartInput = row.cells[7].querySelector('input.karencja-input') || row.cells[7].querySelector('input');
                 if (smartInput) {
                     smartInput.value = p.karencja || '';
                     row.cells[7].dataset.printValue = p.karencja || '';
@@ -16059,17 +16050,24 @@ function applySchema(event) {
         }
     });
 
-    // 8. Odśwież formularz (jeśli otwarty)
+    // 7. Odśwież formularz (jeśli otwarty)
     if (inFormModal) {
         const currentRow = logicalRows[currentIndex];
+        // Uzupełnij pola formularza danymi z tabeli
         currentRow.cells[1].textContent = document.getElementById('formOpis').value; 
         const inpLiczba = currentRow.cells[2].querySelector('input');
         if (inpLiczba) inpLiczba.value = document.getElementById('formLiczba').value;
         const inpRozpoznanie = currentRow.cells[3].querySelector('input');
         if (inpRozpoznanie) inpRozpoznanie.value = input.value;
 
+        // Wymuś odświeżenie widoku formularza
         setTimeout(() => {
             selectRowInForm(currentIndex); 
+            // Jeśli kontrolerem jest formularz, ustaw też ID dla #formLiczba żeby działało przeliczanie wizualne
+            const formLiczba = document.getElementById('formLiczba');
+            if (formLiczba) {
+                formLiczba.dataset.linkedTableId = liczbaInputId; // Linkujemy formularz z ID tabeli
+            }
         }, 0);
     } else {
         const formRowSelect = document.getElementById('formRowSelect');
@@ -23718,6 +23716,74 @@ function handleLiczbaChange(e) {
 /* ======================================================== */
 /* ✅ KONIEC: Logika dynamicznego przeliczania ilości       */
 /* ======================================================== */
+/* ======================================================== */
+/* ✅ MODUŁ 2: GLOBALNY NASŁUCH PRZELICZANIA SCHEMATÓW      */
+/* ======================================================== */
+
+// Funkcja wykonująca matematykę przeliczania
+function recalculateSchemaQuantities(controllerInput, specificControllerId = null) {
+    // 1. Ustal ID kontrolera (z atrybutu ID lub specjalnego datasetu dla formularza)
+    let controllerId = specificControllerId || controllerInput.id;
+    
+    // Jeśli to pole w formularzu (#formLiczba), może sterować wierszem w tabeli
+    if (controllerInput.id === 'formLiczba' && controllerInput.dataset.linkedTableId) {
+        controllerId = controllerInput.dataset.linkedTableId;
+    }
+
+    if (!controllerId) return;
+
+    // 2. Pobierz nową wartość
+    const val = parseFloat(controllerInput.value.replace(',', '.')) || 0;
+    // Jeśli wartość pusta lub 0, traktujemy jako 1 (lub 0, zależnie od logiki, tutaj: 0 czyści, >0 mnoży)
+    // Ale w weterynarii brak liczby to zazwyczaj 1 sztuka przy wpisywaniu. 
+    // Jednak przy mnożeniu chcemy precyzji. Jeśli user wpisze 0, ma być 0.
+    const multiplier = (controllerInput.value.trim() === '') ? 0 : val;
+
+    console.log(`Globalne przeliczanie dla ID: ${controllerId}, Mnożnik: ${multiplier}`);
+
+    // 3. Znajdź wszystkie inputy podległe temu kontrolerowi
+    const targets = document.querySelectorAll(`input[data-schema-controller-id="${controllerId}"]`);
+
+    targets.forEach(targetInput => {
+        const baseQtyStr = targetInput.dataset.schemaBaseQty;
+        if (baseQtyStr) {
+            const baseQty = parseFloat(baseQtyStr);
+            if (!isNaN(baseQty)) {
+                // Oblicz nową ilość
+                const newTotal = baseQty * multiplier;
+                
+                // Formatowanie (brak miejsc po przecinku jeśli całkowita)
+                let finalVal = newTotal;
+                if (newTotal % 1 !== 0) finalVal = newTotal.toFixed(2);
+                
+                targetInput.value = (finalVal > 0) ? String(finalVal) : '';
+                
+                // Jeśli jesteśmy w formularzu i to pole jest widoczne, zaktualizuj też widok
+                if (targetInput.id === 'formIlosc') {
+                    // (Specyficzny przypadek dla pola w modalu)
+                }
+            }
+        }
+    });
+
+    // 4. Jeśli zmieniamy w FORMULARZU, zaktualizuj też wiersz w tabeli (bo formularz nie jest bezpośrednio w tabeli)
+    if (controllerInput.id === 'formLiczba') {
+        // Znajdź odpowiedni wiersz w tabeli i zaktualizuj go ręcznie
+        // (Chociaż powyższy kod 'targets' powinien to załatwić, jeśli inputy w tabeli mają odpowiednie ID)
+    }
+}
+
+// Globalny Listener 'input'
+document.addEventListener('input', function(e) {
+    const target = e.target;
+    
+    // Sprawdź, czy to pole "Liczba zwierząt" (w tabeli lub w formularzu)
+    // 1. W tabeli (ma klasę 'schema-quantity-controller' nadaną w Module 1)
+    // 2. W formularzu (ma id 'formLiczba')
+    if (target.classList.contains('schema-quantity-controller') || target.id === 'formLiczba') {
+        recalculateSchemaQuantities(target);
+    }
+});
 /* ======================================================== */
 /* KONIEC SKRYPTU */
 /* ======================================================== */
