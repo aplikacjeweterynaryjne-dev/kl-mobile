@@ -13181,71 +13181,100 @@ async function fetchReceiptsForReport(dateStart, dateEnd, userId) {
 }
 
 /**
- * Generuje Raporty Wizyt (Typ 1, 2, 3)
+ * Generuje Raporty Wizyt (Typ 1, 2, 3) - ZMODYFIKOWANA WERSJA
+ * Zmiany: 
+ * 1. Raport Kasowy pokazuje też Długi (informacyjnie).
+ * 2. Sortowanie: Wydatki -> Wpłaty -> Długi.
+ * 3. Suma liczy tylko 'Zapłacone'.
  */
 function generateWizytyReport(allReceipts, filters) {
-    console.log("Generowanie raportu wizyt (v4 - Auto Koszty)...");
+    console.log("Generowanie raportu wizyt (v5 - Sortowanie priorytetowe)...");
 
-    // --- 1. Filtrowanie wstępne (Klient, Pracownik, Data są filtrowane wcześniej) ---
+    // --- 1. Filtrowanie wstępne (Klient) ---
     let filteredReceipts = [...allReceipts];
     
-    // Filtr Klienta
     if (filters.klient) {
         filteredReceipts = filteredReceipts.filter(r => r.klient === filters.klient);
     }
 
-    // --- 2. Filtrowanie Typu Raportu ---
+    // --- 2. Konfiguracja Typu Raportu ---
     let reportTitle = "Raport Ogólny";
     let sumTitle = "Suma przychodu (tylko dodatnie)";
 
     if (filters.type === "gotowka") {
-        // Raport Kasowy: Bierzemy tylko to, co przeszło przez kasę (status "Zapłacone")
-        // Dotyczy to zarówno wpłat (+) jak i wypłat na paliwo/zwroty (-)
-        filteredReceipts = filteredReceipts.filter(r => r.status === "Zapłacone");
-        reportTitle = "Raport Kasowy (Gotówka)";
+        // Raport Kasowy: Pokazujemy 'Zapłacone' (Wpływy/Wydatki) ORAZ 'Dług' (Informacyjnie)
+        filteredReceipts = filteredReceipts.filter(r => r.status === "Zapłacone" || r.status === "Dług");
+        reportTitle = "Raport Kasowy (Przepływ gotówki + Lista Długów)";
     } else if (filters.type === "dluznicy") {
         filteredReceipts = filteredReceipts.filter(r => r.status === "Dług");
         reportTitle = "Raport Dłużników";
         sumTitle = "Suma zadłużenia";
+    } else if (filters.type === "ogolny") {
+        // Ogólny pokazuje wszystko
+        reportTitle = "Raport Ogólny (Wszystkie wizyty)";
     }
 
-    // --- 3. Rozdział na Przychód (+) i Koszty (-) ---
-    let positiveReceipts = []; // Przychody
-    let negativeReceipts = []; // Koszty (paliwo, zwroty)
-    
-    let totalPositiveSum = 0; // Suma tego co zarobiłeś
-    let totalNegativeSum = 0; // Suma tego co wydałeś (wartość bezwzględna)
+    // --- 3. SORTOWANIE (Priorytety: Wydatki -> Wpłaty -> Długi) ---
+    filteredReceipts.sort((a, b) => {
+        const getPriority = (item) => {
+            const val = parseFloat(item.suma) || 0;
+            const status = item.status;
+
+            // Priorytet 1: Zapłacone i Ujemne (Koszty)
+            if (status === 'Zapłacone' && val < 0) return 1;
+            
+            // Priorytet 2: Zapłacone i Dodatnie (Przychód)
+            if (status === 'Zapłacone' && val >= 0) return 2;
+            
+            // Priorytet 3: Dług (Informacyjnie na końcu)
+            if (status === 'Dług') return 3;
+
+            return 4; // Inne (zabezpieczenie)
+        };
+
+        const priorityA = getPriority(a);
+        const priorityB = getPriority(b);
+
+        // Najpierw sortuj po priorytecie
+        if (priorityA !== priorityB) {
+            return priorityA - priorityB;
+        }
+
+        // Jeśli priorytet ten sam, sortuj po dacie (rosnąco)
+        return a.data.localeCompare(b.data);
+    });
+
+
+    // --- 4. OBLICZANIE SUM (Tylko dla 'Zapłacone') ---
+    let totalPositiveSum = 0; // Suma tego co zarobiłeś (gotówka w ręku)
+    let totalNegativeSum = 0; // Suma tego co wydałeś (gotówka z ręki)
+    let totalDebtSum = 0;     // Suma długów (tylko do wyświetlenia w tytule jeśli trzeba)
 
     filteredReceipts.forEach(r => {
         const suma = parseFloat(r.suma) || 0;
         
-        if (suma < 0) {
-            // To jest KOSZT (np. tankowanie -250)
-            negativeReceipts.push(r);
-            // Dodajemy wartość dodatnią do kosztów (zamieniamy -250 na 250, żeby wyświetlić w ramce)
-            totalNegativeSum += Math.abs(suma); 
-        } else {
-            // To jest PRZYCHÓD
-            positiveReceipts.push(r);
-            totalPositiveSum += suma;
+        if (r.status === 'Zapłacone') {
+            if (suma < 0) {
+                totalNegativeSum += Math.abs(suma); 
+            } else {
+                totalPositiveSum += suma;
+            }
+        } else if (r.status === 'Dług') {
+            totalDebtSum += suma;
+            // WAŻNE: Nie dodajemy długu do totalPositiveSum ani totalNegativeSum,
+            // bo raport dotyczy "Przyjętej Gotówki".
         }
     });
 
-    // Sortowanie (najpierw data)
-    positiveReceipts.sort((a, b) => a.data.localeCompare(b.data));
-    negativeReceipts.sort((a, b) => a.data.localeCompare(b.data));
-
-    // Łączenie listy: Najpierw KOSZTY (na górze), potem PRZYCHODY
-    const finalSortedReceipts = [...negativeReceipts, ...positiveReceipts];
-
-    // --- 4. Budowanie Tabeli HTML ---
+    // --- 5. Generowanie HTML ---
     let tableHtml = '';
 
-    for (const receipt of finalSortedReceipts) {
+    for (const receipt of filteredReceipts) {
         const suma = parseFloat(receipt.suma) || 0;
-        const isNegative = suma < 0;
+        const isExpense = (receipt.status === 'Zapłacone' && suma < 0);
+        const isDebt = (receipt.status === 'Dług');
 
-        // Formatowanie listy produktów/usług
+        // Formatowanie listy produktów
         let zuzyciaHtml = '';
         if (receipt.pozycje && receipt.pozycje.length > 0) {
             const produkty = receipt.pozycje.filter(p => p.name.toLowerCase() !== 'wyrównanie');
@@ -13258,11 +13287,26 @@ function generateWizytyReport(allReceipts, filters) {
             }
         }
         
-        const statusColor = receipt.status === "Zapłacone" ? "green" : (receipt.status === "Dług" ? "red" : "#555");
-        
-        // Style dla wiersza kosztów (czerwone tło)
-        const rowStyle = isNegative ? "background-color: #ffe6e6;" : "";
-        const sumaColor = isNegative ? "#c0392b" : "#000";
+        // --- Style wierszy ---
+        let rowStyle = "";
+        let statusColor = "#555";
+        let sumaColor = "#000";
+
+        if (isExpense) {
+            // WYDATEK: Czerwone tło wiersza
+            rowStyle = "background-color: #ffe6e6;"; 
+            sumaColor = "#c0392b";
+            statusColor = "green"; // Technicznie 'Zapłacone'
+        } else if (isDebt) {
+            // DŁUG: Lekko żółte tło, żeby odróżnić od wpłat
+            rowStyle = "background-color: #fffde7; border-left: 4px solid #f39c12;";
+            statusColor = "#c0392b"; // Napis "Dług" na czerwono
+            sumaColor = "#7f8c8d";   // Kwota długu na szaro (bo nie wpływa na kasę)
+        } else {
+            // WPŁATA: Standardowe białe tło
+            statusColor = "green";
+        }
+
         const sumaDisplay = formatPrice(suma); 
 
         tableHtml += `
@@ -13278,38 +13322,43 @@ function generateWizytyReport(allReceipts, filters) {
         `;
     }
 
-    // --- 5. Aktualizacja Widoku (DOM) ---
+    // --- 6. Aktualizacja Widoku (DOM) ---
     reportWizytyTableBody.innerHTML = tableHtml || '<tr><td colspan="7" style="text-align: center; padding: 20px;">Brak danych.</td></tr>';
     
     reportWizytyTableContainer.style.display = 'block';
     reportZuzyciaTableContainer.style.display = 'none';
     
-    // --- KLUCZOWA ZMIANA: Widoczność sekcji kosztów ---
-    // Pokaż ramkę kosztów JEŚLI są jakieś koszty (ujemne wizyty) LUB jest to raport gotówkowy
-    const showCosts = (totalNegativeSum > 0) || (filters.type === "gotowka");
+    // Pokaż ramkę kosztów w trybie gotówkowym (nawet jak koszty = 0, żeby było widać strukturę)
+    const showCosts = (filters.type === "gotowka");
     
     reportFuelSection.style.display = showCosts ? 'flex' : 'none';
     reportNetSumContainer.style.display = showCosts ? 'inline' : 'none';
 
-    // Aktualizacja tekstów
+    // Aktualizacja tekstów nagłówkowych
     reportMainTitle.textContent = reportTitle;
     reportDateDisplay.textContent = `Okres: ${filters.dateStart} do ${filters.dateEnd}`;
     reportUserDisplay.textContent = `Pracownik: ${filters.userName}`;
-    reportSumTitle.textContent = `${sumTitle}:`;
     
-    // A. SUMA GŁÓWNA (Zielona): Tylko wizyty dodatnie
-    reportCalculatedSum.textContent = formatPrice(totalPositiveSum);
+    // Jeśli raport dłużników - pokaż sumę długu, jeśli gotówka - pokaż sumę wpłat
+    if (filters.type === "dluznicy") {
+        reportSumTitle.textContent = "Suma zadłużenia:";
+        reportCalculatedSum.textContent = formatPrice(totalDebtSum);
+    } else {
+        reportSumTitle.textContent = "Suma przyjętej gotówki (Wpłaty):";
+        reportCalculatedSum.textContent = formatPrice(totalPositiveSum);
+    }
     
-    // B. KOSZTY (Ramka): Suma wizyt ujemnych (wartość bezwzględna)
+    // Obsługa pola "Koszty" (input)
     const costInput = document.getElementById('reportFuelCost');
     if(costInput) {
-        // Wpisujemy wartość do ramki (bez minusa)
+        // Wpisujemy sumę wydatków (bez minusa)
         costInput.value = totalNegativeSum.toFixed(2);
-        // Upewniamy się, że jest zablokowana (użytkownik nie może zmienić)
+        // Pola nie blokujemy całkowicie, jeśli chcesz móc ręcznie korygować, 
+        // ale w tym scenariuszu wylicza się samo, więc readOnly jest ok.
         costInput.readOnly = true; 
     }
     
-    // C. SUMA NETTO (Niebieska): Przychód - Koszty
+    // Obliczanie NETTO (Wpływy - Wydatki)
     const netSum = totalPositiveSum - totalNegativeSum;
     if(reportNetSum) reportNetSum.textContent = formatPrice(netSum);
 }
