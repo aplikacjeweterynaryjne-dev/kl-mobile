@@ -13834,48 +13834,105 @@ try {
         currentProductInputCell = null; 
     }
     
-    // Funkcja Modala: Wypełnianie i filtrowanie listy
+// Funkcja Modala: Wypełnianie i filtrowanie listy (ZMODYFIKOWANA O OPCJĘ CZYSZCZENIA)
     function populateAndFilterProductList() {
         if (!productSearchListModal) return;
 
-        // `nazwyLekow` to Twoja globalna tablica z nazwami (zdefiniowana wcześnie w kodzie)
-        if (typeof nazwyLekow === 'undefined' || nazwyLekow.length === 0) {
-            productSearchListModal.innerHTML = '<div class="product-search-item">Błąd: Brak załadowanej bazy leków.</div>';
-            return;
-        }
-
         const filterText = productSearchInputModal.value.toLowerCase().trim();
         productSearchListModal.innerHTML = ''; 
+
+        // --- 1. DODAJ OPCJĘ "WYCZYŚĆ" NA GÓRZE ---
+        const clearItem = document.createElement('div');
+        clearItem.className = 'product-search-item';
+        
+        // Style wyróżniające (czerwony)
+        clearItem.style.padding = '12px';
+        clearItem.style.borderBottom = '2px solid #ccc';
+        clearItem.style.cursor = 'pointer';
+        clearItem.style.fontWeight = 'bold';
+        clearItem.style.color = '#c0392b'; 
+        clearItem.style.backgroundColor = '#fff0f0';
+        clearItem.textContent = '❌ [WYCZYŚĆ POLE] - Usuń produkt z wiersza';
+
+        // Logika czyszczenia wiersza
+        clearItem.addEventListener('click', () => {
+            if (currentProductInputCell) {
+                // A. Wyczyść input produktu (główny)
+                const input = currentProductInputCell.querySelector('input[list="listaLekow"]');
+                if (input) input.value = '';
+                currentProductInputCell.dataset.printValue = '';
+
+                // B. Wyczyść sąsiednie komórki w tym wierszu
+                const row = currentProductInputCell.parentElement;
+                
+                // Kolumna 6 (Index 5): Numer Serii (zwykły tekst)
+                if (row.cells[5]) row.cells[5].textContent = '';
+
+                // Kolumna 7 (Index 6): Ilość (Input + Tekst jednostki)
+                if (row.cells[6]) {
+                    const qtyInput = row.cells[6].querySelector('input');
+                    if (qtyInput) qtyInput.value = '';
+                    // Usuń tekst jednostki (nodeType 3 to węzeł tekstowy)
+                    row.cells[6].childNodes.forEach(node => {
+                        if (node.nodeType === Node.TEXT_NODE) node.textContent = '';
+                    });
+                }
+
+                // Kolumna 8 (Index 7): Karencja (Smart Cell)
+                if (row.cells[7]) {
+                    const karInput = row.cells[7].querySelector('input'); // Szukaj inputa (smart cell)
+                    if (karInput) {
+                        karInput.value = ''; 
+                        row.cells[7].dataset.printValue = '';
+                    } else {
+                        // Fallback dla starego typu komórki
+                        row.cells[7].textContent = '';
+                    }
+                }
+
+                // C. Usuń klasę wypełnionego wiersza (żeby zniknęło szare tło)
+                row.classList.remove('filled-row');
+            }
+            // Zamknij modal
+            closeProductSearchModal();
+        });
+
+        productSearchListModal.appendChild(clearItem);
+        // --- KONIEC OPCJI CZYSZCZENIA ---
+
+
+        // --- 2. RESZTA LOGIKI (LISTA LEKÓW) ---
+        if (typeof nazwyLekow === 'undefined' || nazwyLekow.length === 0) {
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'product-search-item';
+            errorDiv.textContent = 'Brak załadowanej bazy leków.';
+            productSearchListModal.appendChild(errorDiv);
+            return;
+        }
+        
         let foundItems = 0;
         
-      nazwyLekow.forEach(lekName => {
+        nazwyLekow.forEach(lekName => {
             if (filterText === '' || lekName.toLowerCase().includes(filterText)) {
                 const itemDiv = document.createElement('div');
                 itemDiv.className = 'product-search-item';
                 itemDiv.textContent = lekName;
                 itemDiv.dataset.lekName = lekName;
 
-                // --- ✅ POCZĄTEK ZMIANY (KOLOROWANIE STANU) ---
+                // Kolorowanie stanu (jeśli włączone)
                 if (currentUserProfile && currentUserProfile.uzywaStanowMagazynowych) {
-                     // 1. Pobierz ID produktu z nazwy
-                     const prodId = typeof produktyGlowneCache !== 'undefined' ? produktyGlowneCache.get(lekName) : null;
-                     
-                     if (prodId) {
-                         // 2. Pobierz stan z cache magazynu
-                         const stanData = typeof magazynCache !== 'undefined' ? magazynCache.get(prodId) : null;
-                         const stan = stanData ? (stanData.stan || 0) : 0;
-
-                         if (stan > 0) {
-                             // 3. Stylizuj na zielono
-                             itemDiv.style.color = '#27ae60'; 
-                             itemDiv.style.fontWeight = '800'; // Mocne pogrubienie
-                             itemDiv.style.backgroundColor = '#f0fff4'; // Bardzo jasne tło dla kontrastu
-                             // Opcjonalnie: Pokaż stan w nawiasie
-                             itemDiv.textContent = `${lekName} (Stan: ${stan})`;
-                         }
-                     }
+                      const prodId = typeof produktyGlowneCache !== 'undefined' ? produktyGlowneCache.get(lekName) : null;
+                      if (prodId) {
+                          const stanData = typeof magazynCache !== 'undefined' ? magazynCache.get(prodId) : null;
+                          const stan = stanData ? (stanData.stan || 0) : 0;
+                          if (stan > 0) {
+                              itemDiv.style.color = '#27ae60'; 
+                              itemDiv.style.fontWeight = '800';
+                              itemDiv.style.backgroundColor = '#f0fff4';
+                              itemDiv.textContent = `${lekName} (Stan: ${stan})`;
+                          }
+                      }
                 }
-                // --- KONIEC ZMIANY ---
 
                 itemDiv.addEventListener('click', () => { selectProductFromModal(lekName); });
                 productSearchListModal.appendChild(itemDiv);
@@ -13884,9 +13941,14 @@ try {
         });
 
         if (foundItems === 0) {
-            productSearchListModal.innerHTML = '<div class="product-search-item" style="color: #999; cursor: default;">Brak pasujących produktów.</div>';
+            const emptyInfo = document.createElement('div');
+            emptyInfo.className = 'product-search-item';
+            emptyInfo.style.color = '#999';
+            emptyInfo.textContent = 'Brak pasujących produktów.';
+            productSearchListModal.appendChild(emptyInfo);
         }
     }
+  
 
   // 5. Funkcja wyboru produktu z listy (WERSJA 2.1 - z zapisem do druku)
     function selectProductFromModal(lekName) {
