@@ -11526,6 +11526,7 @@ async function generateAndSetReceiptDocumentNumber() {
 /**
  * ✅ ZMODYFIKOWANA FUNKCJA (Korekty): Sprawdza status karty przy wejściu.
  */
+/* ✅ KROK 2: Podmień całą funkcję onShowKarta */
 async function onShowKarta() {
     // 1. Sprawdź, czy karta jest "brudna" (wypełniona)
     if (isKartaDirty()) {
@@ -11557,11 +11558,11 @@ async function onShowKarta() {
                         // Zaktualizuj UI
                         if (saveBtn) {
                             saveBtn.textContent = 'Zapisano (Tylko odczyt) ✔️';
-                            saveBtn.disabled = true; // Nie można zapisać drugi raz tego samego
+                            saveBtn.disabled = true; 
                         }
                         if (corrBtn) corrBtn.style.display = 'inline-block'; // Pokaż przycisk korekty
                         
-                        toggleCardInputs(false); // Zablokuj pola (funkcja niżej)
+                        toggleCardInputs(false); // Zablokuj pola
                         showToast("Karta wczytana z archiwum. Tryb tylko do odczytu.", "info");
 
                     } else {
@@ -11572,7 +11573,8 @@ async function onShowKarta() {
                             saveBtn.disabled = false;
                             saveBtn.textContent = '💾 Zapisz w Archiwum';
                         }
-                        if (corrBtn) corrBtn.style.display = 'none';
+                        // ⚠️ ZMIANA: Przycisk korekty widoczny ZAWSZE
+                        if (corrBtn) corrBtn.style.display = 'inline-block'; 
                         toggleCardInputs(true); // Odblokuj pola
                     }
 
@@ -16752,12 +16754,13 @@ function clearKartaLeczenia(skipGenNumber = false) {
     
     const corrBtn = document.getElementById('correctionModeBtn');
     if (corrBtn) {
-        corrBtn.style.display = 'none'; // Ukryj przycisk korekty (bo to nowa karta)
+        // ⚠️ ZMIANA TUTAJ: Zamiast 'none', ustawiamy 'inline-block'
+        // Dzięki temu przycisk jest ZAWSZE widoczny w nowej karcie
+        corrBtn.style.display = 'inline-block'; 
     }
     // ----------------------------------------------
     
     // 7. Wygeneruj nowy numer dokumentu (TYLKO JEŚLI NIE POMIJAMY)
-    // Pomijamy np. wchodząc w tryb korekty, bo tam numer wpisujemy ręcznie/kopiujemy
     if (!skipGenNumber && typeof generateAndSetDocumentNumber === 'function') {
         generateAndSetDocumentNumber();
     }
@@ -23285,7 +23288,8 @@ function renderClientComparisonCharts(vetName, vetStats, clinicStats) {
     });
 }
  /* ======================================================== */
-/* ✅ POPRAWIONY MODUŁ KOREKTY (Z nowym Modalem)            */
+/* ======================================================== */
+/* ✅ POPRAWIONY MODUŁ KOREKTY (Z filtrowaniem klienta)     */
 /* ======================================================== */
 
 // Zmienne dla nowego modala korekty
@@ -23295,57 +23299,99 @@ const correctionCardList = document.getElementById('correctionCardList');
 const correctionCardCloseBtn = document.getElementById('correctionCardCloseBtn');
 let cachedCorrectionCards = []; // Cache na karty do filtrowania
 
-// 1. Obsługa przycisku "Tryb Korekty" - Otwiera Modal
+// 1. Obsługa przycisku "Tryb Korekty"
 if (correctionModeBtn) {
     correctionModeBtn.addEventListener('click', async () => {
         if (!currentUserProfile) return;
         
-        // Pokaż modal
+        // A. Pobierz klienta wybranego w karcie (jeśli jest)
+        const currentClientInput = document.getElementById('klientSelect');
+        const currentClient = currentClientInput && currentClientInput.value !== "Kliknij, aby wybrać klienta..." 
+                              ? currentClientInput.value.trim() 
+                              : "";
+
+        // B. Pokaż modal
         if (correctionCardSearchModal) {
             correctionCardSearchModal.style.display = 'flex';
-            loadCorrectionCardsList(); // Pobierz listę kart
+            
+            // C. Ustaw tekst w wyszukiwarce modala (wizualnie)
+            if (correctionCardSearchInput) {
+                correctionCardSearchInput.value = currentClient;
+            }
+
+            // D. Załaduj listę (z filtrem klienta lub bez)
+            loadCorrectionCardsList(currentClient); 
         }
     });
 }
 
-// 2. Pobieranie listy kart z archiwum (Ostatnie 50)
-async function loadCorrectionCardsList() {
+// 2. Pobieranie listy kart z archiwum
+// Parametr clientFilter: nazwa klienta do przefiltrowania zapytania
+async function loadCorrectionCardsList(clientFilter = "") {
     correctionCardList.innerHTML = '<div style="padding:20px; text-align:center;">Pobieranie kart... ⏳</div>';
     
     try {
-        const q = db.collection("archiwumKarty")
+        let q = db.collection("archiwumKarty")
             .where("lekarz_uid", "==", currentUserProfile.uid)
             .orderBy("createdAt", "desc")
-            .limit(50); // Pobierz ostatnie 50 kart
+            .limit(50); // Domyślnie ostatnie 50 kart
+
+        // ✅ JEŚLI KLIENT JEST WYBRANY: Dodaj filtr do zapytania
+        if (clientFilter) {
+            console.log(`Pobieranie kart tylko dla klienta: ${clientFilter}`);
+            // Nadpisujemy zapytanie
+            q = db.collection("archiwumKarty")
+                  .where("lekarz_uid", "==", currentUserProfile.uid)
+                  .where("klient_nazwa", "==", clientFilter) // Filtrujemy po nazwie
+                  .orderBy("createdAt", "desc")
+                  .limit(50);
+        }
 
         const snapshot = await q.get();
         cachedCorrectionCards = [];
+
+        if (snapshot.empty) {
+             if (clientFilter) {
+                 correctionCardList.innerHTML = `<div style="padding:20px; text-align:center; color:#666;">Brak zapisanych kart dla klienta: <b>${clientFilter}</b>.<br>Sprawdź czy karta została wcześniej zapisana w archiwum.</div>`;
+             } else {
+                 correctionCardList.innerHTML = '<div style="padding:20px; text-align:center; color:#666;">Brak kart w archiwum.</div>';
+             }
+             return;
+        }
 
         snapshot.docs.forEach(doc => {
             cachedCorrectionCards.push({ id: doc.id, ...doc.data() });
         });
 
-        renderCorrectionCardList(''); // Wyświetl listę
+        // Renderuj (jeśli filtrowaliśmy w bazie, to tutaj już nie musimy filtrować tekstowo na start, chyba że użytkownik coś dopisze)
+        renderCorrectionCardList(correctionCardSearchInput.value); 
 
     } catch (error) {
         console.error("Błąd pobierania kart do korekty:", error);
-        correctionCardList.innerHTML = '<div style="padding:20px; text-align:center; color:red;">Błąd pobierania danych.</div>';
+        
+        // Obsługa braku indeksu (częste przy filtrach złożonych)
+        if (error.code === 'failed-precondition') {
+             correctionCardList.innerHTML = '<div style="padding:20px; text-align:center; color:red;">Błąd bazy danych (brak indeksu dla tego klienta).<br>Sprawdź konsolę (F12).</div>';
+        } else {
+             correctionCardList.innerHTML = '<div style="padding:20px; text-align:center; color:red;">Wystąpił błąd pobierania danych.</div>';
+        }
     }
 }
 
-// 3. Renderowanie i Filtrowanie Listy Kart
+// 3. Renderowanie i Filtrowanie Listy Kart (lokalnie w modalu)
 function renderCorrectionCardList(filterText) {
     correctionCardList.innerHTML = '';
     const filter = filterText.toLowerCase().trim();
     let found = 0;
 
     cachedCorrectionCards.forEach(card => {
-        // Przygotuj tekst do szukania
+        // Przygotuj tekst do szukania wewnątrz pobranych wyników
         const searchString = `${card.klient_nazwa || ''} ${card.nrDokumentu || ''} ${card.header?.nrStada || ''} ${card.dataWykonania || ''}`.toLowerCase();
 
+        // Jeśli filtr pusty LUB tekst pasuje
         if (filter === '' || searchString.includes(filter)) {
             const div = document.createElement('div');
-            div.className = 'client-search-item'; // Używamy stylu z listy klientów
+            div.className = 'client-search-item'; 
             div.style.padding = '10px';
             div.style.borderBottom = '1px solid #eee';
             div.style.cursor = 'pointer';
@@ -23367,13 +23413,17 @@ function renderCorrectionCardList(filterText) {
     });
 
     if (found === 0) {
-        correctionCardList.innerHTML = '<div style="padding:20px; text-align:center; color:#999;">Brak pasujących kart.</div>';
+        // Jeśli lista jest pusta, ale mamy dane w cache (czyli filtr tekstowy wyciął wszystko)
+        if (cachedCorrectionCards.length > 0) {
+             correctionCardList.innerHTML = '<div style="padding:20px; text-align:center; color:#999;">Brak wyników pasujących do wyszukiwania.</div>';
+        }
     }
 }
 
 // 4. Obsługa szukania i zamykania w modalu
 if (correctionCardSearchInput) {
     correctionCardSearchInput.addEventListener('input', (e) => {
+        // Filtrujemy lokalnie to co pobraliśmy
         renderCorrectionCardList(e.target.value);
     });
 }
@@ -23383,7 +23433,7 @@ if (correctionCardCloseBtn) {
     });
 }
 
-// 5. ✅ KLUCZOWA FUNKCJA: Wczytanie karty do edycji (Naprawia brakujące kolumny)
+// 5. ✅ KLUCZOWA FUNKCJA: Wczytanie karty do edycji (Ta funkcja pozostaje bez zmian z poprzedniego etapu, ale musi tu być)
 function loadCardForEditing(cardData) {
     console.log("Wczytywanie karty do korekty:", cardData);
     
@@ -23451,31 +23501,24 @@ function loadCardForEditing(cardData) {
                 tr.cells[5].textContent = savedRow.seria || '';
 
                 // ✅ FIX KOLUMNA 7 (Ilość/Dawka)
-                // Musimy wydobyć samą wartość numeryczną z HTML lub tekstu
                 const iloscInput = tr.cells[6].querySelector('input');
                 if (iloscInput) {
                     let qtyVal = '';
                     if(savedRow.iloscDawka && savedRow.iloscDawka.includes('value="')) {
-                        // Regex wyciąga to co jest w value="..."
                          const m = savedRow.iloscDawka.match(/value="([\d\.]+)"/);
                          if(m) qtyVal = m[1];
                     } else {
-                        // Fallback: próba parsowania float z początku stringa
                         qtyVal = parseFloat(savedRow.iloscDawka) || '';
                     }
                     iloscInput.value = qtyVal;
                 }
 
                 // ✅ FIX KOLUMNA 8 (Karencja/Smart Cell)
-                // W nowym systemie to jest input o klasie .karencja-input
                 const karInput = tr.cells[7].querySelector('.karencja-input') || tr.cells[7].querySelector('input');
                 if (karInput) {
-                    // W bazie karencja to czysty tekst (zapisywany przy saveRow)
                     karInput.value = savedRow.karencja || '';
-                    // Aktualizuj też atrybut dla druku
                     tr.cells[7].dataset.printValue = savedRow.karencja || '';
                 } else {
-                    // Fallback dla starych wersji bez inputa
                     tr.cells[7].textContent = savedRow.karencja || '';
                 }
 
@@ -23491,6 +23534,9 @@ function loadCardForEditing(cardData) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     showToast("Wczytano kartę do korekty. Sprawdź dane i podpisz ponownie.", "info");
+    
+    // Zamknij modal po wybraniu
+    correctionCardSearchModal.style.display = 'none';
 }
 /* ======================================================== */
 /* KONIEC SKRYPTU */
