@@ -19355,9 +19355,9 @@ function createSmartDosageCell(cell, row) {
     cell.appendChild(calIcon);
 }
 /**
- * ✅ MODUŁ 4 (POPRAWKA FINALNA v2): Podgląd 110mm z Archiwum.
- * - Nagłówki sekcji (I i II) mają standardową grubość (bold), a nie extra-bold.
- * - Reszta bez zmian (identyczna z generatorem).
+ * ✅ MODUŁ 4 (POPRAWKA DRUKOWANIA v3): Podgląd 110mm z Archiwum.
+ * - FIX: Wymuszona szerokość 80mm przy druku (zapobiega rozciąganiu na A4).
+ * - Zachowane: Podpisy po lewej, standardowe grubości czcionek.
  */
 function openDirectPrintWindow110mm(card) {
     const header = card.header || {};
@@ -19472,6 +19472,7 @@ function openDirectPrintWindow110mm(card) {
                     color: #000 !important;
                     background-color: #ffffff;
                     
+                    /* SZTYWNA SZEROKOŚĆ (Kluczowe dla Generatora i Archiwum) */
                     width: 80mm !important; 
                     max-width: 80mm !important;
                     
@@ -19487,7 +19488,6 @@ function openDirectPrintWindow110mm(card) {
 
                 h2 { font-size: 10pt !important; font-weight: bold; text-transform: uppercase; text-align: center; margin: 0 0 8px 0; }
                 
-                /* ✅ POPRAWKA: font-weight zmienione z 800 na bold (standard) */
                 h3 { 
                     font-size: 9pt !important; 
                     font-weight: bold; 
@@ -19515,13 +19515,27 @@ function openDirectPrintWindow110mm(card) {
                 }
 
                 @media print {
-                    body { background-color: #ffffff !important; display: block !important; margin: 0 !important; padding: 0 !important; }
-                    .print-controls { display: none !important; }
-                    .receipt-page {
-                        width: 100% !important; max-width: 100% !important;
-                        margin: 0 !important; box-shadow: none !important;
+                    body { 
+                        background-color: #ffffff !important; 
+                        display: block !important; 
+                        margin: 0 !important; 
+                        padding: 0 !important; 
                     }
-                    @page { margin: 2mm !important; size: 110mm auto; }
+                    .print-controls { display: none !important; }
+                    
+                    /* ✅ FIX: WYMUSZAMY SZEROKOŚĆ 80mm NAWET PRZY DRUKU */
+                    .receipt-page {
+                        width: 80mm !important; 
+                        max-width: 80mm !important;
+                        margin-left: 1mm !important; /* Zachowujemy margines */
+                        box-shadow: none !important;
+                        padding-right: 2mm !important;
+                    }
+                    
+                    @page { 
+                        margin: 0mm !important; 
+                        size: 110mm auto; 
+                    }
                 }
             </style>
         </head>
