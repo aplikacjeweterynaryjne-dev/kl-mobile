@@ -3160,6 +3160,7 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
 <button id="copyBtn" class="btn">Przepisz dane z leczenia na miejscu</button>
 <button id="formBtn" class="btn">📋 Wprowadź poprzez formularz</button>
 <button id="saveCardToArchiveBtn" class="btn primary" style="background-color: #27ae60; border-color: #229954; margin-left: 5px;">💾 Zapisz w Archiwum</button>
+<button id="correctionModeBtn" class="btn warn" style="background-color: #f39c12; border-color: #e67e22; color: white; display: none;">🛠️ Tryb Korekty</button>
 <button id="printBtn" class="btn">Drukuj / Zapisz PDF</button>
 </div>
 
@@ -6755,6 +6756,7 @@ const saveCardToArchiveBtn = document.getElementById('saveCardToArchiveBtn');
  * Pkt 4: Listener dla przycisku "Zapisz w Archiwum"
  */
 /* ✅ MODUŁ 8 (OFFLINE-PROOF): Zapis Karty z wymuszeniem odblokowania */
+/* ✅ MODUŁ 8 + KOREKTY: Zapis Karty (Kompletna logika) */
 if (saveCardToArchiveBtn) {
     saveCardToArchiveBtn.addEventListener('click', async () => {
         
@@ -6771,49 +6773,118 @@ if (saveCardToArchiveBtn) {
             return;
         }
 
-        // 2. Walidacja Stanu Magazynowego
+        // 2. Walidacja Stanu (Dla nowej wersji karty)
+        if (typeof validateCardStock === 'function') await validateCardStock(); 
         if (typeof isCardStockValid !== 'undefined' && !isCardStockValid) {
             showToast("Nie można zapisać karty. Wykryto błędy w stanach magazynowych.", "error", 4000);
             return;
         }
 
-        console.log("Rozpoczynanie zapisu karty...");
+        // 3. Sprawdź Podpis
+        const canvas = document.getElementById('canvasPosiadacz');
+        let podpisData = canvas.toDataURL();
+        // Fallback dla podpisu z formularza, jeśli główny jest pusty
+        if (podpisData.length < 1000) {
+             const formCanvas = document.getElementById('formCanvasPosiadacz');
+             if(formCanvas) podpisData = formCanvas.toDataURL();
+        }
+
+        if (podpisData.length < 1000) {
+            if(!confirm("Uwaga: Brak podpisu posiadacza. Czy na pewno chcesz zapisać?")) return;
+        }
+
+        // Blokada przycisku
         saveCardToArchiveBtn.disabled = true;
         saveCardToArchiveBtn.textContent = 'Przetwarzanie...';
 
         try {
-            // 3. Walidacja Duplikatów (TYLKO ONLINE - Offline to pomija, żeby nie wisieć)
-            if (navigator.onLine) {
+            const batch = db.batch();
+            const userDocId = currentUserProfile.id; // ID dok konfiguracji
+            const useStock = currentUserProfile.uzywaStanowMagazynowych === true;
+
+            // --- A. JEŚLI TO KOREKTA: WYCOFAJ STARĄ KARTĘ ---
+            // (Zmienna originalCardIdForCorrection jest ustawiana w przycisku "Tryb Korekty")
+            if (originalCardIdForCorrection) {
+                console.log("Tryb Korekty: Wycofywanie starej karty ID:", originalCardIdForCorrection);
+                
+                // 1. Pobierz starą kartę (aby wiedzieć co zwrócić na stan)
+                const oldDocRef = db.collection("archiwumKarty").doc(originalCardIdForCorrection);
+                const oldDocSnap = await oldDocRef.get();
+
+                if (oldDocSnap.exists && useStock) {
+                    const oldData = oldDocSnap.data();
+                    const oldTable = oldData.table || [];
+                    const returnLog = [];
+
+                    // Przelicz zwroty (dodaj ilości ze starej karty do magazynu)
+                    for (const row of oldTable) {
+                        let qty = 0;
+                        // Parsowanie ilości (czasem zapisana jako HTML z value="")
+                        if(row.iloscDawka && row.iloscDawka.includes('value="')) {
+                             const m = row.iloscDawka.match(/value="([\d\.]+)"/);
+                             if(m) qty = parseFloat(m[1]);
+                        } else {
+                             qty = parseFloat(row.iloscDawka) || 0;
+                        }
+                        const prodName = (row.lek || '').trim();
+
+                        if (qty > 0 && prodName) {
+                            // Znajdź ID produktu w cache
+                            const prodId = typeof produktyGlowneCache !== 'undefined' ? produktyGlowneCache.get(prodName) : null;
+                            if (prodId) {
+                                // ZWRÓĆ STAN (Increment)
+                                const stockRef = db.collection("konfiguracja").doc(userDocId).collection("magazynOsobisty").doc(prodId);
+                                batch.set(stockRef, { 
+                                    stan: firebase.firestore.FieldValue.increment(qty) 
+                                }, { merge: true });
+
+                                returnLog.push({
+                                    id_produktu: prodId,
+                                    nazwa_produktu: prodName,
+                                    ilosc: qty, // Dodatnia = zwrot
+                                    stan_przed: 0, 
+                                    stan_po: 0 
+                                });
+                            }
+                        }
+                    }
+                    
+                    // Zapisz log zwrotu w historii
+                    if (returnLog.length > 0) {
+                        const logRef = db.collection("konfiguracja").doc(userDocId).collection("magazynOsobistyLog").doc();
+                        batch.set(logRef, {
+                             typ: "zwrot_korekta",
+                             data: firebase.firestore.FieldValue.serverTimestamp(),
+                             kto_uid: currentUserProfile.uid,
+                             kto_nazwa: "System (Korekta)",
+                             zmiany: returnLog,
+                             nr_karty: oldData.nrDokumentu
+                        });
+                    }
+                }
+
+                // 2. USUŃ STARĄ KARTĘ Z ARCHIWUM
+                batch.delete(oldDocRef);
+            }
+            // --- KONIEC SEKCJI KOREKTY ---
+
+
+            // --- B. WALIDACJA DUPLIKATÓW (Tylko jeśli to NIE jest korekta) ---
+            if (!originalCardIdForCorrection && navigator.onLine) {
                  const idLecznicy = currentUserProfile['ID lecznicy'];
                  const q = db.collection("archiwumKarty")
                      .where("id_lecznicy", "==", idLecznicy)
                      .where("nrDokumentu", "==", nrDokStr)
                      .limit(1);
                  
-                 // "Wyścig": Jeśli sprawdzenie trwa dłużej niż 2s, anuluj je (uznaj, że sieć jest słaba)
-                 const checkPromise = q.get();
-                 const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve('TIMEOUT'), 2000));
-                 
-                 const result = await Promise.race([checkPromise, timeoutPromise]);
-
-                 if (result !== 'TIMEOUT' && result && !result.empty) {
-                     showToast(`Błąd: Karta o numerze [${nrDokStr}] już istnieje (Online)!`, "error", 5000);
-                     saveCardToArchiveBtn.disabled = false;
-                     saveCardToArchiveBtn.textContent = '💾 Zapisz w Archiwum';
-                     return;
-                 }
-            }
-            
-            // --- PRZYGOTOWANIE DANYCH (Standard) ---
-            const canvas = document.getElementById('canvasPosiadacz');
-            let podpisData = canvas.toDataURL();
-            if (podpisData.length < 1000) { 
-                 const formCanvas = document.getElementById('formCanvasPosiadacz');
-                 if (formCanvas) {
-                     podpisData = formCanvas.toDataURL();
+                 const checkSnap = await q.get();
+                 if (!checkSnap.empty) {
+                     throw new Error(`Karta o numerze [${nrDokStr}] już istnieje!`);
                  }
             }
 
+
+            // --- C. PRZYGOTUJ NOWĄ KARTĘ (Zbieranie danych z ekranu) ---
             const headerData = {
                 nazwaLecznicy: document.getElementById('nazwaLecznicy').textContent,
                 dataWykonania: document.getElementById('dataWykonania').value,
@@ -6825,9 +6896,9 @@ if (saveCardToArchiveBtn) {
                 podpisLekarzaImg: document.getElementById('doctor-signature').src,
                 podpisLekarzaLinia: document.getElementById('doctor-signature-name').textContent
             };
-            
+
             const tableRowsData = [];
-            const productUsageMap = new Map();
+            const productUsageMap = new Map(); // Mapa do odjęcia z magazynu
             const rows = rowsEditable();
 
             rows.forEach(tr => {
@@ -6836,31 +6907,24 @@ if (saveCardToArchiveBtn) {
                 const iloscInput = tr.cells[6].querySelector('input[type="number"]');
                 const iloscValue = iloscInput ? iloscInput.value : '';
                 
+                // Budowanie HTML ilości
                 let dawkaText = '';
                 if (iloscInput && iloscInput.nextSibling && iloscInput.nextSibling.nodeType === Node.TEXT_NODE) {
                     dawkaText = iloscInput.nextSibling.textContent;
                 }
                 const iloscDawkaHtml = `<input class="small-input" type="number" value="${iloscValue}"> ${dawkaText}`;
                 
+                // Karencja (Smart Cell)
                 let karencjaCzysta = '';
                 const smartInput = tr.cells[7].querySelector('.karencja-input');
-                if (smartInput) {
-                    karencjaCzysta = smartInput.value;
-                } else {
+                if (smartInput) karencjaCzysta = smartInput.value;
+                else {
                     const anyInput = tr.cells[7].querySelector('input, textarea');
-                    if (anyInput) {
-                        karencjaCzysta = anyInput.value;
-                    } else {
-                        karencjaCzysta = tr.cells[7].textContent.replace('📅', '').trim();
-                    }
-                }
-                if (!karencjaCzysta && tr.cells[7].dataset.printValue) {
-                    karencjaCzysta = tr.cells[7].dataset.printValue;
+                    karencjaCzysta = anyInput ? anyInput.value : tr.cells[7].textContent.replace('📅', '').trim();
                 }
 
                 const rowData = {
                     logicalIndex: logicalIndex,
-                    lp: tr.cells[0].textContent,
                     opis: tr.cells[1].querySelector('input') ? tr.cells[1].querySelector('input').value : tr.cells[1].textContent,
                     liczba: tr.cells[2].querySelector('input') ? tr.cells[2].querySelector('input').value : '',
                     rozpoznanie: tr.cells[3].querySelector('input') ? tr.cells[3].querySelector('input').value : '',
@@ -6869,33 +6933,39 @@ if (saveCardToArchiveBtn) {
                     iloscDawka: iloscDawkaHtml,
                     karencja: karencjaCzysta
                 };
-                
-                if (rowData.opis || rowData.liczba || rowData.rozpoznanie || rowData.lek || (rowData.karencja && rowData.karencja.trim() !== '')) {
+
+                // Dodaj tylko wypełnione wiersze
+                if (rowData.opis || rowData.liczba || rowData.rozpoznanie || rowData.lek) {
                     tableRowsData.push(rowData);
                 }
-                
-                if (currentUserProfile.uzywaStanowMagazynowych === true) {
-                     const productName = rowData.lek.trim();
-                     const quantity = parseFloat(iloscValue) || 0;
-                     if (productName && quantity > 0) {
-                          const productId = produktyGlowneCache.get(productName);
-                          if (productId) {
-                              const currentRequired = productUsageMap.get(productId) || 0;
-                              productUsageMap.set(productId, currentRequired + quantity);
-                          }
-                     }
+
+                // Zliczanie do wydania (Magazyn)
+                if (useStock) {
+                    const productName = rowData.lek.trim();
+                    const quantity = parseFloat(iloscValue) || 0;
+                    if (productName && quantity > 0) {
+                        const productId = produktyGlowneCache.get(productName);
+                        if (productId) {
+                            const current = productUsageMap.get(productId) || 0;
+                            productUsageMap.set(productId, current + quantity);
+                        }
+                    }
                 }
             });
 
+            // Przygotuj obiekt nowej karty
+            const newCardRef = db.collection("archiwumKarty").doc();
+            lastSavedDocId = newCardRef.id;
+
             let finalCounter = currentCardData.nextCounter;
-            try {
+             try {
                 const parts = nrDokStr.split('/');
                 if (parts.length > 0) {
                     const parsedNumber = parseInt(parts[0], 10);
                     if (!isNaN(parsedNumber)) finalCounter = parsedNumber;
                 }
-            } catch (e) { console.warn("Licznik auto"); }
-            
+            } catch (e) { }
+
             const cardArchiveData = {
                 lekarz_uid: currentUserProfile.uid,
                 lekarz_nazwisko: `${currentUserProfile.Imie} ${currentUserProfile.Nazwisko}`,
@@ -6903,7 +6973,7 @@ if (saveCardToArchiveBtn) {
                 klient_nazwa: headerData.klient,
                 nrDokumentu: headerData.nrDokumentu,
                 dataWykonania: headerData.dataWykonania,
-                counter: finalCounter, 
+                counter: finalCounter,
                 miesiac: currentCardData.currentMonth,
                 rok: currentCardData.currentYear,
                 createdAt: firebase.firestore.FieldValue.serverTimestamp(),
@@ -6912,108 +6982,95 @@ if (saveCardToArchiveBtn) {
                 podpisPosiadacza: podpisData
             };
             
-            // --- BATCH (ZAPIS) ---
-            const batch = db.batch();
-            const userDocId = currentUserProfile.id;
-            const cardRef = db.collection("archiwumKarty").doc();
-            lastSavedDocId = cardRef.id; // ⬅️ ✅ DODAJ TĘ LINIJKĘ (Zapamiętujemy ID)
-            batch.set(cardRef, cardArchiveData);
-            
-            if (currentUserProfile.uzywaStanowMagazynowych === true && productUsageMap.size > 0) {
-                const zmianyLog = [];
+            // Dodaj do batcha: Zapis nowej karty
+            batch.set(newCardRef, cardArchiveData);
+
+            // --- D. NOWE WYDANIE Z MAGAZYNU (Odejmowanie) ---
+            if (useStock && productUsageMap.size > 0) {
+                const issueLog = [];
                 for (const [productId, usageQty] of productUsageMap.entries()) {
-                     const stockData = magazynCache.get(productId);
-                     const currentStock = stockData ? (stockData.stan || 0) : 0;
-                     const newStock = currentStock - usageQty;
-                     
-                     const stockRef = db.collection("konfiguracja").doc(userDocId).collection("magazynOsobisty").doc(productId);
-                     batch.update(stockRef, { stan: newStock });
-                     
-                     zmianyLog.push({
+                    const stockRef = db.collection("konfiguracja").doc(userDocId).collection("magazynOsobisty").doc(productId);
+                    // Zmniejszamy stan
+                    batch.update(stockRef, { stan: firebase.firestore.FieldValue.increment(-usageQty) });
+
+                    issueLog.push({
                          id_produktu: productId,
                          nazwa_produktu: productIDtoNameMap.get(productId) || "Produkt",
                          ilosc: -usageQty,
-                         stan_przed: currentStock,
-                         stan_po: newStock
-                     });
+                         stan_przed: 0, 
+                         stan_po: 0 
+                    });
                 }
-                const logData = {
+                const logRef = db.collection("konfiguracja").doc(userDocId).collection("magazynOsobistyLog").doc();
+                batch.set(logRef, {
                      typ: "wydanie_karta",
                      data: firebase.firestore.FieldValue.serverTimestamp(),
                      kto_uid: currentUserProfile.uid,
-                     kto_nazwa: `${currentUserProfile.Imie} ${currentUserProfile.Nazwisko}`,
+                     kto_nazwa: currentUserProfile.Imie,
                      batch_id_powiazany: nrDokStr,
-                     wycofany: false,
-                     zmiany: zmianyLog
-                };
-                const logRef = db.collection("konfiguracja").doc(userDocId).collection("magazynOsobistyLog").doc();
-                batch.set(logRef, logData);
+                     zmiany: issueLog
+                });
             }
 
-            // ✅ CRITICAL FIX: WYŚCIG Z CZASEM
-            // Dajemy bazie 2.5 sekundy na potwierdzenie. Jak nie zdąży -> uznajemy że jest Offline (ale zapisane lokalnie) i puszczamy.
+            // --- E. WYKONAJ BATCH (ZAPISZ WSZYSTKO) ---
             const savePromise = batch.commit();
+            // Wyścig z czasem dla trybu offline
             const offlineTimeout = new Promise((resolve) => setTimeout(() => resolve('OFFLINE_ASSUMED'), 2500));
-            
             const raceResult = await Promise.race([savePromise, offlineTimeout]);
 
-            // Niezależnie od wyniku wyścigu, aktualizujemy cache lokalny dla wydajności
-            if (currentUserProfile.uzywaStanowMagazynowych === true && productUsageMap.size > 0) {
-                 for (const [productId, usageQty] of productUsageMap.entries()) {
-                     const stockData = magazynCache.get(productId);
-                     if (stockData) stockData.stan = stockData.stan - usageQty;
-                 }
-            }
 
-            // ✅ ODBLOKOWANIE UI I DRUKOWANIA
-            isCurrentCardSaved = true; // To najważniejsze - zdejmuje blokadę druku!
+            // --- F. PO SUKCESIE ---
+            isCurrentCardSaved = true; // Karta zapisana
+            isCardLocked = true; // Blokujemy edycję
+            originalCardIdForCorrection = null; // Resetujemy tryb korekty
             
+            // Aktualizuj UI
             if (raceResult === 'OFFLINE_ASSUMED' || !navigator.onLine) {
-                 alert("📡 ZAPISANO OFFLINE: Karta została bezpiecznie zapisana w pamięci telefonu.\nSynchronizacja nastąpi automatycznie po odzyskaniu sieci.\n\nMożesz teraz drukować.");
+                 alert("📡 ZAPISANO OFFLINE: Karta bezpieczna w pamięci telefonu.");
                  saveCardToArchiveBtn.textContent = 'Zapisano (Offline) 💾';
             } else {
-                 showToast(`Karta (Nr: ${nrDokStr}) zapisana w chmurze.`, 'success');
-                 saveCardToArchiveBtn.textContent = 'Zapisano ✔️';
+                 showToast("Karta zapisana pomyślnie.", "success");
+                 saveCardToArchiveBtn.textContent = 'Zapisano (Tylko odczyt) ✔️';
             }
 
-            // Pytanie o kod QR
-            if (confirm("Czy chcesz teraz wydrukować naklejkę z kodem QR?")) {
-                if (typeof showQrModal === 'function') {
-                    showQrModal(cardRef.id, headerData.nrDokumentu, headerData.dataWykonania);
-                }
-            }
+            saveCardToArchiveBtn.classList.remove('warn');
             
-            // Odsłoń przycisk "Zamknij" jeśli jesteśmy w formularzu (Krok 3)
-            const fClose = document.getElementById('formCloseAfterSaveBtn');
-            const fSave = document.getElementById('formOnlySaveBtn');
-            if (fClose && fSave) {
-                fClose.style.display = 'block';
-                fSave.style.display = 'none';
+            // Zablokuj pola (bo zapisano)
+            if (typeof toggleCardInputs === 'function') toggleCardInputs(false);
+            
+            // Pokaż przycisk korekty (bo teraz można robić kolejną korektę tej wersji)
+            const corrBtn = document.getElementById('correctionModeBtn');
+            if(corrBtn) corrBtn.style.display = 'inline-block';
+
+            // Odśwież lokalny cache magazynu
+            if (useStock && typeof loadMagazynCache === 'function') {
+                 loadMagazynCache(currentUserProfile.uid);
+            }
+
+            // Zapytaj o QR
+             if (confirm("Czy chcesz teraz wydrukować naklejkę z kodem QR?")) {
+                if (typeof showQrModal === 'function') {
+                    showQrModal(newCardRef.id, headerData.nrDokumentu, headerData.dataWykonania);
+                }
             }
 
         } catch (error) {
-            console.error("Błąd zapisu karty:", error);
-            // Jeśli to błąd sieci, traktuj jako sukces lokalny
-            if (error.code === 'unavailable' || !navigator.onLine) {
-                 isCurrentCardSaved = true; // Awaryjne odblokowanie
-                 alert("📡 ZAPISANO OFFLINE: Wystąpił problem z siecią, ale dane są bezpieczne w pamięci telefonu.\nMożesz drukować.");
-                 saveCardToArchiveBtn.textContent = 'Zapisano (Offline) 💾';
-                 
-                 const fClose = document.getElementById('formCloseAfterSaveBtn');
-                 const fSave = document.getElementById('formOnlySaveBtn');
-                 if (fClose && fSave) {
-                    fClose.style.display = 'block';
-                    fSave.style.display = 'none';
-                 }
+            console.error("Błąd zapisu karty/korekty:", error);
+            
+            if (error.message && error.message.includes("już istnieje")) {
+                alert(error.message);
+            } else if (error.code === 'unavailable' || !navigator.onLine) {
+                 alert("Brak sieci. W trybie korekty wymagane jest stabilne połączenie.");
             } else {
-                 alert("Wystąpił błąd podczas zapisu: " + error.message);
-                 saveCardToArchiveBtn.disabled = false;
-                 saveCardToArchiveBtn.textContent = '💾 Zapisz w Archiwum';
+                 alert("Wystąpił błąd zapisu: " + error.message);
             }
+            saveCardToArchiveBtn.disabled = false;
+            // Przywróć odpowiedni tekst przycisku w razie błędu
+            saveCardToArchiveBtn.textContent = originalCardIdForCorrection ? '💾 Zapisz KOREKTĘ' : '💾 Zapisz w Archiwum';
         }
+
     });
 }
-
 // Sekcje Archiwum i ich elementy (Pkt 6, 8)
 const archiwumKartySection = document.getElementById('archiwumKartySection');
 const archiwumParagonySection = document.getElementById('archiwumParagonySection');
@@ -7105,6 +7162,9 @@ let cachedClients = null;
 let currentUserProfile = null; // ✅ DODAJ TĘ LINIĘ
 /* ----- GŁÓWNE ZMIENNE APLIKACJI ----- */
 let lastSavedDocId = null; // ✅ NOWA ZMIENNA: Tu zapiszemy ID karty po kliknięciu "Zapisz"
+/* ✅ ZMIENNE DO KOREKTY KARTY */
+let originalCardIdForCorrection = null; // ID dokumentu, który korygujemy (do usunięcia)
+let isCardLocked = false; // Flaga blokady edycji
 let clientFormReturnToModal = null; // ⬅️ ⬅️ ⬅️ DODAJ TĘ LINIĘ
 const adminRoles = ['administrator', 'właściciel'];
 // Przyciski ładowania/odświeżania
@@ -11446,47 +11506,98 @@ async function generateAndSetReceiptDocumentNumber() {
  * ✅ NOWA FUNKCJA (Pkt 4): Wywoływana przy każdym wejściu do sekcji 'karta'.
  * Resetuje stan zapisu i przycisk 'Zapisz w Archiwum'.
  */
-function onShowKarta() {
+/**
+ * ✅ ZMODYFIKOWANA FUNKCJA (Korekty): Sprawdza status karty przy wejściu.
+ */
+async function onShowKarta() {
     // 1. Sprawdź, czy karta jest "brudna" (wypełniona)
     if (isKartaDirty()) {
         
-        // 2. Jeśli jest brudna, zapytaj użytkownika co robić
-        // [OK] = Dokonaj edycji (Kontynuuj)
-        // [Anuluj] = Rozpocznij nową (Wyczyść)
-        if (confirm("Wykryto uzupełnioną kartę leczenia.\n\n[OK] = Kontynuuj edycję\n[Anuluj] = Rozpocznij nową (wyczyść dane)")) {
+        // Jeśli użytkownik wraca do karty, pytamy czy kontynuować
+        if (confirm("Wykryto uzupełnioną kartę leczenia.\n\n[OK] = Kontynuuj edycję/podgląd\n[Anuluj] = Rozpocznij nową (wyczyść dane)")) {
             
-            // Użytkownik chce KONTYNUOWAĆ EDYCJĘ (kliknął OK)
-            // Nie robimy nic, zostawiamy dane.
-            // Ustawiamy tylko flagę zapisu (tak jak wcześniej)
-            isCurrentCardSaved = false; 
-            if (saveCardToArchiveBtn) {
-                saveCardToArchiveBtn.disabled = false;
-                saveCardToArchiveBtn.textContent = '💾 Zapisz w Archiwum';
+            // --- LOGIKA SPRAWDZANIA STATUSU W BAZIE ---
+            const nrDok = document.getElementById('nrDokumentu').value.trim();
+            const saveBtn = document.getElementById('saveCardToArchiveBtn');
+            const corrBtn = document.getElementById('correctionModeBtn'); // Pobierz przycisk korekty
+
+            if (nrDok && currentUserProfile) {
+                try {
+                    // Sprawdź w bazie czy ten numer już istnieje
+                    const q = db.collection("archiwumKarty")
+                        .where("lekarz_uid", "==", currentUserProfile.uid)
+                        .where("nrDokumentu", "==", nrDok)
+                        .limit(1);
+                    
+                    const snap = await q.get();
+
+                    if (!snap.empty) {
+                        // KARTA ISTNIEJE -> Zablokuj edycję, zezwól na druk
+                        console.log("Karta znaleziona w archiwum. Blokuję edycję.");
+                        isCurrentCardSaved = true; 
+                        isCardLocked = true; // Nowa flaga
+                        
+                        // Zaktualizuj UI
+                        if (saveBtn) {
+                            saveBtn.textContent = 'Zapisano (Tylko odczyt) ✔️';
+                            saveBtn.disabled = true; // Nie można zapisać drugi raz tego samego
+                        }
+                        if (corrBtn) corrBtn.style.display = 'inline-block'; // Pokaż przycisk korekty
+                        
+                        toggleCardInputs(false); // Zablokuj pola (funkcja niżej)
+                        showToast("Karta wczytana z archiwum. Tryb tylko do odczytu.", "info");
+
+                    } else {
+                        // Karta nie istnieje -> Pozwól edytować
+                        isCurrentCardSaved = false;
+                        isCardLocked = false;
+                        if (saveBtn) {
+                            saveBtn.disabled = false;
+                            saveBtn.textContent = '💾 Zapisz w Archiwum';
+                        }
+                        if (corrBtn) corrBtn.style.display = 'none';
+                        toggleCardInputs(true); // Odblokuj pola
+                    }
+
+                } catch (e) {
+                    console.error("Błąd sprawdzania statusu karty:", e);
+                }
             }
-            
+            // ------------------------------------------
+
         } else {
             // Użytkownik chce ROZPOCZĄĆ NOWĄ (kliknął Anuluj)
             clearKartaLeczenia();
         }
         
     } else {
-        // 3. Karta jest CZYSTA, więc rozpocznij nową automatycznie
-        // (Wyczyść pole nr dok. i wygeneruj nowy)
-        isCurrentCardSaved = false;
-        if (saveCardToArchiveBtn) {
-            saveCardToArchiveBtn.disabled = false;
-            saveCardToArchiveBtn.textContent = '💾 Zapisz w Archiwum';
-        }
-        
-        // Wymuś wyczyszczenie pola numeru, aby generator zadziałał poprawnie
-        document.getElementById('nrDokumentu').value = ''; 
-        generateAndSetDocumentNumber();
+        // Karta CZYSTA -> Rozpocznij nową
+        clearKartaLeczenia();
     }
 
-    // 4. Zawsze odświeżaj listę schematów przy wejściu
+    // Odśwież listę schematów
     if (typeof refreshSchemaDatalist === 'function') {
-        console.log("onShowKarta: Wymuszone odświeżenie datalist schematów.");
         refreshSchemaDatalist();
+    }
+}
+
+// ✅ Funkcja pomocnicza do blokowania/odblokowania inputów w karcie
+function toggleCardInputs(enable) {
+    const inputs = document.querySelectorAll('#kartaLeczeniaSection input, #kartaLeczeniaSection textarea, #kartaLeczeniaSection select');
+    inputs.forEach(el => {
+        // Nie blokuj przycisku daty wykonania (żeby widzieć) ani samego nr dokumentu w trybie szukania
+        if (el.id !== 'nrDokumentu') { 
+            el.disabled = !enable;
+            if (!enable) el.style.backgroundColor = "#f9f9f9";
+            else el.style.backgroundColor = "";
+        }
+    });
+    
+    // Blokada canvasu podpisu
+    const canvas = document.getElementById('canvasPosiadacz');
+    if(canvas) {
+        if(!enable) canvas.style.pointerEvents = 'none';
+        else canvas.style.pointerEvents = 'auto';
     }
 }
 /* ======================================================== */
@@ -16576,8 +16687,12 @@ function isKalkulatorDirty() {
  * Czyści kompletnie formularz Karty Leczenia i przygotowuje do nowej.
  * ✅ POPRAWKA: Resetuje również wygląd przycisku zapisu.
  */
-function clearKartaLeczenia() {
-    console.log("Czyszczenie Karty Leczenia na żądanie użytkownika...");
+/**
+ * Czyści kompletnie formularz Karty Leczenia i przygotowuje do nowej.
+ * ✅ POPRAWKA (KOREKTY): Resetuje zmienne trybu korekty i obsługuje pomijanie numeracji.
+ */
+function clearKartaLeczenia(skipGenNumber = false) {
+    console.log("Czyszczenie Karty Leczenia...");
     
     // 1. Wyczyść pola nagłówka
     document.getElementById('klientSelect').value = '';
@@ -16589,7 +16704,7 @@ function clearKartaLeczenia() {
     document.getElementById('dataZgloszenia').value = today;
     document.getElementById('dataWykonania').value = today;
     
-    // 3. Wyczyść pole Nr Dokumentu (WAŻNE: to wymusi wygenerowanie nowego)
+    // 3. Wyczyść pole Nr Dokumentu
     document.getElementById('nrDokumentu').value = ''; 
 
     // 4. Wyczyść tabelę (przez jej ponowne wygenerowanie)
@@ -16606,23 +16721,36 @@ function clearKartaLeczenia() {
     // 6. Zresetuj stan zapisu (logiczny)
     isCurrentCardSaved = false;
     
-    // ⬇️⬇️⬇️ ✅ FIX: RESET PRZYCISKU ZAPISU (WIZUALNY) ⬇️⬇️⬇️
+    // --- ✅ NOWE: Resetowanie stanu korekty i UI ---
+    originalCardIdForCorrection = null; // Zapomnij ID starej karty
+    isCardLocked = false; // Zdejmij blokadę edycji
+    toggleCardInputs(true); // Odblokuj pola formularza
+
     const saveBtn = document.getElementById('saveCardToArchiveBtn');
     if (saveBtn) {
-        saveBtn.disabled = false; // Odblokuj
-        saveBtn.textContent = '💾 Zapisz w Archiwum'; // Przywróć tekst
+        saveBtn.disabled = false;
+        saveBtn.classList.remove('warn'); // Usuń pomarańczowy kolor (jeśli był)
+        saveBtn.textContent = '💾 Zapisz w Archiwum'; // Przywróć domyślny tekst
     }
-    // ⬆️⬆️⬆️ KONIEC FIXA ⬆️⬆️⬆️
     
-    // 7. Wygeneruj nowy numer dokumentu
-    if (typeof generateAndSetDocumentNumber === 'function') {
+    const corrBtn = document.getElementById('correctionModeBtn');
+    if (corrBtn) {
+        corrBtn.style.display = 'none'; // Ukryj przycisk korekty (bo to nowa karta)
+    }
+    // ----------------------------------------------
+    
+    // 7. Wygeneruj nowy numer dokumentu (TYLKO JEŚLI NIE POMIJAMY)
+    // Pomijamy np. wchodząc w tryb korekty, bo tam numer wpisujemy ręcznie/kopiujemy
+    if (!skipGenNumber && typeof generateAndSetDocumentNumber === 'function') {
         generateAndSetDocumentNumber();
     }
     
     showToast('Rozpoczęto nową kartę leczenia.', 'info');
 }
+
 /**
  * Czyści kompletnie formularz Kalkulatora Wizyty.
+ * (Ta funkcja pozostaje bez zmian w stosunku do Twojego wklejonego kodu)
  */
 function clearKalkulator() {
     console.log("Czyszczenie Kalkulatora Wizyty na żądanie użytkownika...");
@@ -16666,7 +16794,7 @@ function clearKalkulator() {
     }
     
     showToast('Rozpoczęto nowy paragon.', 'info');
-}
+    }
 /* ======================================================== */
 /* ✅ KONIEC: Logika czyszczenia "brudnych" formularzy      */
 /* ======================================================== */
@@ -23113,6 +23241,130 @@ function renderClientComparisonCharts(vetName, vetStats, clinicStats) {
                     }
                 }
             }
+        }
+    });
+}
+    /* ✅ OBSŁUGA PRZYCISKU TRYB KOREKTY */
+const correctionModeBtn = document.getElementById('correctionModeBtn');
+
+if (correctionModeBtn) {
+    correctionModeBtn.addEventListener('click', async () => {
+        
+        let nrDoKorekty = document.getElementById('nrDokumentu').value.trim();
+        
+        // Jeśli pole puste, zapytaj
+        if (!nrDoKorekty) {
+            nrDoKorekty = prompt("Wpisz numer karty leczenia, którą chcesz skorygować:");
+        }
+
+        if (!nrDoKorekty) return;
+
+        // 1. Znajdź kartę w archiwum
+        try {
+            showToast("Szukam karty do korekty...", "info");
+            const q = db.collection("archiwumKarty")
+                .where("lekarz_uid", "==", currentUserProfile.uid)
+                .where("nrDokumentu", "==", nrDoKorekty)
+                .limit(1);
+            
+            const snap = await q.get();
+
+            if (snap.empty) {
+                alert("Nie znaleziono karty o takim numerze w Twoim archiwum.");
+                return;
+            }
+
+            const doc = snap.docs[0];
+            const oldData = doc.data();
+            
+            // 2. Wczytaj dane do formularza (używamy Twojej funkcji podglądu, ale musimy przenieść dane do inputów)
+            // Najprościej: Wyczyść i wypełnij od nowa
+            clearKartaLeczenia(true); // true = bez generowania nowego numeru
+
+            // Wypełnij nagłówek
+            document.getElementById('klientSelect').value = oldData.header.klient || '';
+            document.getElementById('adresKlienta').textContent = oldData.header.adresKlienta || '';
+            document.getElementById('nrStada').textContent = oldData.header.nrStada || '';
+            document.getElementById('dataWykonania').value = oldData.header.dataWykonania || '';
+            document.getElementById('dataZgloszenia').value = oldData.header.dataZgloszenia || '';
+
+            // Wypełnij tabelę (uproszczona logika odtwarzania wierszy)
+            const rows = document.querySelectorAll('#karta tbody tr');
+            if (oldData.table) {
+                oldData.table.forEach(savedRow => {
+                    // Znajdź odpowiedni wiersz w HTML (bazując na logicalIndex)
+                    // Musimy przeliczyć index logiczny na fizyczny w tabeli HTML (omijając wiersz 10 nagłówkowy)
+                    let domRowIndex = -1;
+                    if (savedRow.logicalIndex < 9) domRowIndex = savedRow.logicalIndex; // Wiersze 1-9
+                    else domRowIndex = savedRow.logicalIndex + 1; // Wiersze 10-12 (przeskok przez nagłówek)
+
+                    const tr = rows[domRowIndex];
+                    if (tr) {
+                        // Wpisz dane
+                        const opisInput = tr.cells[1].querySelector('input');
+                        if (opisInput) opisInput.value = savedRow.opis || '';
+                        else tr.cells[1].textContent = savedRow.opis || '';
+
+                        const liczbaInput = tr.cells[2].querySelector('input');
+                        if (liczbaInput) liczbaInput.value = savedRow.liczba || '';
+
+                        const rozpInput = tr.cells[3].querySelector('input');
+                        if (rozpInput) rozpInput.value = savedRow.rozpoznanie || '';
+
+                        const lekInput = tr.cells[4].querySelector('input');
+                        if (lekInput) lekInput.value = savedRow.lek || '';
+
+                        tr.cells[5].textContent = savedRow.seria || '';
+
+                        const iloscInput = tr.cells[6].querySelector('input');
+                        // Parsowanie ilości (czasem zapisana jako HTML)
+                        let qtyVal = '';
+                        if(savedRow.iloscDawka && savedRow.iloscDawka.includes('value="')) {
+                             const m = savedRow.iloscDawka.match(/value="([\d\.]+)"/);
+                             if(m) qtyVal = m[1];
+                        }
+                        if (iloscInput) iloscInput.value = qtyVal;
+
+                        const karInput = tr.cells[7].querySelector('input');
+                        if (karInput) karInput.value = savedRow.karencja || '';
+                        
+                        tr.classList.add('filled-row');
+                    }
+                });
+            }
+
+            // 3. Ustawienia Korekty
+            originalCardIdForCorrection = doc.id; // ZAPAMIĘTAJ ID STAREJ KARTY
+            
+            // Dodaj dopisek "KOREKTA" jeśli go nie ma
+            let newNr = oldData.nrDokumentu;
+            if (!newNr.toUpperCase().includes("KOREKTA")) {
+                newNr += " - KOREKTA";
+            }
+            document.getElementById('nrDokumentu').value = newNr;
+
+            // 4. Wyczyść podpis (wymuś ponowne podpisanie)
+            const canvas = document.getElementById('canvasPosiadacz');
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 5. Odblokuj interfejs
+            isCardLocked = false;
+            isCurrentCardSaved = false; // Żeby wymusić zapis
+            toggleCardInputs(true); // Odblokuj pola
+
+            const saveBtn = document.getElementById('saveCardToArchiveBtn');
+            saveBtn.disabled = false;
+            saveBtn.textContent = '💾 Zapisz KOREKTĘ (Podmień)';
+            saveBtn.classList.add('warn'); // Zmień kolor na ostrzegawczy
+
+            correctionModeBtn.style.display = 'none'; // Ukryj przycisk korekty (jesteśmy w niej)
+
+            alert("Jesteś w trybie korekty.\n\n1. Popraw dane w tabeli.\n2. Poproś klienta o PONOWNY podpis.\n3. Kliknij 'Zapisz Korektę', aby podmienić dokumenty i zaktualizować magazyn.");
+
+        } catch (e) {
+            console.error("Błąd trybu korekty:", e);
+            alert("Wystąpił błąd podczas pobierania karty.");
         }
     });
 }
