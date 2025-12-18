@@ -3651,11 +3651,14 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
             <textarea id="calcNotatkaInput" style="width: 100%; height: 60px; padding: 8px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 6px;" placeholder="Uwagi..."></textarea>
         </div>
 
-        <div id="paymentStatusSection" style="margin-bottom: 20px;">
+<div id="paymentStatusSection" style="margin-bottom: 20px;">
             <h4 style="margin-bottom: 10px;">Status płatności:</h4>
             <div style="display: flex; gap: 10px;">
                 <button type="button" id="paymentStatusPaid" class="btn payment-status-btn" data-status="Zapłacone" style="flex: 1;">
-                    <span class="check-icon">✔️</span> Zapłacone
+                    <span class="check-icon">✔️</span> Gotówka
+                </button>
+                <button type="button" id="paymentStatusTransfer" class="btn payment-status-btn" data-status="Przelew" style="flex: 1;">
+                    <span class="check-icon">✔️</span> Przelew
                 </button>
                 <button type="button" id="paymentStatusDebt" class="btn payment-status-btn" data-status="Dług" style="flex: 1;">
                     <span class="check-icon">✔️</span> Dług
@@ -4073,9 +4076,10 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
     <div id="archiveReceiptFilterControls" class="archive-filter-controls" style="display: none;"> <input type="date" id="arcReceiptDateStart" title="Data od">
         <input type="date" id="arcReceiptDateEnd" title="Data do">
         <input type="text" id="arcReceiptClient" placeholder="Filtruj klienta...">
-        <select id="arcReceiptStatus">
+         <select id="arcReceiptStatus">
             <option value="">Filtruj status...</option>
-            <option value="Zapłacone">Zapłacone</option>
+            <option value="Zapłacone">Zapłacone (Gotówka)</option>
+            <option value="Przelew">Przelew</option>
             <option value="Dług">Dług</option>
             <option value="Nie wybrano">Nie wybrano</option>
         </select>
@@ -7792,10 +7796,7 @@ const addCorrectionBtn = document.getElementById('addCorrectionBtn');
     // ✅ KONIEC MODUŁU 2
     const calcNotatkaInput = document.getElementById('calcNotatkaInput'); // ✅ ZADANIE 2
 // Tablica przechowuje teraz { name: '...', quantity: 1, price: 10.50 }
-    // ✅ Moduł 2: Zmienne statusu płatności
-const paymentStatusSection = document.getElementById('paymentStatusSection');
-const paymentStatusPaidBtn = document.getElementById('paymentStatusPaid');
-const paymentStatusDebtBtn = document.getElementById('paymentStatusDebt');
+
 let receiptItems = [];
 // receiptTotal jest teraz zadeklarowany globalnie (wcześniej w kodzie)
 
@@ -8335,13 +8336,18 @@ async function populateReceiptFromArchive(receiptDocId) {
         if (calcNrDokInput) calcNrDokInput.value = data.nrDokumentu || ''; // Zostawiamy stary numer
         if (calcCzynnosciInput) calcCzynnosciInput.value = data.czynnosci || '';
 
-        // 2. Populacja Stanu Płatności (Krok 3)
+  // 2. Populacja Stanu Płatności (Krok 3)
+        // Resetujemy wszystkie
+        document.getElementById('paymentStatusPaid')?.classList.remove('active');
+        document.getElementById('paymentStatusTransfer')?.classList.remove('active');
+        document.getElementById('paymentStatusDebt')?.classList.remove('active');
+
         if (data.status === 'Zapłacone') {
             document.getElementById('paymentStatusPaid')?.classList.add('active');
-            document.getElementById('paymentStatusDebt')?.classList.remove('active');
+        } else if (data.status === 'Przelew') {
+            document.getElementById('paymentStatusTransfer')?.classList.add('active');
         } else if (data.status === 'Dług') {
             document.getElementById('paymentStatusDebt')?.classList.add('active');
-            document.getElementById('paymentStatusPaid')?.classList.remove('active');
         }
 
         // 3. Populacja Notatki (Krok 3)
@@ -8408,37 +8414,42 @@ if (pluBtn) {
 
     // ✅ Moduł 2: Logika przełączania statusu płatności
 // Funkcja do ukrywania błędu (przeniesiona lub zdefiniowana tutaj, jeśli jej brakuje)
-    function hidePaymentError() {
-        let errorMsgEl = document.getElementById('paymentStatusError');
-        if (errorMsgEl) errorMsgEl.style.display = 'none';
-    }
+  // ✅ Moduł 2: Zmienne statusu płatności (ZAKTUALIZOWANE)
+    const paymentStatusSection = document.getElementById('paymentStatusSection');
+    const paymentStatusPaidBtn = document.getElementById('paymentStatusPaid');
+    const paymentStatusTransferBtn = document.getElementById('paymentStatusTransfer'); // Nowy przycisk
+    const paymentStatusDebtBtn = document.getElementById('paymentStatusDebt');
 
-    // ✅ Moduł 3.1: Logika przełączania statusu (logika "checkboxa" / toggle)
-    if (paymentStatusPaidBtn && paymentStatusDebtBtn) {
-        paymentStatusPaidBtn.addEventListener('click', () => {
-            if (paymentStatusPaidBtn.classList.contains('active')) {
-                // Kliknięto aktywny - dezaktywuj
-                paymentStatusPaidBtn.classList.remove('active');
-            } else {
-                // Kliknięto nieaktywny - aktywuj ten, dezaktywuj drugi
-                paymentStatusPaidBtn.classList.add('active');
-                paymentStatusDebtBtn.classList.remove('active');
-            }
-            hidePaymentError();
-        });
+    // Funkcja do ukrywania błędu
+    function hidePaymentError() {
+        let errorMsgEl = document.getElementById('paymentStatusError');
+        if (errorMsgEl) errorMsgEl.style.display = 'none';
+    }
 
-        paymentStatusDebtBtn.addEventListener('click', () => {
-            if (paymentStatusDebtBtn.classList.contains('active')) {
-                // Kliknięto aktywny - dezaktywuj
-                paymentStatusDebtBtn.classList.remove('active');
-            } else {
-                // Kliknięto nieaktywny - aktywuj ten, dezaktywuj drugi
-                paymentStatusDebtBtn.classList.add('active');
-                paymentStatusPaidBtn.classList.remove('active');
-            }
-            hidePaymentError();
-        });
-    }
+    // Funkcja pomocnicza do aktywacji jednego przycisku
+    function setActivePaymentStatus(selectedBtn) {
+        // Usuń klasę 'active' ze wszystkich
+        if(paymentStatusPaidBtn) paymentStatusPaidBtn.classList.remove('active');
+        if(paymentStatusTransferBtn) paymentStatusTransferBtn.classList.remove('active');
+        if(paymentStatusDebtBtn) paymentStatusDebtBtn.classList.remove('active');
+        
+        // Dodaj do wybranego (jeśli nie był aktywny, ale tutaj zakładamy tryb "radio")
+        if (selectedBtn) {
+             selectedBtn.classList.add('active');
+        }
+        hidePaymentError();
+    }
+
+    // Listenery
+    if (paymentStatusPaidBtn) {
+        paymentStatusPaidBtn.addEventListener('click', () => setActivePaymentStatus(paymentStatusPaidBtn));
+    }
+    if (paymentStatusTransferBtn) {
+        paymentStatusTransferBtn.addEventListener('click', () => setActivePaymentStatus(paymentStatusTransferBtn));
+    }
+    if (paymentStatusDebtBtn) {
+        paymentStatusDebtBtn.addEventListener('click', () => setActivePaymentStatus(paymentStatusDebtBtn));
+    }
 /* Plik: index.html (ok. linii 2639) */
 
 // ⬇️ ⬇️ ⬇️ POCZĄTEK MODUŁU 2 (Logika Produkt -> PLU) ⬇️ ⬇️ ⬇️
@@ -13325,10 +13336,10 @@ async function fetchReceiptsForReport(dateStart, dateEnd, userId) {
 }
 
 /**
- * Generuje Raporty Wizyt (Typ 1, 2, 3) - WERSJA 6 (Poprawione sumowanie i Raport Ogólny)
+ * Generuje Raporty Wizyt (Typ 1, 2, 3) - WERSJA Z OBSŁUGĄ PRZELEWÓW
  */
 function generateWizytyReport(allReceipts, filters) {
-    console.log("Generowanie raportu wizyt (v6 - Fix Ogólny + Koszty)...");
+    console.log("Generowanie raportu wizyt (v7 - Przelewy)...");
 
     // --- 1. Filtrowanie wstępne (Klient) ---
     let filteredReceipts = [...allReceipts];
@@ -13339,13 +13350,14 @@ function generateWizytyReport(allReceipts, filters) {
 
     // --- 2. Konfiguracja Typu Raportu ---
     let reportTitle = "Raport Ogólny";
-    let sumLabelText = "Suma przychodu:"; // Domyślna etykieta
+    let sumLabelText = "Suma przychodu:"; 
 
     if (filters.type === "gotowka") {
-        // Raport Kasowy: Lista zawiera Zapłacone i Długi
-        filteredReceipts = filteredReceipts.filter(r => r.status === "Zapłacone" || r.status === "Dług");
-        reportTitle = "Raport Kasowy (Przepływ gotówki)";
-        sumLabelText = "Suma przyjętej gotówki (Wpłaty):";
+        // Raport Kasowy: Lista zawiera Zapłacone, Przelew i Dług (informacyjnie), ale suma tylko z gotówki
+        // Możemy pokazać wszystko, ale sumować tylko Gotówkę.
+        filteredReceipts = filteredReceipts.filter(r => ["Zapłacone", "Przelew", "Dług"].includes(r.status));
+        reportTitle = "Raport Kasowy (Przyjęta Gotówka)";
+        sumLabelText = "Suma przyjętej GOTÓWKI (bez przelewów):";
     } else if (filters.type === "dluznicy") {
         // Dłużnicy: Tylko Długi
         filteredReceipts = filteredReceipts.filter(r => r.status === "Dług");
@@ -13354,41 +13366,17 @@ function generateWizytyReport(allReceipts, filters) {
     } else if (filters.type === "ogolny") {
         // Ogólny: Wszystko
         reportTitle = "Raport Ogólny (Wszystkie wizyty)";
-        sumLabelText = "Raport sumaryczny wszystkich wizyt:"; // ✅ ZMIANA NAZWY WG PROŚBY
+        sumLabelText = "Raport sumaryczny (Gotówka + Przelewy):";
     }
 
-    // --- 3. SORTOWANIE (Priorytety: Wydatki -> Wpłaty -> Długi) ---
+    // --- 3. SORTOWANIE ---
     filteredReceipts.sort((a, b) => {
-        const getPriority = (item) => {
-            const val = parseFloat(item.suma) || 0;
-            const status = item.status;
-
-            // Priorytet 1: Zapłacone i Ujemne (Koszty)
-            if (status === 'Zapłacone' && val < 0) return 1;
-            
-            // Priorytet 2: Zapłacone i Dodatnie (Przychód)
-            if (status === 'Zapłacone' && val >= 0) return 2;
-            
-            // Priorytet 3: Dług (Informacyjnie na końcu)
-            if (status === 'Dług') return 3;
-
-            return 4; // Inne
-        };
-
-        const priorityA = getPriority(a);
-        const priorityB = getPriority(b);
-
-        if (priorityA !== priorityB) {
-            return priorityA - priorityB;
-        }
-        return a.data.localeCompare(b.data);
+        return a.data.localeCompare(b.data); // Sortowanie po dacie
     });
 
     // --- 4. OBLICZANIE SUM (Matematyka) ---
-    let totalRevenue = 0; // Przychód (Zielony) - Tylko wartości dodatnie
-    let totalExpenses = 0; // Koszty (Czerwony) - Wartość absolutna z minusów
-    
-    // Zmienna tylko dla raportu dłużników (żeby wyświetlić sumę długu jako główną)
+    let totalRevenue = 0; // To co wyświetlimy jako główną sumę
+    let totalExpenses = 0; // Koszty
     let debtsOnlySum = 0; 
 
     filteredReceipts.forEach(r => {
@@ -13397,25 +13385,31 @@ function generateWizytyReport(allReceipts, filters) {
 
         // Logika dla Raportu KASOWEGO (Gotówka)
         if (filters.type === "gotowka") {
-            // Liczymy TYLKO to, co ma status 'Zapłacone'
+            // Liczymy TYLKO 'Zapłacone' (Gotówka)
             if (status === 'Zapłacone') {
                 if (val < 0) {
-                    totalExpenses += Math.abs(val); // Dodaj do kosztów
+                    totalExpenses += Math.abs(val);
                 } else {
-                    totalRevenue += val; // Dodaj do przychodu
+                    totalRevenue += val;
                 }
             }
-            // Długi są na liście, ale nie wpływają na sumy kasowe
+            // Przelew i Dług są pomijane w sumowaniu gotówki!
         } 
         // Logika dla Raportu OGÓLNEGO
         else if (filters.type === "ogolny") {
-            // Liczymy WSZYSTKO (Zapłacone i Długi)
-            if (val < 0) {
-                // Jeśli ujemne (zwykle to status Zapłacone), to koszt
-                totalExpenses += Math.abs(val);
-            } else {
-                // Jeśli dodatnie (Zapłacone lub Dług), to przychód całkowity
-                totalRevenue += val;
+            // Liczymy Gotówkę i Przelewy jako przychód
+            if (status === 'Zapłacone' || status === 'Przelew') {
+                if (val < 0) {
+                    totalExpenses += Math.abs(val);
+                } else {
+                    totalRevenue += val;
+                }
+            } else if (status === 'Dług') {
+                // Dług też jest przychodem (zaksięgowanym), ale nieopłaconym. 
+                // W raporcie ogólnym zazwyczaj pokazuje się wartość wykonanych usług.
+                // Jeśli chcesz sumować tylko to co wpłynęło, usuń ten warunek. 
+                // Tutaj dodaję do sumy ogólnej (wartość usług).
+                if (val > 0) totalRevenue += val;
             }
         }
         // Logika dla DŁUŻNIKÓW
@@ -13432,9 +13426,28 @@ function generateWizytyReport(allReceipts, filters) {
     for (const receipt of filteredReceipts) {
         const suma = parseFloat(receipt.suma) || 0;
         const isExpense = (receipt.status === 'Zapłacone' && suma < 0);
-        const isDebt = (receipt.status === 'Dług');
+        
+        // Style wierszy i kolor statusu
+        let rowStyle = "";
+        let statusColor = "#555";
+        let sumaColor = "#000";
 
-        // Zużycia
+        if (isExpense) {
+            rowStyle = "background-color: #ffe6e6;"; 
+            sumaColor = "#c0392b";
+            statusColor = "green";
+        } else if (receipt.status === 'Dług') {
+            rowStyle = "background-color: #fffde7; border-left: 4px solid #f39c12;";
+            statusColor = "#c0392b"; // Czerwony napis
+            sumaColor = "#7f8c8d";
+        } else if (receipt.status === 'Przelew') {
+            rowStyle = "background-color: #e3f2fd;"; // Jasny niebieski
+            statusColor = "#2980b9"; // Niebieski napis
+        } else {
+            statusColor = "green"; // Zapłacone
+        }
+
+        // Zużycia (bez zmian)
         let zuzyciaHtml = '';
         if (receipt.pozycje && receipt.pozycje.length > 0) {
             const produkty = receipt.pozycje.filter(p => p.name.toLowerCase() !== 'wyrównanie');
@@ -13447,23 +13460,6 @@ function generateWizytyReport(allReceipts, filters) {
             }
         }
         
-        // Style wierszy
-        let rowStyle = "";
-        let statusColor = "#555";
-        let sumaColor = "#000";
-
-        if (isExpense) {
-            rowStyle = "background-color: #ffe6e6;"; 
-            sumaColor = "#c0392b";
-            statusColor = "green";
-        } else if (isDebt) {
-            rowStyle = "background-color: #fffde7; border-left: 4px solid #f39c12;";
-            statusColor = "#c0392b";
-            sumaColor = "#7f8c8d";
-        } else {
-            statusColor = "green";
-        }
-
         const sumaDisplay = formatPrice(suma); 
 
         tableHtml += `
@@ -13479,33 +13475,28 @@ function generateWizytyReport(allReceipts, filters) {
         `;
     }
 
-    // --- 6. Aktualizacja Widoku (DOM) ---
+    // --- 6. Aktualizacja Widoku ---
     reportWizytyTableBody.innerHTML = tableHtml || '<tr><td colspan="7" style="text-align: center; padding: 20px;">Brak danych.</td></tr>';
     
     reportWizytyTableContainer.style.display = 'block';
     reportZuzyciaTableContainer.style.display = 'none';
     
     // --- KONFIGURACJA PODSUMOWANIA ---
-    
-    // Etykiety
     reportMainTitle.textContent = reportTitle;
     reportDateDisplay.textContent = `Okres: ${filters.dateStart} do ${filters.dateEnd}`;
     reportUserDisplay.textContent = `Pracownik: ${filters.userName}`;
     reportSumTitle.textContent = sumLabelText;
 
-    // Specjalny przypadek: Raport Dłużników (prosty)
     if (filters.type === "dluznicy") {
         reportCalculatedSum.textContent = formatPrice(debtsOnlySum);
         reportFuelSection.style.display = 'none';
         reportNetSumContainer.style.display = 'none';
     } 
     else {
-        // Raport Gotówka i Ogólny (Złożone)
-        
-        // 1. Zielona liczba (Całkowity Przychód - bez odejmowania kosztów)
+        // Raport Gotówka i Ogólny
         reportCalculatedSum.textContent = formatPrice(totalRevenue);
         
-        // 2. Czerwone pole (Koszty) - Pokazujemy ZAWSZE dla Gotówki i Ogólnego
+        // Koszty
         reportFuelSection.style.display = 'flex';
         const costInput = document.getElementById('reportFuelCost');
         if(costInput) {
@@ -13513,8 +13504,7 @@ function generateWizytyReport(allReceipts, filters) {
             costInput.readOnly = true; 
         }
 
-        // 3. Niebieska liczba (Wynik Netto / Saldo)
-        // Matematyka: Przychód (Zielone) - Koszty (Czerwone)
+        // Wynik Netto
         const netSum = totalRevenue - totalExpenses;
         if(reportNetSum) reportNetSum.textContent = formatPrice(netSum);
         reportNetSumContainer.style.display = 'inline';
@@ -16807,11 +16797,9 @@ function clearKalkulator() {
     // 4. Wyczyść notatkę
     document.getElementById('calcNotatkaInput').value = '';
 
-    // 5. Wyczyść status płatności
-    const activeStatusBtn = document.querySelector('.payment-status-btn.active');
-    if (activeStatusBtn) {
-        activeStatusBtn.classList.remove('active');
-    }
+  // 5. Wyczyść status płatności (WSZYSTKIE przyciski)
+    const allStatusBtns = document.querySelectorAll('.payment-status-btn');
+    allStatusBtns.forEach(btn => btn.classList.remove('active'));
     
     // 6. Wyczyść podsumowanie zapisanego paragonu
     if(savedReceiptSummary) savedReceiptSummary.innerHTML = '';
@@ -22775,8 +22763,9 @@ async function loadAnalyticsData() {
     }
 }
 
-// 4. Przeliczanie statystyk i Rysowanie Wykresów
+
 // 4. Przeliczanie statystyk i Rysowanie Wykresów (ZMODYFIKOWANA WERSJA)
+// 4. Przeliczanie statystyk i Rysowanie Wykresów
 function processAndRenderCharts(data) {
     let totalRev = 0;
     let totalDebt = 0;
@@ -22784,8 +22773,8 @@ function processAndRenderCharts(data) {
     // Struktury danych
     const revenueByDate = {}; // Suma przychodu na dzień
     const countByDate = {};   // Liczba paragonów na dzień
-    const clientStats = {};     
-    const efficiencyStats = {}; 
+    const clientStats = {};      
+    const efficiencyStats = {};  
     
     let paidSum = 0;
     let debtSum = 0;
