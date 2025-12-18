@@ -11771,83 +11771,177 @@ if(archiveUserSelect) archiveUserSelect.addEventListener('change', () => {
 // Używamy delegacji zdarzeń, bo przyciski są dynamiczne
 // Listener dla tabeli archiwum (Podgląd i Usuwanie)
 const archiveCardTableBody = document.getElementById('archiveCardTableBody');
-if (archiveCardTableBody) {
-    archiveCardTableBody.addEventListener('click', async (e) => {
-        const target = e.target; // Cel kliknięcia
+archiveCardTableBody.addEventListener('click', async (e) => {
+        const target = e.target.closest('button'); 
+        if (!target) return; 
 
-        // --- ✅ NOWA LOGIKA: BEZPOŚREDNIE OTWARCIE OKNA PODGLĄDU ---
-// --- ✅ MODUŁ 4: Podgląd Karty (Wybór Formatu) ---
+        // --- 1. PODGLĄD KARTY (Moduł 4: Wybór formatu) ---
         if (target.classList.contains('btn-view-archived-card')) {
             const cardId = target.dataset.cardId;
             const originalText = target.textContent;
             
-            // Zmieniamy tekst przycisku na chwilę, żeby user wiedział, że coś się dzieje
-            target.textContent = 'Ładowanie...';
+            target.textContent = '...';
             target.disabled = true;
 
             try {
-                // 1. Pobierz dane tej konkretnej karty z Firebase
+                // Pobierz dane
                 const doc = await db.collection("archiwumKarty").doc(cardId).get();
                 if (!doc.exists) {
-                    alert("Błąd: Nie znaleziono tej karty w archiwum.");
+                    alert("Błąd: Nie znaleziono tej karty.");
                     return;
                 }
                 const cardData = doc.data();
 
-                // 2. Stwórz Okienko Wyboru (Dynamiczny Modal)
+                // Stwórz Okienko Wyboru
                 const choiceOverlay = document.createElement('div');
-                // Styl okienka (na środku ekranu, ciemne tło)
                 choiceOverlay.style.cssText = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:20000;display:flex;justify-content:center;align-items:center;";
                 
                 choiceOverlay.innerHTML = `
                     <div class="form-card" style="width:320px; text-align:center; padding:25px; background:white; border-radius:12px; box-shadow:0 10px 30px rgba(0,0,0,0.3);">
                         <h3 style="margin-top:0; margin-bottom:20px; color:#333;">Wybierz format podglądu</h3>
-                        
-                        <button id="previewA4" class="btn primary" style="width:100%; margin-bottom:10px; padding:12px; font-size:16px;">
-                            📄 Format A4 (Standard)
-                        </button>
-                        
-                        <button id="preview110" class="btn" style="width:100%; margin-bottom:20px; padding:12px; font-size:16px; background-color:#34495e; color:white;">
-                            🧾 Format 110mm (Termiczny)
-                        </button>
-                        
+                        <button id="previewA4" class="btn primary" style="width:100%; margin-bottom:10px; padding:12px; font-size:16px;">📄 Format A4 (Standard)</button>
+                        <button id="preview110" class="btn" style="width:100%; margin-bottom:20px; padding:12px; font-size:16px; background-color:#34495e; color:white;">🧾 Format 110mm (Termiczny)</button>
                         <button id="previewCancel" class="btn ghost small" style="width:100%;">Anuluj</button>
                     </div>
                 `;
                 document.body.appendChild(choiceOverlay);
 
-                // --- Obsługa przycisków w tym nowym okienku ---
-                
-                // Zamknij
-                const closeChoice = () => { 
-                    if(choiceOverlay.parentNode) choiceOverlay.parentNode.removeChild(choiceOverlay); 
-                };
-
+                const closeChoice = () => { if(choiceOverlay.parentNode) choiceOverlay.parentNode.removeChild(choiceOverlay); };
                 document.getElementById('previewCancel').onclick = closeChoice;
 
-                // Wybór A4 -> Uruchom starą funkcję
                 document.getElementById('previewA4').onclick = () => {
                     closeChoice();
                     openDirectPrintWindow(cardData); 
                 };
 
-                // Wybór 110mm -> Uruchom nową funkcję z Kroku 1
                 document.getElementById('preview110').onclick = () => {
                     closeChoice();
                     openDirectPrintWindow110mm(cardData);
                 };
 
             } catch (error) {
-                console.error("Błąd wczytywania karty do podglądu:", error);
+                console.error("Błąd podglądu:", error);
                 alert("Błąd wczytywania karty.");
             } finally {
-                // Przywróć przycisk "Podgląd" do stanu używalności
                 target.textContent = originalText;
                 target.disabled = false;
             }
+        } 
+
+        // --- 2. GENEROWANIE QR (Istniejąca logika) ---
+        else if (target.classList.contains('btn-qr-card')) {
+            const cardId = target.dataset.cardId;
+            const cardNr = target.dataset.cardNr;
+            const cardDate = target.dataset.cardDate;
+            if (typeof showQrModal === 'function') {
+                showQrModal(cardId, cardNr, cardDate);
+            }
+        }
+
+        // --- 3. USUWANIE KARTY (Moduł 5: Przywracanie stanu) ---
+        else if (target.classList.contains('btn-delete-archived-card')) {
+            const cardId = target.dataset.cardId;
+            const cardNr = target.dataset.cardNr;
+            const rowToRemove = target.closest('tr');
+
+            // Sprawdź czy użytkownik ma włączony magazyn
+            const useStock = currentUserProfile && currentUserProfile.uzywaStanowMagazynowych;
+
+            if (confirm(`Czy na pewno chcesz trwale usunąć kartę nr: ${cardNr}?`)) {
+                
+                let restoreStock = false;
+                if (useStock) {
+                    restoreStock = confirm("📦 MAGAZYN: Czy przywrócić zużyte produkty na stan magazynowy?\n\n[OK] = Tak (Zwrot)\n[Anuluj] = Nie (Tylko usuń dokument)");
+                }
+
+                target.textContent = '...';
+                target.disabled = true;
+
+                db.collection("archiwumKarty").doc(cardId).get().then(async (doc) => {
+                    if (!doc.exists) {
+                        alert("Karta już nie istnieje.");
+                        rowToRemove.remove();
+                        return;
+                    }
+                    const cardData = doc.data();
+                    const batch = db.batch();
+                    
+                    // Usuń dokument karty
+                    batch.delete(db.collection("archiwumKarty").doc(cardId));
+
+                    // Logika zwrotu (tylko jeśli user potwierdził)
+                    if (restoreStock && cardData.table) {
+                        const changesLog = [];
+                        
+                        cardData.table.forEach(row => {
+                            let qty = 0;
+                            // Parsowanie ilości z HTML lub tekstu
+                            if (row.iloscDawka && row.iloscDawka.includes('value="')) {
+                                 const match = row.iloscDawka.match(/value="([\d\.]+)"/);
+                                 if (match) qty = parseFloat(match[1]);
+                            } else {
+                                 qty = parseFloat(row.iloscDawka) || 0;
+                            }
+
+                            const productName = (row.lek || '').trim();
+
+                            if (qty > 0 && productName) {
+                                // Szukamy ID produktu w cache
+                                const prodId = typeof produktyGlowneCache !== 'undefined' ? produktyGlowneCache.get(productName) : null;
+                                
+                                if (prodId) {
+                                    const stockRef = db.collection("konfiguracja").doc(currentUserProfile.id).collection("magazynOsobisty").doc(prodId);
+                                    // Zwiększamy stan
+                                    batch.set(stockRef, { 
+                                        stan: firebase.firestore.FieldValue.increment(qty),
+                                        produkt_nazwa: productName
+                                    }, { merge: true });
+
+                                    changesLog.push({
+                                        id_produktu: prodId,
+                                        nazwa_produktu: productName,
+                                        ilosc: qty, 
+                                        stan_przed: 0, 
+                                        stan_po: 0 
+                                    });
+                                }
+                            }
+                        });
+                        
+                        // Zapisz log zwrotu
+                        if (changesLog.length > 0) {
+                             const logRef = db.collection("konfiguracja").doc(currentUserProfile.id).collection("magazynOsobistyLog").doc();
+                             batch.set(logRef, {
+                                 typ: "zwrot_usuniecie",
+                                 data: firebase.firestore.FieldValue.serverTimestamp(),
+                                 kto_uid: currentUserProfile.uid,
+                                 kto_nazwa: "System (Usunięcie Karty)",
+                                 zmiany: changesLog,
+                                 nr_karty: cardNr
+                             });
+                        }
+                    }
+
+                    await batch.commit();
+                    
+                    rowToRemove.remove();
+                    
+                    if (restoreStock) {
+                        showToast("Karta usunięta, stany zwrócone.", "success");
+                        if (typeof loadMagazynCache === 'function') loadMagazynCache(currentUserProfile.uid);
+                    } else {
+                        showToast("Karta usunięta.", "success");
+                    }
+
+                }).catch(error => {
+                    console.error("Błąd usuwania:", error);
+                    alert("Wystąpił błąd podczas usuwania.");
+                    target.textContent = 'Usuń';
+                    target.disabled = false;
+                });
+            }
         }
     });
-}
 
 /**
  * Pkt 6: Funkcja pomocnicza budująca HTML dla podglądu
