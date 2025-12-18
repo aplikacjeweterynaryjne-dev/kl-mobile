@@ -15893,7 +15893,7 @@ function checkSchemaFit(schema, startingIndex) {
  * NAPRAWIONY BŁĄD: Zapobiega czyszczeniu pól Opis i Liczba w wierszu kontrolującym schemat.
  */
 /* ======================================================== */
-/* ✅ ZAKTUALIZOWANA LOGIKA applySchema (FIX: Smart Cell)   */
+/* ✅ ZAKTUALIZOWANA LOGIKA applySchema (Moduł 4.2)       */
 /* ======================================================== */
 function applySchema(event) {
     const input = event.target;
@@ -15949,24 +15949,32 @@ function applySchema(event) {
         return;
     }
 
-    // 5. Pobierz mnożnik zwierząt
-    const controllerRow = logicalRows[currentIndex];
+    // --- ✅ NOWOŚĆ: Logika dynamicznego przeliczania ---
+    
+    // 5. Znajdź pole "Liczba leczonych zwierząt" w wierszu sterującym
+    const controllerRow = logicalRows[currentIndex]; // Wiersz, w którym wpisano diagnozę
     const liczbaInput = controllerRow.cells[2].querySelector('input[type="number"]');
+    
+    // Pobierz aktualny mnożnik (jeśli puste to 1)
     let liczbaZwierzaDlaSchematu = 1;
     if (liczbaInput && liczbaInput.value.trim() !== '') {
         const parsed = parseInt(liczbaInput.value, 10);
         if (!isNaN(parsed) && parsed > 0) liczbaZwierzaDlaSchematu = parsed;
     }
     
-    // Obsługa ID dla dynamicznego przeliczania (Bez zmian)
+    // Nadaj unikalne ID dla inputa liczby (jeśli nie ma), aby powiązać go z inputami ilości
+    // Używamy indeksu wiersza, żeby było unikalne
     const liczbaInputId = 'liczba-zwierzat-' + currentIndex;
     if (liczbaInput) {
         liczbaInput.id = liczbaInputId;
+        
+        // Usuń stary listener (aby nie dublować) i dodaj nowy
         liczbaInput.removeEventListener('input', handleLiczbaChange);
         liczbaInput.addEventListener('input', handleLiczbaChange);
     }
+    // ----------------------------------------------------
 
-    // 6. Wpisz diagnozę (Bez zmian logicznych)
+    // 6. Wpisz diagnozę (Bez zmian)
     const firstLeczenieProduct = schema.produkty.filter(p => p.wierszDocelowy < 9).sort((a, b) => a.wierszDocelowy - b.wierszDocelowy)[0];
     const firstPozostawioneProduct = schema.produkty.filter(p => p.wierszDocelowy >= 9).sort((a, b) => a.wierszDocelowy - b.wierszDocelowy)[0];
 
@@ -15979,7 +15987,7 @@ function applySchema(event) {
         if (targetIndex < logicalRows.length) logicalRows[targetIndex].cells[3].querySelector('input').value = schema.rozpoznanie;
     }
 
-    // 7. Wypełnij produkty (TU JEST ZMIANA)
+    // 7. Wypełnij produkty (Z AKTUALIZACJĄ ILOŚCI)
     schema.produkty.forEach(p => {
         const targetRowIndex = actualStartingIndex + p.wierszDocelowy;
 
@@ -15994,23 +16002,34 @@ function applySchema(event) {
                 // Seria
                 row.cells[5].textContent = p.seria || '';
 
-                // Ilość (Przeliczanie)
+                // --- ✅ NOWOŚĆ: Obliczanie i Tagowanie Ilości ---
                 const iloscInput = row.cells[6].querySelector('input[type="number"]');
+                
+                // Bazowa ilość ze schematu (dla 1 sztuki)
                 let schemaIlosc = 0;
                 if (p.ilosc) schemaIlosc = parseFloat(String(p.ilosc).replace(',', '.')) || 0;
+                
+                // Oblicz ilość początkową (Bazowa * Liczba Zwierząt)
                 const finalIlosc = schemaIlosc * liczbaZwierzaDlaSchematu;
 
                 if (iloscInput) {
                     let finalValue = finalIlosc;
                     if (finalIlosc % 1 !== 0) finalValue = finalIlosc.toFixed(2);
+                    
                     iloscInput.value = finalValue > 0 ? String(finalValue) : '';
                     
-                    // Tagowanie dla dynamicznych zmian
+                    // ZAPISZ METADANE DO AUTOMATYZACJI:
+                    // 1. Ile leku idzie na 1 sztukę?
                     iloscInput.dataset.schemaBaseQty = String(schemaIlosc);
+                    // 2. Kto steruje tą ilością? (ID inputa z liczbą zwierząt)
                     iloscInput.dataset.schemaControllerId = liczbaInputId;
+                    
+                    // Dodaj listener na wypadek ręcznego nadpisania przez użytkownika
+                    // (Jeśli użytkownik wpisze coś ręcznie, przerywamy automatyzację dla tego pola)
                     iloscInput.removeEventListener('keydown', handleIloscOverride);
                     iloscInput.addEventListener('keydown', handleIloscOverride);
                 }
+                // ------------------------------------------------
 
                 // Dawkowanie (tekst)
                 const dawkaText = p.dawkowanie || '';
@@ -16021,21 +16040,14 @@ function applySchema(event) {
                     row.cells[6].appendChild(document.createTextNode(' ' + dawkaText));
                 }
 
-                // ⬇️⬇️⬇️ ✅ FIX 1: OBSŁUGA SMART CELL (IKONA KALENDARZA) ⬇️⬇️⬇️
-                // Sprawdzamy czy w kolumnie 8 (index 7) jest nasz specjalny input
+                // Karencja (Fix Smart Cell)
                 const smartInput = row.cells[7].querySelector('input.karencja-input');
-                
                 if (smartInput) {
-                    // Jeśli to Smart Cell (Pozostawione), wpisujemy wartość do inputa
-                    // Dzięki temu NIE nadpisujemy HTML-a komórki i ikona zostaje!
                     smartInput.value = p.karencja || '';
-                    // Aktualizujemy też atrybut dla druku
                     row.cells[7].dataset.printValue = p.karencja || '';
                 } else {
-                    // Jeśli to zwykła komórka (Leczenie na miejscu), wpisujemy tekst
                     row.cells[7].textContent = p.karencja || '';
                 }
-                // ⬆️⬆️⬆️ KONIEC FIXA ⬆️⬆️⬆️
 
                 row.cells[4].dataset.printValue = p.produkt;
                 row.classList.add('highlight-row');
@@ -23640,6 +23652,72 @@ function loadCardForEditing(cardData) {
     // Zamknij modal po wybraniu
     correctionCardSearchModal.style.display = 'none';
 }
+    /* ======================================================== */
+/* ✅ POCZĄTEK: Logika dynamicznego przeliczania ilości     */
+/* ======================================================== */
+
+/**
+ * Ta funkcja jest wywoływana, gdy użytkownik ręcznie wpisuje
+ * coś w pole "Ilość". Zrywa ona automatyczne połączenie.
+ */
+function handleIloscOverride(e) {
+    const iloscInput = e.target;
+    
+    // Sprawdź, czy to pole jest połączone ze schematem
+    if (iloscInput.dataset.schemaBaseQty) {
+        console.log("Wykryto ręczną edycję ilości. Zerwano automatyczne łącze.");
+        
+        // Usuń tagi, aby 'handleLiczbaChange' przestał je aktualizować
+        delete iloscInput.dataset.schemaBaseQty;
+        delete iloscInput.dataset.schemaControllerId;
+        
+        // Usuń ten listener, aby nie odpalał się przy każdym kolejnym naciśnięciu klawisza
+        iloscInput.removeEventListener('keydown', handleIloscOverride);
+    }
+}
+
+/**
+ * Ta funkcja jest wywoływana, gdy użytkownik zmienia wartość
+ * w polu "Liczba leczonych zwierząt".
+ */
+function handleLiczbaChange(e) {
+    const controllerInput = e.target; // To jest pole "Liczba leczonych zwierząt"
+    const controllerId = controllerInput.id;
+    if (!controllerId) return;
+
+    // Pobierz nowy mnożnik (liczbę zwierząt)
+    const mnoznik = parseFloat(controllerInput.value.replace(',', '.')) || 0;
+    console.log(`Zmiana liczby zwierząt (${controllerId}): Nowy mnożnik = ${mnoznik}`);
+
+    // Znajdź wszystkie pola "Ilość", które są kontrolowane przez to pole "Liczba"
+    const controlledInputs = document.querySelectorAll('input[data-schema-controller-id="' + controllerId + '"]');
+    
+    controlledInputs.forEach(iloscInput => {
+        // Pobierz bazową ilość "na 1 sztukę" zapisaną w tagu
+        const baseQtyStr = iloscInput.dataset.schemaBaseQty;
+        
+        // Sprawdź, czy łącze wciąż istnieje (czy użytkownik go nie zerwał)
+        if (baseQtyStr) {
+            const baseQty = parseFloat(baseQtyStr);
+            if (!isNaN(baseQty)) {
+                // Oblicz nową końcową ilość
+                const finalIlosc = baseQty * mnożnik;
+                
+                // Sformatuj wynik (tak jak robiliśmy to wcześniej)
+                let finalValue = finalIlosc;
+                if (finalIlosc % 1 !== 0) {
+                    finalValue = finalIlosc.toFixed(2);
+                }
+                
+                // Zaktualizuj wartość w polu "Ilość"
+                iloscInput.value = finalValue > 0 ? String(finalValue) : '';
+            }
+        }
+    });
+}
+/* ======================================================== */
+/* ✅ KONIEC: Logika dynamicznego przeliczania ilości       */
+/* ======================================================== */
 /* ======================================================== */
 /* KONIEC SKRYPTU */
 /* ======================================================== */
