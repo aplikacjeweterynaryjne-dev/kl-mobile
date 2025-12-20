@@ -4035,24 +4035,29 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
         </div>
         <button id="loadArchiveUsersBtn" class="btn primary small" style="margin-top: 10px;">📥 Wczytaj Użytkowników</button>
     </div>
-    
-    <div id="archiveCardFilterControls" class="archive-filter-controls" style="display: none;"> <input type="date" id="arcCardDateStart" title="Data od">
-        <input type="date" id="arcCardDateEnd" title="Data do">
-        <input type="text" id="arcCardClient" placeholder="Filtruj klienta...">
-        <input type="text" id="arcCardDoc" placeholder="Filtruj nr dok...">
-    </div>
+
+    <div id="archiveCardFilterControls" class="archive-filter-controls" style="display: none;">
+    <input type="date" id="arcCardDateStart" title="Data od">
+    <input type="date" id="arcCardDateEnd" title="Data do">
+    <input type="text" id="arcCardClient" placeholder="Filtruj klienta...">
+    <input type="text" id="arcCardDoc" placeholder="Filtruj nr dok...">
+    <button id="printSelectedCardsBtn" class="btn" style="background-color: #34495e; color: white; grid-column: 1 / -1;">🖨️ Drukuj Zaznaczone (0)</button>
+</div>
 
     <div class="table-container">
         <table id="archiveCardTable" class="sortable-table">
-            <thead>
-                <tr>
-                    <th data-sort-key="data">Data</th>
-                    <th data-sort-key="klient">Klient</th>
-                    <th data-sort-key="nrDok">Nr Dokumentu</th>
-                    <th data-sort-key="lekarz">Wystawił</th>
-                    <th class="col-akcje">Akcje</th>
-                </tr>
-            </thead>
+     <thead>
+        <tr>
+            <th style="width: 40px; text-align: center;">
+                <input type="checkbox" id="archiveSelectAllCheckbox" style="transform: scale(1.2); cursor: pointer;">
+            </th>
+            <th data-sort-key="data">Data</th>
+            <th data-sort-key="klient">Klient</th>
+            <th data-sort-key="nrDok">Nr Dokumentu</th>
+            <th data-sort-key="lekarz">Wystawił</th>
+            <th class="col-akcje">Akcje</th>
+        </tr>
+    </thead>
            <tbody id="archiveCardTableBody">
                  <tr><td colspan="5" style="text-align: center; padding: 20px; color: #777; font-size: 1.1em;">Proszę wybrać użytkownika z listy powyżej, aby wyświetlić archiwum.</td></tr>
             </tbody>
@@ -7117,6 +7122,7 @@ const archiveCloseBtn = document.getElementById('archiveCloseBtn');
 
 // Elementy filtrowania Archiwum Kart
 const loadArchiveUsersBtn = document.getElementById('loadArchiveUsersBtn');
+let currentArchiveCardsCache = []; // ✅ NOWE: Cache dla kart widocznych w tabeli
 const archiveUserSelect = document.getElementById('archiveUserSelect');
 const archiveCardListContainer = document.getElementById('archiveCardListContainer');
 
@@ -11803,17 +11809,26 @@ if(loadArchiveUsersBtn) loadArchiveUsersBtn.addEventListener('click', loadArchiv
  * Pkt 6: Wczytuje karty dla wybranego UID lekarza (ZMODYFIKOWANA O "WSZYSCY")
  */
 // ✅ ZASTĄP CAŁĄ FUNKCJĘ TYM KODEM
+/**
+ * Pkt 6: Wczytuje karty dla wybranego UID lekarza (ZMODYFIKOWANA O CHECKBOXY I CACHE)
+ */
 async function loadCardsForUser(lekarz_uid) {
     const tableBody = document.getElementById('archiveCardTableBody');
     const filterControls = document.getElementById('archiveCardFilterControls');
-    
+    const printSelectedBtn = document.getElementById('printSelectedCardsBtn'); // Nowy przycisk
+
+    // Reset cache i UI
+    currentArchiveCardsCache = []; 
+    if(printSelectedBtn) printSelectedBtn.textContent = '🖨️ Drukuj Zaznaczone (0)';
+    document.getElementById('archiveSelectAllCheckbox').checked = false;
+
     if (!lekarz_uid) {
-        tableBody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 20px; color: #555;">Wybierz użytkownika, aby zobaczyć archiwum.</td></tr>';
+        tableBody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 20px; color: #555;">Wybierz użytkownika, aby zobaczyć archiwum.</td></tr>';
         filterControls.style.display = 'none';
         return;
     }
     
-    tableBody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 20px; color: #555;">Wczytywanie kart... ⏳</td></tr>';
+    tableBody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 20px; color: #555;">Wczytywanie kart... ⏳</td></tr>';
     filterControls.style.display = 'none';
 
     let q; 
@@ -11824,7 +11839,7 @@ async function loadCardsForUser(lekarz_uid) {
         } else {
             const userClinicId = currentUserProfile['ID lecznicy'];
             if (!userClinicId) {
-                 tableBody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 20px; color: red;">Błąd: Twój profil nie ma przypisanego ID lecznicy.</td></tr>';
+                 tableBody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 20px; color: red;">Błąd: Twój profil nie ma przypisanego ID lecznicy.</td></tr>';
                  return;
             }
             q = db.collection("archiwumKarty")
@@ -11842,7 +11857,7 @@ async function loadCardsForUser(lekarz_uid) {
         const snapshot = await q.get();
         
         if (snapshot.empty) {
-            tableBody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 20px; color: #999;">Brak zapisanych kart dla tego wyboru.</td></tr>';
+            tableBody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 20px; color: #999;">Brak zapisanych kart dla tego wyboru.</td></tr>';
             filterControls.style.display = 'none'; 
             return;
         }
@@ -11851,16 +11866,24 @@ async function loadCardsForUser(lekarz_uid) {
         
         snapshot.docs.forEach(doc => {
             const card = { id: doc.id, ...doc.data() };
+            
+            // ✅ DODAJ DO CACHE
+            currentArchiveCardsCache.push(card);
+
             const tr = document.createElement('tr');
             
-            // Zapisujemy dane do atrybutów data-* dla filtrowania i sortowania
+            // Atrybuty do filtrowania
             tr.dataset.data = card.dataWykonania || '';
             tr.dataset.klient = card.klient_nazwa || 'Klient nieznany';
             tr.dataset.nrDok = card.nrDokumentu || 'Brak nr';
             tr.dataset.lekarz = card.lekarz_nazwisko || 'Nieznany';
             
-            // --- ⬇️ NOWA, BEZPIECZNA METODA BUDOWANIA WIERSZA ⬇️ ---
-            
+            // --- ✅ NOWA KOLUMNA: CHECKBOX ---
+            const tdCheck = document.createElement('td');
+            tdCheck.style.textAlign = 'center';
+            tdCheck.innerHTML = `<input type="checkbox" class="archive-card-checkbox" value="${card.id}" style="transform: scale(1.2); cursor: pointer;">`;
+            tr.appendChild(tdCheck);
+
             // Komórka 1: Data
             const tdData = document.createElement('td');
             tdData.textContent = card.dataWykonania || 'Brak daty';
@@ -11881,7 +11904,7 @@ async function loadCardsForUser(lekarz_uid) {
             tdLekarz.textContent = card.lekarz_nazwisko || 'Nieznany';
             tr.appendChild(tdLekarz);
 
-         // Komórka 5: Akcje
+            // Komórka 5: Akcje
             const tdAkcje = document.createElement('td');
             tdAkcje.className = 'col-akcje';
             tdAkcje.innerHTML = `
@@ -11896,21 +11919,21 @@ async function loadCardsForUser(lekarz_uid) {
             `;
             tr.appendChild(tdAkcje);
             
-            // --- ⬆️ KONIEC NOWEJ METODY ⬆️ ---
-
             tableBody.appendChild(tr);
         });
 
         filterControls.style.display = 'grid';
 
+        // ✅ Podepnij listenery checkboxów po wyrenderowaniu
+        setupArchiveCheckboxListeners();
+
     } catch (error) {
         console.error(`Błąd wczytywania kart dla ${lekarz_uid}:`, error);
         if (lekarz_uid === "ALL" && error.code === 'failed-precondition') {
-             alert("BŁĄD BAZY DANYCH: Aby filtrować 'Wszystkich' w lecznicy, wymagany jest nowy indeks. Sprawdź konsolę (F12), aby zobaczyć link do jego utworzenia.");
-             console.error("BŁĄD: Prawdopodobnie brakuje indeksu kompozytowego w Firestore. Utwórz indeks dla kolekcji 'archiwumKarty' dla pól: 'id_lecznicy' (Rosnąco) i 'createdAt' (Malejąco).");
-             tableBody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 20px; color: red;">Błąd konfiguracji bazy danych (brak indeksu).</td></tr>';
+             alert("BŁĄD BAZY DANYCH: Wymagany indeks Firestore.");
+             tableBody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 20px; color: red;">Błąd konfiguracji bazy danych (brak indeksu).</td></tr>';
         } else {
-            tableBody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 20px; color: red;">Wystąpił błąd podczas wczytywania kart.</td></tr>';
+            tableBody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 20px; color: red;">Wystąpił błąd podczas wczytywania kart.</td></tr>';
         }
         filterControls.style.display = 'none';
     }
@@ -23640,6 +23663,342 @@ function loadCardForEditing(cardData) {
     
     // Zamknij modal po wybraniu
     correctionCardSearchModal.style.display = 'none';
+}
+/* ======================================================== */
+/* ✅ NOWY MODUŁ: Wydruk Zbiorowy Kart Leczenia             */
+/* ======================================================== */
+
+// 1. Obsługa checkboxów (Zaznacz wszystko / Aktualizacja licznika)
+function setupArchiveCheckboxListeners() {
+    const selectAllCb = document.getElementById('archiveSelectAllCheckbox');
+    const itemCbs = document.querySelectorAll('.archive-card-checkbox');
+    const printBtn = document.getElementById('printSelectedCardsBtn');
+
+    // Funkcja aktualizująca licznik na przycisku
+    const updateCount = () => {
+        const checkedCount = document.querySelectorAll('.archive-card-checkbox:checked').length;
+        if (printBtn) {
+            printBtn.textContent = `🖨️ Drukuj Zaznaczone (${checkedCount})`;
+            // Zmień kolor przycisku, żeby rzucał się w oczy jak coś zaznaczono
+            printBtn.style.backgroundColor = checkedCount > 0 ? '#27ae60' : '#34495e';
+        }
+    };
+
+    // Obsługa "Zaznacz wszystko"
+    if (selectAllCb) {
+        // Usuwamy stare listenery (klonowanie)
+        const newSelectAll = selectAllCb.cloneNode(true);
+        selectAllCb.parentNode.replaceChild(newSelectAll, selectAllCb);
+        
+        newSelectAll.addEventListener('change', (e) => {
+            const isChecked = e.target.checked;
+            // Zaznaczamy tylko te, które są WIDOCZNE (przefiltrowane)
+            document.querySelectorAll('#archiveCardTableBody tr').forEach(row => {
+                if (row.style.display !== 'none') {
+                    const cb = row.querySelector('.archive-card-checkbox');
+                    if (cb) cb.checked = isChecked;
+                }
+            });
+            updateCount();
+        });
+    }
+
+    // Obsługa pojedynczych checkboxów
+    itemCbs.forEach(cb => {
+        cb.addEventListener('change', updateCount);
+    });
+}
+
+// 2. Obsługa przycisku "Drukuj Zaznaczone"
+const printSelectedCardsBtn = document.getElementById('printSelectedCardsBtn');
+if (printSelectedCardsBtn) {
+    printSelectedCardsBtn.addEventListener('click', () => {
+        // Pobierz ID zaznaczonych kart
+        const checkboxes = document.querySelectorAll('.archive-card-checkbox:checked');
+        if (checkboxes.length === 0) {
+            showToast("Nie zaznaczono żadnych kart.", "info");
+            return;
+        }
+
+        const selectedIds = Array.from(checkboxes).map(cb => cb.value);
+        
+        // Pobierz pełne dane z cache
+        const cardsToPrint = currentArchiveCardsCache.filter(card => selectedIds.includes(card.id));
+
+        if (cardsToPrint.length === 0) {
+            alert("Błąd: Nie udało się pobrać danych dla zaznaczonych kart.");
+            return;
+        }
+
+        // Zapytaj o format (Używamy prostego modala/alertu lub tego samego co w pojedynczym)
+        // Dla uproszczenia stworzymy dynamiczny wybór
+        const choiceOverlay = document.createElement('div');
+        choiceOverlay.style.cssText = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:20000;display:flex;justify-content:center;align-items:center;";
+        choiceOverlay.innerHTML = `
+            <div class="form-card" style="width:350px; text-align:center; padding:25px; background:white; border-radius:12px; box-shadow:0 10px 30px rgba(0,0,0,0.3);">
+                <h3 style="margin-top:0; margin-bottom:10px; color:#333;">Wydruk Zbiorowy</h3>
+                <p>Wybrano kart: <strong>${cardsToPrint.length}</strong></p>
+                <hr style="margin: 15px 0;">
+                <button id="bulkPrintA4" class="btn primary" style="width:100%; margin-bottom:10px; padding:12px; font-size:16px;">📄 Format A4 (Każda na nowej stronie)</button>
+                <button id="bulkPrint110" class="btn" style="width:100%; margin-bottom:20px; padding:12px; font-size:16px; background-color:#34495e; color:white;">🧾 Format 110mm (Rolka/Termiczny)</button>
+                <button id="bulkPrintCancel" class="btn ghost small" style="width:100%;">Anuluj</button>
+            </div>
+        `;
+        document.body.appendChild(choiceOverlay);
+
+        // Obsługa zdarzeń wyboru
+        document.getElementById('bulkPrintCancel').onclick = () => document.body.removeChild(choiceOverlay);
+        
+        document.getElementById('bulkPrintA4').onclick = () => {
+            document.body.removeChild(choiceOverlay);
+            generateBulkHTML(cardsToPrint, 'A4');
+        };
+
+        document.getElementById('bulkPrint110').onclick = () => {
+            document.body.removeChild(choiceOverlay);
+            generateBulkHTML(cardsToPrint, '110mm');
+        };
+    });
+}
+
+/**
+ * Główna funkcja generująca HTML dla wielu kart
+ */
+function generateBulkHTML(cards, format) {
+    showToast(`Generowanie wydruku dla ${cards.length} kart...`, "info");
+
+    let fullBodyContent = "";
+
+    cards.forEach((card, index) => {
+        // Generujemy HTML dla pojedynczej karty
+        // UWAGA: Musimy "wyłuskać" wnętrze <body> z funkcji generujących, 
+        // ale obecne funkcje openDirectPrintWindow... od razu otwierają okno.
+        // Dlatego musimy stworzyć pomocnicze funkcje generujące czysty HTML (zrobiliśmy to poniżej).
+        
+        let cardHTML = "";
+        
+        if (format === 'A4') {
+            cardHTML = getInnerCardHTML_A4(card);
+            // Opakuj w kontener strony A4
+            fullBodyContent += `<div class="page-sheet">${cardHTML}</div>`;
+        } else {
+            cardHTML = getInnerCardHTML_110mm(card);
+            // Opakuj w kontener 110mm
+            fullBodyContent += `<div class="receipt-page">${cardHTML}</div>`;
+        }
+
+        // Dodaj podział strony (oprócz ostatniej)
+        if (index < cards.length - 1) {
+            fullBodyContent += `<div style="page-break-after: always; height: 0; overflow: hidden;"></div>`;
+        }
+    });
+
+    // Otwórz okno drukowania
+    const printWindow = window.open('', '_blank', 'width=1100,height=800,scrollbars=yes,resizable=yes');
+    if (!printWindow) { alert('Zablokowano okno pop-up.'); return; }
+
+    // Używamy styli z istniejących funkcji, ale łączymy je
+    const cssStyle = format === 'A4' ? getA4Styles() : get110mmStyles();
+    
+    const finalHTML = `
+        <!DOCTYPE html>
+        <html lang="pl">
+        <head>
+            <meta charset="utf-8">
+            <title>Wydruk Zbiorowy ${format}</title>
+            <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
+            <style>
+                ${cssStyle}
+                /* Dodatkowe style dla wydruku seryjnego */
+                @media print {
+                    body { background: white !important; margin: 0; padding: 0; }
+                    .page-sheet, .receipt-page { 
+                        margin: 0 !important; 
+                        box-shadow: none !important; 
+                        page-break-inside: avoid;
+                    }
+                    div[style*="page-break-after: always"] {
+                        page-break-after: always !important;
+                        display: block;
+                    }
+                }
+            </style>
+        </head>
+        <body>
+            <div class="print-controls">
+                <button class="print-btn" onclick="window.print()">🖨️ Drukuj Wszystkie (${cards.length})</button>
+                <button class="close-btn" onclick="window.close()">Zamknij</button>
+            </div>
+            ${fullBodyContent}
+        </body>
+        </html>
+    `;
+
+    printWindow.document.write(finalHTML);
+    printWindow.document.close();
+    printWindow.focus();
+}
+
+// --- HELPERY: Wyciąganie styli i HTML (kopiowane z Twoich istniejących funkcji dla spójności) ---
+
+function getA4Styles() {
+    return `
+        body { font-family: 'Nunito', sans-serif; background-color: #525659; margin: 0; padding: 0; display: block; }
+        .print-controls { position: sticky; top: 0; z-index: 1000; background: #333; padding: 10px; text-align: center; }
+        .print-controls button { padding: 8px 20px; font-size: 16px; margin: 0 10px; cursor: pointer; }
+        .page-sheet { background: white; width: 297mm; min-height: 210mm; margin: 20px auto; padding: 10mm; box-sizing: border-box; display: block; position: relative; }
+        h2 { text-align: center; font-size: 12pt; margin: 0 0 5px 0; font-weight: 700; text-transform: uppercase; }
+        .top-section { display: grid; grid-template-columns: 1fr 1fr 1fr; font-size: 9pt; margin-bottom: 5px; gap: 3px; }
+        .top-section div { padding: 3px 4px; border: 1px solid #000; }
+        table { border-collapse: collapse; width: 100%; font-size: 9pt; margin-bottom: 3px; }
+        th, td { border: 1px solid #000; padding: 2px 3px; vertical-align: middle; }
+        th { background-color: #EBF5E6; text-align: center; font-weight: bold; font-size: 8pt; -webkit-print-color-adjust: exact; }
+        .signatures { display: flex; justify-content: space-between; margin-top: 10px; }
+        .sig-box { display: flex; flex-direction: column; align-items: center; width: 40%; }
+        .sig-img { display: block; height: 35px; width: 100%; object-fit: contain; }
+        @media print {
+            .page-sheet { width: 100%; margin: 0; border: none; transform: scale(0.85); transform-origin: top left; width: 117.6%; }
+            @page { size: A4 landscape; margin: 0.5cm; }
+        }
+    `;
+}
+
+function get110mmStyles() {
+    return `
+        body { font-family: Arial, Helvetica, sans-serif; background-color: #525659; margin: 0; padding: 0; display: flex; flex-direction: column; align-items: center; }
+        .print-controls { position: sticky; top: 0; z-index: 1000; background: #333; padding: 10px; width: 100%; text-align: center; }
+        .receipt-page { font-family: Arial, sans-serif !important; font-size: 8pt !important; background: white; width: 80mm !important; margin: 20px auto; padding: 0; padding-right: 2mm; box-sizing: border-box; text-align: justify; }
+        h2 { font-size: 10pt; font-weight: bold; text-align: center; margin: 0 0 8px 0; }
+        h3 { font-size: 9pt; background: #eee; padding: 4px; border-bottom: 1px solid #000; margin: 10px 0 4px 0; }
+        .data-block p { margin: 1px 0; }
+        .signatures-110mm { margin-top: 15px; }
+        .sig-box-110mm img { max-width: 150px; height: 40px; display: block; }
+        @media print {
+            body { display: block !important; }
+            .receipt-page { width: 80mm !important; margin: 0; page-break-inside: avoid; }
+            @page { size: 110mm auto; margin: 0; }
+        }
+    `;
+}
+
+// Helper: Generuje treść HTML dla pojedynczej karty A4
+function getInnerCardHTML_A4(card) {
+    const header = card.header || {};
+    // Uzupełnij podpisy
+    const imgLekarz = header.podpisLekarzaImg || '';
+    const imgPosiadacz = card.podpisPosiadacza || '';
+
+    // Generowanie wierszy tabeli
+    let rowsHTML = '';
+    const savedRows = card.table || [];
+    const findRowData = (idx) => savedRows.find(r => r.logicalIndex === idx);
+    const clean = (txt) => (txt || '').replace('📅', '').trim();
+
+    for (let i = 1; i <= 13; i++) {
+        let lIdx = (i < 10) ? i - 1 : i - 2;
+        if (i === 10) {
+            rowsHTML += `<tr><td colspan="8" style="text-align: left; font-weight: bold; padding: 2px 4px; background-color: #f9f9f9; font-size: 10pt;">Potwierdzenie nabycia produktu leczniczego weterynaryjnego/paszy leczniczej</td></tr>`;
+            continue;
+        }
+        const rd = findRowData(lIdx);
+        const lp = (i < 10) ? `${i}.` : `${i-10}.`;
+        
+        // Bezpieczne pobieranie wartości
+        const opis = rd ? clean(rd.opis) : '';
+        const liczba = rd ? clean(rd.liczba) : '';
+        const rozp = rd ? clean(rd.rozpoznanie) : '';
+        const lek = rd ? clean(rd.lek) : '';
+        const seria = rd ? clean(rd.seria) : '';
+        const ilosc = rd ? clean(rd.iloscDawka) : '';
+        const karencja = rd ? clean(rd.karencja) : '';
+
+        rowsHTML += `
+            <tr>
+                <td style="text-align: center;">${lp}</td>
+                <td>${opis}</td>
+                <td style="text-align: center;">${liczba}</td>
+                <td style="text-align: center;">${rozp}</td>
+                <td>${lek}</td>
+                <td style="text-align: center;">${seria}</td>
+                <td>${ilosc}</td>
+                <td>${karencja}</td>
+            </tr>`;
+    }
+
+    return `
+        <h2>KARTA LECZENIA ZWIERZĄT GOSPODARSKICH ORAZ ZWIERZĄT, Z KTÓRYCH POZYSKANE TKANKI LUB PRODUKTY SĄ PRZEZNACZONE DO SPOŻYCIA PRZEZ LUDZI / EWIDENCJA LECZENIA ZWIERZĄT</h2>
+        <div class="top-section">
+            <div>Nazwa i adres zakładu:<br><b>${header.nazwaLecznicy}</b><br>Data wyk.: <b>${header.dataWykonania}</b><br>Nr stada: <b>${header.nrStada}</b></div>
+            <div>Posiadacz zwierzęcia:<br><b>${header.klient}</b><br>${header.adresKlienta}</div>
+            <div>Zgłoszenie: <b>${header.dataZgloszenia}</b><br>Nr dokumentu: <b>${header.nrDokumentu}</b></div>
+        </div>
+        <table>
+            <thead>
+               <tr>
+                   <th rowspan="2">Lp.</th>
+                   <th rowspan="2">Nazwa siedziby stada i opis</th>
+                   <th rowspan="2">Liczba</th>
+                   <th rowspan="2">Rozpoznanie</th>
+                   <th colspan="3">Zastosowane produkty</th>
+                   <th rowspan="2">Karencja / Uwagi</th>
+               </tr>
+               <tr><th>Nazwa</th><th>Seria</th><th>Ilość/Dawkowanie</th></tr>
+            </thead>
+            <tbody>${rowsHTML}</tbody>
+        </table>
+        <p><b>Oświadczam, że nabyte produkty lecznicze weterynaryjne/pasze lecznicze zostaną zastosowane zgodnie z zaleceniami lekarza weterynarii.</b></p>
+        <div class="signatures">
+            <div class="sig-box"><span class="sig-label">Lekarz</span>${imgLekarz ? `<img src="${imgLekarz}" class="sig-img">` : ''}<span class="sig-name">${header.podpisLekarzaLinia}</span></div>
+            <div class="sig-box"><span class="sig-label">Posiadacz</span>${imgPosiadacz ? `<img src="${imgPosiadacz}" class="sig-img">` : ''}</div>
+        </div>
+    `;
+}
+
+// Helper: Generuje treść HTML dla pojedynczej karty 110mm
+function getInnerCardHTML_110mm(card) {
+    // Tutaj wykorzystujemy logikę z Twojej funkcji openDirectPrintWindow110mm, ale zwracamy sam HTML
+    // Dla uproszczenia (bo tamta funkcja jest długa), użyjemy skróconej wersji, ale zachowując strukturę.
+    
+    const header = card.header || {};
+    const rows = card.table || [];
+    
+    // Podział wierszy
+    const rowsSec1 = rows.filter(r => r.logicalIndex < 9).sort((a,b)=>a.logicalIndex-b.logicalIndex);
+    const rowsSec2 = rows.filter(r => r.logicalIndex >= 9).sort((a,b)=>a.logicalIndex-b.logicalIndex);
+
+    const generateSection = (list) => {
+        let h = '';
+        list.forEach((r, idx) => {
+             if(r.lek || r.opis || r.rozpoznanie) {
+                 h += `<div style="border-bottom:1px dotted #ccc; margin-bottom:5px; padding-bottom:5px;">`;
+                 if(r.opis) h += `<div><b>Zwierzę:</b> ${r.opis}</div>`;
+                 if(r.rozpoznanie) h += `<div><b>Rozp:</b> ${r.rozpoznanie}</div>`;
+                 if(r.lek) h += `<div><b>${idx+1}. ${r.lek}</b><br>Seria: ${r.seria} | Ilość: <b>${r.iloscDawka ? r.iloscDawka.replace(/<[^>]*>/g, '') : ''}</b><br><i>Karencja: ${r.karencja ? r.karencja.replace('📅','') : ''}</i></div>`;
+                 h += `</div>`;
+             }
+        });
+        return h || '<i>-</i>';
+    };
+
+    return `
+        <div style="text-align:center; border-bottom:2px solid black;">
+            <h2>KARTA LECZENIA</h2>
+            <div>NR: <b>${header.nrDokumentu}</b></div>
+        </div>
+        <div class="data-block">
+            <p><b>Lecznica:</b> ${header.nazwaLecznicy}</p>
+            <p><b>Klient:</b> ${header.klient}</p>
+            <p><b>Data:</b> ${header.dataWykonania}</p>
+        </div>
+        <h3>I. Leczenie na miejscu</h3>
+        ${generateSection(rowsSec1)}
+        <h3>II. Produkty pozostawione</h3>
+        ${generateSection(rowsSec2)}
+        <div class="signatures-110mm">
+             <div class="sig-box-110mm"><b>Lekarz:</b><br>${header.podpisLekarzaImg ? `<img src="${header.podpisLekarzaImg}">` : ''}</div>
+             <div class="sig-box-110mm" style="margin-top:10px;"><b>Posiadacz:</b><br>${card.podpisPosiadacza ? `<img src="${card.podpisPosiadacza}">` : ''}</div>
+        </div>
+    `;
 }
 /* ======================================================== */
 /* KONIEC SKRYPTU */
