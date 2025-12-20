@@ -4116,6 +4116,9 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
 <div id="raportySection" style="display: none; padding: 0 20px;">
     <h2>📊 Raporty</h2>
 
+    <div id="lastSettlementInfo" style="display: none; background-color: #e8f5e9; border: 1px solid #27ae60; color: #1e8449; padding: 10px; border-radius: 8px; margin-bottom: 15px; font-size: 15px; text-align: center;">
+        <span id="lastSettlementText">Ładowanie informacji o rozliczeniach...</span>
+    </div>
     <div class="report-controls">
         <div class="form-row">
             <label for="reportTypeSelect">1. Wybierz typ raportu:</label>
@@ -4157,6 +4160,9 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
         <div class="form-row" style="grid-column: 1 / -1; display: flex; gap: 10px; align-items: flex-end; margin-top: 10px;">
             <button id="generateReportBtn" class="btn primary" style="font-size: 16px; padding: 10px 15px;">Generuj Raport</button>
             <button id="printReportBtn" class="btn" style="font-size: 16px; padding: 10px 15px; display: none;">🖨️ Drukuj Raport</button>
+            <button id="settleReportBtn" class="btn primary" style="font-size: 16px; padding: 10px 15px; display: none; background-color: #8e44ad; border-color: #732d91; margin-left: 10px;">
+    💰 Zatwierdź Rozliczenie
+</button>
         </div>
     </div>
 
@@ -12985,6 +12991,10 @@ const reportUserSelect = document.getElementById('reportUserSelect');
 const reportClientInput = document.getElementById('reportClientInput'); // ZMIENIONO z reportClientSelect
 const generateReportBtn = document.getElementById('generateReportBtn');
 const printReportBtn = document.getElementById('printReportBtn');
+// ✅ NOWE ZMIENNE: Rozliczenia
+const lastSettlementInfo = document.getElementById('lastSettlementInfo');
+const lastSettlementText = document.getElementById('lastSettlementText');
+const settleReportBtn = document.getElementById('settleReportBtn');
 
 // Obszar wyników
 const reportResultArea = document.getElementById('reportResultArea');
@@ -13143,19 +13153,25 @@ let reportClientsLoaded = false;
  * Ładuje listy lekarzy i klientów do filtrów.
  */
 function onShowRaporty() {
-    console.log("Wejście do sekcji Raporty. Ładowanie filtrów...");
-    if (!reportUsersLoaded) {
-        loadReportUsers();
-    }
-    if (!reportClientsLoaded) {
-        loadReportClients();
-    }
-    
-    // ✅ ZMIANA: Ustaw domyślne daty na DZISIAJ
-    const today = new Date().toISOString().split('T')[0];
-    
-    if (!reportDateStart.value) reportDateStart.value = today;
-    if (!reportDateEnd.value) reportDateEnd.value = today;
+    console.log("Wejście do sekcji Raporty. Ładowanie filtrów...");
+    if (!reportUsersLoaded) {
+        loadReportUsers();
+    }
+    if (!reportClientsLoaded) {
+        loadReportClients();
+    }
+    
+    const today = new Date().toISOString().split('T')[0];
+    if (!reportDateStart.value) reportDateStart.value = today;
+    if (!reportDateEnd.value) reportDateEnd.value = today;
+
+    // ✅ DODAJ TO: Odśwież informację o ostatnim rozliczeniu
+    checkLastSettlement();
+    
+    // Ukryj przyciski akcji (reset widoku)
+    if(settleReportBtn) settleReportBtn.style.display = 'none';
+    if(printReportBtn) printReportBtn.style.display = 'none';
+    if(reportResultArea) reportResultArea.style.display = 'none';
 }
 /**
  * Wczytuje użytkowników (lekarzy) do listy <select> w raportach.
@@ -13275,7 +13291,43 @@ async function loadReportClients() {
         // Nie psujemy datalist, zostawiamy puste
     }
 }
+/**
+ * ✅ NOWA FUNKCJA: Pobiera ostatnie rozliczenie zalogowanego użytkownika
+ */
+async function checkLastSettlement() {
+    if (!currentUserProfile || !lastSettlementInfo) return;
 
+    // Ukryj na start
+    lastSettlementInfo.style.display = 'none';
+
+    try {
+        // Szukamy w podkolekcji 'rozliczenia' użytkownika
+        const q = db.collection("konfiguracja")
+                    .doc(currentUserProfile.id)
+                    .collection("rozliczenia")
+                    .orderBy("dataDo", "desc") // Najnowsze wg daty końcowej raportu
+                    .limit(1);
+
+        const snapshot = await q.get();
+
+        if (!snapshot.empty) {
+            const data = snapshot.docs[0].data();
+            // Formatuj daty i kwotę
+            const kwota = parseFloat(data.kwota) || 0;
+            const kwotaStr = kwota.toFixed(2).replace('.', ',') + ' zł';
+            
+            lastSettlementText.innerHTML = `
+                <strong>ℹ️ Ostatnio rozliczony okres:</strong> <br>
+                ${data.dataOd} — ${data.dataDo} <br>
+                Kwota: <strong>${kwotaStr}</strong> <br>
+                <small style="color:#555;">(Zatwierdzono: ${data.timestamp ? new Date(data.timestamp.toDate()).toLocaleDateString() : '-'})</small>
+            `;
+            lastSettlementInfo.style.display = 'block';
+        }
+    } catch (e) {
+        console.error("Błąd pobierania ostatniego rozliczenia:", e);
+    }
+}
 // --- 3. Logika generowania raportu ---
 
 if (generateReportBtn) {
@@ -13499,7 +13551,7 @@ function generateWizytyReport(allReceipts, filters) {
         `;
     }
 
-    // --- 6. Aktualizacja Widoku ---
+// --- 6. Aktualizacja Widoku ---
     reportWizytyTableBody.innerHTML = tableHtml || '<tr><td colspan="7" style="text-align: center; padding: 20px;">Brak danych.</td></tr>';
     
     reportWizytyTableContainer.style.display = 'block';
@@ -13511,17 +13563,40 @@ function generateWizytyReport(allReceipts, filters) {
     reportUserDisplay.textContent = `Pracownik: ${filters.userName}`;
     reportSumTitle.textContent = sumLabelText;
 
+    // Pokaż przycisk druku (bo mógł być ukryty)
+    if(printReportBtn) printReportBtn.style.display = 'inline-block';
+
+    // ✅ LOGIKA PRZYCISKU ROZLICZENIA (Tylko dla Gotówki)
+    if (filters.type === "gotowka") {
+        if(settleReportBtn) {
+            settleReportBtn.style.display = 'inline-block';
+            settleReportBtn.textContent = '💰 Zatwierdź Rozliczenie';
+            settleReportBtn.disabled = false;
+            settleReportBtn.style.backgroundColor = "#8e44ad"; // Reset koloru na fioletowy
+            
+            // Zapisz dane do użycia przy kliknięciu (dataset)
+            settleReportBtn.dataset.start = filters.dateStart;
+            settleReportBtn.dataset.end = filters.dateEnd;
+            // Zapisujemy kwotę (totalRevenue to przychód gotówkowy w tym typie raportu)
+            settleReportBtn.dataset.amount = totalRevenue.toFixed(2);
+            settleReportBtn.dataset.userId = filters.userId;
+        }
+    } else {
+        // Ukryj przycisk dla innych raportów
+        if(settleReportBtn) settleReportBtn.style.display = 'none';
+    }
+
     if (filters.type === "dluznicy") {
         reportCalculatedSum.textContent = formatPrice(debtsOnlySum);
-        reportFuelSection.style.display = 'none';
-        reportNetSumContainer.style.display = 'none';
+        if(reportFuelSection) reportFuelSection.style.display = 'none';
+        if(reportNetSumContainer) reportNetSumContainer.style.display = 'none';
     } 
     else {
         // Raport Gotówka i Ogólny
         reportCalculatedSum.textContent = formatPrice(totalRevenue);
         
         // Koszty
-        reportFuelSection.style.display = 'flex';
+        if(reportFuelSection) reportFuelSection.style.display = 'flex';
         const costInput = document.getElementById('reportFuelCost');
         if(costInput) {
             costInput.value = totalExpenses.toFixed(2);
@@ -13531,7 +13606,7 @@ function generateWizytyReport(allReceipts, filters) {
         // Wynik Netto
         const netSum = totalRevenue - totalExpenses;
         if(reportNetSum) reportNetSum.textContent = formatPrice(netSum);
-        reportNetSumContainer.style.display = 'inline';
+        if(reportNetSumContainer) reportNetSumContainer.style.display = 'inline';
     }
 }
 
@@ -13739,7 +13814,68 @@ if (reportTypeSelect) {
         }
     });
 }
+// ✅ Listener dla przycisku "Zatwierdź Rozliczenie"
+if (settleReportBtn) {
+    settleReportBtn.addEventListener('click', async () => {
+        // 1. Pobierz dane z dataset (ustawione przy generowaniu)
+        const dateStart = settleReportBtn.dataset.start;
+        const dateEnd = settleReportBtn.dataset.end;
+        const amount = settleReportBtn.dataset.amount;
+        const userId = settleReportBtn.dataset.userId;
 
+        // Walidacja: Czy rozliczamy siebie? (Tylko zalogowany może zatwierdzić swoje rozliczenie)
+        if (userId !== currentUserProfile.uid && userId !== 'ALL') {
+             // Admin może rozliczać innych, ale uprośćmy:
+             // Jeśli userId == ALL, to też blokujemy, bo rozlicza się konkretną osobę.
+             if(!confirm("Zatwierdzasz rozliczenie dla innego użytkownika. Kontynuować?")) return;
+        }
+
+        const msg = `Czy na pewno chcesz oznaczyć okres:\n${dateStart} do ${dateEnd}\njako ROZLICZONY (przekazana gotówka: ${amount} zł)?\n\nTo utworzy trwały wpis w historii.`;
+
+        if (confirm(msg)) {
+            settleReportBtn.disabled = true;
+            settleReportBtn.textContent = "Zapisywanie...";
+
+            try {
+                // Zapisujemy w podkolekcji 'rozliczenia' w dokumencie użytkownika
+                // Dzięki temu każdy lekarz ma swoją historię.
+                // Jeśli Admin rozlicza kogoś, musimy znaleźć ID dok. konfiguracji tego kogoś.
+                // Dla uproszczenia w v1: Zapisujemy w profilu TEGO KTO KLIKA (zalogowanego).
+                // Jeśli chcesz zapisywać w profilu wybranego lekarza, trzeba by pobrać jego docId.
+                // Zakładam scenariusz: Lekarz klika u siebie.
+                
+                const settlementData = {
+                    dataOd: dateStart,
+                    dataDo: dateEnd,
+                    kwota: parseFloat(amount),
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                    zatwierdzil_uid: currentUserProfile.uid,
+                    zatwierdzil_nazwisko: `${currentUserProfile.Imie} ${currentUserProfile.Nazwisko}`
+                };
+
+                await db.collection("konfiguracja")
+                        .doc(currentUserProfile.id)
+                        .collection("rozliczenia")
+                        .add(settlementData);
+
+                showToast("Rozliczenie zapisane pomyślnie! ✅", "success");
+                
+                // Aktualizuj przycisk
+                settleReportBtn.textContent = "Rozliczono ✔️";
+                settleReportBtn.style.backgroundColor = "#27ae60";
+                
+                // Odśwież "przypominajkę" na górze
+                checkLastSettlement();
+
+            } catch (error) {
+                console.error("Błąd zapisu rozliczenia:", error);
+                alert("Wystąpił błąd podczas zapisu.");
+                settleReportBtn.disabled = false;
+                settleReportBtn.textContent = '💰 Zatwierdź Rozliczenie';
+            }
+        }
+    });
+}
 /* ✅ KONIEC: Logika dla sekcji Raportów                   */
 /* ⬆️ ======================================================= ⬆️ */
 /* ⬇️ ======================================================= ⬇️ */
