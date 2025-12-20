@@ -23764,32 +23764,54 @@ if (printSelectedCardsBtn) {
 /**
  * Główna funkcja generująca HTML dla wielu kart
  */
+/**
+ * Główna funkcja generująca HTML dla wielu kart
+ * ✅ POPRAWIONA: Dodaje odstępy w 110mm i poprawne kontenery
+ */
 function generateBulkHTML(cards, format) {
     showToast(`Generowanie wydruku dla ${cards.length} kart...`, "info");
 
     let fullBodyContent = "";
+    
+    // Dodajemy przyciski na samej górze body
+    fullBodyContent += `
+        <div class="print-controls">
+            <button class="print-btn" onclick="window.print()">🖨️ Drukuj Wszystkie (${cards.length})</button>
+            <button class="close-btn" onclick="window.close()">Zamknij</button>
+        </div>
+    `;
 
     cards.forEach((card, index) => {
-        // Generujemy HTML dla pojedynczej karty
-        // UWAGA: Musimy "wyłuskać" wnętrze <body> z funkcji generujących, 
-        // ale obecne funkcje openDirectPrintWindow... od razu otwierają okno.
-        // Dlatego musimy stworzyć pomocnicze funkcje generujące czysty HTML (zrobiliśmy to poniżej).
-        
         let cardHTML = "";
         
         if (format === 'A4') {
             cardHTML = getInnerCardHTML_A4(card);
             // Opakuj w kontener strony A4
             fullBodyContent += `<div class="page-sheet">${cardHTML}</div>`;
+            
+            // Podział strony dla A4 (zawsze nowa kartka)
+            if (index < cards.length - 1) {
+                // Pusty div wymuszający nową stronę, ale niewidoczny
+                fullBodyContent += `<div style="page-break-after: always;"></div>`;
+            }
+
         } else {
+            // Format 110mm
             cardHTML = getInnerCardHTML_110mm(card);
             // Opakuj w kontener 110mm
             fullBodyContent += `<div class="receipt-page">${cardHTML}</div>`;
-        }
 
-        // Dodaj podział strony (oprócz ostatniej)
-        if (index < cards.length - 1) {
-            fullBodyContent += `<div style="page-break-after: always; height: 0; overflow: hidden;"></div>`;
+            // ✅ DODANIE ODSTĘPU DLA 110mm (zamiast page-break, który na rolce bywa dziwny)
+            if (index < cards.length - 1) {
+                fullBodyContent += `
+                    <div style="text-align: center; margin: 20px 0;">
+                        <br>
+                        <div style="border-bottom: 2px dashed #999; width: 80mm; margin: 0 auto;"></div>
+                        <div style="font-size: 10px; color: #999; margin-top: 2px;">✂️ ROZDZIELENIE ✂️</div>
+                        <br>
+                    </div>
+                `;
+            }
         }
     });
 
@@ -23797,7 +23819,7 @@ function generateBulkHTML(cards, format) {
     const printWindow = window.open('', '_blank', 'width=1100,height=800,scrollbars=yes,resizable=yes');
     if (!printWindow) { alert('Zablokowano okno pop-up.'); return; }
 
-    // Używamy styli z istniejących funkcji, ale łączymy je
+    // Wybierz odpowiednie style
     const cssStyle = format === 'A4' ? getA4Styles() : get110mmStyles();
     
     const finalHTML = `
@@ -23809,26 +23831,9 @@ function generateBulkHTML(cards, format) {
             <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
             <style>
                 ${cssStyle}
-                /* Dodatkowe style dla wydruku seryjnego */
-                @media print {
-                    body { background: white !important; margin: 0; padding: 0; }
-                    .page-sheet, .receipt-page { 
-                        margin: 0 !important; 
-                        box-shadow: none !important; 
-                        page-break-inside: avoid;
-                    }
-                    div[style*="page-break-after: always"] {
-                        page-break-after: always !important;
-                        display: block;
-                    }
-                }
             </style>
         </head>
         <body>
-            <div class="print-controls">
-                <button class="print-btn" onclick="window.print()">🖨️ Drukuj Wszystkie (${cards.length})</button>
-                <button class="close-btn" onclick="window.close()">Zamknij</button>
-            </div>
             ${fullBodyContent}
         </body>
         </html>
@@ -23841,18 +23846,28 @@ function generateBulkHTML(cards, format) {
 
 // --- HELPERY: Wyciąganie styli i HTML (kopiowane z Twoich istniejących funkcji dla spójności) ---
 
-/* ✅ 1. STYLE A4 (Identyczne jak w podglądzie pojedynczym) */
+/* ✅ 1. STYLE A4 (Poprawione: Widoczne przyciski) */
 function getA4Styles() {
     return `
         /* --- STYLE Z getUnifiedPrintHTML --- */
         body { font-family: 'Nunito', sans-serif; background-color: #525659; margin: 0; padding: 0; display: block; }
-        .print-controls { display: none; } /* Ukryte w samym wydruku */
         
+        /* POPRAWKA: Przyciski widoczne na górze, przyklejone */
+        .print-controls { 
+            position: sticky; top: 0; z-index: 1000; 
+            background: #333; padding: 10px; text-align: center; 
+            display: flex; justify-content: center; gap: 15px;
+            width: 100%; box-sizing: border-box;
+        }
+        .print-controls button { padding: 8px 20px; font-size: 16px; cursor: pointer; border-radius: 4px; border: 1px solid #777; color: white; font-weight: bold; }
+        .print-btn { background-color: #4CAF50; }
+        .close-btn { background-color: #f44336; }
+
         .page-sheet { 
             background: white; 
             width: 297mm; 
             min-height: 210mm; 
-            margin: 0 auto; 
+            margin: 20px auto; 
             padding: 10mm; 
             box-sizing: border-box; 
             display: block; 
@@ -23860,8 +23875,8 @@ function getA4Styles() {
             
             /* Skalowanie identyczne jak w pojedynczym */
             transform: scale(0.85); 
-            transform-origin: top left; 
-            width: 117.6%; 
+            transform-origin: top center; /* Zmieniono na center dla lepszego wyglądu listy */
+            width: 297mm; /* Sztywna szerokość dla podglądu */
         }
 
         h2 { 
@@ -23905,11 +23920,17 @@ function getA4Styles() {
 
         @media print {
             body { background: white !important; margin: 0; padding: 0; }
+            .print-controls { display: none !important; } /* Ukryj przyciski przy druku */
+            
             .page-sheet { 
+                width: 100% !important;
                 margin: 0 !important; 
+                padding: 5mm !important; /* Mniejszy padding przy druku */
                 box-shadow: none !important; 
                 page-break-inside: avoid;
-                page-break-after: always; /* Kluczowe dla zbiorówek */
+                page-break-after: always; /* KAŻDA KARTA NA NOWEJ STRONIE */
+                transform: scale(0.95); /* Lekkie skalowanie dla dopasowania */
+                transform-origin: top left;
             }
             /* Reset marginesów strony */
             @page { size: A4 landscape; margin: 0.5cm; }
@@ -23917,12 +23938,22 @@ function getA4Styles() {
     `;
 }
 
-/* ✅ 2. STYLE 110mm (Identyczne jak w podglądzie pojedynczym) */
+/* ✅ 2. STYLE 110mm (Poprawione: Widoczne przyciski) */
 function get110mmStyles() {
     return `
         /* --- STYLE Z openDirectPrintWindow110mm --- */
         body { font-family: Arial, Helvetica, sans-serif; background-color: #525659; margin: 0; padding: 0; display: flex; flex-direction: column; align-items: center; }
-        .print-controls { display: none; }
+        
+        /* POPRAWKA: Przyciski widoczne */
+        .print-controls { 
+            position: sticky; top: 0; z-index: 1000; 
+            background: #333; padding: 10px; text-align: center; 
+            display: flex; justify-content: center; gap: 15px;
+            width: 100%;
+        }
+        .print-controls button { padding: 8px 20px; font-size: 16px; cursor: pointer; border-radius: 4px; border: 1px solid #777; color: white; font-weight: bold; }
+        .print-btn { background-color: #4CAF50; }
+        .close-btn { background-color: #f44336; }
 
         .receipt-page { 
             font-family: Arial, Helvetica, sans-serif !important;
@@ -23935,13 +23966,14 @@ function get110mmStyles() {
             width: 80mm !important; 
             max-width: 80mm !important;
             
-            margin: 0 auto; 
+            margin: 20px auto; 
             padding: 0 !important; 
             padding-right: 2mm !important;
             
             box-sizing: border-box;
             text-align: justify !important; 
             text-justify: inter-word !important;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
         }
 
         h2 { font-size: 10pt !important; font-weight: bold; text-transform: uppercase; text-align: center; margin: 0 0 8px 0; }
@@ -23970,21 +24002,26 @@ function get110mmStyles() {
             border-top: 1px dotted #000; padding-top: 5px; 
             text-align: justify !important; 
         }
+        
+        /* Odstęp między kartami (widoczny tylko na ekranie dla wygody) */
+        .separator-screen { height: 20px; background: transparent; }
 
         @media print {
             body { display: block !important; background: white !important; margin: 0 !important; padding: 0 !important; }
+            .print-controls { display: none !important; }
+            .separator-screen { display: none; } /* Ukryj ekranowy separator, użyjemy <br> w HTML */
+            
             .receipt-page { 
                 width: 80mm !important; 
                 margin: 0 !important; 
                 page-break-inside: avoid;
-                page-break-after: always; /* Kluczowe dla zbiorówek */
+                /* page-break-after: always; <-- To usunąłem, bo w 110mm często wolimy ciągły druk z odstępem */
                 box-shadow: none !important;
             }
             @page { size: 110mm auto; margin: 0; }
         }
     `;
 }
-
 // Helper: Generuje treść HTML dla pojedynczej karty A4
 /* ✅ 3. HTML A4 (Kopia struktury z openCurrentA4PrintWindow) */
 function getInnerCardHTML_A4(card) {
