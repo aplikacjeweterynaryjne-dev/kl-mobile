@@ -2411,6 +2411,21 @@ tr.filled-row td {
         -webkit-print-color-adjust: exact;
     }
 }
+/* ✅ STYLE DLA WYDRUKU ZBIOROWEGO */
+@media print {
+    .page-break { 
+        page-break-after: always !important; 
+        break-after: page !important;
+        display: block;
+        height: 1px;
+        clear: both;
+    }
+    /* Ukrycie ostatniego łamania strony */
+    .bulk-container > .page-break:last-child {
+        page-break-after: avoid !important;
+        break-after: avoid !important;
+    }
+}
 </style>
     <div id="calcProductSearchModal" class="product-search-modal" style="display: none; z-index: 10003;">
     <div class="product-search-card">
@@ -4024,7 +4039,13 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
 </div>
     <div id="archiwumKartySection" style="display: none; padding: 0 20px;">
     <h2>🗄️ Archiwum Kart Leczenia</h2>
-    
+    <div id="bulkActionsContainer" style="display: none; background: #e3f2fd; padding: 10px; margin-bottom: 15px; border-radius: 8px; align-items: center; justify-content: space-between; border: 1px solid #90caf9;">
+        <span style="font-weight: bold; color: #1565c0;">Wybrano kart: <span id="selectedCardsCount">0</span></span>
+        <div>
+            <button id="btnBulkPrintA4" class="btn primary small">🖨️ Drukuj A4</button>
+            <button id="btnBulkPrint110" class="btn small" style="background-color: #34495e; color: white;">🧾 Drukuj 110mm</button>
+        </div>
+    </div>
     <div style="margin-bottom: 20px; border-bottom: 1px solid #eee; padding-bottom: 15px;">
         <div class="form-row">
             <label for="archiveUserSelect">Wybierz użytkownika:</label>
@@ -4043,15 +4064,18 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
 
     <div class="table-container">
         <table id="archiveCardTable" class="sortable-table">
-            <thead>
-                <tr>
-                    <th data-sort-key="data">Data</th>
-                    <th data-sort-key="klient">Klient</th>
-                    <th data-sort-key="nrDok">Nr Dokumentu</th>
-                    <th data-sort-key="lekarz">Wystawił</th>
-                    <th class="col-akcje">Akcje</th>
-                </tr>
-            </thead>
+           <thead>
+                <tr>
+                    <th style="width: 40px; text-align: center;">
+                        <input type="checkbox" id="selectAllArchiveCards" title="Zaznacz wszystkie">
+                    </th>
+                    <th data-sort-key="data">Data</th>
+                    <th data-sort-key="klient">Klient</th>
+                    <th data-sort-key="nrDok">Nr Dokumentu</th>
+                    <th data-sort-key="lekarz">Wystawił</th>
+                    <th class="col-akcje">Akcje</th>
+                </tr>
+            </thead>
            <tbody id="archiveCardTableBody">
                  <tr><td colspan="5" style="text-align: center; padding: 20px; color: #777; font-size: 1.1em;">Proszę wybrać użytkownika z listy powyżej, aby wyświetlić archiwum.</td></tr>
             </tbody>
@@ -11802,28 +11826,32 @@ if(loadArchiveUsersBtn) loadArchiveUsersBtn.addEventListener('click', loadArchiv
  * Pkt 6: Wczytuje karty dla wybranego UID lekarza (ZMODYFIKOWANA O "WSZYSCY")
  */
 // ✅ ZASTĄP CAŁĄ FUNKCJĘ TYM KODEM
+/* ✅ ZMODYFIKOWANA FUNKCJA: Wczytuje karty + Checkboxy + Cache */
 async function loadCardsForUser(lekarz_uid) {
     const tableBody = document.getElementById('archiveCardTableBody');
     const filterControls = document.getElementById('archiveCardFilterControls');
     
+    // Resetuj cache i widok
+    if(typeof globalArchiveCardsCache !== 'undefined') globalArchiveCardsCache.clear();
+    if(typeof updateBulkActionsUI === 'function') updateBulkActionsUI(); // Ukryj pasek akcji masowych
+
     if (!lekarz_uid) {
-        tableBody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 20px; color: #555;">Wybierz użytkownika, aby zobaczyć archiwum.</td></tr>';
+        tableBody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 20px; color: #555;">Wybierz użytkownika, aby zobaczyć archiwum.</td></tr>';
         filterControls.style.display = 'none';
         return;
     }
     
-    tableBody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 20px; color: #555;">Wczytywanie kart... ⏳</td></tr>';
+    tableBody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 20px; color: #555;">Wczytywanie kart... ⏳</td></tr>';
     filterControls.style.display = 'none';
 
     let q; 
     if (lekarz_uid === "ALL") {
-        console.log("Wczytywanie kart dla: WSZYSCY");
         if (currentUserProfile.Rola === 'administrator') {
             q = db.collection("archiwumKarty").orderBy("createdAt", "desc");
         } else {
             const userClinicId = currentUserProfile['ID lecznicy'];
             if (!userClinicId) {
-                 tableBody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 20px; color: red;">Błąd: Twój profil nie ma przypisanego ID lecznicy.</td></tr>';
+                 tableBody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 20px; color: red;">Błąd: Twój profil nie ma przypisanego ID lecznicy.</td></tr>';
                  return;
             }
             q = db.collection("archiwumKarty")
@@ -11831,7 +11859,6 @@ async function loadCardsForUser(lekarz_uid) {
                   .orderBy("createdAt", "desc");
         }
     } else {
-        console.log(`Wczytywanie kart dla UID: ${lekarz_uid}`);
         q = db.collection("archiwumKarty")
               .where("lekarz_uid", "==", lekarz_uid)
               .orderBy("createdAt", "desc");
@@ -11841,46 +11868,54 @@ async function loadCardsForUser(lekarz_uid) {
         const snapshot = await q.get();
         
         if (snapshot.empty) {
-            tableBody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 20px; color: #999;">Brak zapisanych kart dla tego wyboru.</td></tr>';
+            tableBody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 20px; color: #999;">Brak zapisanych kart dla tego wyboru.</td></tr>';
             filterControls.style.display = 'none'; 
             return;
         }
         
-        tableBody.innerHTML = ''; // Wyczyść tabelę
+        tableBody.innerHTML = ''; 
         
         snapshot.docs.forEach(doc => {
             const card = { id: doc.id, ...doc.data() };
+            
+            // ZAPISZ DO CACHE (Kluczowe dla druku zbiorowego)
+            if(typeof globalArchiveCardsCache !== 'undefined') globalArchiveCardsCache.set(card.id, card);
+
             const tr = document.createElement('tr');
             
-            // Zapisujemy dane do atrybutów data-* dla filtrowania i sortowania
+            // Dane do filtrów
             tr.dataset.data = card.dataWykonania || '';
             tr.dataset.klient = card.klient_nazwa || 'Klient nieznany';
             tr.dataset.nrDok = card.nrDokumentu || 'Brak nr';
             tr.dataset.lekarz = card.lekarz_nazwisko || 'Nieznany';
             
-            // --- ⬇️ NOWA, BEZPIECZNA METODA BUDOWANIA WIERSZA ⬇️ ---
-            
-            // Komórka 1: Data
+            // Kolumna 0: Checkbox (NOWOŚĆ)
+            const tdCheck = document.createElement('td');
+            tdCheck.style.textAlign = 'center';
+            tdCheck.innerHTML = `<input type="checkbox" class="archive-card-checkbox" value="${card.id}">`;
+            tr.appendChild(tdCheck);
+
+            // Kolumna 1: Data
             const tdData = document.createElement('td');
             tdData.textContent = card.dataWykonania || 'Brak daty';
             tr.appendChild(tdData);
 
-            // Komórka 2: Klient
+            // Kolumna 2: Klient
             const tdKlient = document.createElement('td');
             tdKlient.textContent = card.klient_nazwa || 'Klient nieznany';
             tr.appendChild(tdKlient);
 
-            // Komórka 3: Nr Dokumentu
+            // Kolumna 3: Nr Dokumentu
             const tdNrDok = document.createElement('td');
             tdNrDok.textContent = card.nrDokumentu || 'Brak nr';
             tr.appendChild(tdNrDok);
 
-            // Komórka 4: Wystawił
+            // Kolumna 4: Wystawił
             const tdLekarz = document.createElement('td');
             tdLekarz.textContent = card.lekarz_nazwisko || 'Nieznany';
             tr.appendChild(tdLekarz);
 
-         // Komórka 5: Akcje
+            // Kolumna 5: Akcje
             const tdAkcje = document.createElement('td');
             tdAkcje.className = 'col-akcje';
             tdAkcje.innerHTML = `
@@ -11895,22 +11930,17 @@ async function loadCardsForUser(lekarz_uid) {
             `;
             tr.appendChild(tdAkcje);
             
-            // --- ⬆️ KONIEC NOWEJ METODY ⬆️ ---
-
             tableBody.appendChild(tr);
         });
 
         filterControls.style.display = 'grid';
+        
+        // Podepnij listenery checkboxów (Funkcja zdefiniowana w nowym module)
+        if(typeof attachCheckboxListeners === 'function') attachCheckboxListeners();
 
     } catch (error) {
-        console.error(`Błąd wczytywania kart dla ${lekarz_uid}:`, error);
-        if (lekarz_uid === "ALL" && error.code === 'failed-precondition') {
-             alert("BŁĄD BAZY DANYCH: Aby filtrować 'Wszystkich' w lecznicy, wymagany jest nowy indeks. Sprawdź konsolę (F12), aby zobaczyć link do jego utworzenia.");
-             console.error("BŁĄD: Prawdopodobnie brakuje indeksu kompozytowego w Firestore. Utwórz indeks dla kolekcji 'archiwumKarty' dla pól: 'id_lecznicy' (Rosnąco) i 'createdAt' (Malejąco).");
-             tableBody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 20px; color: red;">Błąd konfiguracji bazy danych (brak indeksu).</td></tr>';
-        } else {
-            tableBody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 20px; color: red;">Wystąpił błąd podczas wczytywania kart.</td></tr>';
-        }
+        console.error(`Błąd wczytywania kart:`, error);
+        tableBody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 20px; color: red;">Wystąpił błąd podczas wczytywania kart.</td></tr>';
         filterControls.style.display = 'none';
     }
 }
@@ -23362,7 +23392,7 @@ const correctionCardSearchInput = document.getElementById('correctionCardSearchI
 const correctionCardList = document.getElementById('correctionCardList');
 const correctionCardCloseBtn = document.getElementById('correctionCardCloseBtn');
 let cachedCorrectionCards = []; // Cache na karty do filtrowania
-
+let globalArchiveCardsCache = new Map(); // Mapa ID -> Dane Karty (Dla druku zbiorowego)
 // 1. Obsługa przycisku "Tryb Korekty"
 if (correctionModeBtn) {
     correctionModeBtn.addEventListener('click', async () => {
@@ -23640,6 +23670,314 @@ function loadCardForEditing(cardData) {
     // Zamknij modal po wybraniu
     correctionCardSearchModal.style.display = 'none';
 }
+    /* ======================================================== */
+/* ✅ MODUŁ: DRUK ZBIOROWY KART LECZENIA (Bulk Print)       */
+/* ======================================================== */
+
+const bulkActionsContainer = document.getElementById('bulkActionsContainer');
+const selectedCardsCountSpan = document.getElementById('selectedCardsCount');
+const selectAllCheckbox = document.getElementById('selectAllArchiveCards');
+const btnBulkPrintA4 = document.getElementById('btnBulkPrintA4');
+const btnBulkPrint110 = document.getElementById('btnBulkPrint110');
+
+// 1. Obsługa checkboxów i UI
+function attachCheckboxListeners() {
+    const checkboxes = document.querySelectorAll('.archive-card-checkbox');
+    checkboxes.forEach(cb => {
+        cb.addEventListener('change', updateBulkActionsUI);
+    });
+}
+
+function updateBulkActionsUI() {
+    const checkedBoxes = document.querySelectorAll('.archive-card-checkbox:checked');
+    const count = checkedBoxes.length;
+    
+    if (selectedCardsCountSpan) selectedCardsCountSpan.textContent = count;
+    
+    if (count > 0) {
+        if(bulkActionsContainer) bulkActionsContainer.style.display = 'flex';
+    } else {
+        if(bulkActionsContainer) bulkActionsContainer.style.display = 'none';
+        if(selectAllCheckbox) selectAllCheckbox.checked = false;
+    }
+}
+
+// 2. Obsługa "Zaznacz wszystko"
+if (selectAllCheckbox) {
+    selectAllCheckbox.addEventListener('change', function() {
+        const isChecked = this.checked;
+        const visibleRows = document.querySelectorAll('#archiveCardTableBody tr');
+        
+        visibleRows.forEach(row => {
+            // Zaznacz tylko widoczne wiersze (po filtracji)
+            if (row.style.display !== 'none') {
+                const cb = row.querySelector('.archive-card-checkbox');
+                if (cb) cb.checked = isChecked;
+            }
+        });
+        updateBulkActionsUI();
+    });
+}
+
+// 3. LISTENERY PRZYCISKÓW DRUKU
+if (btnBulkPrintA4) {
+    btnBulkPrintA4.addEventListener('click', () => handleBulkPrint('A4'));
+}
+if (btnBulkPrint110) {
+    btnBulkPrint110.addEventListener('click', () => handleBulkPrint('110mm'));
+}
+
+
+// 4. GŁÓWNA FUNKCJA GENERUJĄCA WYDRUK ZBIOROWY
+function handleBulkPrint(format) {
+    const checkedBoxes = document.querySelectorAll('.archive-card-checkbox:checked');
+    if (checkedBoxes.length === 0) return;
+
+    const cardsToPrint = [];
+    checkedBoxes.forEach(cb => {
+        const cardData = globalArchiveCardsCache.get(cb.value);
+        if (cardData) {
+            cardsToPrint.push(cardData);
+        }
+    });
+
+    if (cardsToPrint.length === 0) {
+        alert("Błąd: Nie znaleziono danych dla zaznaczonych kart.");
+        return;
+    }
+
+    // Sortuj (opcjonalne)
+    // cardsToPrint.sort((a,b) => a.createdAt - b.createdAt);
+
+    console.log(`Generowanie wydruku zbiorczego (${format}) dla ${cardsToPrint.length} kart.`);
+
+    // --- GENEROWANIE HTML ---
+    let combinedHTML = '';
+    
+    // Ustal style bazowe w zależności od formatu
+    let styleBlock = '';
+    
+    if (format === 'A4') {
+        styleBlock = `
+            @page { size: A4 landscape; margin: 0.5cm; }
+            body { font-family: 'Nunito', sans-serif; background: white; margin: 0; padding: 0; }
+            .page-sheet { 
+                width: 100%; height: 100vh; box-sizing: border-box; 
+                page-break-after: always; padding: 20px;
+                /* Skala dla A4 */
+                transform: scale(0.88); transform-origin: top center;
+            }
+            /* ... style wspólne ... */
+            table { border-collapse: collapse; width: 100%; font-size: 9pt; }
+            th, td { border: 1px solid #000; padding: 2px; text-align: left; vertical-align: middle; }
+            th { background: #EBF5E6; text-align: center; font-weight: bold; }
+            .center-text { text-align: center; }
+            .top-section { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 5px; font-size: 10pt; margin-bottom: 10px; }
+            .top-section div { border: 1px solid #000; padding: 5px; }
+            .signatures { display: flex; justify-content: space-between; margin-top: 20px; }
+            .sig-box { width: 40%; text-align: center; display: flex; flex-direction: column; align-items: center;}
+            .sig-img { height: 40px; display: block; margin: 0 auto; }
+            .sig-label { border-top: 1px dashed #000; display: block; width: 100%; }
+        `;
+    } else {
+        // Format 110mm
+        styleBlock = `
+            @page { size: 110mm auto; margin: 0; }
+            body { font-family: Arial, sans-serif; background: white; margin: 0; padding: 5px; width: 110mm; }
+            .receipt-page { 
+                width: 100%; box-sizing: border-box; 
+                page-break-after: always; 
+                border-bottom: 1px dashed #ccc; 
+                padding-bottom: 20px; margin-bottom: 20px;
+            }
+            h2 { font-size: 10pt; text-align: center; margin: 0 0 10px 0; }
+            .data-block { font-size: 9pt; margin-bottom: 5px; }
+            h3 { font-size: 9pt; background: #eee; padding: 2px; margin: 5px 0; }
+            .item-row { font-size: 8pt; border-bottom: 1px dotted #ddd; margin-bottom: 2px; }
+            .signatures-110mm { margin-top: 15px; }
+            .sig-box-110mm { margin-top: 10px; }
+            .sig-box-110mm img { height: 35px; }
+        `;
+    }
+
+    // Pętla po kartach
+    cardsToPrint.forEach(card => {
+        if (format === 'A4') {
+            combinedHTML += `<div class="page-sheet page-break">
+                                ${generateInnerHtmlForA4(card)}
+                             </div>`;
+        } else {
+            combinedHTML += `<div class="receipt-page page-break">
+                                ${generateInnerHtmlFor110mm(card)}
+                             </div>`;
+        }
+    });
+
+    // Otwórz okno druku
+    const printWindow = window.open('', '_blank', 'width=1000,height=800');
+    printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Wydruk Zbiorowy</title>
+            <style>
+                ${styleBlock}
+                /* Styl łamania strony */
+                @media print {
+                    .page-break { page-break-after: always !important; break-after: page !important; }
+                    body { margin: 0; padding: 0; }
+                }
+            </style>
+        </head>
+        <body>
+            ${combinedHTML}
+            <script>
+                // Automatyczny druk po załadowaniu obrazków
+                window.onload = function() { 
+                    setTimeout(() => window.print(), 500); 
+                };
+            </script>
+        </body>
+        </html>
+    `);
+    printWindow.document.close();
+}
+
+// 5. HELPERY GENERUJĄCE TREŚĆ (Skrócone wersje istniejących funkcji)
+
+function generateInnerHtmlForA4(card) {
+    const header = card.header || {};
+    // ... Budowanie wierszy tabeli ...
+    let rowsHTML = '';
+    const savedRows = card.table || [];
+    // Helper clean
+    const cl = (t) => (t||'').replace('📅','').trim();
+
+    for (let i = 1; i <= 13; i++) {
+        let lIdx = (i < 10) ? i - 1 : i - 2;
+        
+        if (i === 10) {
+            rowsHTML += `<tr><td colspan="8" style="background:#eee;font-weight:bold;font-size:9pt;">Potwierdzenie nabycia produktu leczniczego weterynaryjnego/paszy leczniczej</td></tr>`; 
+            continue; 
+        }
+        
+        const r = savedRows.find(row => row.logicalIndex === lIdx);
+        // Pobierz ilość (usuń HTML)
+        let iloscCzysta = '';
+        if (r && r.iloscDawka) {
+             iloscCzysta = r.iloscDawka.replace(/<[^>]*>/g, '').trim();
+             // Spróbuj wydobyć wartość z value="" jeśli jest input
+             if (r.iloscDawka.includes('value="')) {
+                  const m = r.iloscDawka.match(/value="([\d\.]+)"/);
+                  if (m) iloscCzysta = m[1] + ' ' + iloscCzysta;
+             }
+        }
+
+        rowsHTML += `<tr>
+            <td style="text-align:center">${i < 10 ? i : i-10}.</td>
+            <td>${r ? cl(r.opis) : ''}</td>
+            <td style="text-align:center">${r ? cl(r.liczba) : ''}</td>
+            <td style="text-align:center">${r ? cl(r.rozpoznanie) : ''}</td>
+            <td>${r ? cl(r.lek) : ''}</td>
+            <td style="text-align:center">${r ? cl(r.seria) : ''}</td>
+            <td>${iloscCzysta}</td>
+            <td>${r ? cl(r.karencja) : ''}</td>
+        </tr>`;
+    }
+
+    const imgLek = header.podpisLekarzaImg || '';
+    const imgPos = card.podpisPosiadacza || '';
+
+    return `
+        <h2 style="text-align:center;font-size:12pt;margin:0;">KARTA LECZENIA ZWIERZĄT...</h2>
+        <div style="font-size:10pt;text-align:center;margin-bottom:5px;">NR: <b>${header.nrDokumentu}</b></div>
+        
+        <div class="top-section">
+            <div>Lecznica: <b>${header.nazwaLecznicy}</b><br>Data: <b>${header.dataWykonania}</b><br>Stado: <b>${header.nrStada}</b></div>
+            <div>Klient: <b>${header.klient}</b><br>${header.adresKlienta}</div>
+            <div>Zgłoszenie: <b>${header.dataZgloszenia}</b></div>
+        </div>
+        <table>
+            <colgroup>
+                <col style="width:30px;"><col style="width:20%;"><col style="width:40px;"><col style="width:15%;">
+                <col style="width:18%;"><col style="width:8%;"><col style="width:10%;"><col>
+            </colgroup>
+            <thead>
+                <tr>
+                   <th>Lp</th><th>Opis zwierzęcia</th><th>Liczba</th><th>Rozpoznanie</th>
+                   <th>Produkt</th><th>Seria</th><th>Ilość</th><th>Karencja</th>
+                </tr>
+            </thead>
+            <tbody>${rowsHTML}</tbody>
+        </table>
+        
+        <p style="font-size:9pt; margin-top:5px;"><b>Oświadczam, że nabyte produkty lecznicze...</b></p>
+
+        <div class="signatures">
+            <div class="sig-box">
+                <span class="sig-label">Lekarz weterynarii</span>
+                ${imgLek ? `<img src="${imgLek}" class="sig-img">` : ''}
+                <br>${header.podpisLekarzaLinia}
+            </div>
+            <div class="sig-box">
+                <span class="sig-label">Posiadacz zwierzęcia</span>
+                ${imgPos ? `<img src="${imgPos}" class="sig-img">` : ''}
+            </div>
+        </div>
+    `;
+}
+
+function generateInnerHtmlFor110mm(card) {
+    const header = card.header || {};
+    // Prostszy widok dla 110mm
+    let content = `
+        <h2>KARTA LECZENIA</h2>
+        <div style="text-align:center;">NR: <b>${header.nrDokumentu}</b></div>
+        <div class="data-block">
+            <p><strong>Lekarz:</strong> ${header.podpisLekarzaLinia}</p>
+            <p><strong>Klient:</strong> ${header.klient}</p>
+            <p><strong>Data:</strong> ${header.dataWykonania}</p>
+        </div>
+        <h3>I. Leczenie / II. Produkty</h3>
+    `;
+    
+    // Prosta pętla po produktach (bez pustych wierszy)
+    (card.table || []).forEach(row => {
+        if(row.lek) {
+            let ilosc = (row.iloscDawka || '').replace(/<[^>]*>/g, '').trim();
+             if (row.iloscDawka && row.iloscDawka.includes('value="')) {
+                  const m = row.iloscDawka.match(/value="([\d\.]+)"/);
+                  if (m) ilosc = m[1] + ' ' + ilosc;
+             }
+            
+            content += `
+                <div class="item-row">
+                    <b>${row.lek}</b><br>
+                    Ilość: ${ilosc} | Seria: ${row.seria || '-'} <br>
+                    Karencja: ${row.karencja || '-'}
+                </div>
+            `;
+        }
+    });
+
+    const imgLek = header.podpisLekarzaImg || '';
+    const imgPos = card.podpisPosiadacza || '';
+
+    content += `
+        <div class="signatures-110mm">
+            <div class="sig-box-110mm">
+                <strong>Lekarz:</strong>
+                ${imgLek ? `<img src="${imgLek}">` : ''}
+            </div>
+            <div class="sig-box-110mm">
+                <strong>Posiadacz:</strong>
+                ${imgPos ? `<img src="${imgPos}">` : ''}
+            </div>
+        </div>
+    `;
+    return content;
+}
+/* ✅ KONIEC MODUŁU DRUKU ZBIOROWEGO */
 /* ======================================================== */
 /* KONIEC SKRYPTU */
 /* ======================================================== */
