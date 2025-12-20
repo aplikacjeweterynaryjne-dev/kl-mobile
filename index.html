@@ -23768,6 +23768,10 @@ if (printSelectedCardsBtn) {
  * Główna funkcja generująca HTML dla wielu kart
  * ✅ POPRAWIONA: Dodaje odstępy w 110mm i poprawne kontenery
  */
+/**
+ * Główna funkcja generująca HTML dla wielu kart
+ * ✅ POPRAWIONA v2: Usunięto podwójne łamanie strony w A4 i dodano odstępy w 110mm
+ */
 function generateBulkHTML(cards, format) {
     showToast(`Generowanie wydruku dla ${cards.length} kart...`, "info");
 
@@ -23787,13 +23791,8 @@ function generateBulkHTML(cards, format) {
         if (format === 'A4') {
             cardHTML = getInnerCardHTML_A4(card);
             // Opakuj w kontener strony A4
+            // ✅ USUNIĘTO RĘCZNY "page-break-after" - teraz CSS to robi automatycznie
             fullBodyContent += `<div class="page-sheet">${cardHTML}</div>`;
-            
-            // Podział strony dla A4 (zawsze nowa kartka)
-            if (index < cards.length - 1) {
-                // Pusty div wymuszający nową stronę, ale niewidoczny
-                fullBodyContent += `<div style="page-break-after: always;"></div>`;
-            }
 
         } else {
             // Format 110mm
@@ -23801,13 +23800,13 @@ function generateBulkHTML(cards, format) {
             // Opakuj w kontener 110mm
             fullBodyContent += `<div class="receipt-page">${cardHTML}</div>`;
 
-            // ✅ DODANIE ODSTĘPU DLA 110mm (zamiast page-break, który na rolce bywa dziwny)
+            // ✅ ODSTĘP DLA 110mm (Tylko między kartami, nie po ostatniej)
             if (index < cards.length - 1) {
                 fullBodyContent += `
-                    <div style="text-align: center; margin: 20px 0;">
+                    <div style="text-align: center; margin: 0; padding: 15px 0;">
                         <br>
-                        <div style="border-bottom: 2px dashed #999; width: 80mm; margin: 0 auto;"></div>
-                        <div style="font-size: 10px; color: #999; margin-top: 2px;">✂️ ROZDZIELENIE ✂️</div>
+                        <div style="border-bottom: 2px dashed #000; width: 100%;"></div>
+                        <div style="font-size: 10px; font-weight:bold; color: #000; margin-top: 4px;">✂️ --- KOLEJNA KARTA --- ✂️</div>
                         <br>
                     </div>
                 `;
@@ -23847,12 +23846,11 @@ function generateBulkHTML(cards, format) {
 // --- HELPERY: Wyciąganie styli i HTML (kopiowane z Twoich istniejących funkcji dla spójności) ---
 
 /* ✅ 1. STYLE A4 (Poprawione: Widoczne przyciski) */
+/* ✅ 1. STYLE A4 (NAPRAWIONE: Brak pustych stron) */
 function getA4Styles() {
     return `
-        /* --- STYLE Z getUnifiedPrintHTML --- */
         body { font-family: 'Nunito', sans-serif; background-color: #525659; margin: 0; padding: 0; display: block; }
         
-        /* POPRAWKA: Przyciski widoczne na górze, przyklejone */
         .print-controls { 
             position: sticky; top: 0; z-index: 1000; 
             background: #333; padding: 10px; text-align: center; 
@@ -23872,46 +23870,21 @@ function getA4Styles() {
             box-sizing: border-box; 
             display: block; 
             position: relative;
-            
-            /* Skalowanie identyczne jak w pojedynczym */
             transform: scale(0.85); 
-            transform-origin: top center; /* Zmieniono na center dla lepszego wyglądu listy */
-            width: 297mm; /* Sztywna szerokość dla podglądu */
+            transform-origin: top center; 
         }
 
-        h2 { 
-            text-align: center; font-size: 12pt; 
-            margin: 0 0 5px 0; 
-            font-weight: 700; color: #000; text-transform: uppercase; line-height: 1.1;
-        }
-        
-        .top-section { 
-            display: grid; 
-            grid-template-columns: 1fr 1fr 1fr; 
-            font-size: 9pt; 
-            margin-bottom: 5px; 
-            gap: 3px; 
-            width: 100%;
-        }
+        /* ... (Style wewnętrzne karty - h2, table, th, td itp. pozostają bez zmian) ... */
+        h2 { text-align: center; font-size: 12pt; margin: 0 0 5px 0; font-weight: 700; color: #000; text-transform: uppercase; line-height: 1.1; }
+        .top-section { display: grid; grid-template-columns: 1fr 1fr 1fr; font-size: 9pt; margin-bottom: 5px; gap: 3px; width: 100%; }
         .top-section div { padding: 3px 4px; border: 1px solid #000; word-wrap: break-word; }
         .bold { font-weight: 700; }
-
         table { border-collapse: collapse; width: 100%; font-size: 9pt; margin-bottom: 3px; }
         th, td { border: 1px solid #000; padding: 2px 3px; text-align: left; vertical-align: middle; }
-        
-        /* Fix zawijania tekstu */
-        td:nth-child(2) {
-            white-space: normal !important;
-            word-wrap: break-word !important;
-            overflow-wrap: break-word !important;
-            word-break: break-word !important;
-        }
-        
+        td:nth-child(2) { white-space: normal !important; word-wrap: break-word !important; overflow-wrap: break-word !important; word-break: break-word !important; }
         th { background-color: #EBF5E6 !important; text-align: center; font-weight: bold; font-size: 8pt; -webkit-print-color-adjust: exact; }
         .center-text { text-align: center; }
-        
         p { font-size: 9pt; margin: 2px 0; color: #000; }
-        
         .signatures { display: flex; justify-content: space-between; margin-top: 10px; }
         .sig-box { display: flex; flex-direction: column; align-items: center; width: 40%; }
         .sig-label { font-weight: bold; margin-bottom: 0; font-size: 9pt; display: block; text-align: center; width: 100%; }
@@ -23920,19 +23893,32 @@ function getA4Styles() {
 
         @media print {
             body { background: white !important; margin: 0; padding: 0; }
-            .print-controls { display: none !important; } /* Ukryj przyciski przy druku */
+            .print-controls { display: none !important; } 
             
             .page-sheet { 
                 width: 100% !important;
                 margin: 0 !important; 
-                padding: 5mm !important; /* Mniejszy padding przy druku */
+                padding: 5mm !important; 
                 box-shadow: none !important; 
+                
+                /* ✅ TU JEST POPRAWKA: Łamanie strony w CSS */
                 page-break-inside: avoid;
-                page-break-after: always; /* KAŻDA KARTA NA NOWEJ STRONIE */
-                transform: scale(0.95); /* Lekkie skalowanie dla dopasowania */
+                break-inside: avoid;
+                
+                page-break-after: always; /* Zawsze nowa strona po karcie */
+                break-after: page;
+                
+                transform: scale(0.95); 
                 transform-origin: top left;
             }
-            /* Reset marginesów strony */
+
+            /* ✅ Ukrywamy łamanie strony po OSTATNIEJ karcie, żeby nie drukować pustej kartki na końcu */
+            .page-sheet:last-of-type {
+                page-break-after: auto !important;
+                break-after: auto !important;
+                margin-bottom: 0 !important;
+            }
+
             @page { size: A4 landscape; margin: 0.5cm; }
         }
     `;
