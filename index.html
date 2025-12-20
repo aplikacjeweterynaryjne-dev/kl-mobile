@@ -23844,7 +23844,7 @@ function generateBulkHTML(cards, format) {
 }
 
 // --- HELPERY: Wyciąganie styli i HTML (kopiowane z Twoich istniejących funkcji dla spójności) ---
-/* ✅ 1. STYLE A4 (IDENTYCZNE jak pojedyncze + fix na puste strony) */
+/* ✅ 1. STYLE A4 (SKALA 83% - DOPASOWANIE IDEALNE) */
 function getA4Styles() {
     return `
         /* --- STYLE OGÓLNE (EKRAN) --- */
@@ -23870,14 +23870,14 @@ function getA4Styles() {
             display: block; 
             position: relative;
             
-            /* Skalowanie na ekranie */
-            transform: scale(0.85); 
+            /* Podgląd na ekranie (też 83% żebyś widział to co na druku) */
+            transform: scale(0.83); 
             transform-origin: top left; 
-            width: 117.6%; /* Kompensacja skalowania */
+            width: 120.5%; /* Kompensacja: 100 / 0.83 */
             box-shadow: 0 5px 15px rgba(0,0,0,0.3);
         }
 
-        /* --- STYLE WEWNĘTRZNE KARTY (Identyczne jak w pojedynczej) --- */
+        /* --- STYLE WEWNĘTRZNE KARTY --- */
         h2 { text-align: center; font-size: 12pt; margin: 0 0 5px 0; font-weight: 700; color: #000; text-transform: uppercase; line-height: 1.1; }
         
         .top-section { display: grid; grid-template-columns: 1fr 1fr 1fr; font-size: 9pt; margin-bottom: 5px; gap: 3px; width: 100%; }
@@ -23901,7 +23901,7 @@ function getA4Styles() {
         .sig-img { display: block; height: 35px; width: 100%; object-fit: contain; margin-top: 1px; }
         .sig-name { margin-top: 0; font-size: 8pt; text-align: center; }
 
-        /* --- USTAWIENIA DRUKU --- */
+        /* --- USTAWIENIA DRUKU (WYMUSZONE 83%) --- */
         @media print {
             body { background: white !important; margin: 0; padding: 0; }
             .print-controls { display: none !important; } 
@@ -23909,14 +23909,18 @@ function getA4Styles() {
             .page-sheet { 
                 /* Reset marginesów kontenera */
                 margin: 0 !important; 
-                padding: 10mm !important; /* Zachowujemy padding jak w pojedynczym */
+                padding: 10mm !important; 
                 box-shadow: none !important; 
                 border: none !important;
 
-                /* ✅ KLUCZOWE: Ustawienia identyczne jak w pojedynczym */
-                transform: scale(0.85) !important; 
-                transform-origin: top left !important; /* Przywrócono TOP LEFT */
-                width: 117.6% !important; /* Kompensacja, żeby zajęło całą szerokość */
+                /* ✅ KLUCZOWE: SKALA 83% */
+                transform: scale(0.83) !important; 
+                transform-origin: top left !important; 
+                
+                /* ✅ KOMPENSACJA SZEROKOŚCI */
+                /* Żeby zmniejszona strona (83%) zajęła całą kartkę A4, */
+                /* kontener musi być szerszy o 1/0.83 = 120.48% */
+                width: 120.5% !important; 
 
                 /* Wymuszanie nowej strony */
                 page-break-after: always !important;
@@ -23924,7 +23928,7 @@ function getA4Styles() {
                 page-break-inside: avoid !important;
             }
 
-            /* ✅ FIX: Ostatnia karta NIE robi nowej strony */
+            /* ✅ Ostatnia karta NIE robi nowej strony */
             .page-sheet:last-of-type {
                 page-break-after: auto !important;
                 break-after: auto !important;
@@ -23934,7 +23938,7 @@ function getA4Styles() {
             /* Ustawienia marginesów kartki */
             @page { 
                 size: A4 landscape; 
-                margin: 0.5cm; /* Mały margines bezpieczny */
+                margin: 0.5cm; 
             }
         }
     `;
