@@ -3031,9 +3031,6 @@ background-color: #eef;
   <div id="archiwumSubMenu" style="display: none; width: 90%; max-width: 400px; margin-top: -10px; margin-bottom: 10px;">
     <button id="menuArchiwumKartyBtn" class="submenu-btn">📄 Karty leczenia</button>
     <button id="menuArchiwumParagonyBtn" class="submenu-btn">🧾 Paragony</button>
-    <button id="menuTimelineBtn" class="menu-btn" style="background-color: #e8f6f3; border-color: #a3e4d7;">
-    ⏳ Oś Czasu Zwierzęcia
-</button>
   </div>
   <button id="menuKonfiguracjaBtn" class="menu-btn">⚙️ Konfiguracja programu</button>
   <button id="menuSpolecznoscBtn" class="menu-btn" style="background-color: #e3f2fd; border-color: #bbdefb;">💬 Komunikator & Baza Wiedzy</button>
@@ -4970,23 +4967,6 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
         </div>
     </div>
 </div>
-    <div id="timelineModal" class="product-search-modal" style="display: none; z-index: 10050;">
-    <div class="form-card" style="height: 90vh; max-width: 600px; display: flex; flex-direction: column;">
-        <div style="border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
-            <h3 style="margin: 0; color: #2b74e4;">🐄 Historia Zwierzęcia</h3>
-            <button id="closeTimelineBtn" class="btn ghost small" style="font-size: 20px;">✕</button>
-        </div>
-
-        <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-            <input type="text" id="timelineSearchInput" placeholder="Wpisz nr kolczyka lub imię..." style="flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 16px;">
-            <button id="timelineSearchBtn" class="btn primary">Szukaj</button>
-        </div>
-
-        <div id="timelineContent" style="flex: 1; overflow-y: auto; padding: 10px 20px; background-color: #f9f9f9; border-radius: 8px;">
-            <p style="text-align: center; color: #888; margin-top: 50px;">Wpisz identyfikator zwierzęcia (np. końcówkę numeru), aby zobaczyć jego historię leczenia.</p>
-        </div>
-    </div>
-</div>
     <script>
 /* ----- Inicjalizacja Firebase (Uruchamia się na starcie) ----- */
 // ... reszta kodu pierwszego bloku script ...
@@ -6469,88 +6449,6 @@ if (printFormat110 && receiptPrintContainer) {
                                 margin: 0mm;      /* Marginesy zerowe - sterujemy div'em .receipt-page */
                             }
                         }
-                        /* --- ✅ NOWE STYLE: OŚ CZASU (TIMELINE) --- */
-.timeline {
-    position: relative;
-    max-width: 100%;
-    margin: 0 auto;
-    padding-left: 10px;
-}
-
-/* Pionowa linia */
-.timeline::after {
-    content: '';
-    position: absolute;
-    width: 4px;
-    background-color: #ddd;
-    top: 0;
-    bottom: 0;
-    left: 30px; /* Pozycja linii */
-    margin-left: -2px;
-}
-
-.timeline-item {
-    padding: 10px 10px 20px 50px; /* Miejsce na kropkę z lewej */
-    position: relative;
-    background-color: inherit;
-    width: 100%;
-    box-sizing: border-box;
-}
-
-/* Kropka na linii */
-.timeline-item::after {
-    content: '';
-    position: absolute;
-    width: 16px;
-    height: 16px;
-    background-color: white;
-    border: 4px solid #999; /* Domyślny kolor */
-    top: 20px;
-    left: 20px; /* Pozycja kropki na linii */
-    border-radius: 50%;
-    z-index: 2;
-}
-
-/* Kolory kropek zależnie od typu */
-.timeline-item.type-leczenie::after { border-color: #c0392b; } /* Czerwony */
-.timeline-item.type-profilaktyka::after { border-color: #27ae60; } /* Zielony */
-.timeline-item.type-rozrod::after { border-color: #2980b9; } /* Niebieski */
-
-/* Dymek z treścią */
-.timeline-content {
-    padding: 12px;
-    background-color: white;
-    position: relative;
-    border-radius: 8px;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.08);
-    border-left: 5px solid #ccc; /* Pasek koloru przy dymku */
-}
-
-.timeline-item.type-leczenie .timeline-content { border-left-color: #c0392b; }
-.timeline-item.type-profilaktyka .timeline-content { border-left-color: #27ae60; }
-.timeline-item.type-rozrod .timeline-content { border-left-color: #2980b9; }
-
-.timeline-date {
-    font-size: 13px;
-    font-weight: 800;
-    color: #555;
-    margin-bottom: 4px;
-    display: block;
-}
-
-.timeline-title {
-    font-size: 17px;
-    font-weight: bold;
-    margin-bottom: 6px;
-    color: #333;
-    display: block;
-}
-
-.timeline-details {
-    font-size: 14px;
-    color: #666;
-    line-height: 1.4;
-}
                     </style>
                 </head>
                 <body>
@@ -24487,152 +24385,6 @@ function getInnerCardHTML_110mm(card) {
             <p style="margin: 2px 0;">***** Wyniki badań uzupełniających (jeśli dotyczy)</p>
         </div>
     `;
-}
-    /* ======================================================== */
-/* ✅ NOWY MODUŁ: OŚ CZASU (TIMELINE)                       */
-/* ======================================================== */
-
-const timelineModal = document.getElementById('timelineModal');
-const timelineInput = document.getElementById('timelineSearchInput');
-const timelineContent = document.getElementById('timelineContent');
-const timelineSearchBtn = document.getElementById('timelineSearchBtn');
-const closeTimelineBtn = document.getElementById('closeTimelineBtn');
-const menuTimelineBtn = document.getElementById('menuTimelineBtn');
-
-// 1. Otwieranie z Menu
-if (menuTimelineBtn) {
-    menuTimelineBtn.addEventListener('click', () => {
-        timelineModal.style.display = 'flex';
-        timelineInput.value = ''; // Wyczyść stare wyszukiwanie
-        timelineContent.innerHTML = '<p style="text-align: center; color: #888; margin-top: 50px;">Wpisz identyfikator zwierzęcia, aby zobaczyć jego historię.</p>';
-        setTimeout(() => timelineInput.focus(), 50);
-    });
-}
-
-// 2. Zamykanie
-if (closeTimelineBtn) {
-    closeTimelineBtn.addEventListener('click', () => {
-        timelineModal.style.display = 'none';
-    });
-}
-
-// 3. Logika Wyszukiwania
-if (timelineSearchBtn) {
-    timelineSearchBtn.addEventListener('click', async () => {
-        const query = timelineInput.value.toLowerCase().trim();
-        
-        if (query.length < 2) {
-            alert("Wpisz co najmniej 2 znaki (np. końcówkę kolczyka lub imię).");
-            return;
-        }
-
-        timelineContent.innerHTML = '<div style="text-align:center; padding: 20px;">Przeszukiwanie historii... ⏳<br><small>To może chwilę potrwać</small></div>';
-
-        try {
-            // A. Pobieranie kart (z Cache lub z Bazy)
-            let cards = [];
-            
-            // Sprawdź czy mamy załadowane archiwum w tle (z innych modułów)
-            // Jeśli nie, pobierz ostatnie 100 kart z bazy
-            if (typeof currentArchiveCardsCache !== 'undefined' && currentArchiveCardsCache.length > 0) {
-                console.log("Timeline: Używam danych z cache.");
-                cards = currentArchiveCardsCache;
-            } else {
-                console.log("Timeline: Pobieram dane z Firebase...");
-                const q = db.collection("archiwumKarty")
-                            .where("lekarz_uid", "==", currentUserProfile.uid)
-                            .orderBy("createdAt", "desc")
-                            .limit(150); // Pobierz 150 ostatnich kart
-                const snap = await q.get();
-                cards = snap.docs.map(doc => doc.data());
-            }
-
-            // B. Przeszukiwanie wierszy
-            const events = [];
-
-            cards.forEach(card => {
-                if (card.table && Array.isArray(card.table)) {
-                    card.table.forEach(row => {
-                        // Sprawdź czy opis zwierzęcia pasuje do szukanej frazy
-                        const opis = (row.opis || '').toLowerCase();
-                        
-                        if (opis.includes(query)) {
-                            // Znaleziono pasujące zwierzę!
-                            
-                            // Analiza typu zdarzenia (heurystyka po słowach kluczowych)
-                            let type = 'leczenie'; // Domyślnie czerwone
-                            const lek = (row.lek || '').toLowerCase();
-                            const rozp = (row.rozpoznanie || '').toLowerCase();
-
-                            if (lek.includes('szczep') || rozp.includes('szczep') || rozp.includes('profilaktyka') || lek.includes('wit')) {
-                                type = 'profilaktyka'; // Zielone
-                            } else if (rozp.includes('inseminacja') || rozp.includes('badanie') || rozp.includes('ciaza') || rozp.includes('ciąża') || rozp.includes('rozrod')) {
-                                type = 'rozrod'; // Niebieskie
-                            }
-
-                            // Ilość/Dawkowanie (czyszczenie HTML)
-                            let iloscTxt = row.iloscDawka || '';
-                            if (iloscTxt.includes('value="')) {
-                                const m = iloscTxt.match(/value="([\d\.]+)"/);
-                                iloscTxt = m ? m[1] : '';
-                            }
-                            iloscTxt = iloscTxt.replace(/<[^>]*>/g, '').trim();
-
-                            events.push({
-                                date: card.header.dataWykonania,
-                                title: row.rozpoznanie || 'Wizyta lekarska',
-                                products: row.lek ? `${row.lek} (${iloscTxt})` : 'Brak leków',
-                                fullDesc: row.opis, 
-                                type: type,
-                                docNr: card.nrDokumentu
-                            });
-                        }
-                    });
-                }
-            });
-
-            // C. Sortowanie chronologiczne (Od najnowszych)
-            events.sort((a, b) => new Date(b.date) - new Date(a.date));
-
-            // D. Renderowanie HTML
-            if (events.length === 0) {
-                timelineContent.innerHTML = `<div style="text-align:center; padding:20px; color:#888;">
-                    Nie znaleziono historii dla frazy: "<b>${timelineInput.value}</b>" w ostatnich 150 kartach.<br><br>
-                    Spróbuj wpisać inną część numeru kolczyka.
-                </div>`;
-                return;
-            }
-
-            let html = `<div class="timeline">`;
-            
-            events.forEach(ev => {
-                html += `
-                    <div class="timeline-item type-${ev.type}">
-                        <div class="timeline-content">
-                            <span class="timeline-date">📅 ${ev.date} <span style="float:right; font-weight:normal; font-size:11px;">Dok: ${ev.docNr}</span></span>
-                            <span class="timeline-title">${ev.title}</span>
-                            <div class="timeline-details">
-                                💊 <strong>${ev.products}</strong><br>
-                                <span style="font-size:11px; color:#888;">Pacjent: ${ev.fullDesc}</span>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            });
-
-            html += `</div>`;
-            timelineContent.innerHTML = html;
-
-        } catch (e) {
-            console.error("Błąd osi czasu:", e);
-            timelineContent.innerHTML = '<p style="text-align: center; color: red;">Wystąpił błąd podczas pobierania danych.</p>';
-        }
-    });
-
-    // Szukanie enterem
-    timelineInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') timelineSearchBtn.click();
-    });
 }
 /* ======================================================== */
 /* KONIEC SKRYPTU */
