@@ -2411,87 +2411,7 @@ tr.filled-row td {
         -webkit-print-color-adjust: exact;
     }
 }
-    /* --- STYLE OSI CZASU (TIMELINE) --- */
-.timeline {
-    position: relative;
-    max-width: 100%;
-    margin: 0 auto;
-}
-
-/* Pionowa linia */
-.timeline::after {
-    content: '';
-    position: absolute;
-    width: 4px;
-    background-color: #ddd;
-    top: 0;
-    bottom: 0;
-    left: 20px; /* Pozycja linii */
-    margin-left: -2px;
-}
-
-.timeline-item {
-    padding: 10px 10px 10px 50px; /* Miejsce na kropkę z lewej */
-    position: relative;
-    background-color: inherit;
-    width: 100%;
-    box-sizing: border-box;
-}
-
-/* Kropka na linii */
-.timeline-item::after {
-    content: '';
-    position: absolute;
-    width: 20px;
-    height: 20px;
-    right: auto;
-    background-color: white;
-    border: 4px solid #FF9F55; /* Domyślny kolor */
-    top: 15px;
-    left: 10px; /* Pozycja kropki na linii */
-    border-radius: 50%;
-    z-index: 1;
-}
-
-/* Kolory kropek zależnie od typu */
-.timeline-item.type-leczenie::after { border-color: #c0392b; } /* Czerwony */
-.timeline-item.type-profilaktyka::after { border-color: #27ae60; } /* Zielony */
-.timeline-item.type-rozrod::after { border-color: #2980b9; } /* Niebieski */
-
-/* Dymek z treścią */
-.timeline-content {
-    padding: 15px;
-    background-color: white;
-    position: relative;
-    border-radius: 6px;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    border-left: 4px solid #ccc; /* Pasek koloru przy dymku */
-}
-
-.timeline-item.type-leczenie .timeline-content { border-left-color: #c0392b; }
-.timeline-item.type-profilaktyka .timeline-content { border-left-color: #27ae60; }
-.timeline-item.type-rozrod .timeline-content { border-left-color: #2980b9; }
-
-.timeline-date {
-    font-size: 12px;
-    font-weight: bold;
-    color: #555;
-    margin-bottom: 5px;
-    display: block;
-}
-
-.timeline-title {
-    font-size: 16px;
-    font-weight: bold;
-    margin-bottom: 5px;
-    color: #333;
-}
-
-.timeline-details {
-    font-size: 13px;
-    color: #666;
-    line-height: 1.4;
-}
+    
 </style>
     <div id="calcProductSearchModal" class="product-search-modal" style="display: none; z-index: 10003;">
     <div class="product-search-card">
@@ -3112,9 +3032,6 @@ background-color: #eef;
     <button id="menuArchiwumKartyBtn" class="submenu-btn">📄 Karty leczenia</button>
     <button id="menuArchiwumParagonyBtn" class="submenu-btn">🧾 Paragony</button>
   </div>
-    <button id="menuTimelineBtn" class="menu-btn" style="background-color: #e8f6f3; border-color: #a3e4d7;">
-      ⏳ Oś Czasu Zwierzęcia
-  </button>
   <button id="menuKonfiguracjaBtn" class="menu-btn">⚙️ Konfiguracja programu</button>
   <button id="menuSpolecznoscBtn" class="menu-btn" style="background-color: #e3f2fd; border-color: #bbdefb;">💬 Komunikator & Baza Wiedzy</button>
   <button id="menuLogoutBtn" class="menu-btn" style="background-color: #fdf2f2; border-color: #e6b8b3; color: #c0392b; font-weight: bold;">➡️ Wyloguj</button>
@@ -6558,23 +6475,6 @@ if (printFormat110 && receiptPrintContainer) {
         
         <div class="form-actions" style="justify-content: flex-end; margin-top: 15px;">
             <button id="correctionCardCloseBtn" class="btn ghost">Anuluj</button>
-        </div>
-    </div>
-</div>
-<div id="timelineModal" class="product-search-modal" style="display: none; z-index: 10050;">
-    <div class="form-card" style="height: 90vh; max-width: 600px; display: flex; flex-direction: column;">
-        <div style="border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
-            <h3 style="margin: 0; color: #2b74e4;">🐄 Historia Zwierzęcia</h3>
-            <button id="closeTimelineBtn" class="btn ghost small" style="font-size: 20px;">✕</button>
-        </div>
-
-        <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-            <input type="text" id="timelineSearchInput" placeholder="Wpisz nr kolczyka lub imię..." style="flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 6px;">
-            <button id="timelineSearchBtn" class="btn primary">Szukaj</button>
-        </div>
-
-        <div id="timelineContent" style="flex: 1; overflow-y: auto; padding: 10px 20px; background-color: #f9f9f9; border-radius: 8px;">
-            <p style="text-align: center; color: #888; margin-top: 50px;">Wpisz identyfikator zwierzęcia, aby zobaczyć jego historię.</p>
         </div>
     </div>
 </div>
@@ -24485,134 +24385,6 @@ function getInnerCardHTML_110mm(card) {
             <p style="margin: 2px 0;">***** Wyniki badań uzupełniających (jeśli dotyczy)</p>
         </div>
     `;
-}
-    /* ======================================================== */
-/* ✅ MODUŁ: OŚ CZASU (TIMELINE)                            */
-/* ======================================================== */
-
-const timelineModal = document.getElementById('timelineModal');
-const timelineInput = document.getElementById('timelineSearchInput');
-const timelineContent = document.getElementById('timelineContent');
-const timelineSearchBtn = document.getElementById('timelineSearchBtn');
-const closeTimelineBtn = document.getElementById('closeTimelineBtn');
-
-// Funkcja otwierająca (możesz ją podpiąć pod guzik w menu)
-function openTimeline() {
-    timelineModal.style.display = 'flex';
-    timelineInput.focus();
-}
-
-if (closeTimelineBtn) closeTimelineBtn.onclick = () => timelineModal.style.display = 'none';
-
-if (timelineSearchBtn) {
-    timelineSearchBtn.addEventListener('click', async () => {
-        const query = timelineInput.value.toLowerCase().trim();
-        if (query.length < 2) {
-            alert("Wpisz co najmniej 2 znaki (np. końcówkę kolczyka).");
-            return;
-        }
-
-        timelineContent.innerHTML = '<p style="text-align: center;">Przeszukiwanie historii... ⏳</p>';
-
-        try {
-            // 1. Pobieramy karty (limitujemy do np. 100 ostatnich lub filtrujemy po kliencie jeśli możliwe)
-            // Dla optymalizacji: najlepiej szukać w cache'u jeśli jest, lub pobrać ostatnie X kart
-            let cards = [];
-            
-            // Jeśli mamy cache archiwum (z poprzednich modułów), użyjmy go
-            if (typeof currentArchiveCardsCache !== 'undefined' && currentArchiveCardsCache.length > 0) {
-                cards = currentArchiveCardsCache;
-            } else {
-                // Pobierz z bazy (Ostatnie 100 kart zalogowanego lekarza)
-                const q = db.collection("archiwumKarty")
-                            .where("lekarz_uid", "==", currentUserProfile.uid)
-                            .orderBy("createdAt", "desc")
-                            .limit(100);
-                const snap = await q.get();
-                cards = snap.docs.map(doc => doc.data());
-            }
-
-            // 2. Filtrujemy wiersze pasujące do zapytania
-            const events = [];
-
-            cards.forEach(card => {
-                if (card.table) {
-                    card.table.forEach(row => {
-                        const opis = (row.opis || '').toLowerCase();
-                        // Jeśli opis zwierzęcia zawiera szukaną frazę (np. numer kolczyka)
-                        if (opis.includes(query)) {
-                            
-                            // Analiza typu zdarzenia (prosta heurystyka)
-                            let type = 'leczenie'; // Domyślnie
-                            const lek = (row.lek || '').toLowerCase();
-                            const rozp = (row.rozpoznanie || '').toLowerCase();
-
-                            if (lek.includes('szczepionka') || rozp.includes('szczepienie') || rozp.includes('profilaktyka')) {
-                                type = 'profilaktyka';
-                            } else if (rozp.includes('inseminacja') || rozp.includes('badanie') || rozp.includes('ciąża')) {
-                                type = 'rozrod';
-                            }
-
-                            events.push({
-                                date: card.header.dataWykonania,
-                                title: row.rozpoznanie || 'Wizyta',
-                                details: `${row.lek || ''} (${row.iloscDawka || ''})`,
-                                desc: row.opis, // Pełny opis (żeby upewnić się że to to zwierzę)
-                                type: type,
-                                docNr: card.nrDokumentu
-                            });
-                        }
-                    });
-                }
-            });
-
-            // 3. Sortowanie chronologiczne (od najnowszych)
-            events.sort((a, b) => new Date(b.date) - new Date(a.date));
-
-            // 4. Renderowanie
-            if (events.length === 0) {
-                timelineContent.innerHTML = '<p style="text-align: center;">Nie znaleziono historii dla tego zwierzęcia w ostatnich kartach.</p>';
-                return;
-            }
-
-            let html = `<div class="timeline">`;
-            
-            events.forEach(ev => {
-                html += `
-                    <div class="timeline-item type-${ev.type}">
-                        <div class="timeline-content">
-                            <span class="timeline-date">📅 ${ev.date} | Dok: ${ev.docNr}</span>
-                            <div class="timeline-title">${ev.title}</div>
-                            <div class="timeline-details">
-                                💊 <strong>Leki:</strong> ${ev.details}<br>
-                                🐄 <strong>Pacjent:</strong> ${ev.desc}
-                            </div>
-                        </div>
-                    </div>
-                `;
-            });
-
-            html += `</div>`;
-            timelineContent.innerHTML = html;
-
-        } catch (e) {
-            console.error("Błąd osi czasu:", e);
-            timelineContent.innerHTML = '<p style="text-align: center; color: red;">Wystąpił błąd.</p>';
-        }
-    });
-}
-    // --- Podpięcie przycisku w Menu Głównym ---
-const menuTimelineBtn = document.getElementById('menuTimelineBtn');
-
-if (menuTimelineBtn) {
-    menuTimelineBtn.addEventListener('click', () => {
-        // Funkcja openTimeline() została zdefiniowana w kodzie, który wkleiłeś wcześniej
-        if (typeof openTimeline === 'function') {
-            openTimeline();
-        } else {
-            alert("Błąd: Moduł Osi Czasu nie został poprawnie załadowany.");
-        }
-    });
 }
 /* ======================================================== */
 /* KONIEC SKRYPTU */
