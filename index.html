@@ -4159,7 +4159,6 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
 </div>
         <div class="form-row" style="grid-column: 1 / -1; display: flex; gap: 10px; align-items: flex-end; margin-top: 10px;">
             <button id="generateReportBtn" class="btn primary" style="font-size: 16px; padding: 10px 15px;">Generuj Raport</button>
-            <button id="printReportBtn" class="btn" style="font-size: 16px; padding: 10px 15px; display: none;">🖨️ Drukuj Raport</button>
             <button id="settleReportBtn" class="btn primary" style="font-size: 16px; padding: 10px 15px; display: none; background-color: #8e44ad; border-color: #732d91; margin-left: 10px;">
     💰 Zatwierdź Rozliczenie
 </button>
@@ -13170,7 +13169,6 @@ function onShowRaporty() {
     
     // Ukryj przyciski akcji (reset widoku)
     if(settleReportBtn) settleReportBtn.style.display = 'none';
-    if(printReportBtn) printReportBtn.style.display = 'none';
     if(reportResultArea) reportResultArea.style.display = 'none';
 }
 /**
@@ -13414,15 +13412,27 @@ async function fetchReceiptsForReport(dateStart, dateEnd, userId) {
 /**
  * Generuje Raporty Wizyt (Typ 1, 2, 3) - WERSJA Z OBSŁUGĄ PRZELEWÓW
  */
-function generateWizytyReport(allReceipts, filters) {
-    console.log("Generowanie raportu wizyt (v7 - Przelewy)...");
-
-    // --- 1. Filtrowanie wstępne (Klient) ---
-    let filteredReceipts = [...allReceipts];
+// --- 3. SORTOWANIE (Grupowanie Statusami + Daty Malejąco) ---
+    const statusOrder = { "Zapłacone": 1, "Przelew": 2, "Dług": 3 };
     
-    if (filters.klient) {
-        filteredReceipts = filteredReceipts.filter(r => r.klient === filters.klient);
-    }
+    filteredReceipts.sort((a, b) => {
+        // A. Najpierw sortuj po grupie statusu (1. Zapłacone, 2. Przelew, 3. Dług)
+        const orderA = statusOrder[a.status] || 99; // 99 dla nieznanych
+        const orderB = statusOrder[b.status] || 99;
+        
+        if (orderA !== orderB) {
+            return orderA - orderB;
+        }
+
+        // B. Wewnątrz grupy sortuj po dacie MALEJĄCO (od najnowszej)
+        // Używamy b.localeCompare(a) dla odwróconej kolejności
+        if (a.data !== b.data) {
+            return b.data.localeCompare(a.data);
+        }
+
+        // C. (Opcjonalnie) Jeśli data ta sama, sortuj po Nr Dokumentu malejąco
+        return (b.nrDokumentu || '').localeCompare(a.nrDokumentu || '');
+    });
 
     // --- 2. Konfiguracja Typu Raportu ---
     let reportTitle = "Raport Ogólny";
@@ -13563,8 +13573,6 @@ function generateWizytyReport(allReceipts, filters) {
     reportUserDisplay.textContent = `Pracownik: ${filters.userName}`;
     reportSumTitle.textContent = sumLabelText;
 
-    // Pokaż przycisk druku (bo mógł być ukryty)
-    if(printReportBtn) printReportBtn.style.display = 'inline-block';
 
     // ✅ LOGIKA PRZYCISKU ROZLICZENIA (Tylko dla Gotówki)
     if (filters.type === "gotowka") {
