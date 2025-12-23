@@ -13412,118 +13412,150 @@ async function fetchReceiptsForReport(dateStart, dateEnd, userId) {
 /**
  * Generuje Raporty Wizyt (Typ 1, 2, 3) - WERSJA Z OBSŁUGĄ PRZELEWÓW
  */
-// --- 4. Funkcja Generująca Raport (Wizyty) - WERSJA POPRAWIONA ---
 function generateWizytyReport(allReceipts, filters) {
-    console.log(`Pobieranie danych dla raportu: UserID: ${filters.userId}, Date: ${filters.dateStart} do ${filters.dateEnd}`);
+    console.log("Generowanie raportu wizyt (v8 - Sortowanie)...");
 
-    // --- 1. FILTROWANIE ---
-    let filteredReceipts = allReceipts.filter(receipt => {
-        // Data
-        const dateOk = receipt.data >= filters.dateStart && receipt.data <= filters.dateEnd;
-        if (!dateOk) return false;
-
-        // Użytkownik
-        const userOk = (filters.userId === 'ALL') || (receipt.uid === filters.userId);
-        if (!userOk) return false;
-
-        // Typ raportu
-        if (filters.type === "dluznicy") return receipt.status === "Dług";
-        if (filters.type === "gotowka") return receipt.status === "Zapłacone";
-        
-        return true; // Ogólny i Zużycia
-    });
-
-    console.log(`Pobrano ${filteredReceipts.length} pasujących paragonów.`);
-
-    // --- 2. LOGIKA OBLICZEŃ ---
-    let totalRevenue = 0;
-    let totalExpenses = 0; 
-    let debtsOnlySum = 0;
-
-    filteredReceipts.forEach(r => {
-        let val = 0;
-        if (typeof r.kwota === 'number') val = r.kwota;
-        else if (typeof r.kwota === 'string') val = parseFloat(r.kwota.replace(',', '.'));
-        if (isNaN(val)) val = 0;
-
-        if (filters.type === "dluznicy") {
-            if(r.status === "Dług") debtsOnlySum += val;
-        } else {
-            if (r.status === "Zapłacone" || r.status === "Przelew") {
-                totalRevenue += val;
-            }
-        }
-    });
-
-    // --- 3. SORTOWANIE (Zapłacone -> Przelew -> Dług | Daty Malejąco) ---
-    // Definicja kolejności grup
-    const statusOrder = { "Zapłacone": 1, "Przelew": 2, "Dług": 3 };
+    // --- 1. Filtrowanie wstępne (Klient) ---
+    let filteredReceipts = [...allReceipts];
     
+    if (filters.klient) {
+        filteredReceipts = filteredReceipts.filter(r => r.klient === filters.klient);
+    }
+
+    // --- 2. Konfiguracja Typu Raportu ---
+    let reportTitle = "Raport Ogólny";
+    let sumLabelText = "Suma przychodu:"; 
+
+    if (filters.type === "gotowka") {
+        filteredReceipts = filteredReceipts.filter(r => ["Zapłacone", "Przelew", "Dług"].includes(r.status));
+        reportTitle = "Raport Kasowy (Przyjęta Gotówka)";
+        sumLabelText = "Suma przyjętej GOTÓWKI (bez przelewów):";
+    } else if (filters.type === "dluznicy") {
+        filteredReceipts = filteredReceipts.filter(r => r.status === "Dług");
+        reportTitle = "Raport Dłużników";
+        sumLabelText = "Suma zadłużenia:";
+    } else if (filters.type === "ogolny") {
+        reportTitle = "Raport Ogólny (Wszystkie wizyty)";
+        sumLabelText = "Raport sumaryczny (Gotówka + Przelewy):";
+    }
+
+    // --- 3. SORTOWANIE (Poprawione) ---
+    // Kolejność: 1. Zapłacone, 2. Przelew, 3. Dług. Wewnątrz grup: od najnowszej daty.
+    const statusOrder = { "Zapłacone": 1, "Przelew": 2, "Dług": 3 };
+
     filteredReceipts.sort((a, b) => {
-        // A. Sortuj po grupie statusu
-        // Jeśli status jest inny niż zdefiniowane, daj go na koniec (99)
-        const orderA = statusOrder[a.status] || 99;
+        // A. Sortowanie po grupie statusu
+        const orderA = statusOrder[a.status] || 99; // Inne na koniec
         const orderB = statusOrder[b.status] || 99;
-        
+
         if (orderA !== orderB) {
-            return orderA - orderB; // Rosnąco: 1, 2, 3
+            return orderA - orderB; // Rosnąco: 1 -> 2 -> 3
         }
 
-        // B. Wewnątrz grupy: Sortuj po dacie MALEJĄCO (od najnowszej)
+        // B. Sortowanie po dacie MALEJĄCO (od najnowszej)
         if (a.data !== b.data) {
             return b.data.localeCompare(a.data);
         }
 
-        // C. Jeśli data ta sama, sortuj po Nr Dokumentu malejąco
+        // C. (Opcjonalnie) Po nr dokumentu malejąco
         return (b.nrDokumentu || '').localeCompare(a.nrDokumentu || '');
     });
 
-    // --- 4. Generowanie HTML Tabeli ---
-    let tableHtml = '';
-    
+    // --- 4. OBLICZANIE SUM (Matematyka) ---
+    let totalRevenue = 0; 
+    let totalExpenses = 0; 
+    let debtsOnlySum = 0; 
+
     filteredReceipts.forEach(r => {
-        let statusColor = '#333';
-        if(r.status === 'Zapłacone') statusColor = 'green';
-        if(r.status === 'Dług') statusColor = 'red';
-        if(r.status === 'Przelew') statusColor = 'blue';
+        const val = parseFloat(r.suma) || 0;
+        const status = r.status;
 
-        let kwotaStr = (typeof formatPrice === 'function') ? formatPrice(r.kwota) : r.kwota + ' zł';
-
-        tableHtml += `
-            <tr style="border-bottom: 1px solid #eee;">
-                <td style="padding:8px;">${r.data}</td>
-                <td style="padding:8px;">${r.nrDokumentu}</td>
-                <td style="padding:8px;">${r.klientNazwa || '-'}</td>
-                <td style="padding:8px; font-weight:bold; color:${statusColor}">${r.status}</td>
-                <td style="padding:8px; text-align:right;">${kwotaStr}</td>
-            </tr>
-        `;
+        if (filters.type === "gotowka") {
+            if (status === 'Zapłacone') {
+                if (val < 0) totalExpenses += Math.abs(val);
+                else totalRevenue += val;
+            }
+        } 
+        else if (filters.type === "ogolny") {
+            if (status === 'Zapłacone' || status === 'Przelew') {
+                if (val < 0) totalExpenses += Math.abs(val);
+                else totalRevenue += val;
+            } else if (status === 'Dług') {
+                if (val > 0) totalRevenue += val;
+            }
+        }
+        else if (filters.type === "dluznicy") {
+            if (status === 'Dług') debtsOnlySum += val;
+        }
     });
 
-    // --- 5. Tytuły i Sumy ---
-    let reportTitle = "Raport Wizyt";
-    let sumLabelText = "Łączny Przychód:";
+    // --- 5. Generowanie HTML (Twój oryginalny układ) ---
+    let tableHtml = '';
 
-    if (filters.type === "gotowka") {
-        reportTitle = "Raport Kasowy (Gotówka)";
-        sumLabelText = "Gotówka w kasie:";
-    } else if (filters.type === "dluznicy") {
-        reportTitle = "Zestawienie Dłużników";
-        sumLabelText = "Łączne Zadłużenie:";
+    for (const receipt of filteredReceipts) {
+        const suma = parseFloat(receipt.suma) || 0;
+        const isExpense = (receipt.status === 'Zapłacone' && suma < 0);
+        
+        let rowStyle = "";
+        let statusColor = "#555";
+        let sumaColor = "#000";
+
+        if (isExpense) {
+            rowStyle = "background-color: #ffe6e6;"; 
+            sumaColor = "#c0392b";
+            statusColor = "green";
+        } else if (receipt.status === 'Dług') {
+            rowStyle = "background-color: #fffde7; border-left: 4px solid #f39c12;";
+            statusColor = "#c0392b";
+            sumaColor = "#7f8c8d";
+        } else if (receipt.status === 'Przelew') {
+            rowStyle = "background-color: #e3f2fd;"; 
+            statusColor = "#2980b9"; 
+        } else {
+            statusColor = "green"; 
+        }
+
+        let zuzyciaHtml = '';
+        if (receipt.pozycje && receipt.pozycje.length > 0) {
+            const produkty = receipt.pozycje.filter(p => p.name.toLowerCase() !== 'wyrównanie');
+            if (produkty.length > 0) {
+                 zuzyciaHtml = '<ul style="margin: 0; padding-left: 18px; font-size: 12px; color: #333;">';
+                for (const item of produkty) {
+                    zuzyciaHtml += `<li>${item.name} - ${item.quantity}</li>`;
+                }
+                zuzyciaHtml += '</ul>';
+            }
+        }
+        
+        const sumaDisplay = formatPrice(suma); 
+
+        tableHtml += `
+            <tr style="${rowStyle}" data-klient="${receipt.klient}" data-data="${receipt.data}">
+                <td>${receipt.klient}</td>
+                <td>${receipt.data}</td>
+                <td>${receipt.czynnosci || ''}</td>
+                <td class="col-zuzycia">${zuzyciaHtml}</td>
+                <td style="text-align: right; color: ${sumaColor}; font-weight: bold;">${sumaDisplay}</td>
+                <td style="color: ${statusColor}; font-weight: bold;">${receipt.status || 'Brak'}</td>
+                <td style="white-space: normal; word-break: break-word; min-width: 150px;">${receipt.notatka || ''}</td>
+            </tr>
+        `;
     }
 
     // --- 6. Aktualizacja Widoku ---
-    reportWizytyTableBody.innerHTML = tableHtml || '<tr><td colspan="5" style="text-align: center; padding: 20px;">Brak danych.</td></tr>';
+    reportWizytyTableBody.innerHTML = tableHtml || '<tr><td colspan="7" style="text-align: center; padding: 20px;">Brak danych.</td></tr>';
     
     reportWizytyTableContainer.style.display = 'block';
-    if(typeof reportZuzyciaTableContainer !== 'undefined') reportZuzyciaTableContainer.style.display = 'none';
+    reportZuzyciaTableContainer.style.display = 'none';
     
     reportMainTitle.textContent = reportTitle;
     reportDateDisplay.textContent = `Okres: ${filters.dateStart} do ${filters.dateEnd}`;
     reportUserDisplay.textContent = `Pracownik: ${filters.userName}`;
     reportSumTitle.textContent = sumLabelText;
 
-    // Przycisk "Zatwierdź Rozliczenie" (Tylko dla Gotówki)
+    // USUNIĘTO: if(printReportBtn) printReportBtn.style.display = 'inline-block';
+
+    // ✅ LOGIKA PRZYCISKU ROZLICZENIA
     if (filters.type === "gotowka") {
         if(settleReportBtn) {
             settleReportBtn.style.display = 'inline-block';
@@ -13540,23 +13572,23 @@ function generateWizytyReport(allReceipts, filters) {
         if(settleReportBtn) settleReportBtn.style.display = 'none';
     }
 
-    // Sumy końcowe
     if (filters.type === "dluznicy") {
-        reportCalculatedSum.textContent = (typeof formatPrice === 'function') ? formatPrice(debtsOnlySum) : debtsOnlySum;
+        reportCalculatedSum.textContent = formatPrice(debtsOnlySum);
         if(reportFuelSection) reportFuelSection.style.display = 'none';
         if(reportNetSumContainer) reportNetSumContainer.style.display = 'none';
     } 
     else {
-        // Gotówka / Ogólny
-        reportCalculatedSum.textContent = (typeof formatPrice === 'function') ? formatPrice(totalRevenue) : totalRevenue;
+        reportCalculatedSum.textContent = formatPrice(totalRevenue);
         
         if(reportFuelSection) reportFuelSection.style.display = 'flex';
-        
-        // Netto (wstępne)
-        const costVal = document.getElementById('reportFuelCost') ? parseFloat(document.getElementById('reportFuelCost').value) : 0;
-        const netSum = totalRevenue - (isNaN(costVal) ? 0 : costVal);
-        
-        if(reportNetSum) reportNetSum.textContent = (typeof formatPrice === 'function') ? formatPrice(netSum) : netSum;
+        const costInput = document.getElementById('reportFuelCost');
+        if(costInput) {
+            costInput.value = totalExpenses.toFixed(2);
+            costInput.readOnly = true; 
+        }
+
+        const netSum = totalRevenue - totalExpenses;
+        if(reportNetSum) reportNetSum.textContent = formatPrice(netSum);
         if(reportNetSumContainer) reportNetSumContainer.style.display = 'inline';
     }
 }
