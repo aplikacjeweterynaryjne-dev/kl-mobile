@@ -4996,7 +4996,17 @@ firebase.firestore().enablePersistence()
 const db = firebase.firestore();
 const auth = firebase.auth();
 console.log("Firebase gotowy do działania.");
-
+/**
+ * ✅ FIX DATY: Funkcja pobierająca datę wg czasu LOKALNEGO urządzenia (nie UTC).
+ * Rozwiązuje problem "wczorajszej daty" wczesnym rankiem.
+ */
+function getLocalDateString() {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0'); // Miesiące są 0-11
+    const day = String(now.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
 /* ----- GŁÓWNE ZMIENNE APLIKACJI ----- */
 let mapaSerii = {}, mapaIlosci = {}, mapaKarencji = {}, nazwyLekow = [];
 let mapaCen = {};
@@ -5081,14 +5091,15 @@ nazwyLekow.push(l.nazwa);
 });
 rebuildListaLekow();
 
-// default daty -> today
-const today = new Date().toISOString().split('T')[0];
+// default daty -> today (Używamy FIXA lokalnego czasu)
+const today = getLocalDateString(); 
+
 if (!document.getElementById('dataZgloszenia').value) document.getElementById('dataZgloszenia').value = today;
 if (!document.getElementById('dataWykonania').value) document.getElementById('dataWykonania').value = today;
 document.getElementById('formDataZgloszenia').value = today;
 document.getElementById('formDataWykonania').value = today;
+// To naprawia datę w Kalkulatorze:
 if (document.getElementById('calcDataInput')) document.getElementById('calcDataInput').value = today;
-
 // generuj wiersze tabeli
 generateRows();
 
@@ -14966,8 +14977,8 @@ try {
             fetchAndRenderVisits();
         }
 
-        // Ustaw domyślną datę w formularzu
-        const todayISO = new Date().toISOString().split('T')[0];
+        // Ustaw domyślną datę w formularzu (FIX Czasu Lokalnego)
+        const todayISO = getLocalDateString();
         visitFormDate.value = todayISO;
 
 
@@ -16927,8 +16938,8 @@ function clearKartaLeczenia(skipGenNumber = false) {
     document.getElementById('adresKlienta').textContent = '';
     document.getElementById('nrStada').textContent = '';
     
-    // 2. Zresetuj daty na dzisiejsze
-    const today = new Date().toISOString().split('T')[0];
+  // 2. Zresetuj daty na dzisiejsze (FIX Czasu Lokalnego)
+    const today = getLocalDateString();
     document.getElementById('dataZgloszenia').value = today;
     document.getElementById('dataWykonania').value = today;
     
