@@ -11700,6 +11700,7 @@ function goToCalcStep(stepNumber) {
 }
 function onShowKalkulator() {
     goToCalcStep(1); // Zawsze startuj od Kroku 1
+    
     // 1. Sprawdź, czy kalkulator jest "brudny"
     if (isKalkulatorDirty()) {
         
@@ -11712,6 +11713,10 @@ function onShowKalkulator() {
         } else {
             // Użytkownik chce ROZPOCZĄĆ NOWY (kliknął Anuluj)
             clearKalkulator();
+            
+            // ✅ FIX: Ustawiamy poprawną datę lokalną po wyczyszczeniu formularza
+            // (Na wypadek gdyby clearKalkulator przywracał starą wartość)
+            document.getElementById('calcDataInput').value = getLocalDateString();
         }
         
     } else {
@@ -11719,6 +11724,10 @@ function onShowKalkulator() {
         // (Wyczyść pole nr dok. i wygeneruj nowy)
         document.getElementById('calcNrDokInput').value = '';
         generateAndSetReceiptDocumentNumber();
+
+        // ✅ FIX: To jest najważniejsze! Nadpisujemy datę "tu i teraz".
+        // Nawet jeśli rano initData wpisało "wczoraj", to ta linia wstawi poprawną datę.
+        document.getElementById('calcDataInput').value = getLocalDateString();
     }
 }
 // Zmodyfikuj też listener dla menuKartaBtn
@@ -12401,6 +12410,35 @@ if (archivePrintBtn) {
                             margin: 1cm;
                         }
                     }
+                    /* ======================================================== */
+/* ✅ POPRAWKA: WIĘKSZA CZCIONKA W RAPORTACH (+2px)        */
+/* ======================================================== */
+
+/* Nagłówki tabeli raportów */
+#reportWizytyTable th, 
+#reportZuzyciaTable th {
+    font-size: 13px !important; /* Było ok. 11px */
+    padding: 10px 8px !important; /* Trochę więcej miejsca */
+}
+
+/* Komórki tabeli raportów */
+#reportWizytyTable td, 
+#reportZuzyciaTable td {
+    font-size: 13px !important; /* Było ok. 11px */
+    padding: 8px !important;
+}
+
+/* Lista zużytych produktów wewnątrz tabeli */
+#reportWizytyTable .col-zuzycia ul {
+    font-size: 13px !important; /* Było 12px */
+}
+
+/* Podsumowanie finansowe (Suma, Koszty, Netto) */
+#reportCalculatedSum, 
+#reportNetSum, 
+#reportFuelCost {
+    font-size: 24px !important; /* Było 22px - powiększamy sumy, żeby były czytelne */
+}
                 </style>
             </head>
             <body>
