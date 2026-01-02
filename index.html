@@ -4496,7 +4496,11 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
         
         <h3 id="visitFormTitle" style="font-size: 25px;">Nowa wizyta</h3>
         <input type="hidden" id="visitFormDocId">
-
+        <div class="form-row">
+            <label for="visitFormUserSelect">Przypisany pracownik</label>
+            <select id="visitFormUserSelect" style="width: 100%; padding: 8px; font-size: 16px; border: 1px solid #ccc; border-radius: 6px;">
+                </select>
+        </div>
         <div class="form-row">
             <label for="visitFormStatus">Status wizyty</label>
             <select id="visitFormStatus">
@@ -11916,48 +11920,52 @@ if (btnBackToStep2) {
  * Pkt 6: Wczytuje użytkowników (lekarzy) do listy rozwijanej w Archiwum Kart
  */
 async function loadArchiveUsers() {
-    if (!archiveUserSelect || !loadArchiveUsersBtn) return;
-    
-    // Użyjmy tych samych uprawnień co w Konfiguracji
-    let query;
-    if (!currentUserProfile) return;
+    if (!archiveUserSelect || !loadArchiveUsersBtn) return;
+    
+    // Użyjmy tych samych uprawnień co w Konfiguracji
+    let query;
+    if (!currentUserProfile) return;
 
-    if (currentUserProfile.Rola === 'administrator') {
-        query = db.collection("konfiguracja").orderBy("Nazwisko");
-    } else {
-        const userClinicId = currentUserProfile['ID lecznicy'];
-        if (!userClinicId) return;
-        query = db.collection("konfiguracja").where("ID lecznicy", "==", userClinicId).orderBy("Nazwisko");
-    }
-    
-    loadArchiveUsersBtn.disabled = true;
-    loadArchiveUsersBtn.textContent = 'Ładowanie...';
-    archiveUserSelect.innerHTML = '<option value="">Ładowanie...</option>';
+    if (currentUserProfile.Rola === 'administrator') {
+        query = db.collection("konfiguracja").orderBy("Nazwisko");
+    } else {
+        const userClinicId = currentUserProfile['ID lecznicy'];
+        if (!userClinicId) return;
+        query = db.collection("konfiguracja").where("ID lecznicy", "==", userClinicId).orderBy("Nazwisko");
+    }
+    
+    loadArchiveUsersBtn.disabled = true;
+    loadArchiveUsersBtn.textContent = 'Ładowanie...';
+    archiveUserSelect.innerHTML = '<option value="">Ładowanie...</option>';
 
-    try {
-        const snapshot = await query.get();
-        archiveUserSelect.innerHTML = ''; // Wyczyść
-        archiveUserSelect.add(new Option("--- Wybierz użytkownika ---", ""));
-        archiveUserSelect.add(new Option("Wszyscy", "ALL"));
-        snapshot.docs.forEach(doc => {
-            const user = doc.data();
-            const optionText = `${user.Imie} ${user.Nazwisko}`;
-            archiveUserSelect.add(new Option(optionText, user.uid)); // Wartością jest UID
-        });
-        
-        // Jeśli jest tylko 1 lekarz (np. właściciel), wybierz go automatycznie
-        if (snapshot.docs.length === 1) {
-             archiveUserSelect.value = snapshot.docs[0].data().uid;
-             // Automatycznie wczytaj jego karty
-             loadCardsForUser(snapshot.docs[0].data().uid);
-        }
+    try {
+        const snapshot = await query.get();
+        archiveUserSelect.innerHTML = ''; // Wyczyść
+        archiveUserSelect.add(new Option("--- Wybierz użytkownika ---", ""));
+        archiveUserSelect.add(new Option("Wszyscy", "ALL"));
+        
+        snapshot.docs.forEach(doc => {
+            const user = doc.data();
+            const optionText = `${user.Imie} ${user.Nazwisko}`;
+            archiveUserSelect.add(new Option(optionText, user.uid)); 
+        });
+        
+        // ✅ ZMIANA: Ustaw domyślnie na zalogowanego użytkownika
+        if (currentUserProfile.uid) {
+            archiveUserSelect.value = currentUserProfile.uid;
+            
+            // Jeśli udało się ustawić, od razu załaduj karty
+            if (archiveUserSelect.value === currentUserProfile.uid) {
+                loadCardsForUser(currentUserProfile.uid);
+            }
+        }
 
-    } catch (error) {
-        console.error("Błąd wczytywania użytkowników do archiwum:", error);
-        archiveUserSelect.innerHTML = '<option value="">Błąd ładowania</option>';
-    } finally {
-        loadArchiveUsersBtn.style.display = 'none'; // Ukryj przycisk po wczytaniu
-    }
+    } catch (error) {
+        console.error("Błąd wczytywania użytkowników do archiwum:", error);
+        archiveUserSelect.innerHTML = '<option value="">Błąd ładowania</option>';
+    } finally {
+        loadArchiveUsersBtn.style.display = 'none'; // Ukryj przycisk po wczytaniu
+    }
 }
 // Podepnij listener
 if(loadArchiveUsersBtn) loadArchiveUsersBtn.addEventListener('click', loadArchiveUsers);
@@ -12597,46 +12605,51 @@ if (archivePrintBtn) {
 /* ⬆️ KONIEC ZASTĘPOWANIA ⬆️ */
 
 async function loadArchiveReceiptUsers() {
-    if (!archiveReceiptUserSelect || !loadArchiveReceiptUsersBtn) return;
-    
-    // Użyjmy tych samych uprawnień co w Konfiguracji
-    let query;
-    if (!currentUserProfile) return;
+    if (!archiveReceiptUserSelect || !loadArchiveReceiptUsersBtn) return;
+    
+    let query;
+    if (!currentUserProfile) return;
 
-    if (currentUserProfile.Rola === 'administrator') {
-        query = db.collection("konfiguracja").orderBy("Nazwisko");
-    } else {
-        const userClinicId = currentUserProfile['ID lecznicy'];
-        if (!userClinicId) return;
-        query = db.collection("konfiguracja").where("ID lecznicy", "==", userClinicId).orderBy("Nazwisko");
-    }
-    
-    loadArchiveReceiptUsersBtn.disabled = true;
-    loadArchiveReceiptUsersBtn.textContent = 'Ładowanie...';
-    archiveReceiptUserSelect.innerHTML = '<option value="">Ładowanie...</option>';
+    if (currentUserProfile.Rola === 'administrator') {
+        query = db.collection("konfiguracja").orderBy("Nazwisko");
+    } else {
+        const userClinicId = currentUserProfile['ID lecznicy'];
+        if (!userClinicId) return;
+        query = db.collection("konfiguracja").where("ID lecznicy", "==", userClinicId).orderBy("Nazwisko");
+    }
+    
+    loadArchiveReceiptUsersBtn.disabled = true;
+    loadArchiveReceiptUsersBtn.textContent = 'Ładowanie...';
+    archiveReceiptUserSelect.innerHTML = '<option value="">Ładowanie...</option>';
 
-    try {
-        const snapshot = await query.get();
-        archiveReceiptUserSelect.innerHTML = ''; // Wyczyść
-        archiveReceiptUserSelect.add(new Option("--- Wybierz użytkownika ---", ""));
-        archiveReceiptUserSelect.add(new Option("Wszyscy", "ALL"));
-        snapshot.docs.forEach(doc => {
-            const user = doc.data();
-            const optionText = `${user.Imie} ${user.Nazwisko}`;
-            archiveReceiptUserSelect.add(new Option(optionText, user.uid)); // Wartością jest UID
-        });
-        
-        if (snapshot.docs.length === 1) {
-             archiveReceiptUserSelect.value = snapshot.docs[0].data().uid;
-             loadReceiptsForUser(snapshot.docs[0].data().uid);
-        }
+    try {
+        const snapshot = await query.get();
+        archiveReceiptUserSelect.innerHTML = ''; 
+        archiveReceiptUserSelect.add(new Option("--- Wybierz użytkownika ---", ""));
+        archiveReceiptUserSelect.add(new Option("Wszyscy", "ALL"));
+        
+        snapshot.docs.forEach(doc => {
+            const user = doc.data();
+            const optionText = `${user.Imie} ${user.Nazwisko}`;
+            archiveReceiptUserSelect.add(new Option(optionText, user.uid));
+        });
+        
+        // ✅ ZMIANA: Ustaw domyślnie na zalogowanego użytkownika
+        if (currentUserProfile.uid) {
+            archiveReceiptUserSelect.value = currentUserProfile.uid;
+            
+            // Jeśli udało się ustawić, od razu załaduj paragony
+            if (archiveReceiptUserSelect.value === currentUserProfile.uid) {
+                loadReceiptsForUser(currentUserProfile.uid);
+            }
+        }
 
-    } catch (error) {
-        console.error("Błąd wczytywania użytkowników do archiwum paragonów:", error);
-        archiveReceiptUserSelect.innerHTML = '<option value="">Błąd ładowania</option>';
-    } finally {
-        loadArchiveReceiptUsersBtn.style.display = 'none';
-    }
+    } catch (error) {
+        console.error("Błąd wczytywania użytkowników do archiwum paragonów:", error);
+        archiveReceiptUserSelect.innerHTML = '<option value="">Błąd ładowania</option>';
+    } finally {
+        loadArchiveReceiptUsersBtn.style.display = 'none';
+    }
 }
 if(loadArchiveReceiptUsersBtn) loadArchiveReceiptUsersBtn.addEventListener('click', loadArchiveReceiptUsers);
 
@@ -15167,8 +15180,12 @@ try {
     // --- 4. Ładowanie Filtrów ---
 
     // Wczytuje użytkowników (lekarzy) do listy <select>
+  // Wczytuje użytkowników (lekarzy) do listy <select> w filtrze ORAZ w formularzu
     async function loadCalendarUsers() {
         if (!calendarUserSelect || !currentUserProfile) return;
+
+        // Zmienna dla selecta w modalu (ten, który dodałeś w HTML)
+        const modalUserSelect = document.getElementById('visitFormUserSelect');
 
         let query;
         if (currentUserProfile.Rola === 'administrator') {
@@ -15181,24 +15198,35 @@ try {
 
         try {
             const snapshot = await query.get();
-            calendarUserSelect.innerHTML = ''; // Wyczyść
-            calendarUserSelect.add(new Option("Wszyscy", "ALL")); // Opcja "Wszyscy"
+            
+            // 1. Czyścimy oba selecty
+            calendarUserSelect.innerHTML = ''; 
+            if(modalUserSelect) modalUserSelect.innerHTML = '';
 
+            // 2. Dodajemy opcje
+            calendarUserSelect.add(new Option("Wszyscy", "ALL")); // Filtr ma opcję "Wszyscy"
+            
             snapshot.docs.forEach(doc => {
                 const user = doc.data();
                 const optionText = `${user.Imie} ${user.Nazwisko}`;
-                calendarUserSelect.add(new Option(optionText, user.uid)); // Wartością jest UID
+                
+                // Dodaj do filtra
+                calendarUserSelect.add(new Option(optionText, user.uid));
+                
+                // Dodaj do modala (jeśli istnieje)
+                if(modalUserSelect) {
+                    modalUserSelect.add(new Option(optionText, user.uid));
+                }
             });
 
-            // Ustaw domyślnie na zalogowanego użytkownika
+            // 3. Ustaw domyślny filtr na zalogowanego
             if (currentUserProfile.uid) {
                 calendarUserSelect.value = currentUserProfile.uid;
             }
 
             calendarUsersLoaded = true;
-            console.log("Wczytano użytkowników do kalendarza.");
+            console.log("Wczytano użytkowników do kalendarza (filtr i formularz).");
 
-            // ✅ DODANA LINIA: Uruchom pobieranie wizyt DOPIERO TERAZ
             fetchAndRenderVisits();
 
         } catch (error) {
@@ -15490,15 +15518,23 @@ try {
 
     // --- 8. Logika Formularza Wizyty (Modal) ---
 
-    // Otwieranie formularza
+  // Otwieranie formularza (Nowa wizyta)
     addVisitBtn.addEventListener('click', () => {
         visitFormTitle.textContent = "Nowa wizyta";
         visitFormDocId.value = ''; // Tryb dodawania
         visitFormStatus.value = 'Nowa';
+        
+        // ✅ NOWOŚĆ: Ustaw domyślnego pracownika (zalogowanego) w modalu
+        const modalUserSelect = document.getElementById('visitFormUserSelect');
+        if (modalUserSelect && currentUserProfile) {
+            modalUserSelect.value = currentUserProfile.uid;
+        }
+
         visitFormKlient.value = '';
         visitFormKlientAdres.textContent = '...';
         visitFormKlientTelefon.textContent = '...';
-        visitFormDate.value = new Date().toISOString().split('T')[0]; // Dziś
+        // Używamy funkcji getLocalDateString() dla poprawnej daty
+        visitFormDate.value = (typeof getLocalDateString === 'function') ? getLocalDateString() : new Date().toISOString().split('T')[0];
         visitFormPoraDnia.value = '6-10';
         visitFormCel.value = '';
         visitFormNotatka.value = '';
@@ -15541,6 +15577,19 @@ try {
             return;
         }
 
+        // ✅ NOWOŚĆ: Pobierz dane z selecta (Kto ma wykonać wizytę)
+        const modalUserSelect = document.getElementById('visitFormUserSelect');
+        let assignedUid = currentUserProfile.uid; // Domyślnie ja
+        let assignedName = `${currentUserProfile.Imie} ${currentUserProfile.Nazwisko}`;
+
+        if (modalUserSelect && modalUserSelect.value) {
+            assignedUid = modalUserSelect.value;
+            // Pobierz tekst z wybranej opcji (Imię i Nazwisko)
+            if (modalUserSelect.selectedIndex !== -1) {
+                assignedName = modalUserSelect.options[modalUserSelect.selectedIndex].text;
+            }
+        }
+
         // Pobierz dane klienta
         let klientNazwa = visitFormKlient.value;
         let klientAdres = visitFormKlientAdres.textContent;
@@ -15558,8 +15607,10 @@ try {
         }
 
         const visitData = {
-            lekarz_uid: currentUserProfile.uid,
-            lekarz_nazwisko: `${currentUserProfile.Imie} ${currentUserProfile.Nazwisko}`,
+            // ✅ ZAPISUJEMY WYBRANEGO LEKARZA (zamiast sztywno currentUserProfile)
+            lekarz_uid: assignedUid,
+            lekarz_nazwisko: assignedName,
+            
             id_lecznicy: currentUserProfile['ID lecznicy'],
             dataWizyty: dataWizyty,
             status: visitFormStatus.value,
@@ -15569,18 +15620,16 @@ try {
             poraDnia: visitFormPoraDnia.value,
             celWizyty: visitFormCel.value.trim(),
             notatka: visitFormNotatka.value.trim(),
-            createdAt: firebase.firestore.FieldValue.serverTimestamp() // Zawsze ustawiaj przy zapisie
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
         };
 
         const docId = visitFormDocId.value;
-
         saveVisitBtn.disabled = true;
         saveVisitBtn.textContent = 'Zapisywanie...';
 
         try {
             if (docId) {
-                // Tryb Edycji
-                // Usuwamy createdAt, aby nie nadpisać oryginalnej daty utworzenia
+                // Tryb Edycji (bez nadpisywania createdAt)
                 delete visitData.createdAt; 
                 await db.collection('wizyty').doc(docId).update(visitData);
                 showToast("Wizyta zaktualizowana.", "success");
@@ -15599,12 +15648,11 @@ try {
             saveVisitBtn.textContent = 'Zapisz';
         }
     });
-
-    // --- 9. Logika Szybkiej Zmiany Statusu i Edycji (Widok Dnia) ---
+   // --- 9. Logika Szybkiej Zmiany Statusu i Edycji (Widok Dnia) ---
     todayVisitList.addEventListener('click', async (e) => {
         const target = e.target;
 
-        // Szybka zmiana statusu
+        // A. Szybka zmiana statusu
         if (target.classList.contains('btn-quick-status')) {
             const docId = target.dataset.id;
             const newStatus = target.dataset.newStatus;
@@ -15625,13 +15673,23 @@ try {
             }
         }
 
-        // Edycja wizyty
+        // B. Edycja wizyty
         if (target.classList.contains('btn-edit-visit')) {
             const docId = target.dataset.id;
             const visitData = allFetchedVisits.find(v => v.id === docId);
+            
             if (visitData) {
                 visitFormTitle.textContent = "Edytuj wizytę";
                 visitFormDocId.value = visitData.id;
+                
+                // ✅ NOWOŚĆ: Ustaw pracownika przypisanego do tej wizyty w modalu
+                const modalUserSelect = document.getElementById('visitFormUserSelect');
+                // Jeśli pole istnieje i wizyta ma zapisanego lekarza, wybierz go na liście
+                if (modalUserSelect && visitData.lekarz_uid) {
+                    modalUserSelect.value = visitData.lekarz_uid;
+                }
+
+                // Wypełnij resztę pól
                 visitFormStatus.value = visitData.status;
                 visitFormKlient.value = visitData.klientNazwa;
                 visitFormKlientAdres.textContent = visitData.klientAdres || '...';
@@ -15641,7 +15699,7 @@ try {
                 visitFormCel.value = visitData.celWizyty;
                 visitFormNotatka.value = visitData.notatka;
 
-                // Zapisz dane klienta na potrzeby zapisu
+                // Zapisz dane klienta na potrzeby ponownego zapisu (żeby nie zniknęły)
                 currentVisitClientData = {
                     nazwa: visitData.klientNazwa,
                     adres: visitData.klientAdres,
@@ -15652,8 +15710,7 @@ try {
             }
         }
 
-        // ⬇️ ⬇️ ⬇️ WKLEJ TEN NOWY BLOK ⬇️ ⬇️ ⬇️
-        // Usuwanie wizyty
+        // C. Usuwanie wizyty
         else if (target.classList.contains('btn-delete-visit')) {
             const docId = target.dataset.id;
 
@@ -15673,6 +15730,8 @@ try {
                 }
             }
         }
+    });
+
         // ⬆️ ⬆️ ⬆️ KONIEC NOWEGO BLOKU ⬆️ ⬆️ ⬆️
 
     });
