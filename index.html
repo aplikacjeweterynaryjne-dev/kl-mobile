@@ -4534,9 +4534,10 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
             </select>
         </div>
 
-        <div class="form-row">
+       <div class="form-row">
             <label for="visitFormCel">Ogólny cel wizyty</label>
-            <input type="text" id="visitFormCel" placeholder="Np. badanie stada, leczenie...">
+            <input type="text" id="visitFormCel" list="listaCelowWizyt" placeholder="Wpisz lub wybierz z historii..." autocomplete="off">
+            <datalist id="listaCelowWizyt"></datalist>
         </div>
 
         <div class="form-row">
@@ -15673,7 +15674,7 @@ try {
             }
         }
 
-        // B. Edycja wizyty
+      // B. Edycja wizyty
         if (target.classList.contains('btn-edit-visit')) {
             const docId = target.dataset.id;
             const visitData = allFetchedVisits.find(v => v.id === docId);
@@ -15682,7 +15683,7 @@ try {
                 visitFormTitle.textContent = "Edytuj wizytę";
                 visitFormDocId.value = visitData.id;
                 
-                // ✅ NOWOŚĆ: Ustaw pracownika przypisanego do tej wizyty w modalu
+                // Ustaw pracownika przypisanego do tej wizyty w modalu
                 const modalUserSelect = document.getElementById('visitFormUserSelect');
                 // Jeśli pole istnieje i wizyta ma zapisanego lekarza, wybierz go na liście
                 if (modalUserSelect && visitData.lekarz_uid) {
@@ -15705,6 +15706,11 @@ try {
                     adres: visitData.klientAdres,
                     telefon: visitData.klientTelefon
                 };
+
+                // ✅ NOWE: Ładuj podpowiedzi celów (historia) przed otwarciem okna
+                if (typeof loadVisitPurposeHistory === 'function') {
+                    loadVisitPurposeHistory();
+                }
 
                 visitFormModal.style.display = 'flex';
             }
@@ -24613,6 +24619,50 @@ function getInnerCardHTML_110mm(card) {
             <p style="margin: 2px 0;">***** Wyniki badań uzupełniających (jeśli dotyczy)</p>
         </div>
     `;
+}
+    /**
+ * ✅ NOWA FUNKCJA: Ładuje historię celów wizyt do <datalist>
+ * Pobiera ostatnie 50 wizyt zalogowanego użytkownika.
+ */
+async function loadVisitPurposeHistory() {
+    const dataList = document.getElementById('listaCelowWizyt');
+    if (!dataList || !currentUserProfile) return;
+
+    dataList.innerHTML = ''; // Wyczyść stare opcje
+
+    try {
+        // Pobieramy ostatnie 50 wizyt tego lekarza (zamiast filtrować datą, bierzemy po prostu najnowsze)
+        // To jest szybsze i nie wymaga skomplikowanych indeksów.
+        const q = db.collection("wizyty")
+            .where("lekarz_uid", "==", currentUserProfile.uid)
+            .orderBy("dataWizyty", "desc") // Najnowsze pierwsze
+            .limit(50);
+
+        const snapshot = await q.get();
+        
+        // Używamy Set, aby automatycznie usunąć duplikaty
+        const uniquePurposes = new Set();
+
+        snapshot.docs.forEach(doc => {
+            const data = doc.data();
+            if (data.celWizyty && data.celWizyty.trim().length > 1) {
+                uniquePurposes.add(data.celWizyty.trim());
+            }
+        });
+
+        // Wypełnij datalist
+        uniquePurposes.forEach(purpose => {
+            const opt = document.createElement('option');
+            opt.value = purpose;
+            dataList.appendChild(opt);
+        });
+
+        console.log(`Załadowano ${uniquePurposes.size} unikalnych celów wizyt do podpowiedzi.`);
+
+    } catch (error) {
+        console.error("Błąd ładowania historii celów wizyt:", error);
+        // Jeśli błąd indeksu, to nic nie szkodzi, po prostu nie będzie podpowiedzi
+    }
 }
 /* ======================================================== */
 /* KONIEC SKRYPTU */
