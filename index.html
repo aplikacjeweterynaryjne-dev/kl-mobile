@@ -24664,6 +24664,67 @@ async function loadVisitPurposeHistory() {
         // Jeśli błąd indeksu, to nic nie szkodzi, po prostu nie będzie podpowiedzi
     }
 }
+    /* ======================================================== */
+/* ✅ POPRAWKA: Brakujące funkcje list historii (Cel i Opis) */
+/* ======================================================== */
+
+// 1. Funkcja ładująca historię CELÓW WIZYTY (Naprawia pustą listę w Kalendarzu)
+async function loadVisitPurposeHistory() {
+    const datalist = document.getElementById('listaCelowWizyt');
+    if (!datalist) return;
+    
+    // Wyczyść starą listę
+    datalist.innerHTML = '';
+    
+    if (!currentUserProfile) return;
+
+    try {
+        // Pobierz ostatnie 50 wizyt
+        const q = db.collection('wizyty')
+            .where('lekarz_uid', '==', currentUserProfile.uid)
+            .orderBy('createdAt', 'desc')
+            .limit(50);
+
+        const snapshot = await q.get();
+        const purposes = new Set(); // Używamy Set, żeby mieć unikalne wartości
+
+        snapshot.docs.forEach(doc => {
+            const cel = doc.data().celWizyty;
+            if (cel && cel.trim() !== '') {
+                purposes.add(cel.trim());
+            }
+        });
+
+        // Dodaj opcje do datalist
+        purposes.forEach(cel => {
+            const opt = document.createElement('option');
+            opt.value = cel;
+            datalist.appendChild(opt);
+        });
+
+        console.log(`Załadowano ${purposes.size} celów wizyt do historii.`);
+
+    } catch (error) {
+        console.error("Błąd ładowania historii celów:", error);
+        // Jeśli brakuje indeksu, to nic nie szkodzi, po prostu lista będzie pusta na początku
+        if (error.code === 'failed-precondition') {
+             console.warn("Brak indeksu dla wizyt (createdAt). Historia celów może nie działać.");
+        }
+    }
+}
+
+// 2. Automatyczne uruchomienie ładowania celów przy otwieraniu okna wizyty
+const addVisitBtnRef = document.getElementById('addVisitBtn');
+if (addVisitBtnRef) {
+    // Dodajemy nowy nasłuchiwacz (nie usuwając starego), który uruchomi się przy kliknięciu
+    addVisitBtnRef.addEventListener('click', () => {
+        loadVisitPurposeHistory();
+    });
+}
+// Uruchom też przy edycji (delegacja zdarzeń w Kalendarzu już to robi, ale dla pewności):
+// Funkcja `loadVisitPurposeHistory` jest już globalna, więc `btn-edit-visit` ją znajdzie.
+
+/* --- KONIEC POPRAWKI --- */
 /* ======================================================== */
 /* KONIEC SKRYPTU */
 /* ======================================================== */
