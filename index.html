@@ -9809,9 +9809,12 @@ loadAndCacheProducts(); // Wywołaj funkcję pobierającą dane produktów
 /* ✅ OBSŁUGA TABELI PRODUKTÓW (KLIKNIĘCIA + WKLEJANIE)      */
 /* ======================================================== */
 
+/* ======================================================== */
+/* ✅ OBSŁUGA TABELI PRODUKTÓW (KLIKNIĘCIA + WKLEJANIE)      */
+/* ======================================================== */
+
 /**
  * 1. Funkcja pomocnicza: Tworzy pusty wiersz (wymagana do wklejania)
- * Jeśli już ją masz w kodzie, możesz ją pominąć, ale dla pewności zostawiam.
  */
 function createEmptyProductRow() {
     const tr = document.createElement('tr');
@@ -9841,6 +9844,7 @@ if (produktTableBody) {
             const docId = target.dataset.id;
             console.log(`Próba edycji produktu o ID: ${docId}`);
             try {
+                // Pobierz aktualne dane produktu z Firestore
                 const doc = await db.collection("leki").doc(docId).get();
                 if (!doc.exists) {
                     alert('Błąd: Nie znaleziono produktu w bazie danych.');
@@ -9851,9 +9855,10 @@ if (produktTableBody) {
                 console.log("Pobrano dane produktu do edycji:", data);
 
                 productFormTitle.textContent = 'Edytuj produkt';
-                productFormDocId.value = docId;
+                productFormDocId.value = docId; // Ustaw ID do edycji
                 productFormNazwa.value = data.nazwa || '';
                 productFormPlu.value = data.plu || '';
+                // Upewnij się, że cena i stan są liczbami w formularzu
                 productFormCena.value = data.cena !== undefined ? parseFloat(data.cena) : '';
                 productFormDawkowanie.value = data.dawkowanie || '';
                 productFormKarencja.value = data.karencja || '';
@@ -9879,13 +9884,13 @@ if (produktTableBody) {
                     await db.collection("leki").doc(docId).delete();
                     alert('Produkt usunięty pomyślnie.');
                     console.log(`Produkt ${docId} usunięty.`);
-                    
+                    // Usuń produkt z cache i przeładuj tabelę oraz listy
                     if (cachedProducts) {
                         cachedProducts = cachedProducts.filter(p => p.id !== docId);
-                        renderProductTable(cachedProducts);
-                        refreshProductDataLists();
+                        renderProductTable(cachedProducts); // Odśwież tabelę z cache
+                        refreshProductDataLists(); // Odśwież globalne listy
                     } else {
-                        loadAndCacheProducts();
+                        loadAndCacheProducts(); // Jeśli cache był pusty, załaduj na nowo
                     }
                 } catch (error) {
                     console.error('Błąd usuwania produktu: ', error);
@@ -9894,6 +9899,56 @@ if (produktTableBody) {
             }
         }
     });
+
+    // --- B. NOWA LOGIKA (Inteligentne Wklejanie - FIX PUSTYCH PÓL) ---
+    // To jest ten poprawiony fragment, który nie gubi pustych wierszy z Excela
+    produktTableBody.addEventListener('paste', (event) => {
+        // 1. Sprawdź czy tryb importu jest aktywny
+        const table = document.getElementById('produktTable');
+        const targetCell = event.target.closest('td[contenteditable="true"]');
+        
+        if (!table.classList.contains('import-mode') || !targetCell) return;
+
+        // 2. Przechwyć wklejanie
+        event.preventDefault();
+        const pastedText = (event.clipboardData || window.clipboardData).getData('text/plain');
+        
+        // 3. Podziel na linie
+        // ⚠️ ZMIANA KLUCZOWA: Nie używamy .filter() na środku!
+        let lines = pastedText.split(/\r?\n/);
+
+        // Usuń tylko OSTATNIĄ pustą linię (techniczną z Excela)
+        if (lines.length > 0 && lines[lines.length - 1] === '') {
+            lines.pop();
+        }
+
+        // 4. Znajdź start
+        let allRows = Array.from(produktTableBody.querySelectorAll('tr'));
+        const startRow = targetCell.closest('tr');
+        const startRowIndex = allRows.indexOf(startRow);
+        const cellIndex = targetCell.cellIndex;
+
+        console.log(`Wklejanie ${lines.length} linii (w tym puste), start od wiersza: ${startRowIndex}`);
+
+        // 5. Pętla wstawiania danych
+        lines.forEach((line, i) => {
+            const currentRowIndex = startRowIndex + i;
+
+            // Jeśli brakuje wiersza, stwórz nowy
+            if (currentRowIndex >= allRows.length) {
+                const newRow = createEmptyProductRow(); 
+                produktTableBody.appendChild(newRow);
+                allRows.push(newRow);
+            }
+
+            // Wstaw dane (nawet puste ciągi znaków, aby wyczyścić komórkę i zachować układ)
+            const targetRow = allRows[currentRowIndex];
+            if (targetRow && targetRow.cells[cellIndex]) {
+                targetRow.cells[cellIndex].textContent = line.trim();
+            }
+        });
+    });
+}
 
     // --- B. NOWA LOGIKA (Inteligentne Wklejanie - 'paste') ---
     produktTableBody.addEventListener('paste', (event) => {
