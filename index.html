@@ -9805,74 +9805,141 @@ loadAndCacheProducts(); // Wywołaj funkcję pobierającą dane produktów
 // ✅ POCZĄTEK: LOGIKA CRUD DLA BAZY PRODUKTÓW
 // ========================================================
 
+/* ======================================================== */
+/* ✅ OBSŁUGA TABELI PRODUKTÓW (KLIKNIĘCIA + WKLEJANIE)      */
+/* ======================================================== */
+
 /**
-* Obsługa kliknięć w tabeli produktów (Edycja i Usuwanie)
-*/
+ * 1. Funkcja pomocnicza: Tworzy pusty wiersz (wymagana do wklejania)
+ * Jeśli już ją masz w kodzie, możesz ją pominąć, ale dla pewności zostawiam.
+ */
+function createEmptyProductRow() {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+        <td contenteditable="true" style="cursor: text;"></td> 
+        <td contenteditable="true" style="cursor: text;"></td> 
+        <td contenteditable="true" style="cursor: text;"></td> 
+        <td contenteditable="true" style="cursor: text;"></td> 
+        <td contenteditable="true" style="cursor: text;"></td> 
+        <td contenteditable="true" style="cursor: text;"></td> 
+        <td contenteditable="true" style="cursor: text;"></td> 
+        <td class="col-akcje">
+            <span style="color: #999; font-size: 12px;">(Nowy)</span>
+        </td>
+    `;
+    return tr;
+}
+
 if (produktTableBody) {
-produktTableBody.addEventListener('click', async (e) => {
-const target = e.target;
 
-// --- EDYCJA PRODUKTU ---
-if (target.classList.contains('btn-edit-product')) {
-const docId = target.dataset.id;
-console.log(`Próba edycji produktu o ID: ${docId}`);
-try {
-// Pobierz aktualne dane produktu z Firestore
-const doc = await db.collection("leki").doc(docId).get();
-if (!doc.exists) {
-alert('Błąd: Nie znaleziono produktu w bazie danych.');
-console.error(`Nie znaleziono produktu o ID: ${docId}`);
-return;
-}
-const data = doc.data();
-console.log("Pobrano dane produktu do edycji:", data);
+    // --- A. TWOJA ISTNIEJĄCA LOGIKA (Edycja i Usuwanie - 'click') ---
+    produktTableBody.addEventListener('click', async (e) => {
+        const target = e.target;
 
-// Wypełnij i pokaż modal
-productFormTitle.textContent = 'Edytuj produkt';
-productFormDocId.value = docId; // Ustaw ID do edycji
-productFormNazwa.value = data.nazwa || '';
-productFormPlu.value = data.plu || '';
-// Upewnij się, że cena i stan są liczbami w formularzu
-productFormCena.value = data.cena !== undefined ? parseFloat(data.cena) : '';
-productFormDawkowanie.value = data.dawkowanie || '';
-productFormKarencja.value = data.karencja || '';
-productFormStan.value = data.stanMagazynowy !== undefined ? parseInt(data.stanMagazynowy) : '';
+        // --- EDYCJA PRODUKTU ---
+        if (target.classList.contains('btn-edit-product')) {
+            const docId = target.dataset.id;
+            console.log(`Próba edycji produktu o ID: ${docId}`);
+            try {
+                const doc = await db.collection("leki").doc(docId).get();
+                if (!doc.exists) {
+                    alert('Błąd: Nie znaleziono produktu w bazie danych.');
+                    console.error(`Nie znaleziono produktu o ID: ${docId}`);
+                    return;
+                }
+                const data = doc.data();
+                console.log("Pobrano dane produktu do edycji:", data);
 
-productFormModal.style.display = 'flex';
+                productFormTitle.textContent = 'Edytuj produkt';
+                productFormDocId.value = docId;
+                productFormNazwa.value = data.nazwa || '';
+                productFormPlu.value = data.plu || '';
+                productFormCena.value = data.cena !== undefined ? parseFloat(data.cena) : '';
+                productFormDawkowanie.value = data.dawkowanie || '';
+                productFormKarencja.value = data.karencja || '';
+                productFormStan.value = data.stanMagazynowy !== undefined ? parseInt(data.stanMagazynowy) : '';
 
-} catch (error) {
-console.error('Błąd pobierania produktu do edycji: ', error);
-alert('Wystąpił błąd podczas pobierania danych produktu.');
-}
-}
+                productFormModal.style.display = 'flex';
 
-// --- USUWANIE PRODUKTU ---
-if (target.classList.contains('btn-delete-product')) {
-const docId = target.dataset.id;
-const row = target.closest('tr');
-const productName = row.cells[0].textContent;
+            } catch (error) {
+                console.error('Błąd pobierania produktu do edycji: ', error);
+                alert('Wystąpił błąd podczas pobierania danych produktu.');
+            }
+        }
 
-if (confirm(`Czy na pewno chcesz usunąć produkt: "${productName}"? \n\nTej operacji nie można cofnąć.`)) {
-console.log(`Próba usunięcia produktu o ID: ${docId}`);
-try {
-await db.collection("leki").doc(docId).delete();
-alert('Produkt usunięty pomyślnie.');
-console.log(`Produkt ${docId} usunięty.`);
-// Usuń produkt z cache i przeładuj tabelę oraz listy
-if (cachedProducts) {
-cachedProducts = cachedProducts.filter(p => p.id !== docId);
-renderProductTable(cachedProducts); // Odśwież tabelę z cache
-refreshProductDataLists(); // Odśwież globalne listy
-} else {
-loadAndCacheProducts(); // Jeśli cache był pusty, załaduj na nowo
-}
-} catch (error) {
-console.error('Błąd usuwania produktu: ', error);
-alert('Wystąpił błąd podczas usuwania produktu.');
-}
-}
-}
-});
+        // --- USUWANIE PRODUKTU ---
+        if (target.classList.contains('btn-delete-product')) {
+            const docId = target.dataset.id;
+            const row = target.closest('tr');
+            const productName = row.cells[0].textContent;
+
+            if (confirm(`Czy na pewno chcesz usunąć produkt: "${productName}"? \n\nTej operacji nie można cofnąć.`)) {
+                console.log(`Próba usunięcia produktu o ID: ${docId}`);
+                try {
+                    await db.collection("leki").doc(docId).delete();
+                    alert('Produkt usunięty pomyślnie.');
+                    console.log(`Produkt ${docId} usunięty.`);
+                    
+                    if (cachedProducts) {
+                        cachedProducts = cachedProducts.filter(p => p.id !== docId);
+                        renderProductTable(cachedProducts);
+                        refreshProductDataLists();
+                    } else {
+                        loadAndCacheProducts();
+                    }
+                } catch (error) {
+                    console.error('Błąd usuwania produktu: ', error);
+                    alert('Wystąpił błąd podczas usuwania produktu.');
+                }
+            }
+        }
+    });
+
+    // --- B. NOWA LOGIKA (Inteligentne Wklejanie - 'paste') ---
+    produktTableBody.addEventListener('paste', (event) => {
+        // 1. Sprawdź czy tryb importu jest aktywny (czy widać żółte pola)
+        // Szukamy tabeli po ID, żeby sprawdzić klasę
+        const table = document.getElementById('produktTable');
+        const targetCell = event.target.closest('td[contenteditable="true"]');
+        
+        // Jeśli nie jesteśmy w trybie importu LUB nie kliknięto w komórkę -> przerwij
+        if (!table || !table.classList.contains('import-mode') || !targetCell) return;
+
+        // 2. Przechwyć wklejanie (zablokuj standardowe zachowanie)
+        event.preventDefault();
+        
+        // 3. Pobierz dane ze schowka
+        const pastedText = (event.clipboardData || window.clipboardData).getData('text/plain');
+        
+        // 4. Podziel na linie (usuwając puste na końcu)
+        const lines = pastedText.split(/\r?\n/).filter(line => line.trim() !== '');
+
+        // 5. Znajdź punkt startowy (wiersz i kolumna)
+        let allRows = Array.from(produktTableBody.querySelectorAll('tr'));
+        const startRow = targetCell.closest('tr');
+        const startRowIndex = allRows.indexOf(startRow);
+        const cellIndex = targetCell.cellIndex;
+
+        console.log(`Wklejanie ${lines.length} linii, start od wiersza: ${startRowIndex}`);
+
+        // 6. Pętla wstawiania danych
+        lines.forEach((line, i) => {
+            const currentRowIndex = startRowIndex + i;
+
+            // 🔥 Jeśli brakuje wiersza, stwórz nowy automatycznie!
+            if (currentRowIndex >= allRows.length) {
+                const newRow = createEmptyProductRow(); 
+                produktTableBody.appendChild(newRow);
+                allRows.push(newRow); // Aktualizuj lokalną listę wierszy
+            }
+
+            // Wstaw dane do odpowiedniej komórki
+            const targetRow = allRows[currentRowIndex];
+            if (targetRow && targetRow.cells[cellIndex]) {
+                targetRow.cells[cellIndex].textContent = line.trim();
+            }
+        });
+    });
 }
 
 /**
