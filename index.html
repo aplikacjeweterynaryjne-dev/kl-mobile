@@ -13804,56 +13804,50 @@ function generateWizytyReport(allReceipts, filters) {
  * ✅ ZAKTUALIZOWANA FUNKCJA: Generuje Raport Zużycia z filtrowaniem po PRODUKCIE.
  */
 function generateZuzyciaReportFromCards(allCards, filters) {
-    console.log("Generowanie raportu zużycia z KART LECZENIA...");
+    console.log("Generowanie raportu zużycia z KART LECZENIA (Rozszerzone dane)...");
 
-    // 1. Pobierz wartość filtra produktu (NOWOŚĆ)
     const productFilterInput = document.getElementById('reportProductInput');
     const targetProduct = productFilterInput ? productFilterInput.value.trim().toLowerCase() : "";
 
-    // 2. Filtr Klienta (jeśli wpisano)
     let filteredCards = [...allCards];
     if (filters.klient) {
-        // Sprawdzamy pole klient_nazwa w karcie
         const filterKlientLower = filters.klient.toLowerCase();
         filteredCards = filteredCards.filter(c => (c.klient_nazwa || '').toLowerCase().includes(filterKlientLower));
     }
     
-    // Mapa: Nazwa Produktu -> { totalQty, uses: [] }
     const productMap = new Map();
 
-    // 3. Iteracja po kartach
     for (const card of filteredCards) {
-        // Iteracja po wierszach tabeli w karcie
-        // (W archiwum wiersze są w tablicy `table`)
         if (card.table && Array.isArray(card.table)) {
             for (const row of card.table) {
-                // Szukamy nazwy leku (row.lek)
                 const rowProductName = (row.lek || '').trim();
                 if (!rowProductName) continue;
 
-                // ✅ 4. FILTRACJA PO PRODUKCIE (Jeśli filtr jest ustawiony)
+                // Filtracja po produkcie
                 if (targetProduct !== "" && !rowProductName.toLowerCase().includes(targetProduct)) {
-                    continue; // Pomiń ten produkt, bo nie pasuje do filtra
+                    continue; 
                 }
 
-                // --- PARSOWANIE ILOŚCI ---
-                // W bazie iloscDawka to np: `<input class="..." value="50"> ml`
+                // Parsowanie ilości
                 let qty = 0;
                 if (row.iloscDawka) {
-                    // Próba wyciągnięcia liczby z value="..."
                     const match = row.iloscDawka.match(/value="([\d\.]+)"/);
                     if (match && match[1]) {
                         qty = parseFloat(match[1]);
                     } else {
-                        // Fallback: jeśli to zwykły tekst (np. stare dane), spróbuj sparsować początek
                         qty = parseFloat(row.iloscDawka) || 0;
                     }
                 }
 
                 if (qty > 0) {
                     const docNr = card.nrDokumentu || 'Brak nr';
-                    // Format: "12/2025/AW (5)"
-                    const usageEntry = `${docNr} (<strong>${qty}</strong>)`;
+                    // ✅ NOWOŚĆ: Pobieramy klienta i datę
+                    const clientName = card.klient_nazwa || 'Nieznany';
+                    const date = card.dataWykonania || 'Brak daty';
+
+                    // ✅ FORMAT WYŚWIETLANIA: "Nr / Klient / Data (ilość)"
+                    // Używamy <br> dla czytelności w komórce tabeli lub "/" jeśli wolisz w jednej linii
+                    const usageEntry = `${docNr} / ${clientName} / ${date} (<strong>${qty}</strong>)`;
 
                     if (!productMap.has(rowProductName)) {
                         productMap.set(rowProductName, { totalQty: 0, uses: [] });
@@ -13866,35 +13860,34 @@ function generateZuzyciaReportFromCards(allCards, filters) {
         }
     }
 
-    // --- 5. Budowanie HTML tabeli ---
+    // Budowanie HTML
     let tableHtml = '';
     const sortedProducts = Array.from(productMap.keys()).sort((a, b) => a.localeCompare(b, 'pl'));
 
     for (const productName of sortedProducts) {
         const data = productMap.get(productName);
-        const usesList = data.uses.join(', ');
+        // Łączymy wpisy nową linią <br> dla czytelności
+        const usesList = data.uses.join('<br>'); 
 
         tableHtml += `
             <tr data-produkt="${productName}" data-ilosc="${data.totalQty}">
                 <td style="font-weight: 600;">${productName}</td>
                 <td style="text-align: center; font-weight: bold; font-size: 1.1em;">${parseFloat(data.totalQty.toFixed(3))}</td>
-                <td style="font-size: 0.9em; color: #333; line-height: 1.4;">
+                <td style="font-size: 0.85em; color: #333; line-height: 1.5;">
                     ${usesList}
                 </td>
             </tr>
         `;
     }
 
-    // --- 6. Aktualizacja widoku ---
     reportZuzyciaTableBody.innerHTML = tableHtml || '<tr><td colspan="3" style="text-align: center; padding: 20px;">Brak danych dla wybranych filtrów.</td></tr>';
     
-    // Pokaż odpowiednie kontenery
     reportWizytyTableContainer.style.display = 'none';
     reportZuzyciaTableContainer.style.display = 'block';
     if(reportFuelSection) reportFuelSection.style.display = 'none'; 
     if(reportNetSumContainer) reportNetSumContainer.style.display = 'none';
 
-    // Aktualizuj nagłówki (Dynamiczny tytuł)
+    // Aktualizacja nagłówków
     const prodFilterVal = document.getElementById('reportProductInput')?.value || '';
     reportMainTitle.textContent = targetProduct ? `Raport Zużycia: "${prodFilterVal}"` : "Raport Zużycia (Wszystkie Produkty)";
     
@@ -14714,44 +14707,67 @@ try {
     }
 
  // Wybór klienta (WERSJA ZMODYFIKOWANA DLA KALENDARZA)
-    function selectFormClient(klient) {
-        if (!klient) return;
+  function selectFormClient(klient) {
+        if (!klient) return;
+        
+        // Zmienna 'modal' odnosi się do formClientSearchModal w zakresie closure (try-catch block)
+        // Jeśli ten kod jest wklejony globalnie, musimy pobrać element
+        const searchModal = document.getElementById('formClientSearchModal');
 
-        // Sprawdź, skąd przyszliśmy (zmienna globalna)
+        // SCENARIUSZ A: Wracamy do formularza WIZYTY (Kalendarz)
         if (clientFormReturnToModal === '#visitFormModal') {
-            // SCENARIUSZ A: Wracamy do formularza WIZYTY
+            console.log("Powrót do modala wizyty z klientem:", klient.nazwa);
             
-     // 1. Zapisz dane klienta tymczasowo
-            // Musimy znaleźć oryginalną opcję <option>, żeby dostać telefon (jeśli tam jest)
+            // 1. Pobierz telefon
             const dataList = document.getElementById('klientList');
-            const opt = Array.from(dataList.options).find(o => o.value === klient.nazwa);
-            const telefonKlienta = opt ? (opt.dataset.telefon || '') : (klient.telefon || ''); // Poprawka na pobranie telefonu
+            let telefonKlienta = klient.telefon || ''; 
+            // Próba pobrania z datalist jeśli brak w obiekcie
+            if (!telefonKlienta && dataList) {
+                 const opt = Array.from(dataList.options).find(o => o.value === klient.nazwa);
+                 if (opt) telefonKlienta = opt.dataset.telefon || '';
+            }
 
+            // 2. Zapisz w zmiennej globalnej wizyty
             currentVisitClientData = {
                 nazwa: klient.nazwa,
                 adres: klient.adres || '',
                 telefon: telefonKlienta
             };
             
-            // 2. Wypełnij pola w modalu wizyty
-            visitFormKlient.value = klient.nazwa;
-            visitFormKlientAdres.textContent = klient.adres || 'Brak';
-            visitFormKlientTelefon.textContent = telefonKlienta || 'Brak';
+            // 3. Wypełnij pola w modalu WIZYTY (bezpośrednio po ID)
+            const vInput = document.getElementById('visitFormKlient');
+            const vAdres = document.getElementById('visitFormKlientAdres');
+            const vTel = document.getElementById('visitFormKlientTelefon');
             
-            // 3. Zamknij modal klienta i pokaż modal wizyty
-            modal.style.display = 'none'; // (modal klienta)
-            visitFormModal.style.display = 'flex';
-            clientFormReturnToModal = null; // Wyczyść stan
+            if(vInput) vInput.value = klient.nazwa;
+            if(vAdres) vAdres.textContent = klient.adres || 'Brak';
+            if(vTel) vTel.textContent = telefonKlienta || 'Brak';
+            
+            // 4. Zamknij modal szukania i OTWÓRZ modal wizyty
+            if(searchModal) searchModal.style.display = 'none';
+            
+            const visitModal = document.getElementById('visitFormModal');
+            if(visitModal) visitModal.style.display = 'flex';
+            
+            clientFormReturnToModal = null; // Reset flagi
 
         } else {
-            // SCENARIUSZ B: Domyślne zachowanie (powrót do formularza KARTY)
-            // Aktualizuj pola w formularzu (Step 1)
-            document.getElementById('formKlient').value = klient.nazwa;
-            document.getElementById('formAdres').value = klient.adres || '';
-            document.getElementById('formNrStada').value = klient.nrStada || '';
-            modal.style.display = 'none';
+            // SCENARIUSZ B: Domyślne (Karta Leczenia - Formularz)
+            const fKlient = document.getElementById('formKlient');
+            const fAdres = document.getElementById('formAdres');
+            const fStado = document.getElementById('formNrStada');
+            
+            if(fKlient) {
+                fKlient.value = klient.nazwa;
+                // Ważne: Wyzwól event input, aby zaktualizować logikę formularza
+                fKlient.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+            if(fAdres) fAdres.value = klient.adres || '';
+            if(fStado) fStado.value = klient.nrStada || '';
+            
+            if(searchModal) searchModal.style.display = 'none';
         }
-    }
+    }
     
 } catch(err) {
     console.error("Błąd inicjalizacji Modala Klientów (Formularz):", err);
@@ -15301,35 +15317,31 @@ try {
     // --- 6. Renderowanie Widoków ---
     
 // Renderuje widok Dnia (ZMODYFIKOWANA)
-    function renderTodayView(visits, dateToShow) { // <-- Ta linia jest już poprawna
-        // ⬇️ ⬇️ ⬇️ POCZĄTEK POPRAWKI (BŁĄD STREFY CZASOWEJ) ⬇️ ⬇️ ⬇️
-        // Użyj przekazanej daty lub dzisiejszej, jeśli nic nie podano
-        const targetDate = dateToShow || new Date();
+// --- ZMIENNA GLOBALNA KALENDARZA ---
+    let currentCalendarDateViewed = new Date(); // Zapamiętuje aktualnie oglądany dzień
 
-        // BŁĄD był tutaj: .toISOString() konwertuje na czas UTC, cofając datę.
-        // const todayISO = targetDate.toISOString().split('T')[0]; // <-- ZŁY KOD
+    // Renderuje widok Dnia (POPRAWIONA - zapamiętuje datę)
+    function renderTodayView(visits, dateToShow) {
+        // Użyj przekazanej daty lub weź ostatnio zapamiętaną (a na start - dzisiejszą)
+        const targetDate = dateToShow || new Date();
+        currentCalendarDateViewed = targetDate; // ✅ ZAPISUJEMY STAN
 
-        // POPRAWKA: Ręcznie formatujemy datę do stringa YYYY-MM-DD w LOKALNEJ strefie czasowej
-        const y = targetDate.getFullYear();
-        const m = String(targetDate.getMonth() + 1).padStart(2, '0'); // Miesiące są 0-11
-        const d = String(targetDate.getDate()).padStart(2, '0');
-        const todayISO = `${y}-${m}-${d}`; // To jest teraz poprawny string, np. "2025-11-14"
+        const y = targetDate.getFullYear();
+        const m = String(targetDate.getMonth() + 1).padStart(2, '0');
+        const d = String(targetDate.getDate()).padStart(2, '0');
+        const todayISO = `${y}-${m}-${d}`; 
 
-        // 2. Zaktualizuj tytuł widoku dnia (ta logika jest poprawna)
-        const isToday = (new Date().toISOString().split('T')[0] === todayISO);
-        const titleDateString = targetDate.toLocaleDateString('pl-PL', { day: 'numeric', month: 'long', year: 'numeric' });
-        
-        if (isToday) {
-            todayViewTitle.textContent = `Wizyty na dzisiaj (${titleDateString})`;
-        } else {
-            todayViewTitle.textContent = `Wizyty na dzień: ${titleDateString}`;
-        }
-        // ⬆️ ⬆️ ⬆️ KONIEC POPRAWKI ⬆️ ⬆️ ⬆️
-        
-        // Filtruj wizyty dla wybranego dnia (teraz używa poprawnego 'todayISO')
-        const todayVisits = visits.filter(v => v.dataWizyty === todayISO);
+        const isToday = (new Date().toISOString().split('T')[0] === todayISO);
+        const titleDateString = targetDate.toLocaleDateString('pl-PL', { day: 'numeric', month: 'long', year: 'numeric' });
+        
+        if (isToday) {
+            todayViewTitle.textContent = `Wizyty na dzisiaj (${titleDateString})`;
+        } else {
+            todayViewTitle.textContent = `Wizyty na dzień: ${titleDateString}`;
+        }
+        
+        const todayVisits = visits.filter(v => v.dataWizyty === todayISO);
 
-        // ✅ KOREKTA 2: Ustaw podsumowanie
         const totalCount = todayVisits.length;
         let summaryText = '';
         const statusFilter = calendarStatusFilter.value;
@@ -15341,21 +15353,18 @@ try {
         } else {
             summaryText = `Łączna liczba wizyt: ${totalCount}`;
         }
-        // Wpisz do nowego elementu P
         if (todayViewSummary) {
-            // Ukryj tekst "Liczba wizyt: 0"
             todayViewSummary.textContent = totalCount > 0 ? summaryText : ''; 
         }
 
-        // Sortuj po porze dnia
         const poraOrder = {"Pilne": 1, "6-10": 2, "10-15": 3, "15-20": 4, "Obojętne": 5};
         todayVisits.sort((a, b) => (poraOrder[a.poraDnia] || 99) - (poraOrder[b.poraDnia] || 99));
 
-        todayVisitList.innerHTML = ''; // Wyczyść
+        todayVisitList.innerHTML = ''; 
 
         if (todayVisits.length === 0) {
             const statusMsg = calendarStatusFilter.value === "Nowa" ? "do realizacji" : "zrealizowanych";
-            todayVisitList.innerHTML = `<p style="text-align:center; color:#888; margin-top: 30px;">Brak wizyt ${statusMsg} na dzisiaj.</p>`;
+            todayVisitList.innerHTML = `<p style="text-align:center; color:#888; margin-top: 30px;">Brak wizyt ${statusMsg} na ten dzień.</p>`;
             return;
         }
 
@@ -15368,7 +15377,6 @@ try {
 
             const statusText = visit.status === 'Nowa' ? 'Oznacz jako Zrobione' : 'Oznacz jako Nowe';
 
-            // ✅ KOREKTA 1: Dodano "Pora dnia" (pogrubione)
             visitDiv.innerHTML = `
                 <div class="visit-item-info">
                     <strong>${visit.klientNazwa}</strong>
@@ -15549,19 +15557,28 @@ try {
     });
 
     // Podpięcie wyszukiwania klienta
+// Podpięcie wyszukiwania klienta (POPRAWIONE)
     visitFormKlient.addEventListener('click', () => {
-        // Powiedz globalnemu skryptowi, że po dodaniu klienta ma wrócić do modala wizyty
-        if (typeof(clientFormReturnToModal) !== 'undefined') {
-            clientFormReturnToModal = '#visitFormModal';
-        }
+        // 1. Ustaw flagę powrotu (żeby selectFormClient wiedział co robić)
+        clientFormReturnToModal = '#visitFormModal'; 
 
-        // Ukryj modal wizyty
+        // 2. Ukryj modal wizyty
         visitFormModal.style.display = 'none';
 
-        // Otwórz modal wyszukiwania klienta (ten sam co w formularzu karty)
-        const formKlientTrigger = document.getElementById('formKlient');
-        if(formKlientTrigger) {
-            formKlientTrigger.click(); // Użyj modala z formularza
+        // 3. Otwórz modal szukania klienta RĘCZNIE (zamiast symulować kliknięcie w formularz)
+        // To zapobiega problemom z kontekstem
+        const searchModal = document.getElementById('formClientSearchModal');
+        const searchInput = document.getElementById('formClientSearchInputModal');
+        
+        if (searchModal && searchInput) {
+            searchInput.value = ''; // Wyczyść pole
+            if(typeof populateAndFilterFormClientList === 'function') {
+                populateAndFilterFormClientList(); // Załaduj listę
+            }
+            searchModal.style.display = 'flex'; // Pokaż modal
+            setTimeout(() => searchInput.focus(), 50);
+        } else {
+            console.error("Nie znaleziono modala wyszukiwania klientów!");
         }
     });
 
@@ -15650,7 +15667,7 @@ try {
         }
     });
    // --- 9. Logika Szybkiej Zmiany Statusu i Edycji (Widok Dnia) ---
-    todayVisitList.addEventListener('click', async (e) => {
+todayVisitList.addEventListener('click', async (e) => {
         const target = e.target;
 
         // A. Szybka zmiana statusu
@@ -15666,7 +15683,18 @@ try {
                     status: newStatus
                 });
                 showToast(`Status zmieniony na: ${newStatus}`, 'info');
-                fetchAndRenderVisits(); // Odśwież widok
+                
+                // ✅ POPRAWKA: Pobierz dane i WRÓĆ DO TEGO SAMEGO DNIA
+                await fetchAndRenderVisits(); 
+
+                // Odtwórz datę ze zmiennej globalnej
+                const y = currentCalendarDateViewed.getFullYear();
+                const m = String(currentCalendarDateViewed.getMonth() + 1).padStart(2, '0');
+                const d = String(currentCalendarDateViewed.getDate()).padStart(2, '0');
+                const isoDate = `${y}-${m}-${d}`;
+                
+                switchToDayView(isoDate); // Wymuś powrót do widoku dnia
+
             } catch (error) {
                 console.error("Błąd zmiany statusu:", error);
                 alert("Błąd zmiany statusu.");
