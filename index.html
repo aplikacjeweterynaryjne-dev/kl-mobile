@@ -15258,16 +15258,16 @@ try {
 
     // --- 5. Pobieranie Danych (Firestore) ---
 
-    // Główna funkcja pobierająca dane
+ // Główna funkcja pobierająca dane (POPRAWIONA: Nie resetuje daty)
     async function fetchAndRenderVisits() {
         if (!currentUserProfile) return; // Musimy być zalogowani
 
         const selectedUserId = calendarUserSelect.value;
         const selectedStatus = calendarStatusFilter.value;
 
-        // Pokaż loader (można dodać)
-        todayVisitList.innerHTML = '<p style="text-align:center; color:#888; margin-top: 30px;">Ładowanie wizyt... ⏳</p>';
-        monthGridBody.innerHTML = '<p style="text-align:center; color:#888;">Ładowanie... ⏳</p>';
+        // Pokaż loader (można odkomentować w razie potrzeby)
+        // todayVisitList.innerHTML = '<p style="text-align:center; color:#888; margin-top: 30px;">Ładowanie wizyt... ⏳</p>';
+        // monthGridBody.innerHTML = '<p style="text-align:center; color:#888;">Ładowanie... ⏳</p>';
 
         try {
             let q = db.collection("wizyty");
@@ -15300,9 +15300,20 @@ try {
 
             console.log(`Pobrano ${allFetchedVisits.length} wizyt.`);
 
-            // Wyrenderuj oba widoki (jeden będzie ukryty)
-            renderTodayView(allFetchedVisits);
+            // ⬇️⬇️⬇️ KLUCZOWA POPRAWKA TUTAJ ⬇️⬇️⬇️
+            
+            // Sprawdzamy, jaką datę użytkownik aktualnie ogląda (zmienna globalna).
+            // Jeśli zmienna nie istnieje (np. start aplikacji), używamy dzisiejszej daty.
+            const dateToRender = (typeof currentCalendarDateViewed !== 'undefined') ? currentCalendarDateViewed : new Date();
+
+            // Przekazujemy tę datę do funkcji renderującej.
+            // Dzięki temu, po odświeżeniu danych (np. zmianie statusu), kalendarz zostanie na tym samym dniu.
+            renderTodayView(allFetchedVisits, dateToRender);
+            
+            // Renderujemy widok miesiąca (ten korzysta z własnej zmiennej currentMonthView)
             renderMonthView(allFetchedVisits, currentMonthView);
+
+            // ⬆️⬆️⬆️ KONIEC POPRAWKI ⬆️⬆️⬆️
 
         } catch (error) {
             console.error("Błąd pobierania wizyt z Firestore:", error);
@@ -20826,24 +20837,37 @@ function selectInventoryProduct(name) {
     inventoryQuantityInput.select();
 }
 
-// 3. Dodawanie do listy
+// 3. Dodawanie do listy (POPRAWKA: Pozwala na ilość 0)
 if (inventoryAddBtn) {
     inventoryAddBtn.addEventListener('click', () => {
         const name = inventoryProductInput.value.trim();
-        const qty = parseFloat(inventoryQuantityInput.value);
+        // Pobieramy wartość jako string najpierw, żeby sprawdzić czy nie jest pusta
+        const qtyStr = inventoryQuantityInput.value;
+        const qty = parseFloat(qtyStr);
 
-        if (!name) { showToast("Wybierz produkt.", "error"); return; }
-        if (isNaN(qty) || qty < 0) { showToast("Podaj poprawny stan (>= 0).", "error"); return; }
+        if (!name) { 
+            showToast("Wybierz produkt.", "error"); 
+            return; 
+        }
+
+        // ✅ POPRAWIONA WALIDACJA:
+        // Sprawdzamy czy pole nie jest puste ORAZ czy jest liczbą ORAZ czy jest >= 0
+        if (qtyStr === "" || isNaN(qty) || qty < 0) { 
+            showToast("Podaj poprawny stan (musi być liczbą >= 0).", "error"); 
+            return; 
+        }
 
         let productId = null;
         if (typeof produktyGlowneCache !== 'undefined') productId = produktyGlowneCache.get(name);
-        // Fallback dla cache
         if (!productId && typeof cachedProducts !== 'undefined') {
             const found = cachedProducts.find(p => p.nazwa === name);
             if (found) productId = found.id;
         }
 
-        if (!productId) { showToast("Błąd produktu w bazie.", "error"); return; }
+        if (!productId) { 
+            showToast("Błąd produktu w bazie.", "error"); 
+            return; 
+        }
 
         // Dodaj lub nadpisz w koszyku
         const existing = inventoryBasket.find(x => x.id === productId);
