@@ -4548,9 +4548,6 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
         <div class="form-actions" style="flex-wrap: wrap; gap: 10px;">
             <div class="left" style="display: flex; gap: 5px;">
                 <button id="cancelVisitForm" type="button" class="btn ghost small" style="font-size: 19px;">Anuluj</button>
-                <button id="btnSmsToDoctor" type="button" class="btn" style="background-color: #e3f2fd; color: #1565c0; border: 1px solid #90caf9;" title="Wyślij SMS do przypisanego lekarza">
-                    📱 SMS
-                </button>
             </div>
             <button id="saveVisitBtn" type="button" class="btn primary" style="font-size: 19px;">Zapisz</button>
         </div>
@@ -15360,83 +15357,115 @@ try {
 // --- ZMIENNA GLOBALNA KALENDARZA ---
     let currentCalendarDateViewed = new Date(); // Zapamiętuje aktualnie oglądany dzień
 
-    // Renderuje widok Dnia (POPRAWIONA - zapamiętuje datę)
-    function renderTodayView(visits, dateToShow) {
-        // Użyj przekazanej daty lub weź ostatnio zapamiętaną (a na start - dzisiejszą)
-        const targetDate = dateToShow || new Date();
-        currentCalendarDateViewed = targetDate; // ✅ ZAPISUJEMY STAN
+// Renderuje widok Dnia (ZMODYFIKOWANA O PRZYCISK SMS)
+function renderTodayView(visits, dateToShow) {
+    const targetDate = dateToShow || new Date();
+    currentCalendarDateViewed = targetDate; 
 
-        const y = targetDate.getFullYear();
-        const m = String(targetDate.getMonth() + 1).padStart(2, '0');
-        const d = String(targetDate.getDate()).padStart(2, '0');
-        const todayISO = `${y}-${m}-${d}`; 
+    const y = targetDate.getFullYear();
+    const m = String(targetDate.getMonth() + 1).padStart(2, '0');
+    const d = String(targetDate.getDate()).padStart(2, '0');
+    const todayISO = `${y}-${m}-${d}`; 
 
-        const isToday = (new Date().toISOString().split('T')[0] === todayISO);
-        const titleDateString = targetDate.toLocaleDateString('pl-PL', { day: 'numeric', month: 'long', year: 'numeric' });
-        
-        if (isToday) {
-            todayViewTitle.textContent = `Wizyty na dzisiaj (${titleDateString})`;
-        } else {
-            todayViewTitle.textContent = `Wizyty na dzień: ${titleDateString}`;
-        }
-        
-        const todayVisits = visits.filter(v => v.dataWizyty === todayISO);
-
-        const totalCount = todayVisits.length;
-        let summaryText = '';
-        const statusFilter = calendarStatusFilter.value;
-
-        if (statusFilter === 'Nowa') {
-            summaryText = `Liczba wizyt do realizacji: ${totalCount}`;
-        } else if (statusFilter === 'Zrealizowana') {
-            summaryText = `Liczba wizyt zrealizowanych: ${totalCount}`;
-        } else {
-            summaryText = `Łączna liczba wizyt: ${totalCount}`;
-        }
-        if (todayViewSummary) {
-            todayViewSummary.textContent = totalCount > 0 ? summaryText : ''; 
-        }
-
-        const poraOrder = {"Pilne": 1, "6-10": 2, "10-15": 3, "15-20": 4, "Obojętne": 5};
-        todayVisits.sort((a, b) => (poraOrder[a.poraDnia] || 99) - (poraOrder[b.poraDnia] || 99));
-
-        todayVisitList.innerHTML = ''; 
-
-        if (todayVisits.length === 0) {
-            const statusMsg = calendarStatusFilter.value === "Nowa" ? "do realizacji" : "zrealizowanych";
-            todayVisitList.innerHTML = `<p style="text-align:center; color:#888; margin-top: 30px;">Brak wizyt ${statusMsg} na ten dzień.</p>`;
-            return;
-        }
-
-        todayVisits.forEach(visit => {
-            const visitDiv = document.createElement('div');
-            visitDiv.className = 'visit-item';
-            visitDiv.dataset.id = visit.id;
-            visitDiv.dataset.status = visit.status;
-            visitDiv.dataset.pora = visit.poraDnia;
-
-            const statusText = visit.status === 'Nowa' ? 'Oznacz jako Zrobione' : 'Oznacz jako Nowe';
-
-            visitDiv.innerHTML = `
-                <div class="visit-item-info">
-                    <strong>${visit.klientNazwa}</strong>
-                    <span class="details">
-                        ${visit.klientAdres || 'Brak adresu'}<br>
-                        ${visit.klientTelefon || 'Brak telefonu'}
-                    </span>
-                    <span class="purpose">Cel: ${visit.celWizyty || 'Nieokreślony'}</span>
-                    <span class="purpose" style="font-weight: 700;">Pora: ${visit.poraDnia || 'Brak'}</span>
-                    ${visit.notatka ? `<span class="details" style="color: #c0392b; font-style: italic;">Notatka: ${visit.notatka}</span>` : ''}
-                </div>
-                <div class="visit-item-actions">
-                    <button class="btn btn-quick-status" data-id="${visit.id}" data-new-status="${visit.status === 'Nowa' ? 'Zrealizowana' : 'Nowa'}">${statusText}</button>
-                    <button class="btn ghost small btn-edit-visit" data-id="${visit.id}">Edytuj</button>
-                    <button class="btn warn small btn-delete-visit" data-id="${visit.id}" style="margin-top: 5px;">Usuń</button>
-                </div>
-            `;
-            todayVisitList.appendChild(visitDiv);
-        });
+    const isToday = (new Date().toISOString().split('T')[0] === todayISO);
+    const titleDateString = targetDate.toLocaleDateString('pl-PL', { day: 'numeric', month: 'long', year: 'numeric' });
+    
+    if (isToday) {
+        todayViewTitle.textContent = `Wizyty na dzisiaj (${titleDateString})`;
+    } else {
+        todayViewTitle.textContent = `Wizyty na dzień: ${titleDateString}`;
     }
+    
+    const todayVisits = visits.filter(v => v.dataWizyty === todayISO);
+
+    // --- Statystyki ---
+    const totalCount = todayVisits.length;
+    let summaryText = '';
+    const statusFilter = calendarStatusFilter.value;
+    if (statusFilter === 'Nowa') summaryText = `Liczba wizyt do realizacji: ${totalCount}`;
+    else if (statusFilter === 'Zrealizowana') summaryText = `Liczba wizyt zrealizowanych: ${totalCount}`;
+    else summaryText = `Łączna liczba wizyt: ${totalCount}`;
+    
+    if (todayViewSummary) todayViewSummary.textContent = totalCount > 0 ? summaryText : ''; 
+
+    // Sortowanie
+    const poraOrder = {"Pilne": 1, "6-10": 2, "10-15": 3, "15-20": 4, "Obojętne": 5};
+    todayVisits.sort((a, b) => (poraOrder[a.poraDnia] || 99) - (poraOrder[b.poraDnia] || 99));
+
+    todayVisitList.innerHTML = ''; 
+
+    if (todayVisits.length === 0) {
+        const statusMsg = calendarStatusFilter.value === "Nowa" ? "do realizacji" : "zrealizowanych";
+        todayVisitList.innerHTML = `<p style="text-align:center; color:#888; margin-top: 30px;">Brak wizyt ${statusMsg} na ten dzień.</p>`;
+        return;
+    }
+
+    // --- FUNKCJA POMOCNICZA: Szukanie telefonu lekarza po UID ---
+    const getDocPhone = (uid) => {
+        if (!calendarUserSelect) return '';
+        // Szukamy w opcjach selecta, gdzie wcześniej zapisaliśmy numer w dataset
+        for (let i = 0; i < calendarUserSelect.options.length; i++) {
+            const opt = calendarUserSelect.options[i];
+            if (opt.value === uid) {
+                return opt.dataset.phone || '';
+            }
+        }
+        return '';
+    };
+
+    todayVisits.forEach(visit => {
+        const visitDiv = document.createElement('div');
+        visitDiv.className = 'visit-item';
+        visitDiv.dataset.id = visit.id;
+        visitDiv.dataset.status = visit.status;
+        visitDiv.dataset.pora = visit.poraDnia;
+
+        const statusText = visit.status === 'Nowa' ? 'Oznacz jako Zrobione' : 'Oznacz jako Nowe';
+        
+        // Pobierz telefon lekarza przypisanego do tej wizyty
+        const docPhone = getDocPhone(visit.lekarz_uid);
+        
+        // ✅ NOWOŚĆ: Przycisk SMS (widoczny tylko jeśli jest numer telefonu)
+        let smsButtonHtml = '';
+        if (docPhone && docPhone.length >= 9) {
+            smsButtonHtml = `
+            <button class="btn small btn-sms-visit" 
+                    style="background-color: #e3f2fd; color: #1565c0; border: 1px solid #90caf9;"
+                    data-phone="${docPhone}"
+                    data-client="${visit.klientNazwa}"
+                    data-date="${visit.dataWizyty}"
+                    data-time="${visit.poraDnia}"
+                    data-cel="${visit.celWizyty || 'Wizyta'}">
+                📱 SMS
+            </button>`;
+        }
+
+        visitDiv.innerHTML = `
+            <div class="visit-item-info">
+                <strong>${visit.klientNazwa}</strong>
+                <div class="details" style="font-size:12px; color:#555;">
+                    ${visit.lekarz_nazwisko ? `Lekarz: ${visit.lekarz_nazwisko}` : ''}
+                </div>
+                <span class="details">
+                    ${visit.klientAdres || ''}<br>
+                    ${visit.klientTelefon || ''}
+                </span>
+                <span class="purpose">Cel: ${visit.celWizyty || 'Nieokreślony'}</span>
+                <span class="purpose" style="font-weight: 700;">Pora: ${visit.poraDnia || 'Brak'}</span>
+                ${visit.notatka ? `<span class="details" style="color: #c0392b; font-style: italic;">Notatka: ${visit.notatka}</span>` : ''}
+            </div>
+            <div class="visit-item-actions">
+                <button class="btn btn-quick-status" data-id="${visit.id}" data-new-status="${visit.status === 'Nowa' ? 'Zrealizowana' : 'Nowa'}">${statusText}</button>
+                
+                ${smsButtonHtml}
+
+                <button class="btn ghost small btn-edit-visit" data-id="${visit.id}">Edytuj</button>
+                <button class="btn warn small btn-delete-visit" data-id="${visit.id}" style="margin-top: 5px;">Usuń</button>
+            </div>
+        `;
+        todayVisitList.appendChild(visitDiv);
+    });
+}
     // Renderuje widok Miesiąca
     function renderMonthView(visits, date) {
         monthGridBody.innerHTML = ''; // Wyczyść
@@ -15755,106 +15784,109 @@ saveVisitBtn.addEventListener('click', async () => {
         saveVisitBtn.textContent = 'Zapisz';
     }
 });
-   // --- 9. Logika Szybkiej Zmiany Statusu i Edycji (Widok Dnia) ---
+// --- 9. Logika Szybkiej Zmiany Statusu, SMS i Edycji (Widok Dnia) ---
 todayVisitList.addEventListener('click', async (e) => {
-        const target = e.target;
+    const target = e.target;
 
-        // A. Szybka zmiana statusu
-        if (target.classList.contains('btn-quick-status')) {
-            const docId = target.dataset.id;
-            const newStatus = target.dataset.newStatus;
+    // A. Szybka zmiana statusu
+    if (target.classList.contains('btn-quick-status')) {
+        const docId = target.dataset.id;
+        const newStatus = target.dataset.newStatus;
+        target.disabled = true;
+        target.textContent = '...';
+        try {
+            await db.collection('wizyty').doc(docId).update({ status: newStatus });
+            showToast(`Status zmieniony na: ${newStatus}`, 'info');
+            await fetchAndRenderVisits(); 
+            // Przywróć widok dnia
+            const y = currentCalendarDateViewed.getFullYear();
+            const m = String(currentCalendarDateViewed.getMonth() + 1).padStart(2, '0');
+            const d = String(currentCalendarDateViewed.getDate()).padStart(2, '0');
+            switchToDayView(`${y}-${m}-${d}`);
+        } catch (error) {
+            console.error("Błąd zmiany statusu:", error);
+            alert("Błąd zmiany statusu.");
+            target.disabled = false;
+        }
+    }
 
+    // B. ✅ NOWOŚĆ: WYŚLIJ SMS (Z poziomu listy)
+    else if (target.classList.contains('btn-sms-visit')) {
+        const phone = target.dataset.phone;
+        const client = target.dataset.client;
+        const date = target.dataset.date;
+        const time = target.dataset.time;
+        const cel = target.dataset.cel;
+
+        // Konwersja daty (2025-11-10 -> 10.11)
+        const parts = date.split('-');
+        const dateShort = parts.length === 3 ? `${parts[2]}.${parts[1]}` : date;
+
+        // Treść SMS
+        const message = `Wizyta: ${client}, dn. ${dateShort} (${time}). Cel: ${cel}.`;
+
+        // Logika linku SMS
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+        const separator = isIOS ? '&' : '?';
+        const link = `sms:${phone}${separator}body=${encodeURIComponent(message)}`;
+
+        window.location.href = link;
+    }
+
+    // C. Edycja wizyty (stary kod)
+    else if (target.classList.contains('btn-edit-visit')) {
+        const docId = target.dataset.id;
+        const visitData = allFetchedVisits.find(v => v.id === docId);
+        
+        if (visitData) {
+            visitFormTitle.textContent = "Edytuj wizytę";
+            visitFormDocId.value = visitData.id;
+            
+            const modalUserSelect = document.getElementById('visitFormUserSelect');
+            if (modalUserSelect && visitData.lekarz_uid) {
+                modalUserSelect.value = visitData.lekarz_uid;
+            }
+
+            visitFormStatus.value = visitData.status;
+            visitFormKlient.value = visitData.klientNazwa;
+            visitFormKlientAdres.textContent = visitData.klientAdres || '...';
+            visitFormKlientTelefon.textContent = visitData.klientTelefon || '...';
+            visitFormDate.value = visitData.dataWizyty;
+            visitFormPoraDnia.value = visitData.poraDnia;
+            visitFormCel.value = visitData.celWizyty;
+            visitFormNotatka.value = visitData.notatka;
+
+            currentVisitClientData = {
+                nazwa: visitData.klientNazwa,
+                adres: visitData.klientAdres,
+                telefon: visitData.klientTelefon
+            };
+
+            if (typeof loadVisitPurposeHistory === 'function') loadVisitPurposeHistory();
+
+            visitFormModal.style.display = 'flex';
+        }
+    }
+
+    // D. Usuwanie wizyty
+    else if (target.classList.contains('btn-delete-visit')) {
+        const docId = target.dataset.id;
+        if (confirm("Czy na pewno chcesz usunąć tę wizytę?\n\nTej operacji nie można cofnąć.")) {
             target.disabled = true;
             target.textContent = '...';
-
             try {
-                await db.collection('wizyty').doc(docId).update({
-                    status: newStatus
-                });
-                showToast(`Status zmieniony na: ${newStatus}`, 'info');
-                
-                // ✅ POPRAWKA: Pobierz dane i WRÓĆ DO TEGO SAMEGO DNIA
-                await fetchAndRenderVisits(); 
-
-                // Odtwórz datę ze zmiennej globalnej
-                const y = currentCalendarDateViewed.getFullYear();
-                const m = String(currentCalendarDateViewed.getMonth() + 1).padStart(2, '0');
-                const d = String(currentCalendarDateViewed.getDate()).padStart(2, '0');
-                const isoDate = `${y}-${m}-${d}`;
-                
-                switchToDayView(isoDate); // Wymuś powrót do widoku dnia
-
+                await db.collection('wizyty').doc(docId).delete();
+                showToast("Wizyta została usunięta.", "success");
+                fetchAndRenderVisits(); 
             } catch (error) {
-                console.error("Błąd zmiany statusu:", error);
-                alert("Błąd zmiany statusu.");
+                console.error("Błąd usuwania wizyty:", error);
+                alert("Wystąpił błąd podczas usuwania wizyty.");
                 target.disabled = false;
+                target.textContent = 'Usuń';
             }
         }
-
-      // B. Edycja wizyty
-        if (target.classList.contains('btn-edit-visit')) {
-            const docId = target.dataset.id;
-            const visitData = allFetchedVisits.find(v => v.id === docId);
-            
-            if (visitData) {
-                visitFormTitle.textContent = "Edytuj wizytę";
-                visitFormDocId.value = visitData.id;
-                
-                // Ustaw pracownika przypisanego do tej wizyty w modalu
-                const modalUserSelect = document.getElementById('visitFormUserSelect');
-                // Jeśli pole istnieje i wizyta ma zapisanego lekarza, wybierz go na liście
-                if (modalUserSelect && visitData.lekarz_uid) {
-                    modalUserSelect.value = visitData.lekarz_uid;
-                }
-
-                // Wypełnij resztę pól
-                visitFormStatus.value = visitData.status;
-                visitFormKlient.value = visitData.klientNazwa;
-                visitFormKlientAdres.textContent = visitData.klientAdres || '...';
-                visitFormKlientTelefon.textContent = visitData.klientTelefon || '...';
-                visitFormDate.value = visitData.dataWizyty;
-                visitFormPoraDnia.value = visitData.poraDnia;
-                visitFormCel.value = visitData.celWizyty;
-                visitFormNotatka.value = visitData.notatka;
-
-                // Zapisz dane klienta na potrzeby ponownego zapisu (żeby nie zniknęły)
-                currentVisitClientData = {
-                    nazwa: visitData.klientNazwa,
-                    adres: visitData.klientAdres,
-                    telefon: visitData.klientTelefon
-                };
-
-                // ✅ NOWE: Ładuj podpowiedzi celów (historia) przed otwarciem okna
-                if (typeof loadVisitPurposeHistory === 'function') {
-                    loadVisitPurposeHistory();
-                }
-
-                visitFormModal.style.display = 'flex';
-            }
-        }
-
-        // C. Usuwanie wizyty
-        else if (target.classList.contains('btn-delete-visit')) {
-            const docId = target.dataset.id;
-
-            if (confirm("Czy na pewno chcesz usunąć tę wizytę?\n\nTej operacji nie można cofnąć.")) {
-                target.disabled = true;
-                target.textContent = '...';
-
-                try {
-                    await db.collection('wizyty').doc(docId).delete();
-                    showToast("Wizyta została usunięta.", "success");
-                    fetchAndRenderVisits(); // Odśwież widok
-                } catch (error) {
-                    console.error("Błąd usuwania wizyty:", error);
-                    alert("Wystąpił błąd podczas usuwania wizyty.");
-                    target.disabled = false;
-                    target.textContent = 'Usuń';
-                }
-            }
-        }
-    });
-
+    }
+});
         // ⬆️ ⬆️ ⬆️ KONIEC NOWEGO BLOKU ⬆️ ⬆️ ⬆️
 
 } catch (err) {
