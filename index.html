@@ -17915,13 +17915,44 @@ function populateTopUpSearchList() {
     nazwyLekow.forEach(lekName => {
         if (filterText === '' || lekName.toLowerCase().includes(filterText)) {
             const itemDiv = document.createElement('div');
-            itemDiv.className = 'product-search-item'; // Używamy istniejącej klasy stylów
-            // Dodaj style inline, jeśli klasa nie jest dostępna globalnie
+            itemDiv.className = 'product-search-item'; 
             itemDiv.style.padding = "10px";
             itemDiv.style.borderBottom = "1px solid #eee";
             itemDiv.style.cursor = "pointer";
             
             itemDiv.textContent = lekName;
+
+            // --- ✅ NOWOŚĆ: Wyświetlanie stanu na zielono ---
+            if (currentUserProfile && currentUserProfile.uzywaStanowMagazynowych) {
+                 // Pobierz ID produktu z mapy nazw
+                 let productId = null;
+                 if (typeof produktyGlowneCache !== 'undefined') productId = produktyGlowneCache.get(lekName);
+                 
+                 if (productId) {
+                     let stan = 0;
+                     let foundStock = false;
+
+                     // 1. Sprawdź w Moim Magazynie (standardowy użytkownik)
+                     if (typeof magazynCache !== 'undefined' && magazynCache.has(productId)) {
+                         stan = magazynCache.get(productId).stan || 0;
+                         foundStock = true;
+                     } 
+                     // 2. Jeśli nie, sprawdź w Zarządzaniu (jeśli Admin edytuje kogoś innego)
+                     else if (typeof zarzadzanieMagazynCache !== 'undefined' && zarzadzanieMagazynCache.has(productId)) {
+                         stan = zarzadzanieMagazynCache.get(productId).stan || 0;
+                         foundStock = true;
+                     }
+
+                     // Jeśli znaleziono stan i jest większy od zera -> Styluj na zielono
+                     if (foundStock && stan > 0) {
+                         itemDiv.style.color = '#27ae60'; // Zielony tekst
+                         itemDiv.style.fontWeight = '800'; // Pogrubienie
+                         itemDiv.style.backgroundColor = '#f0fff4'; // Jasnozielone tło
+                         itemDiv.textContent = `${lekName} (Stan: ${stan})`;
+                     }
+                 }
+            }
+            // --- KONIEC NOWOŚCI ---
             
             // Kliknięcie w produkt
             itemDiv.addEventListener('click', () => {
@@ -20833,7 +20864,39 @@ function populateInventorySearchList() {
             itemDiv.style.padding = "10px";
             itemDiv.style.borderBottom = "1px solid #eee";
             itemDiv.style.cursor = "pointer";
+            
             itemDiv.textContent = lekName;
+
+            // --- ✅ NOWOŚĆ: Wyświetlanie stanu na zielono ---
+            if (currentUserProfile && currentUserProfile.uzywaStanowMagazynowych) {
+                 // Pobierz ID produktu
+                 let productId = null;
+                 if (typeof produktyGlowneCache !== 'undefined') productId = produktyGlowneCache.get(lekName);
+                 
+                 if (productId) {
+                     let stan = 0;
+                     let foundStock = false;
+
+                     // Sprawdź w Moim Magazynie
+                     if (typeof magazynCache !== 'undefined' && magazynCache.has(productId)) {
+                         stan = magazynCache.get(productId).stan || 0;
+                         foundStock = true;
+                     } 
+                     // Jeśli nie, sprawdź w Zarządzaniu (jeśli Admin edytuje kogoś innego)
+                     else if (typeof zarzadzanieMagazynCache !== 'undefined' && zarzadzanieMagazynCache.has(productId)) {
+                         stan = zarzadzanieMagazynCache.get(productId).stan || 0;
+                         foundStock = true;
+                     }
+
+                     if (foundStock && stan > 0) {
+                         itemDiv.style.color = '#27ae60'; // Zielony tekst
+                         itemDiv.style.fontWeight = '800'; // Pogrubienie
+                         itemDiv.style.backgroundColor = '#f0fff4'; // Jasnozielone tło
+                         itemDiv.textContent = `${lekName} (Stan: ${stan})`;
+                     }
+                 }
+            }
+            // --- KONIEC NOWOŚCI ---
             
             itemDiv.addEventListener('click', () => {
                 selectInventoryProduct(lekName);
@@ -20842,7 +20905,6 @@ function populateInventorySearchList() {
         }
     });
 }
-
 function selectInventoryProduct(name) {
     inventoryProductInput.value = name;
     if (typeof mapaIlosci !== 'undefined' && mapaIlosci[name]) {
