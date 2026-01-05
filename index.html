@@ -15357,7 +15357,7 @@ try {
 // --- ZMIENNA GLOBALNA KALENDARZA ---
     let currentCalendarDateViewed = new Date(); // Zapamiętuje aktualnie oglądany dzień
 
-// Renderuje widok Dnia (ZMODYFIKOWANA O PRZYCISK SMS)
+// Renderuje widok Dnia (WERSJA: Guzik SMS widoczny ZAWSZE)
 function renderTodayView(visits, dateToShow) {
     const targetDate = dateToShow || new Date();
     currentCalendarDateViewed = targetDate; 
@@ -15403,7 +15403,6 @@ function renderTodayView(visits, dateToShow) {
     // --- FUNKCJA POMOCNICZA: Szukanie telefonu lekarza po UID ---
     const getDocPhone = (uid) => {
         if (!calendarUserSelect) return '';
-        // Szukamy w opcjach selecta, gdzie wcześniej zapisaliśmy numer w dataset
         for (let i = 0; i < calendarUserSelect.options.length; i++) {
             const opt = calendarUserSelect.options[i];
             if (opt.value === uid) {
@@ -15422,13 +15421,11 @@ function renderTodayView(visits, dateToShow) {
 
         const statusText = visit.status === 'Nowa' ? 'Oznacz jako Zrobione' : 'Oznacz jako Nowe';
         
-        // Pobierz telefon lekarza przypisanego do tej wizyty
+        // Pobierz telefon
         const docPhone = getDocPhone(visit.lekarz_uid);
         
-        // ✅ NOWOŚĆ: Przycisk SMS (widoczny tylko jeśli jest numer telefonu)
-        let smsButtonHtml = '';
-        if (docPhone && docPhone.length >= 9) {
-            smsButtonHtml = `
+        // ✅ ZMIANA: Pokazujemy guzik ZAWSZE. Jeśli brak telefonu, dataset będzie pusty.
+        let smsButtonHtml = `
             <button class="btn small btn-sms-visit" 
                     style="background-color: #e3f2fd; color: #1565c0; border: 1px solid #90caf9;"
                     data-phone="${docPhone}"
@@ -15438,7 +15435,6 @@ function renderTodayView(visits, dateToShow) {
                     data-cel="${visit.celWizyty || 'Wizyta'}">
                 📱 SMS
             </button>`;
-        }
 
         visitDiv.innerHTML = `
             <div class="visit-item-info">
