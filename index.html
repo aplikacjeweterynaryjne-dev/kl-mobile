@@ -15729,7 +15729,7 @@ saveVisitBtn.addEventListener('click', async () => {
 
                 // Przygotuj SMS
                 shouldOfferSms = true;
-                smsMessage = `Hej, przepisałem Ci wizytę: ${klientNazwa}, Data: ${dataWizyty}. Sprawdź w kalendarzu.`;
+                smsMessage = `Nowa wizyta: ${klientNazwa}, Data: ${dataWizyty} (${visitData.poraDnia}). Cel: ${visitData.celWizyty}.`;
             }
 
             delete visitData.createdAt; 
@@ -15806,25 +15806,42 @@ todayVisitList.addEventListener('click', async (e) => {
         }
     }
 
-    // B. ✅ NOWOŚĆ: WYŚLIJ SMS (Z poziomu listy)
+ // B. ✅ POPRAWIONA OBSŁUGA SMS (Czyści numer i dobiera format do systemu)
     else if (target.classList.contains('btn-sms-visit')) {
-        const phone = target.dataset.phone;
+        let phone = target.dataset.phone || '';
+        
+        // 1. WYCZYŚĆ NUMER (To jest kluczowe! Usuwa spacje i myślniki)
+        phone = phone.replace(/[^0-9+]/g, '');
+
+        if (phone.length < 9) {
+            alert(`Błąd: Numer telefonu lekarza jest nieprawidłowy lub pusty. Sprawdź Konfigurację.`);
+            return;
+        }
+
         const client = target.dataset.client;
         const date = target.dataset.date;
         const time = target.dataset.time;
         const cel = target.dataset.cel;
 
-        // Konwersja daty (2025-11-10 -> 10.11)
+        // Konwersja daty (dla czytelności)
         const parts = date.split('-');
         const dateShort = parts.length === 3 ? `${parts[2]}.${parts[1]}` : date;
 
         // Treść SMS
         const message = `Wizyta: ${client}, dn. ${dateShort} (${time}). Cel: ${cel}.`;
 
-        // Logika linku SMS
-        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-        const separator = isIOS ? '&' : '?';
-        const link = `sms:${phone}${separator}body=${encodeURIComponent(message)}`;
+        // 2. DETEKCJA SYSTEMU (Naprawia problem pustej treści na iPhone)
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+                      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+        let link = '';
+        if (isIOS) {
+            // Wersja dla iPhone (&body=)
+            link = `sms:${phone}&body=${encodeURIComponent(message)}`;
+        } else {
+            // Wersja dla Androida (?body=)
+            link = `sms:${phone}?body=${encodeURIComponent(message)}`;
+        }
 
         window.location.href = link;
     }
