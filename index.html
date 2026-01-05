@@ -8933,6 +8933,9 @@ async function fetchUserProfile(uid) {
         if (typeof checkUserProfileMessage === 'function') {
             checkUserProfileMessage();
         }
+    if (typeof startCalendarNotificationListener === 'function') {
+            startCalendarNotificationListener();
+        }
     }, 1500); // 1.5 sekundy opóźnienia, żeby user zdążył zobaczyć pulpit
 }
 /**
@@ -24857,7 +24860,85 @@ if (addVisitBtnRef) {
 }
 // Uruchom też przy edycji (delegacja zdarzeń w Kalendarzu już to robi, ale dla pewności):
 // Funkcja `loadVisitPurposeHistory` jest już globalna, więc `btn-edit-visit` ją znajdzie.
+/* ======================================================== */
+/* ✅ MODUŁ: Powiadomienia o Nowych Wizytach (Listener)     */
+/* ======================================================== */
 
+let calendarNotificationUnsubscribe = null;
+
+function startCalendarNotificationListener() {
+    // 1. Sprawdź czy mamy użytkownika i uprawnienia
+    if (!currentUserProfile) return;
+    
+    // Jeśli już nasłuchujemy, nie dublujmy
+    if (calendarNotificationUnsubscribe) return;
+
+    console.log("Uruchamianie nasłuchu powiadomień kalendarza...");
+
+    // Poproś o uprawnienia do powiadomień (jeśli jeszcze nie ma)
+    if ("Notification" in window && Notification.permission !== "granted") {
+        Notification.requestPermission();
+    }
+
+    // 2. Zapytanie: Śledzimy wizyty przypisane DO MNIE, które są NOWE
+    const q = db.collection('wizyty')
+        .where('lekarz_uid', '==', currentUserProfile.uid)
+        .where('status', '==', 'Nowa')
+        // Opcjonalnie: ograniczenie czasowe, żeby nie pobierać historii przy każdym odświeżeniu
+        // ale 'initialLoad' poniżej załatwi sprawę.
+        .limit(20); 
+
+    let initialLoad = true;
+
+    calendarNotificationUnsubscribe = q.onSnapshot(snapshot => {
+        // Ignorujemy pierwsze wczytanie (żeby nie dostać powiadomień o starych wizytach przy starcie)
+        if (initialLoad) {
+            initialLoad = false;
+            return;
+        }
+
+        snapshot.docChanges().forEach(change => {
+            // Reagujemy tylko na DODANIE nowej wizyty
+            if (change.type === 'added') {
+                const visit = change.doc.data();
+                
+                // Sprawdź, czy to nie ja sam sobie dodałem wizytę (opcjonalne)
+                // Używamy metadanych: hasPendingWrites jest true, jeśli zmiana pochodzi z tego urządzenia
+                if (snapshot.metadata.hasPendingWrites) {
+                    return; // Nie powiadamiaj mnie o wizycie, którą sam właśnie wpisałem
+                }
+
+                // WYŚWIETL POWIADOMIENIE
+                if (Notification.permission === "granted") {
+                    // Wibracja (jeśli urządzenie wspiera)
+                    if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+
+                    const notification = new Notification("📅 Nowa wizyta w kalendarzu!", {
+                        body: `Klient: ${visit.klientNazwa}\nData: ${visit.dataWizyty}\nPora: ${visit.poraDnia}`,
+                        icon: 'logo.jpg', // Upewnij się, że masz plik logo.jpg
+                        tag: 'new-visit' // Zapobiega spamowi (nadpisuje poprzednie o tym samym tagu)
+                    });
+
+                    // Po kliknięciu przenieś do kalendarza
+                    notification.onclick = function() {
+                        window.focus();
+                        showSection('kalendarz');
+                        // Opcjonalnie: Przełącz na dzień wizyty
+                        if (typeof switchToDayView === 'function') {
+                            switchToDayView(visit.dataWizyty);
+                        }
+                    };
+                } else {
+                    // Fallback: Jeśli brak uprawnień powiadomień, pokaż Toast w aplikacji
+                    showToast(`📅 Nowa wizyta: ${visit.klientNazwa}`, "success", 5000);
+                }
+            }
+        });
+
+    }, error => {
+        console.error("Błąd nasłuchu powiadomień kalendarza:", error);
+    });
+}
 /* --- KONIEC POPRAWKI --- */
 /* ======================================================== */
 /* KONIEC SKRYPTU */
