@@ -1,4 +1,4 @@
-// 🔒 Nazwa pamięci podręcznej (zmieniona na v93, aby wymusić aktualizację)
+// 🔒 Nazwa pamięci podręcznej (zmieniona na v94, aby wymusić aktualizację)
 const CACHE_NAME = 'karta-leczenia-cache-v93';
 
 // 📦 Lista plików do zapamiętania offline (tzw. App Shell)
