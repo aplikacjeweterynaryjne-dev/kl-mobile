@@ -24861,37 +24861,33 @@ if (addVisitBtnRef) {
 // Uruchom też przy edycji (delegacja zdarzeń w Kalendarzu już to robi, ale dla pewności):
 // Funkcja `loadVisitPurposeHistory` jest już globalna, więc `btn-edit-visit` ją znajdzie.
 /* ======================================================== */
-/* ✅ MODUŁ: Powiadomienia o Nowych Wizytach (Listener)     */
-/* ======================================================== */
-
-/* ======================================================== */
-/* ✅ MODUŁ: Powiadomienia (Wersja Diagnostyczna)           */
+/* ✅ MODUŁ: Powiadomienia Systemowe (Ulepszone dla Androida) */
 /* ======================================================== */
 
 let calendarNotificationUnsubscribe = null;
 
 function startCalendarNotificationListener() {
+    // 1. Sprawdź czy mamy użytkownika
     if (!currentUserProfile) return;
     if (calendarNotificationUnsubscribe) return;
 
-    console.log("🟢 Uruchamianie nasłuchu powiadomień dla:", currentUserProfile.uid);
+    console.log("🟢 Uruchamianie nasłuchu powiadomień systemowych...");
 
-    // Zapytanie: Śledzimy wizyty przypisane DO MNIE, które są NOWE
-    // (Pobieramy wizyty z przyszłości lub teraźniejszości, żeby nie zasypało nas starymi)
+    // Zapytanie: Śledzimy NOWE wizyty przypisane DO MNIE
+    // Pobieramy tylko wizyty od "dzisiaj" w górę
     const todayISO = new Date().toISOString().split('T')[0];
 
     const q = db.collection('wizyty')
         .where('lekarz_uid', '==', currentUserProfile.uid)
         .where('status', '==', 'Nowa')
-        .where('dataWizyty', '>=', todayISO); // Tylko od dzisiaj w górę
+        .where('dataWizyty', '>=', todayISO);
 
     let initialLoad = true;
 
     calendarNotificationUnsubscribe = q.onSnapshot(snapshot => {
-        // Ignorujemy pierwsze wczytanie (żeby nie dostać powiadomień przy starcie)
+        // Ignorujemy pierwsze wczytanie przy starcie aplikacji
         if (initialLoad) {
             initialLoad = false;
-            console.log(`Załadowano stan początkowy: ${snapshot.size} wizyt (bez powiadomień).`);
             return;
         }
 
@@ -24899,84 +24895,73 @@ function startCalendarNotificationListener() {
             // Reagujemy tylko na DODANIE nowej wizyty
             if (change.type === 'added') {
                 const visit = change.doc.data();
-                console.log("🔔 OTRZYMANO NOWĄ WIZYTĘ:", visit);
+                
+                // Ignoruj wizyty, które sam właśnie dodałem (żeby nie dostawać powiadomienia od siebie)
+                if (snapshot.metadata.hasPendingWrites) {
+                    return; 
+                }
 
-                // --- 1. Sprawdź czy to nie ja sam dodałem (DLA TESTÓW ZAKOMENTUJ TO!) ---
-                // Jeśli testujesz sam na sobie, usuń/zakomentuj poniższe 3 linie:
-                // if (snapshot.metadata.hasPendingWrites) {
-                //    console.log("Ignoruję własną zmianę (lokalną).");
-                //    return; 
-                // }
+                const title = "📅 Nowa wizyta w kalendarzu!";
+                const body = `Klient: ${visit.klientNazwa}\nData: ${visit.dataWizyty}\nPora: ${visit.poraDnia}`;
+                const icon = 'logo.jpg';
+                const tag = 'visit-' + change.doc.id;
 
-                const title = "📅 Nowa wizyta!";
-                const body = `Klient: ${visit.klientNazwa}\nData: ${visit.dataWizyty} (${visit.poraDnia})`;
-
-                // --- 2. Próba wysłania powiadomienia ---
+                // --- LOGIKA WYSYŁANIA POWIADOMIENIA ---
                 if (Notification.permission === "granted") {
-                    try {
-                        // Wibracja
-                        if (navigator.vibrate) navigator.vibrate([500, 200, 500]);
-                        
-                        // Powiadomienie systemowe
-                        const notification = new Notification(title, {
-                            body: body,
-                            icon: 'logo.jpg',
-                            tag: 'new-visit-' + change.doc.id,
-                            requireInteraction: true // Wymaga kliknięcia, żeby zniknąć
+                    
+                    // Opcja 1: Próba wysłania przez Service Workera (Najlepsza dla Androida)
+                    if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+                        navigator.serviceWorker.ready.then(registration => {
+                            registration.showNotification(title, {
+                                body: body,
+                                icon: icon,
+                                tag: tag,
+                                vibrate: [200, 100, 200], // Wibracja: bzz-przerwa-bzz
+                                data: { url: window.location.href }, // Dane dla kliknięcia
+                                requireInteraction: true // Wymaga kliknięcia, nie znika samo
+                            });
+                            console.log("✅ Wysłano powiadomienie przez Service Worker.");
                         });
-
-                        notification.onclick = function() {
-                            window.focus();
-                            showSection('kalendarz');
-                            const isoDate = visit.dataWizyty;
-                            if (typeof switchToDayView === 'function') switchToDayView(isoDate);
-                        };
-                        console.log("✅ Wysłano powiadomienie Push.");
-                    } catch (e) {
-                        console.error("Błąd Notification API:", e);
-                        alert(`🔔 ${title}\n${body}`); // Fallback
+                    } 
+                    // Opcja 2: Fallback (Zwykłe powiadomienie)
+                    else {
+                        const n = new Notification(title, {
+                            body: body,
+                            icon: icon,
+                            tag: tag,
+                            vibrate: [200, 100, 200]
+                        });
+                        n.onclick = function() { window.focus(); showSection('kalendarz'); };
                     }
+                    
+                    // Dodatkowo pokaż Toast wewnątrz aplikacji
+                    showToast(`🔔 Otrzymano nową wizytę: ${visit.klientNazwa}`, "success", 5000);
+                    
+                    // Odtwórz dźwięk (jeśli przeglądarka pozwoli)
+                    try {
+                        const audio = new Audio('https://actions.google.com/sounds/v1/alarms/beep_short.ogg');
+                        audio.play().catch(e => console.log("Audio zablokowane przez przeglądarkę"));
+                    } catch(e) {}
+
                 } else {
-                    console.warn("Brak uprawnień do powiadomień. Wyświetlam Toast/Alert.");
-                    // Fallback dla zablokowanych powiadomień
-                    showToast(`📅 Otrzymano nową wizytę: ${visit.klientNazwa}`, "success", 8000);
-                    // Opcjonalnie głośny alert, żebyś wiedział, że działa:
-                    // alert(`🔔 NOWA WIZYTA!\n${body}`);
+                    console.warn("Brak uprawnień do powiadomień systemowych.");
+                    showToast(`📅 Nowa wizyta: ${visit.klientNazwa}`, "info", 5000);
                 }
             }
         });
 
     }, error => {
-        console.error("Błąd nasłuchu powiadomień kalendarza:", error);
+        console.error("Błąd nasłuchu powiadomień:", error);
     });
 }
+
+
+
 /* --- KONIEC POPRAWKI --- */
 /* ======================================================== */
 /* KONIEC SKRYPTU */
 /* ======================================================== */
-// --- TESTOWANIE POWIADOMIEŃ ---
-// Wywołaj tę funkcję ręcznie z konsoli (F12) wpisując: testNotificationPermission()
-// LUB podepnij pod jakiś tymczasowy przycisk, np. w konfiguracji.
 
-window.testNotificationPermission = async function() {
-    if (!("Notification" in window)) {
-        alert("Twoja przeglądarka nie obsługuje powiadomień.");
-        return;
-    }
-
-    if (Notification.permission === "granted") {
-        new Notification("Test Powiadomienia", { body: "To jest test. System działa!" });
-    } else if (Notification.permission !== "denied") {
-        const permission = await Notification.requestPermission();
-        if (permission === "granted") {
-            new Notification("Test Powiadomienia", { body: "Dziękuję! Teraz będziesz otrzymywać powiadomienia." });
-        } else {
-            alert("Brak zgody na powiadomienia. Sprawdź ustawienia przeglądarki.");
-        }
-    } else {
-        alert("Powiadomienia są zablokowane w ustawieniach przeglądarki. Musisz je odblokować ręcznie (kłódka przy pasku adresu).");
-    }
-}
 </script>
 </body>
 </html>
