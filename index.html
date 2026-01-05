@@ -8031,7 +8031,10 @@ if (addCorrectionBtn) {
 // Kopiowanie z karty leczenia (używa addItemToReceipt)
 /* Plik: index.html (zastąp cały blok copyCheckbox, ok. linii 1397) */
 
-// Kopiowanie z karty leczenia (POPRAWIONE: Kopiuje też Klienta i Datę)
+/* ======================================================== */
+/* ✅ POPRAWKA KOPIOWANIA (FIX REFERENCJI DOM) */
+/* ======================================================== */
+
 if (copyCheckbox) {
     copyCheckbox.addEventListener('change', () => {
         if (copyCheckbox.checked) {
@@ -8042,7 +8045,7 @@ if (copyCheckbox) {
             rows.forEach(row => {
                 if (row.cells.length === 8) { // Sprawdź czy to wiersz danych
                     const lekInput = row.cells[4].querySelector('input[list="listaLekow"]');
-                    const iloscInput = row.cells[6].querySelector('input'); // input.small-input
+                    const iloscInput = row.cells[6].querySelector('input'); 
 
                     if (lekInput && iloscInput) {
                         const productName = lekInput.value.trim();
@@ -8051,29 +8054,41 @@ if (copyCheckbox) {
                         const quantity = quantityValue ? parseFloat(quantityValue) : 0;
 
                         if (productName && quantity > 0) {
-                            // Dodaj do paragonu (używa ceny z mapy)
+                            // Dodaj do paragonu
                             addItemToReceipt(productName, quantity); 
                         }
                     }
                 }
             });
 
-            // 2. ✅ KLUCZOWA POPRAWKA: Kopiuj dane z nagłówka Karty Leczenia
-            const kartaKlient = document.getElementById('klientSelect').value;
-            const kartaData = document.getElementById('dataWykonania').value;
+            // 2. ✅ KRYTYCZNA POPRAWKA: Pobieramy elementy "na świeżo"
+            // Globalna zmienna 'calcKlientInput' może wskazywać na stary element, 
+            // jeśli został on podmieniony przez skrypt Modala Wyszukiwania.
+            const liveCalcKlientInput = document.getElementById('calcKlientInput');
+            const liveCalcDataInput = document.getElementById('calcDataInput');
 
-            if (calcKlientInput) {
-                calcKlientInput.value = kartaKlient;
-                // Wyzwól event input, aby np. sprawdzić dług klienta (jeśli funkcja jest podpięta)
-                calcKlientInput.dispatchEvent(new Event('input', { bubbles: true }));
+            // Źródła danych z Karty Leczenia
+            const sourceKlient = document.getElementById('klientSelect');
+            const sourceData = document.getElementById('dataWykonania');
+
+            // Kopiowanie Klienta
+            if (liveCalcKlientInput && sourceKlient) {
+                const klientValue = sourceKlient.value;
+                console.log("Kopiowanie klienta z karty:", klientValue);
+                
+                liveCalcKlientInput.value = klientValue;
+                
+                // Wyzwól event, aby np. sprawdzanie długu zadziałało
+                liveCalcKlientInput.dispatchEvent(new Event('input', { bubbles: true }));
             }
-            if (calcDataInput) {
-                calcDataInput.value = kartaData;
+
+            // Kopiowanie Daty
+            if (liveCalcDataInput && sourceData) {
+                liveCalcDataInput.value = sourceData.value;
             }
 
         } else {
-            // Opcjonalnie: można wyczyścić pola po odznaczeniu, 
-            // ale zazwyczaj użytkownik woli, żeby dane zostały do edycji.
+            // Opcjonalnie: wyczyść pola po odznaczeniu (zazwyczaj niepożądane)
         }
     });
 }
