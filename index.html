@@ -15617,6 +15617,7 @@ try {
     });
 
     // Zapisywanie wizyty (Dodawanie/Edycja)
+// Zapisywanie wizyty (Dodawanie/Edycja) - Wersja z SMS
 saveVisitBtn.addEventListener('click', async () => {
     if (!currentUserProfile) {
         alert("Błąd: Brak danych użytkownika.");
@@ -15658,7 +15659,7 @@ saveVisitBtn.addEventListener('click', async () => {
     }
 
     const visitData = {
-        lekarz_uid: assignedUid, // To jest NOWY lekarz
+        lekarz_uid: assignedUid,
         lekarz_nazwisko: assignedName,
         id_lecznicy: currentUserProfile['ID lecznicy'],
         dataWizyty: dataWizyty,
@@ -15669,49 +15670,37 @@ saveVisitBtn.addEventListener('click', async () => {
         poraDnia: visitFormPoraDnia.value,
         celWizyty: visitFormCel.value.trim(),
         notatka: visitFormNotatka.value.trim(),
-        // createdAt nie aktualizujemy przy edycji, dodajemy tylko przy tworzeniu
     };
 
     const docId = visitFormDocId.value;
     saveVisitBtn.disabled = true;
     saveVisitBtn.textContent = 'Zapisywanie...';
 
+    // Flaga, czy wysyłać SMS (ustawimy ją na true, jeśli zmieniono lekarza)
+    let shouldOfferSms = false;
+    let smsMessage = "";
+
     try {
         if (docId) {
-            // --- TRYB EDYCJI (TUTAJ JEST ZMIANA) ---
-            
-            // 1. Znajdź STARĄ wersję wizyty w pamięci podręcznej (allFetchedVisits)
+            // --- TRYB EDYCJI ---
             const oldVisit = allFetchedVisits.find(v => v.id === docId);
 
-            // 2. Sprawdź, czy zmienił się lekarz
+            // Sprawdź zmianę lekarza
             if (oldVisit && oldVisit.lekarz_uid !== assignedUid) {
-                console.log(`Zmiana lekarza! Stary: ${oldVisit.lekarz_uid}, Nowy: ${assignedUid}`);
-
-                // --- TU WSTAW LOGIKĘ POWIADOMIENIA ---
-                // Przykład: Wysłanie wiadomości systemowej na czat do NOWEGO lekarza
-                // (Wymaga, aby funkcja sendMessageToUser lub dodanie do kolekcji 'powiadomienia' istniało w Twoim systemie)
-                
-                // Opcja A: Jeśli powiadomienia opierają się na 'onSnapshot' w Kalendarzu:
-                // Zmiana pola 'lekarz_uid' w bazie automatycznie zaktualizuje kalendarz u nowego lekarza.
-                
-                // Opcja B: Jeśli chcesz wysłać wiadomość na czat systemowy:
-                /*
+                // Dodajemy powiadomienie systemowe (Chat Push)
                 await db.collection('czat_wiadomosci').add({
                     id_lecznicy: currentUserProfile['ID lecznicy'],
-                    uid: assignedUid, // Adresat (można filtrować po tym)
+                    uid: currentUserProfile.uid,
                     autor: "SYSTEM",
-                    tresc: `Przypisano Ci nową wizytę: ${klientNazwa} (${dataWizyty})`,
+                    tresc: `🔔 Przepisano wizytę: ${klientNazwa} (${dataWizyty}) do: ${assignedName}`,
                     timestamp: firebase.firestore.FieldValue.serverTimestamp()
                 });
-                */
-               
-               // Opcja C: Powiadomienie tylko lokalne (Toast) - dla osoby która klika
-               if (assignedUid !== currentUserProfile.uid) {
-                   showToast(`Wizyta przepisana do: ${assignedName}`, "info");
-               }
+
+                // Przygotuj SMS
+                shouldOfferSms = true;
+                smsMessage = `Hej, przepisałem Ci wizytę: ${klientNazwa}, Data: ${dataWizyty}. Sprawdź w kalendarzu.`;
             }
 
-            // 3. Wykonaj aktualizację
             delete visitData.createdAt; 
             await db.collection('wizyty').doc(docId).update(visitData);
             showToast("Wizyta zaktualizowana.", "success");
@@ -15720,14 +15709,38 @@ saveVisitBtn.addEventListener('click', async () => {
             // --- TRYB DODAWANIA ---
             visitData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
             await db.collection('wizyty').add(visitData);
-            showToast("Wizyta dodana.", "success");
             
-            // Tutaj powiadomienie działa "samo", bo nowy lekarz dostanie update z Firebase
-            // i `onSnapshot` w jego kalendarzu wykryje nową wizytę.
+            // Jeśli dodajemy wizytę komuś innemu
+            if (assignedUid !== currentUserProfile.uid) {
+                 await db.collection('czat_wiadomosci').add({
+                    id_lecznicy: currentUserProfile['ID lecznicy'],
+                    uid: currentUserProfile.uid,
+                    autor: "SYSTEM",
+                    tresc: `📅 Nowa wizyta w grafiku: ${klientNazwa} (${dataWizyty})`,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                });
+
+                // Przygotuj SMS
+                shouldOfferSms = true;
+                smsMessage = `Hej, dodałem Ci nową wizytę: ${klientNazwa}, Data: ${dataWizyty}.`;
+            }
+
+            showToast("Wizyta dodana.", "success");
         }
 
         visitFormModal.style.display = 'none';
-        fetchAndRenderVisits(); // Odśwież listę
+        fetchAndRenderVisits(); 
+
+        // --- OBSŁUGA SMS (PO ZAPISIE) ---
+        if (shouldOfferSms) {
+            // Małe opóźnienie, żeby toast zdążył się pokazać
+            setTimeout(async () => {
+                if (confirm(`Wizyta została przypisana do: ${assignedName}.\n\nCzy chcesz wysłać mu/jej powiadomienie SMS?`)) {
+                    await sendSmsToDoctor(assignedUid, smsMessage);
+                }
+            }, 500);
+        }
+
     } catch (error) {
         console.error("Błąd zapisu wizyty:", error);
         alert("Wystąpił błąd podczas zapisu.");
@@ -24997,7 +25010,48 @@ function startCalendarNotificationListener() {
 /* ======================================================== */
 /* KONIEC SKRYPTU */
 /* ======================================================== */
+/**
+ * Funkcja pomocnicza: Pobiera nr telefonu lekarza i otwiera aplikację SMS
+ */
+async function sendSmsToDoctor(targetUid, messageBody) {
+    console.log("Przygotowanie SMS dla UID:", targetUid);
 
+    try {
+        // 1. Pobierz dane lekarza z bazy konfiguracji
+        const q = db.collection('konfiguracja').where('uid', '==', targetUid).limit(1);
+        const snapshot = await q.get();
+
+        if (snapshot.empty) {
+            alert("Nie znaleziono profilu lekarza. Nie można wysłać SMS.");
+            return;
+        }
+
+        const docData = snapshot.docs[0].data();
+        let phone = docData['Nr telefonu'];
+
+        if (!phone) {
+            alert(`Lekarz ${docData.Imie} ${docData.Nazwisko} nie ma wpisanego numeru telefonu w konfiguracji.`);
+            return;
+        }
+
+        // 2. Wyczyść numer (usuń spacje, myślniki)
+        phone = phone.replace(/[\s-]/g, '');
+
+        // 3. Kodowanie treści wiadomości (żeby działały polskie znaki i spacje)
+        const encodedBody = encodeURIComponent(messageBody);
+
+        // 4. Wykrywanie systemu (iOS wymaga nieco innej składni separatora niż Android)
+        const isIos = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+        const separator = isIos ? '&' : '?';
+
+        // 5. Otwarcie aplikacji SMS
+        window.location.href = `sms:${phone}${separator}body=${encodedBody}`;
+
+    } catch (error) {
+        console.error("Błąd podczas wysyłania SMS:", error);
+        alert("Wystąpił błąd przy pobieraniu numeru telefonu.");
+    }
+}
 </script>
 </body>
 </html>
