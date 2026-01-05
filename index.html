@@ -15617,89 +15617,125 @@ try {
     });
 
     // Zapisywanie wizyty (Dodawanie/Edycja)
-    saveVisitBtn.addEventListener('click', async () => {
-        if (!currentUserProfile) {
-            alert("Błąd: Brak danych użytkownika.");
-            return;
+saveVisitBtn.addEventListener('click', async () => {
+    if (!currentUserProfile) {
+        alert("Błąd: Brak danych użytkownika.");
+        return;
+    }
+
+    const dataWizyty = visitFormDate.value;
+    if (!dataWizyty) {
+        alert("Data wizyty jest wymagana.");
+        return;
+    }
+
+    // Pobierz dane z selecta (Kto ma wykonać wizytę - NOWY LEKARZ)
+    const modalUserSelect = document.getElementById('visitFormUserSelect');
+    let assignedUid = currentUserProfile.uid; // Domyślnie ja
+    let assignedName = `${currentUserProfile.Imie} ${currentUserProfile.Nazwisko}`;
+
+    if (modalUserSelect && modalUserSelect.value) {
+        assignedUid = modalUserSelect.value;
+        if (modalUserSelect.selectedIndex !== -1) {
+            assignedName = modalUserSelect.options[modalUserSelect.selectedIndex].text;
         }
+    }
 
-        const dataWizyty = visitFormDate.value;
-        if (!dataWizyty) {
-            alert("Data wizyty jest wymagana.");
-            return;
-        }
+    // Pobierz dane klienta
+    let klientNazwa = visitFormKlient.value;
+    let klientAdres = visitFormKlientAdres.textContent;
+    let klientTelefon = visitFormKlientTelefon.textContent;
 
-        // ✅ NOWOŚĆ: Pobierz dane z selecta (Kto ma wykonać wizytę)
-        const modalUserSelect = document.getElementById('visitFormUserSelect');
-        let assignedUid = currentUserProfile.uid; // Domyślnie ja
-        let assignedName = `${currentUserProfile.Imie} ${currentUserProfile.Nazwisko}`;
+    if (currentVisitClientData) {
+        klientNazwa = currentVisitClientData.nazwa;
+        klientAdres = currentVisitClientData.adres;
+        klientTelefon = currentVisitClientData.telefon;
+    }
 
-        if (modalUserSelect && modalUserSelect.value) {
-            assignedUid = modalUserSelect.value;
-            // Pobierz tekst z wybranej opcji (Imię i Nazwisko)
-            if (modalUserSelect.selectedIndex !== -1) {
-                assignedName = modalUserSelect.options[modalUserSelect.selectedIndex].text;
-            }
-        }
+    if (!klientNazwa || klientNazwa === '...') {
+        alert("Klient jest wymagany.");
+        return;
+    }
 
-        // Pobierz dane klienta
-        let klientNazwa = visitFormKlient.value;
-        let klientAdres = visitFormKlientAdres.textContent;
-        let klientTelefon = visitFormKlientTelefon.textContent;
+    const visitData = {
+        lekarz_uid: assignedUid, // To jest NOWY lekarz
+        lekarz_nazwisko: assignedName,
+        id_lecznicy: currentUserProfile['ID lecznicy'],
+        dataWizyty: dataWizyty,
+        status: visitFormStatus.value,
+        klientNazwa: klientNazwa,
+        klientAdres: (klientAdres === '...') ? '' : klientAdres,
+        klientTelefon: (klientTelefon === '...') ? '' : klientTelefon,
+        poraDnia: visitFormPoraDnia.value,
+        celWizyty: visitFormCel.value.trim(),
+        notatka: visitFormNotatka.value.trim(),
+        // createdAt nie aktualizujemy przy edycji, dodajemy tylko przy tworzeniu
+    };
 
-        if (currentVisitClientData) {
-             klientNazwa = currentVisitClientData.nazwa;
-             klientAdres = currentVisitClientData.adres;
-             klientTelefon = currentVisitClientData.telefon;
-        }
+    const docId = visitFormDocId.value;
+    saveVisitBtn.disabled = true;
+    saveVisitBtn.textContent = 'Zapisywanie...';
 
-        if (!klientNazwa || klientNazwa === '...') {
-            alert("Klient jest wymagany.");
-            return;
-        }
-
-        const visitData = {
-            // ✅ ZAPISUJEMY WYBRANEGO LEKARZA (zamiast sztywno currentUserProfile)
-            lekarz_uid: assignedUid,
-            lekarz_nazwisko: assignedName,
+    try {
+        if (docId) {
+            // --- TRYB EDYCJI (TUTAJ JEST ZMIANA) ---
             
-            id_lecznicy: currentUserProfile['ID lecznicy'],
-            dataWizyty: dataWizyty,
-            status: visitFormStatus.value,
-            klientNazwa: klientNazwa,
-            klientAdres: (klientAdres === '...') ? '' : klientAdres,
-            klientTelefon: (klientTelefon === '...') ? '' : klientTelefon,
-            poraDnia: visitFormPoraDnia.value,
-            celWizyty: visitFormCel.value.trim(),
-            notatka: visitFormNotatka.value.trim(),
-            createdAt: firebase.firestore.FieldValue.serverTimestamp()
-        };
+            // 1. Znajdź STARĄ wersję wizyty w pamięci podręcznej (allFetchedVisits)
+            const oldVisit = allFetchedVisits.find(v => v.id === docId);
 
-        const docId = visitFormDocId.value;
-        saveVisitBtn.disabled = true;
-        saveVisitBtn.textContent = 'Zapisywanie...';
+            // 2. Sprawdź, czy zmienił się lekarz
+            if (oldVisit && oldVisit.lekarz_uid !== assignedUid) {
+                console.log(`Zmiana lekarza! Stary: ${oldVisit.lekarz_uid}, Nowy: ${assignedUid}`);
 
-        try {
-            if (docId) {
-                // Tryb Edycji (bez nadpisywania createdAt)
-                delete visitData.createdAt; 
-                await db.collection('wizyty').doc(docId).update(visitData);
-                showToast("Wizyta zaktualizowana.", "success");
-            } else {
-                // Tryb Dodawania
-                await db.collection('wizyty').add(visitData);
-                showToast("Wizyta dodana.", "success");
+                // --- TU WSTAW LOGIKĘ POWIADOMIENIA ---
+                // Przykład: Wysłanie wiadomości systemowej na czat do NOWEGO lekarza
+                // (Wymaga, aby funkcja sendMessageToUser lub dodanie do kolekcji 'powiadomienia' istniało w Twoim systemie)
+                
+                // Opcja A: Jeśli powiadomienia opierają się na 'onSnapshot' w Kalendarzu:
+                // Zmiana pola 'lekarz_uid' w bazie automatycznie zaktualizuje kalendarz u nowego lekarza.
+                
+                // Opcja B: Jeśli chcesz wysłać wiadomość na czat systemowy:
+                /*
+                await db.collection('czat_wiadomosci').add({
+                    id_lecznicy: currentUserProfile['ID lecznicy'],
+                    uid: assignedUid, // Adresat (można filtrować po tym)
+                    autor: "SYSTEM",
+                    tresc: `Przypisano Ci nową wizytę: ${klientNazwa} (${dataWizyty})`,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                */
+               
+               // Opcja C: Powiadomienie tylko lokalne (Toast) - dla osoby która klika
+               if (assignedUid !== currentUserProfile.uid) {
+                   showToast(`Wizyta przepisana do: ${assignedName}`, "info");
+               }
             }
-            visitFormModal.style.display = 'none';
-            fetchAndRenderVisits(); // Odśwież listę
-        } catch (error) {
-            console.error("Błąd zapisu wizyty:", error);
-            alert("Wystąpił błąd podczas zapisu.");
-        } finally {
-            saveVisitBtn.disabled = false;
-            saveVisitBtn.textContent = 'Zapisz';
+
+            // 3. Wykonaj aktualizację
+            delete visitData.createdAt; 
+            await db.collection('wizyty').doc(docId).update(visitData);
+            showToast("Wizyta zaktualizowana.", "success");
+
+        } else {
+            // --- TRYB DODAWANIA ---
+            visitData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+            await db.collection('wizyty').add(visitData);
+            showToast("Wizyta dodana.", "success");
+            
+            // Tutaj powiadomienie działa "samo", bo nowy lekarz dostanie update z Firebase
+            // i `onSnapshot` w jego kalendarzu wykryje nową wizytę.
         }
-    });
+
+        visitFormModal.style.display = 'none';
+        fetchAndRenderVisits(); // Odśwież listę
+    } catch (error) {
+        console.error("Błąd zapisu wizyty:", error);
+        alert("Wystąpił błąd podczas zapisu.");
+    } finally {
+        saveVisitBtn.disabled = false;
+        saveVisitBtn.textContent = 'Zapisz';
+    }
+});
    // --- 9. Logika Szybkiej Zmiany Statusu i Edycji (Widok Dnia) ---
 todayVisitList.addEventListener('click', async (e) => {
         const target = e.target;
