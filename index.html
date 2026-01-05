@@ -15219,14 +15219,14 @@ try {
     }
     // --- 4. Ładowanie Filtrów ---
 
-    // Wczytuje użytkowników (lekarzy) do listy <select>
-  async function loadCalendarUsers() {
+// Wczytuje użytkowników do listy <select> w filtrze ORAZ w formularzu
+async function loadCalendarUsers() {
     if (!calendarUserSelect || !currentUserProfile) return;
 
     const modalUserSelect = document.getElementById('visitFormUserSelect');
     let query;
 
-    // Logika uprawnień (bez zmian)
+    // Uprawnienia (bez zmian)
     if (currentUserProfile.Rola === 'administrator') {
         query = db.collection("konfiguracja").orderBy("Nazwisko");
     } else {
@@ -15249,18 +15249,24 @@ try {
             const user = doc.data();
             const optionText = `${user.Imie} ${user.Nazwisko}`;
             
-            // ✅ NOWOŚĆ: Pobieramy numer telefonu
-            const userPhone = user['Nr telefonu'] || ''; 
+            // ✅ POPRAWKA: Szukamy numeru pod różnymi nazwami pól, żeby mieć pewność
+            // Usuwamy też spacje od razu przy pobieraniu
+            let rawPhone = user['Nr telefonu'] || user['telefon'] || user['Telefon'] || '';
+            const userPhone = rawPhone.replace(/\s/g, ''); 
 
-            // Dodaj do filtra w kalendarzu
-            calendarUserSelect.add(new Option(optionText, user.uid));
+            // Debugowanie w konsoli (wciśnij F12 żeby zobaczyć czy pobrało)
+            console.log(`Wczytano lekarza: ${user.Nazwisko}, Tel: ${userPhone}`);
+
+            // 1. Dodaj do filtra w kalendarzu
+            const optFilter = new Option(optionText, user.uid);
+            optFilter.dataset.phone = userPhone; // <--- WAŻNE: Zapisujemy numer w filtrze
+            calendarUserSelect.add(optFilter);
             
-            // Dodaj do formularza wizyty (modal)
+            // 2. Dodaj do formularza wizyty (modal)
             if(modalUserSelect) {
-                const opt = new Option(optionText, user.uid);
-                // ✅ ZAPISUJEMY NUMER W ATROCIE DATASET
-                opt.dataset.phone = userPhone; 
-                modalUserSelect.add(opt);
+                const optModal = new Option(optionText, user.uid);
+                optModal.dataset.phone = userPhone; 
+                modalUserSelect.add(optModal);
             }
         });
 
@@ -15270,7 +15276,8 @@ try {
         }
 
         calendarUsersLoaded = true;
-        console.log("Wczytano użytkowników z numerami telefonów.");
+        
+        // Odśwież wizyty (to przerysuje kafelki i doda do nich numery)
         fetchAndRenderVisits();
 
     } catch (error) {
