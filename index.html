@@ -8031,50 +8031,52 @@ if (addCorrectionBtn) {
 // Kopiowanie z karty leczenia (używa addItemToReceipt)
 /* Plik: index.html (zastąp cały blok copyCheckbox, ok. linii 1397) */
 
+// Kopiowanie z karty leczenia (POPRAWIONE: Kopiuje też Klienta i Datę)
 if (copyCheckbox) {
     copyCheckbox.addEventListener('change', () => {
         if (copyCheckbox.checked) {
             receiptItems = []; // Wyczyść obecny paragon
 
-            // 1. Kopiuj produkty z tabeli (tak jak wcześniej)
+            // 1. Kopiuj produkty z tabeli
             const rows = document.querySelectorAll('#karta tbody tr');
             rows.forEach(row => {
                 if (row.cells.length === 8) { // Sprawdź czy to wiersz danych
                     const lekInput = row.cells[4].querySelector('input[list="listaLekow"]');
-                    const iloscInput = row.cells[6].querySelector('input.small-input');
+                    const iloscInput = row.cells[6].querySelector('input'); // input.small-input
 
                     if (lekInput && iloscInput) {
                         const productName = lekInput.value.trim();
+                        // Pobierz wartość liczbową z inputa
                         const quantityValue = iloscInput.value;
-                        const quantity = quantityValue ? parseInt(quantityValue, 10) : 0;
+                        const quantity = quantityValue ? parseFloat(quantityValue) : 0;
 
                         if (productName && quantity > 0) {
-                            if (mapaCen.hasOwnProperty(productName)){
-                                addItemToReceipt(productName, quantity);
-                            } else {
-                                console.warn(`Pominięto kopiowanie: Produkt "${productName}" nie znaleziony w bazie cen.`);
-                            }
+                            // Dodaj do paragonu (używa ceny z mapy)
+                            addItemToReceipt(productName, quantity); 
                         }
                     }
                 }
             });
 
-            // 2. ✅ NOWOŚĆ: Kopiuj dane z nagłówka Karty Leczenia (Pkt 1)
-            if (calcKlientInput) calcKlientInput.value = document.getElementById('klientSelect').value;
-            if (calcDataInput) calcDataInput.value = document.getElementById('dataWykonania').value;
+            // 2. ✅ KLUCZOWA POPRAWKA: Kopiuj dane z nagłówka Karty Leczenia
+            const kartaKlient = document.getElementById('klientSelect').value;
+            const kartaData = document.getElementById('dataWykonania').value;
 
-            // ✅ POPRAWKA (Pkt 1): Nie kopiujemy nr dokumentu z karty
-            // if (calcNrDokInput) calcNrDokInput.value = document.getElementById('nrDokumentu').value;
+            if (calcKlientInput) {
+                calcKlientInput.value = kartaKlient;
+                // Wyzwól event input, aby np. sprawdzić dług klienta (jeśli funkcja jest podpięta)
+                calcKlientInput.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+            if (calcDataInput) {
+                calcDataInput.value = kartaData;
+            }
 
         } else {
-            // Opcjonalnie: wyczyść pola, jeśli użytkownik odznaczy checkbox
-            // if (calcKlientInput) calcKlientInput.value = '';
-            // if (calcDataInput) calcDataInput.value = document.getElementById('calcDataInput').value; // Zachowaj dzisiejszą datę
-            // if (calcNrDokInput) calcNrDokInput.value = '';
+            // Opcjonalnie: można wyczyścić pola po odznaczeniu, 
+            // ale zazwyczaj użytkownik woli, żeby dane zostały do edycji.
         }
     });
 }
-
 
 // Zapisywanie paragonu (dodaje sumę)
 // ✅ Moduł 2: ZMODYFIKOWANA funkcja zapisu paragonu (dodaje status)
@@ -12660,41 +12662,44 @@ async function loadReceiptsForUser(lekarz_uid) {
     const filterControls = document.getElementById('archiveReceiptFilterControls');
 
     if (!lekarz_uid) {
-        tableBody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 20px; color: #555;">Wybierz użytkownika, aby zobaczyć archiwum.</td></tr>'; // Zmieniono colspan
+        tableBody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 20px; color: #555;">Wybierz użytkownika, aby zobaczyć archiwum.</td></tr>';
         filterControls.style.display = 'none';
         return;
     }
     
-    tableBody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 20px; color: #555;">Wczytywanie paragonów... ⏳</td></tr>'; // Zmieniono colspan
+    tableBody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 20px; color: #555;">Wczytywanie paragonów... ⏳</td></tr>';
     filterControls.style.display = 'none';
 
     let q; 
     if (lekarz_uid === "ALL") {
         console.log("Wczytywanie paragonów dla: WSZYSCY");
         if (currentUserProfile.Rola === 'administrator') {
-            q = db.collection("archiwumParagony").orderBy("createdAt", "desc");
+            // ✅ ZMIANA SORTOWANIA: orderBy("data", "desc")
+            q = db.collection("archiwumParagony").orderBy("data", "desc");
         } else {
             const userClinicId = currentUserProfile['ID lecznicy'];
             if (!userClinicId) {
-                  tableBody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 20px; color: red;">Błąd: Twój profil nie ma przypisanego ID lecznicy.</td></tr>'; // Zmieniono colspan
+                  tableBody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 20px; color: red;">Błąd: Twój profil nie ma przypisanego ID lecznicy.</td></tr>';
                   return;
             }
+            // ✅ ZMIANA SORTOWANIA
             q = db.collection("archiwumParagony")
                     .where("id_lecznicy", "==", userClinicId)
-                    .orderBy("createdAt", "desc");
+                    .orderBy("data", "desc");
         }
     } else {
         console.log(`Wczytywanie paragonów dla UID: ${lekarz_uid}`);
+        // ✅ ZMIANA SORTOWANIA
         q = db.collection("archiwumParagony")
                   .where("lekarz_uid", "==", lekarz_uid)
-                  .orderBy("createdAt", "desc");
+                  .orderBy("data", "desc");
     }
 
     try {
         const snapshot = await q.get(); 
         
         if (snapshot.empty) {
-            tableBody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 20px; color: #999;">Brak zapisanych paragonów dla tego wyboru.</td></tr>'; // Zmieniono colspan
+            tableBody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 20px; color: #999;">Brak zapisanych paragonów dla tego wyboru.</td></tr>';
             filterControls.style.display = 'none';
             return;
         }
@@ -12707,9 +12712,9 @@ async function loadReceiptsForUser(lekarz_uid) {
             
             const statusColor = receipt.status === "Zapłacone" ? "green" : (receipt.status === "Dług" ? "red" : "#555");
             const suma = parseFloat(receipt.suma) || 0;
-            const notatka = receipt.notatka || ''; // ✅ ZADANIE 2
+            const notatka = receipt.notatka || '';
             
-            // Zapisujemy dane do atrybutów data-*
+            // Zapisujemy dane do atrybutów data-* (dla filtrów JS)
             tr.dataset.data = receipt.data || '';
             tr.dataset.klient = receipt.klient || 'Klient nieznany';
             tr.dataset.czynnosci = receipt.czynnosci || '';
@@ -12717,7 +12722,7 @@ async function loadReceiptsForUser(lekarz_uid) {
             tr.dataset.status = receipt.status || 'Nie wybrano';
             tr.dataset.suma = suma;
             tr.dataset.lekarz = receipt.lekarz_nazwisko || 'Nieznany';
-            tr.dataset.notatka = notatka; // ✅ ZADANIE 2
+            tr.dataset.notatka = notatka;
             
             // --- Budowanie wiersza metodą DOM ---
 
@@ -12759,16 +12764,15 @@ async function loadReceiptsForUser(lekarz_uid) {
             tdLekarz.textContent = receipt.lekarz_nazwisko || 'Nieznany';
             tr.appendChild(tdLekarz);
 
-           // ✅ ZADANIE 2: Komórka 8: Notatka
+            // Komórka 8: Notatka
             const tdNotatka = document.createElement('td');
-            tdNotatka.textContent = notatka; // Wyświetl pełny tekst
-            // Nadpisz styl tabeli, aby tekst się zawijał
+            tdNotatka.textContent = notatka;
             tdNotatka.style.whiteSpace = "normal"; 
             tdNotatka.style.wordBreak = "break-word";
-            tdNotatka.style.minWidth = "200px"; // Zapewnij trochę miejsca na tekst
+            tdNotatka.style.minWidth = "150px"; 
             tr.appendChild(tdNotatka);
 
-            // Komórka 9: Akcje (z logiką dla Zadania 3)
+            // Komórka 9: Akcje
             const tdAkcje = document.createElement('td');
             tdAkcje.className = 'col-akcje';
             
@@ -12777,9 +12781,7 @@ async function loadReceiptsForUser(lekarz_uid) {
                 <button class="btn warn small btn-delete-archived-receipt" data-receipt-id="${receipt.id}" data-receipt-info="${receipt.data} / ${receipt.klient}">Usuń</button>
             `;
             
-            // ⬇️ LOGIKA DLA ZADANIA 3 ⬇️
             if (receipt.status === "Dług") {
-                // Dodaj przycisk "Spłata długu"
                 akcjeHTML += ` <button class="btn small btn-pay-debt" style="background-color: #27ae60; color: white;" data-receipt-id="${receipt.id}" data-receipt-klient="${receipt.klient || ''}" data-receipt-suma="${suma}">Spłata długu</button>`;
             }
             
@@ -12793,12 +12795,15 @@ async function loadReceiptsForUser(lekarz_uid) {
 
     } catch (error) {
         console.error(`Błąd wczytywania paragonów dla ${lekarz_uid}:`, error);
-        if (lekarz_uid === "ALL" && error.code === 'failed-precondition') {
-             alert("BŁĄD BAZY DANYCH: Aby filtrować 'Wszystkich' w lecznicy, wymagany jest nowy indeks. Sprawdź konsolę (F12), aby zobaczyć link do jego utworzenia.");
-             console.error("BŁĄD: Prawdopodobnie brakuje indeksu kompozytowego w Firestore. Utwórz indeks dla kolekcji 'archiwumParagony' dla pól: 'id_lecznicy' (Rosnąco) i 'createdAt' (Malejąco).");
-             tableBody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 20px; color: red;">Błąd konfiguracji bazy danych (brak indeksu).</td></tr>'; // Zmieniono colspan
+        
+        // Obsługa błędu indeksu (Kluczowe przy zmianie sortowania!)
+        if (error.code === 'failed-precondition') {
+             alert("⚠️ BŁĄD INDEKSU FIREBASE!\n\nZmieniłeś sposób sortowania (po dacie). Firebase wymaga nowego indeksu.\n\n1. Otwórz konsolę przeglądarki (F12 lub Prawy Przycisk -> Zbadaj -> Konsola).\n2. Kliknij w długi link w komunikacie błędu Firebase.\n3. Zaakceptuj utworzenie indeksu w konsoli Firebase.");
+             console.error("KLIKNIJ LINK PONIŻEJ, ABY UTWORZYĆ INDEKS:");
+             console.error(error.message); // To wyświetli link
+             tableBody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 20px; color: red;">Wymagany nowy indeks w bazie danych. Sprawdź konsolę (F12).</td></tr>';
         } else {
-             tableBody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 20px; color: red;">Wystąpił błąd podczas wczytywania paragonów.</td></tr>'; // Zmieniono colspan
+             tableBody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 20px; color: red;">Wystąpił błąd podczas wczytywania paragonów.</td></tr>';
         }
         filterControls.style.display = 'none';
     }
