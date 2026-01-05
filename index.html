@@ -4540,18 +4540,21 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
             <datalist id="listaCelowWizyt"></datalist>
         </div>
 
-        <div class="form-row">
+      <div class="form-row">
             <label for="visitFormNotatka">Notatnik</label>
             <textarea id="visitFormNotatka" placeholder="Dodatkowe uwagi..."></textarea>
         </div>
 
-        <div class="form-actions">
-            <div class="left">
+        <div class="form-actions" style="flex-wrap: wrap; gap: 10px;">
+            <div class="left" style="display: flex; gap: 5px;">
                 <button id="cancelVisitForm" type="button" class="btn ghost small" style="font-size: 19px;">Anuluj</button>
+                <button id="btnSmsToDoctor" type="button" class="btn" style="background-color: #e3f2fd; color: #1565c0; border: 1px solid #90caf9;" title="Wyślij SMS do przypisanego lekarza">
+                    📱 SMS
+                </button>
             </div>
             <button id="saveVisitBtn" type="button" class="btn primary" style="font-size: 19px;">Zapisz</button>
         </div>
-    </div>
+        </div>
 </div>
     <div id="schemaProductSearchModal" class="product-search-modal" style="display: none;">
     <div class="product-search-card">
@@ -15220,60 +15223,63 @@ try {
     // --- 4. Ładowanie Filtrów ---
 
     // Wczytuje użytkowników (lekarzy) do listy <select>
-  // Wczytuje użytkowników (lekarzy) do listy <select> w filtrze ORAZ w formularzu
-    async function loadCalendarUsers() {
-        if (!calendarUserSelect || !currentUserProfile) return;
+  async function loadCalendarUsers() {
+    if (!calendarUserSelect || !currentUserProfile) return;
 
-        // Zmienna dla selecta w modalu (ten, który dodałeś w HTML)
-        const modalUserSelect = document.getElementById('visitFormUserSelect');
+    const modalUserSelect = document.getElementById('visitFormUserSelect');
+    let query;
 
-        let query;
-        if (currentUserProfile.Rola === 'administrator') {
-            query = db.collection("konfiguracja").orderBy("Nazwisko");
-        } else {
-            const userClinicId = currentUserProfile['ID lecznicy'];
-            if (!userClinicId) return;
-            query = db.collection("konfiguracja").where("ID lecznicy", "==", userClinicId).orderBy("Nazwisko");
-        }
-
-        try {
-            const snapshot = await query.get();
-            
-            // 1. Czyścimy oba selecty
-            calendarUserSelect.innerHTML = ''; 
-            if(modalUserSelect) modalUserSelect.innerHTML = '';
-
-            // 2. Dodajemy opcje
-            calendarUserSelect.add(new Option("Wszyscy", "ALL")); // Filtr ma opcję "Wszyscy"
-            
-            snapshot.docs.forEach(doc => {
-                const user = doc.data();
-                const optionText = `${user.Imie} ${user.Nazwisko}`;
-                
-                // Dodaj do filtra
-                calendarUserSelect.add(new Option(optionText, user.uid));
-                
-                // Dodaj do modala (jeśli istnieje)
-                if(modalUserSelect) {
-                    modalUserSelect.add(new Option(optionText, user.uid));
-                }
-            });
-
-            // 3. Ustaw domyślny filtr na zalogowanego
-            if (currentUserProfile.uid) {
-                calendarUserSelect.value = currentUserProfile.uid;
-            }
-
-            calendarUsersLoaded = true;
-            console.log("Wczytano użytkowników do kalendarza (filtr i formularz).");
-
-            fetchAndRenderVisits();
-
-        } catch (error) {
-            console.error("Błąd wczytywania użytkowników do kalendarza:", error);
-            calendarUserSelect.innerHTML = '<option value="">Błąd ładowania</option>';
-        }
+    // Logika uprawnień (bez zmian)
+    if (currentUserProfile.Rola === 'administrator') {
+        query = db.collection("konfiguracja").orderBy("Nazwisko");
+    } else {
+        const userClinicId = currentUserProfile['ID lecznicy'];
+        if (!userClinicId) return;
+        query = db.collection("konfiguracja").where("ID lecznicy", "==", userClinicId).orderBy("Nazwisko");
     }
+
+    try {
+        const snapshot = await query.get();
+        
+        // Czyścimy selecty
+        calendarUserSelect.innerHTML = ''; 
+        if(modalUserSelect) modalUserSelect.innerHTML = '';
+
+        // Dodajemy opcję "Wszyscy" do filtra
+        calendarUserSelect.add(new Option("Wszyscy", "ALL")); 
+        
+        snapshot.docs.forEach(doc => {
+            const user = doc.data();
+            const optionText = `${user.Imie} ${user.Nazwisko}`;
+            
+            // ✅ NOWOŚĆ: Pobieramy numer telefonu
+            const userPhone = user['Nr telefonu'] || ''; 
+
+            // Dodaj do filtra w kalendarzu
+            calendarUserSelect.add(new Option(optionText, user.uid));
+            
+            // Dodaj do formularza wizyty (modal)
+            if(modalUserSelect) {
+                const opt = new Option(optionText, user.uid);
+                // ✅ ZAPISUJEMY NUMER W ATROCIE DATASET
+                opt.dataset.phone = userPhone; 
+                modalUserSelect.add(opt);
+            }
+        });
+
+        // Ustaw domyślnego użytkownika
+        if (currentUserProfile.uid) {
+            calendarUserSelect.value = currentUserProfile.uid;
+        }
+
+        calendarUsersLoaded = true;
+        console.log("Wczytano użytkowników z numerami telefonów.");
+        fetchAndRenderVisits();
+
+    } catch (error) {
+        console.error("Błąd wczytywania użytkowników:", error);
+    }
+}
 
     // Listenery filtrów
     if (calendarUserSelect) calendarUserSelect.addEventListener('change', fetchAndRenderVisits);
@@ -25051,6 +25057,54 @@ async function sendSmsToDoctor(targetUid, messageBody) {
         console.error("Błąd podczas wysyłania SMS:", error);
         alert("Wystąpił błąd przy pobieraniu numeru telefonu.");
     }
+}
+    /* ======================================================== */
+/* ✅ NOWY MODUŁ: Trwały guzik SMS w wizycie                */
+/* ======================================================== */
+
+const btnSmsToDoctor = document.getElementById('btnSmsToDoctor');
+
+if (btnSmsToDoctor) {
+    btnSmsToDoctor.addEventListener('click', () => {
+        // 1. Pobierz wybranego lekarza z listy w modalu
+        const userSelect = document.getElementById('visitFormUserSelect');
+        const selectedOption = userSelect.options[userSelect.selectedIndex];
+
+        // 2. Pobierz numer telefonu (z zapisanego wcześniej dataset)
+        const targetPhone = selectedOption.dataset.phone;
+
+        if (!targetPhone || targetPhone.length < 9) {
+            alert(`Wybrany użytkownik (${selectedOption.text}) nie ma zapisanego poprawnego numeru telefonu w Konfiguracji.`);
+            return;
+        }
+
+        // 3. Pobierz dane wizyty z formularza
+        const klient = document.getElementById('visitFormKlient').value || "Nieznany klient";
+        const data = document.getElementById('visitFormDate').value;
+        const pora = document.getElementById('visitFormPoraDnia').value;
+        const cel = document.getElementById('visitFormCel').value || "Wizyta";
+        
+        // Konwersja daty na czytelniejszą (opcjonalnie)
+        // np. 2025-05-12 -> 12.05.2025
+        const dateParts = data.split('-');
+        const datePL = dateParts.length === 3 ? `${dateParts[2]}.${dateParts[1]}` : data;
+
+        // 4. Sklej treść wiadomości
+        // Przykład: "Hej, nowa wizyta: Jan Kowalski, 12.05 (10-15). Cel: Szczepienie."
+        const message = `Nowa wizyta: ${klient}, dn. ${datePL} (${pora}). Cel: ${cel}.`;
+
+        // 5. Wygeneruj link SMS
+        // encodeURIComponent jest ważny, żeby polskie znaki i spacje nie zepsuły linku
+        const smsLink = `sms:${targetPhone}?body=${encodeURIComponent(message)}`;
+        
+        // Dla iOS czasem lepiej użyć '&' zamiast '?' - prosty trick detekcji:
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+        const smsSeparator = isIOS ? '&' : '?';
+        const finalLink = `sms:${targetPhone}${smsSeparator}body=${encodeURIComponent(message)}`;
+
+        // 6. Otwórz aplikację SMS
+        window.location.href = finalLink;
+    });
 }
 </script>
 </body>
