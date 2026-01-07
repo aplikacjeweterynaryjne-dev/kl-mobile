@@ -4936,7 +4936,6 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
     <div style="padding: 10px; background: #fff; border-bottom: 1px solid #ccc; display: flex; justify-content: space-between; align-items: center;">
         <button id="spolecznoscBackBtn" class="btn ghost small">⬅ Menu</button>
         <div style="display: flex; gap: 10px;">
-            <button id="btnEnableNotifications" class="btn small" title="Włącz powiadomienia" style="background: #fff3e0; border: 1px solid #ffb74d;">🔕</button>
             <button id="tabChatBtn" class="btn primary small">💬 Czat Zespołu</button>
             <button id="tabWiedzaBtn" class="btn small">📚 Baza Wiedzy</button>
         </div>
@@ -16789,41 +16788,18 @@ try {
         'arcCardClient',        // Archiwum Kart
         'arcReceiptClient'      // Archiwum Paragonów
     ];
-/* ======================================================== */
-/* ✅ MODUŁ 6 (UNIWERSALNY): Logika Modala Klienta (Kalkulator + Raporty + Archiwum + ANALIZA) */
-/* ======================================================== */
-try {
-    // --- Zmienne dla modala wyszukiwania ---
-    const uniClientSearchModal = document.getElementById('calcClientSearchModal'); 
-    const uniClientSearchInput = document.getElementById('calcClientSearchInputModal');
-    const uniClientSearchList = document.getElementById('calcClientSearchListModal');
-    const uniClientSearchCloseBtn = document.getElementById('calcClientSearchCloseBtn');
-    
-    // Zmienna przechowująca, które pole wywołało modal
-    let activeClientInputTrigger = null; 
-
-    // ✅ ZMIANA TUTAJ: Dodano 'anClientInput' do listy
-    const clientInputIds = [
-        'calcKlientInput',      // Kalkulator
-        'reportClientInput',    // Raporty
-        'arcCardClient',        // Archiwum Kart
-        'arcReceiptClient',     // Archiwum Paragonów
-        'anClientInput'         // <--- 🆕 NOWE POLE (ANALIZA)
-    ];
 
     // 1. Inicjalizacja pól (blokada pisania, dodanie kursora, podpięcie listenera)
     clientInputIds.forEach(id => {
         const inputEl = document.getElementById(id);
         if (inputEl) {
-            // Stylizacja na "przycisk"
+            // Ustawiamy styl, żeby wyglądało jak przycisk
             inputEl.style.cursor = 'pointer';
             inputEl.setAttribute('readonly', true); // Blokada klawiatury na mobilnych
             inputEl.placeholder = "Kliknij, aby wybrać klienta...";
             
-            // Usuwamy atrybut 'list', żeby natywna podpowiedź nie wyskakiwała
-            inputEl.removeAttribute('list'); 
-
-            // Podpinamy otwieranie modala (zabezpieczenie przed dublowaniem listenerów)
+            // Podpinamy otwieranie modala
+            // Usuwamy stare listenery (klonowanie) aby uniknąć dublowania
             const newInputEl = inputEl.cloneNode(true);
             inputEl.parentNode.replaceChild(newInputEl, inputEl);
             
@@ -16831,10 +16807,11 @@ try {
                 e.preventDefault();
                 openUniversalClientModal(e.target);
             });
+            
+            // Dla kalkulatora musimy przywrócić nasłuchiwanie na 'input' do długu (jeśli było)
+            // Ale tutaj obsłużymy to centralnie w funkcji wyboru
         }
     });
-
-    // ... (reszta funkcji openUniversalClientModal, closeUniversalClientModal itp. bez zmian) ...
 
     // 2. Funkcja Otwierająca Modal
     function openUniversalClientModal(triggerElement) {
@@ -21294,7 +21271,85 @@ if (helpModal) {
         }
     });
 }
+/* ======================================================== */
+/* ======================================================== */
+/* ✅ LOGIKA DASHBOARDU (Pulpit Sterowania)                 */
+/* ======================================================== */
 
+async function updateDashboard() {
+    // ✅ ZABEZPIECZENIE: Jeśli nie ma profilu lub UID, przerwij po cichu (nie rób błędów)
+    if (!currentUserProfile || !currentUserProfile.uid) {
+        console.log("Dashboard wstrzymany: brak profilu użytkownika.");
+        return;
+    }
+
+    console.log("Aktualizacja Dashboardu...");
+    const dashboardStats = document.getElementById('dashboardStats');
+    
+    // Jeśli z jakiegoś powodu elementu nie ma, też przerwij
+    if (!dashboardStats) return;
+
+    // 1. Pokaż dashboard
+    dashboardStats.style.display = 'flex';
+    // ... (reszta funkcji bez zmian)
+
+    // 1. WIZYTY DZISIAJ
+    // Pobieramy z kolekcji wizyt, jeśli nie mamy ich w cache
+    try {
+        const todayISO = new Date().toISOString().split('T')[0];
+        let countToday = 0;
+        
+        // Jeśli mamy załadowany kalendarz, użyj cache, jeśli nie - szybkie zapytanie
+        if (allFetchedVisits && allFetchedVisits.length > 0) {
+             countToday = allFetchedVisits.filter(v => v.dataWizyty === todayISO && v.status === 'Nowa').length;
+        } else {
+             const q = db.collection("wizyty")
+                .where("lekarz_uid", "==", currentUserProfile.uid)
+                .where("dataWizyty", "==", todayISO)
+                .where("status", "==", "Nowa");
+             const snap = await q.get();
+             countToday = snap.size;
+        }
+        document.getElementById('dashVisitsCount').textContent = countToday;
+    } catch (e) { console.error("Błąd dash wizyty:", e); }
+
+    // 2. NISKI STAN LEKÓW (z cache magazynu)
+    try {
+        let lowStockCount = 0;
+        // Sprawdzamy czy magazyn jest załadowany
+        if (magazynCache.size === 0 && currentUserProfile.uzywaStanowMagazynowych) {
+             // Spróbuj załadować po cichu
+             await loadMagazynCache(currentUserProfile.uid);
+        }
+        
+        magazynCache.forEach(item => {
+            // Uznajemy stan < 5 za niski (możesz to zmienić)
+            if (item.stan <= 5) lowStockCount++;
+        });
+        document.getElementById('dashStockCount').textContent = lowStockCount;
+    } catch (e) { console.error("Błąd dash stan:", e); }
+
+    // 3. NIESPŁACONE DŁUGI (Suma)
+    try {
+        // Proste zapytanie o status "Dług" dla danego lekarza
+        const qDebt = db.collection("archiwumParagony")
+            .where("lekarz_uid", "==", currentUserProfile.uid)
+            .where("status", "==", "Dług");
+            
+        const snapDebt = await qDebt.get();
+        let totalDebt = 0;
+        snapDebt.forEach(doc => {
+            totalDebt += parseFloat(doc.data().suma) || 0;
+        });
+        
+        // Formatowanie kwoty
+        document.getElementById('dashDebtCount').textContent = totalDebt.toFixed(0) + " zł";
+    } catch (e) { 
+        console.error("Błąd dash długi:", e); 
+        // Jeśli błąd indeksu, pokaż myślnik
+        document.getElementById('dashDebtCount').textContent = "-";
+    }
+}
 /* ======================================================== */
 /* ✅ LOGIKA DASHBOARDU (Zaktualizowana v2)                 */
 /* ======================================================== */
@@ -21594,61 +21649,6 @@ if (tabWiedzaBtn) tabWiedzaBtn.addEventListener('click', openWiedzaTab);
 
 // --- 2. LOGIKA CZATU (CORE) ---
 
-/* ======================================================== */
-/* ✅ NOWOŚĆ: OBSŁUGA POWIADOMIEŃ PUSH (Dzwoneczek)         */
-/* ======================================================== */
-
-const btnEnableNotifications = document.getElementById('btnEnableNotifications');
-
-// 1. Obsługa przycisku włączania powiadomień
-if (btnEnableNotifications) {
-    // Sprawdź obecny stan przy starcie
-    if (Notification.permission === 'granted') {
-        btnEnableNotifications.textContent = '🔔'; // Ikona włączonego dzwonka
-        btnEnableNotifications.style.background = '#e8f5e9';
-        btnEnableNotifications.style.borderColor = '#27ae60';
-        btnEnableNotifications.title = "Powiadomienia są aktywne";
-    }
-
-    btnEnableNotifications.addEventListener('click', () => {
-        if (!('Notification' in window)) {
-            alert("Twoja przeglądarka nie obsługuje powiadomień.");
-            return;
-        }
-
-        // Zapytaj o zgodę
-        Notification.requestPermission().then(permission => {
-            if (permission === "granted") {
-                btnEnableNotifications.textContent = '🔔';
-                btnEnableNotifications.style.background = '#e8f5e9';
-                btnEnableNotifications.style.borderColor = '#27ae60';
-                
-                // Wyślij testowe powiadomienie
-                sendPushNotification("Powiadomienia włączone!", "Będziesz otrzymywać wiadomości od zespołu.");
-            } else {
-                alert("Brak zgody na powiadomienia. Zmień ustawienia w przeglądarce (kłódka przy adresie).");
-            }
-        });
-    });
-}
-
-// 2. Funkcja pomocnicza wysyłająca Push przez Service Worker
-function sendPushNotification(title, body) {
-    // Sprawdź czy mamy zgodę i czy Service Worker jest aktywny
-    if (Notification.permission === 'granted' && navigator.serviceWorker) {
-        navigator.serviceWorker.ready.then(registration => {
-            registration.showNotification(title, {
-                body: body,
-                icon: 'logo.jpg', // Upewnij się, że masz plik logo.jpg w folderze
-                vibrate: [200, 100, 200],
-                tag: 'chat-msg', // Taguje wiadomości, aby nie spamować (nadpisuje poprzednią)
-                renotify: true   // Wibruje przy każdej nowej wiadomości
-            });
-        });
-    }
-}
-
-// 3. Główna funkcja czatu
 function initChat() {
     // Zapobiegamy podwójnemu nasłuchiwaniu
     if (chatListenerUnsubscribe) return; 
@@ -21657,6 +21657,11 @@ function initChat() {
     
     const clinicId = currentUserProfile['ID lecznicy'];
     console.log("Uruchamianie nasłuchu czatu...");
+
+    // Prośba o powiadomienia
+    if ("Notification" in window && Notification.permission !== "granted") {
+        Notification.requestPermission();
+    }
 
     const q = db.collection('czat_wiadomosci')
         .where('id_lecznicy', '==', clinicId)
@@ -21673,41 +21678,33 @@ function initChat() {
             renderMessage(msg);
         });
 
-        // --- LOGIKA POWIADOMIEŃ I LICZNIKA ---
+        // LOGIKA POWIADOMIEŃ I LICZNIKA
         snapshot.docChanges().forEach(change => {
             if (change.type === "added" && !initialLoad) {
                 const msg = change.doc.data();
                 
-                // Sprawdź czy wiadomość nie jest ode mnie
+                // Jeśli wiadomość nie jest ode mnie
                 if (msg.uid !== currentUserProfile.uid) {
                     
-                    // Sprawdź warunki wysłania powiadomienia:
-                    // 1. Aplikacja zminimalizowana (hidden) LUB
-                    // 2. Użytkownik jest w innej sekcji niż 'spolecznoscSection' LUB
-                    // 3. Użytkownik jest w sekcji społeczności, ale w zakładce 'Wiedza' (nie 'Czat')
-                    
-                    const isAppHidden = document.visibilityState === 'hidden';
-                    const isSectionHidden = spolecznoscSection.style.display === 'none';
-                    const isTabInactive = !isChatTabActive; // Zmienna globalna ustawiana przy przełączaniu zakładek
-
-                    if (isAppHidden || isSectionHidden || isTabInactive) {
+                    // Jeśli NIE jestem w zakładce czatu -> zwiększ licznik
+                    if (!isChatTabActive || spolecznoscSection.style.display === 'none') {
                         unreadMessagesCount++;
                         updateUnreadDashboard();
                         
-                        // ✅ WYŚLIJ POWIADOMIENIE PUSH PRZEZ SW
-                        // (Wiadomość systemowa została wyłączona w saveVisitBtn, 
-                        // więc tutaj przychodzą tylko wiadomości od ludzi)
-                        sendPushNotification(`Nowa wiadomość: ${msg.autor}`, msg.tresc);
+                        // Wyślij powiadomienie przeglądarkowe
+                        if (Notification.permission === "granted") {
+                            new Notification(`Wiadomość od: ${msg.autor}`, {
+                                body: msg.tresc,
+                                icon: 'logo.jpg'
+                            });
+                        }
                     }
                 }
             }
         });
         
         initialLoad = false;
-        // Przewijanie na dół
-        setTimeout(() => {
-             chatMessagesArea.scrollTop = chatMessagesArea.scrollHeight;
-        }, 100);
+        chatMessagesArea.scrollTop = chatMessagesArea.scrollHeight; // Przewiń na dół
 
     }, error => {
         console.error("Błąd czatu:", error);
@@ -24881,7 +24878,46 @@ function getInnerCardHTML_110mm(card) {
  * ✅ NOWA FUNKCJA: Ładuje historię celów wizyt do <datalist>
  * Pobiera ostatnie 50 wizyt zalogowanego użytkownika.
  */
+async function loadVisitPurposeHistory() {
+    const dataList = document.getElementById('listaCelowWizyt');
+    if (!dataList || !currentUserProfile) return;
 
+    dataList.innerHTML = ''; // Wyczyść stare opcje
+
+    try {
+        // Pobieramy ostatnie 50 wizyt tego lekarza (zamiast filtrować datą, bierzemy po prostu najnowsze)
+        // To jest szybsze i nie wymaga skomplikowanych indeksów.
+        const q = db.collection("wizyty")
+            .where("lekarz_uid", "==", currentUserProfile.uid)
+            .orderBy("dataWizyty", "desc") // Najnowsze pierwsze
+            .limit(50);
+
+        const snapshot = await q.get();
+        
+        // Używamy Set, aby automatycznie usunąć duplikaty
+        const uniquePurposes = new Set();
+
+        snapshot.docs.forEach(doc => {
+            const data = doc.data();
+            if (data.celWizyty && data.celWizyty.trim().length > 1) {
+                uniquePurposes.add(data.celWizyty.trim());
+            }
+        });
+
+        // Wypełnij datalist
+        uniquePurposes.forEach(purpose => {
+            const opt = document.createElement('option');
+            opt.value = purpose;
+            dataList.appendChild(opt);
+        });
+
+        console.log(`Załadowano ${uniquePurposes.size} unikalnych celów wizyt do podpowiedzi.`);
+
+    } catch (error) {
+        console.error("Błąd ładowania historii celów wizyt:", error);
+        // Jeśli błąd indeksu, to nic nie szkodzi, po prostu nie będzie podpowiedzi
+    }
+}
     /* ======================================================== */
 /* ✅ POPRAWKA: Brakujące funkcje list historii (Cel i Opis) */
 /* ======================================================== */
