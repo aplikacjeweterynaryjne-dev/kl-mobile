@@ -1,5 +1,5 @@
-// 🔒 Nazwa pamięci podręcznej (zmieniona na v94, aby wymusić aktualizację)
-const CACHE_NAME = 'karta-leczenia-cache-v93';
+// 🔒 Nazwa pamięci podręcznej (zmieniona na v94, aby wymusić aktualizację u użytkowników)
+const CACHE_NAME = 'karta-leczenia-cache-v94';
 
 // 📦 Lista plików do zapamiętania offline (tzw. App Shell)
 const urlsToCache = [
@@ -21,20 +21,22 @@ const urlsToCache = [
 
 // ⚙️ Instalacja Service Workera
 self.addEventListener('install', event => {
-  console.log('[Service Worker] Instalacja (v93)...');
+  console.log('[Service Worker] Instalacja (v94)...');
+  // Wymuś natychmiastowe zastąpienie starego Service Workera
+  self.skipWaiting();
+
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => {
         console.log('[Service Worker] Otworzono cache i dodano pliki');
         return cache.addAll(urlsToCache);
       })
-      .then(() => self.skipWaiting()) // Wymuś aktywację nowej wersji
   );
 });
 
 // ♻️ Aktywacja — czyszczenie starych cache
 self.addEventListener('activate', event => {
-  console.log('[Service Worker] Aktywacja (v93)...');
+  console.log('[Service Worker] Aktywacja (v94)...');
   event.waitUntil(
     caches.keys().then(cacheNames => {
       return Promise.all(
@@ -77,6 +79,7 @@ self.addEventListener('fetch', event => {
             return cachedResponse;
           }
           return fetch(event.request).then(networkResponse => {
+            // Sprawdź czy odpowiedź jest poprawna
             if (!networkResponse || networkResponse.status !== 200 || networkResponse.type !== 'basic' && networkResponse.type !== 'cors') {
               return networkResponse;
             }
@@ -91,13 +94,17 @@ self.addEventListener('fetch', event => {
   }
 });
 
-// 🔔 NOWOŚĆ: Obsługa kliknięcia w powiadomienie
+// 🔔 NOWOŚĆ: Obsługa kliknięcia w powiadomienie (Messenger style)
 self.addEventListener('notificationclick', function(event) {
   console.log('[Service Worker] Kliknięto powiadomienie:', event.notification.tag);
   
   event.notification.close(); // Zamknij dymek powiadomienia
 
-  // Ta magia sprawia, że po kliknięciu otwiera się aplikacja (lub skupia na niej, jeśli jest otwarta)
+  // Pobierz URL z danych powiadomienia (jeśli istnieje) lub użyj głównego
+  // (To łączy się z kodem JS, gdzie ustawiliśmy data: { url: ... })
+  const urlToOpen = event.notification.data && event.notification.data.url ? event.notification.data.url : '/';
+
+  // Ta magia sprawia, że po kliknięciu otwiera się aplikacja
   event.waitUntil(
     clients.matchAll({
       type: 'window',
@@ -106,14 +113,14 @@ self.addEventListener('notificationclick', function(event) {
       // 1. Sprawdź, czy aplikacja jest już otwarta w którejś karcie
       for (var i = 0; i < clientList.length; i++) {
         var client = clientList[i];
-        // Jeśli tak i mamy url (oraz przeglądarka pozwala na focus), skupiamy się na niej
+        // Jeśli tak i przeglądarka pozwala na focus -> skupiamy się na niej
         if (client.url && 'focus' in client) {
           return client.focus();
         }
       }
-      // 2. Jeśli nie jest otwarta, otwórz nowe okno
+      // 2. Jeśli nie jest otwarta -> otwórz nowe okno z odpowiednim URL
       if (clients.openWindow) {
-        return clients.openWindow('./');
+        return clients.openWindow(urlToOpen);
       }
     })
   );
