@@ -15655,7 +15655,7 @@ function renderTodayView(visits, dateToShow) {
     });
 
     // Zapisywanie wizyty (Dodawanie/Edycja)
-// Zapisywanie wizyty (Dodawanie/Edycja) - Wersja z SMS
+// Zapisywanie wizyty (Dodawanie/Edycja) - BEZ WIADOMOŚCI CZATU, ALE Z SMS
 saveVisitBtn.addEventListener('click', async () => {
     if (!currentUserProfile) {
         alert("Błąd: Brak danych użytkownika.");
@@ -15725,18 +15725,11 @@ saveVisitBtn.addEventListener('click', async () => {
 
             // Sprawdź zmianę lekarza
             if (oldVisit && oldVisit.lekarz_uid !== assignedUid) {
-                // Dodajemy powiadomienie systemowe (Chat Push)
-                await db.collection('czat_wiadomosci').add({
-                    id_lecznicy: currentUserProfile['ID lecznicy'],
-                    uid: currentUserProfile.uid,
-                    autor: "SYSTEM",
-                    tresc: `🔔 Przepisano wizytę: ${klientNazwa} (${dataWizyty}) do: ${assignedName}`,
-                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
-                });
+                // USUNIĘTO AUTOMATYCZNE GENEROWANIE WIADOMOŚCI W CZACIE
 
                 // Przygotuj SMS
                 shouldOfferSms = true;
-                smsMessage = `Nowa wizyta: ${klientNazwa}, Data: ${dataWizyty} (${visitData.poraDnia}). Cel: ${visitData.celWizyty}.`;
+                smsMessage = `Hej, przepisałem Ci wizytę: ${klientNazwa}, Data: ${dataWizyty} (${visitData.poraDnia}). Cel: ${visitData.celWizyty}.`;
             }
 
             delete visitData.createdAt; 
@@ -15750,17 +15743,11 @@ saveVisitBtn.addEventListener('click', async () => {
             
             // Jeśli dodajemy wizytę komuś innemu
             if (assignedUid !== currentUserProfile.uid) {
-                 await db.collection('czat_wiadomosci').add({
-                    id_lecznicy: currentUserProfile['ID lecznicy'],
-                    uid: currentUserProfile.uid,
-                    autor: "SYSTEM",
-                    tresc: `📅 Nowa wizyta w grafiku: ${klientNazwa} (${dataWizyty})`,
-                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
-                });
+                // USUNIĘTO AUTOMATYCZNE GENEROWANIE WIADOMOŚCI W CZACIE
 
                 // Przygotuj SMS
                 shouldOfferSms = true;
-                smsMessage = `Hej, dodałem Ci nową wizytę: ${klientNazwa}, Data: ${dataWizyty}.`;
+                smsMessage = `Hej, dodałem Ci nową wizytę: ${klientNazwa}, Data: ${dataWizyty} (${visitData.poraDnia}). Cel: ${visitData.celWizyty}.`;
             }
 
             showToast("Wizyta dodana.", "success");
@@ -15771,10 +15758,33 @@ saveVisitBtn.addEventListener('click', async () => {
 
         // --- OBSŁUGA SMS (PO ZAPISIE) ---
         if (shouldOfferSms) {
-            // Małe opóźnienie, żeby toast zdążył się pokazać
             setTimeout(async () => {
+                // Pytamy o SMS, ale czat pozostaje czysty
                 if (confirm(`Wizyta została przypisana do: ${assignedName}.\n\nCzy chcesz wysłać mu/jej powiadomienie SMS?`)) {
-                    await sendSmsToDoctor(assignedUid, smsMessage);
+                    // Tutaj wywołujemy logikę otwarcia linku SMS (tą samą co w guziku)
+                    // Musimy znaleźć numer telefonu tego lekarza
+                    
+                    // Funkcja pomocnicza do szukania telefonu w selectcie
+                    const getPhoneFromSelect = (uid) => {
+                        const sel = document.getElementById('calendarUserSelect'); // Główny filtr ma te dane
+                        if (!sel) return '';
+                        for (let i = 0; i < sel.options.length; i++) {
+                            if (sel.options[i].value === uid) return sel.options[i].dataset.phone || '';
+                        }
+                        return '';
+                    };
+
+                    let targetPhone = getPhoneFromSelect(assignedUid);
+                    targetPhone = targetPhone.replace(/[^0-9+]/g, ''); // Czyść numer
+
+                    if (targetPhone.length >= 9) {
+                         const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+                         const separator = isIOS ? '&' : '?';
+                         const link = `sms:${targetPhone}${separator}body=${encodeURIComponent(smsMessage)}`;
+                         window.location.href = link;
+                    } else {
+                        alert("Brak numeru telefonu lekarza w konfiguracji, nie można wysłać SMS.");
+                    }
                 }
             }, 500);
         }
