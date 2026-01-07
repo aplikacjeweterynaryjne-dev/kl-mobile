@@ -21687,11 +21687,9 @@ if (btnEnableNotif) {
 }
 
 // ============================================================
-// 2. POPRAWIONA FUNKCJA INIT CHAT
-// (Zastąp swoją starą funkcję tym kodem)
+// POPRAWIONA FUNKCJA INIT CHAT (Wersja agresywna)
 // ============================================================
 function initChat() {
-    // Zapobiegamy podwójnemu nasłuchiwaniu
     if (chatListenerUnsubscribe) return; 
 
     if (!currentUserProfile || !currentUserProfile['ID lecznicy']) return;
@@ -21714,12 +21712,11 @@ function initChat() {
             renderMessage(msg);
         });
 
-        // Przewiń na dół
         setTimeout(() => {
             chatMessagesArea.scrollTop = chatMessagesArea.scrollHeight;
         }, 100);
 
-        // --- LOGIKA POWIADOMIEŃ (POPRAWIONA) ---
+        // --- LOGIKA POWIADOMIEŃ ---
         snapshot.docChanges().forEach(change => {
             if (change.type === "added" && !initialLoad) {
                 const msg = change.doc.data();
@@ -21727,42 +21724,52 @@ function initChat() {
                 // Jeśli wiadomość nie jest ode mnie
                 if (msg.uid !== currentUserProfile.uid) {
                     
-                    // Sprawdź czy aplikacja jest w tle (zminimalizowana lub inna zakładka)
-                    const isAppHidden = document.hidden || spolecznoscSection.style.display === 'none' || !isChatTabActive;
+                    // Sprawdź czy aplikacja jest w tle
+                    // (Dodaliśmy document.visibilityState, to pewniejsza metoda)
+                    const isAppHidden = document.hidden || document.visibilityState === 'hidden' || spolecznoscSection.style.display === 'none' || !isChatTabActive;
 
                     if (isAppHidden) {
-                        // 1. Zwiększ licznik w dashboardzie
+                        console.log("🔔 Próba wysłania powiadomienia dla:", msg.tresc);
+
+                        // 1. Zwiększ licznik
                         unreadMessagesCount++;
                         updateUnreadDashboard();
                         
-                        // 2. Odtwórz Dźwięk (Fix zacinania)
+                        // 2. Dźwięk z HTML (Próba odtworzenia)
                         const audio = document.getElementById('notificationSound');
                         if (audio) {
-                            audio.currentTime = 0; // Przewiń na start (kluczowe!)
-                            audio.play().catch(e => console.log("Audio zablokowane (brak interakcji)."));
+                            audio.currentTime = 0;
+                            audio.play().catch(e => console.warn("Audio zablokowane:", e));
                         }
 
                         // 3. Wibracja
-                        if (navigator.vibrate) {
-                            navigator.vibrate([200, 100, 200]);
-                        }
+                        if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
 
-                        // 4. Powiadomienie Systemowe (Push)
+                        // 4. PUSH (DYMEK) - WERSJA AGRESYWNA
                         if (Notification.permission === "granted") {
-                            const notification = new Notification(`Wiadomość od: ${msg.autor}`, {
-                                body: msg.tresc,
-                                icon: 'logo.jpg', 
-                                tag: 'chat-msg',     // Grupuje, żeby nie było spamu
-                                renotify: true,      // 🔥 TO JEST NAJWAŻNIEJSZE! Wymusza dźwięk/wibrację przy każdej nowej wiadomości
-                                requireInteraction: true // Dymek nie zniknie sam, dopóki nie klikniesz
-                            });
+                            try {
+                                // Generujemy UNIKALNY tag. To sprawia, że system nie "scala" powiadomień po cichu.
+                                const uniqueTag = 'msg-' + Date.now(); 
 
-                            // Kliknięcie otwiera aplikację
-                            notification.onclick = function() {
-                                window.focus(); 
-                                notification.close();
-                                if (menuSpolecznoscBtn) menuSpolecznoscBtn.click();
-                            };
+                                const notification = new Notification(`Wiadomość od: ${msg.autor}`, {
+                                    body: msg.tresc,
+                                    icon: 'logo.jpg', 
+                                    tag: uniqueTag,      // UNIKALNY TAG = ZAWSZE DŹWIĘK
+                                    renotify: true,      // Wymuś wibrację
+                                    requireInteraction: true, // Nie znikaj sam
+                                    silent: false        // Upewnij się, że nie jest wyciszone
+                                });
+
+                                notification.onclick = function() {
+                                    window.focus(); 
+                                    notification.close();
+                                    if (menuSpolecznoscBtn) menuSpolecznoscBtn.click();
+                                };
+                            } catch (err) {
+                                console.error("Błąd tworzenia powiadomienia:", err);
+                            }
+                        } else {
+                            console.warn("Brak uprawnień do powiadomień (Notification.permission = " + Notification.permission + ")");
                         }
                     }
                 }
