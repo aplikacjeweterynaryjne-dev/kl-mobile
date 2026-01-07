@@ -2942,6 +2942,9 @@ background-color: #eef;
 </style>
 
 <body>
+<audio id="notificationSound" preload="auto">
+    <source src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" type="audio/mpeg">
+</audio>
 <div id="app-container"> <div id="loginSection" style="display: flex; flex-direction: column; justify-content: center; align-items: center; width: 100vw; height: 100vh; background-color: #F7F9F5;">
   <div class="form-card" style="width: 100%; max-width: 400px; height: auto;">
     
@@ -21621,14 +21624,17 @@ function openChatTab() {
     tabChatBtn.classList.add('primary');
     tabWiedzaBtn.classList.remove('primary');
     
-    // Reset licznika przy wejściu
-    isChatTabActive = true;
-    unreadMessagesCount = 0;
-    updateUnreadDashboard();
+    // ✅ RESETOWANIE LICZNIKA I STANU PRZY WEJŚCIU
+    isChatTabActive = true;       // Ustawiamy flagę: "patrzę na czat"
+    unreadMessagesCount = 0;      // Zerujemy licznik
+    updateUnreadDashboard();      // Aktualizujemy kafelki (usuwamy cyferkę)
 
-    // Uruchom nasłuchiwanie (jeśli jeszcze nie działa)
-    // UWAGA: W tej wersji nasłuchujemy CAŁY CZAS w tle (inicjowane w onShowKalendarz lub przy starcie), 
-    // ale tutaj upewniamy się, że działa.
+    // Przewiń na dół po otwarciu
+    setTimeout(() => {
+        chatMessagesArea.scrollTop = chatMessagesArea.scrollHeight;
+    }, 100);
+
+    // Upewnij się, że nasłuch działa
     initChat(); 
 }
 
@@ -21648,6 +21654,7 @@ if (tabWiedzaBtn) tabWiedzaBtn.addEventListener('click', openWiedzaTab);
 
 // --- 2. LOGIKA CZATU (CORE) ---
 
+// ✅ NOWA FUNKCJA INIT CHAT Z POWIADOMIENIAMI
 function initChat() {
     // Zapobiegamy podwójnemu nasłuchiwaniu
     if (chatListenerUnsubscribe) return; 
@@ -21655,9 +21662,9 @@ function initChat() {
     if (!currentUserProfile || !currentUserProfile['ID lecznicy']) return;
     
     const clinicId = currentUserProfile['ID lecznicy'];
-    console.log("Uruchamianie nasłuchu czatu...");
+    console.log("Uruchamianie nasłuchu czatu z powiadomieniami...");
 
-    // Prośba o powiadomienia
+    // Prośba o uprawnienia do powiadomień systemowych
     if ("Notification" in window && Notification.permission !== "granted") {
         Notification.requestPermission();
     }
@@ -21665,7 +21672,7 @@ function initChat() {
     const q = db.collection('czat_wiadomosci')
         .where('id_lecznicy', '==', clinicId)
         .orderBy('timestamp', 'asc')
-        .limitToLast(50); // Ostatnie 50 wiadomości
+        .limitToLast(50);
 
     let initialLoad = true; 
 
@@ -21677,7 +21684,12 @@ function initChat() {
             renderMessage(msg);
         });
 
-        // LOGIKA POWIADOMIEŃ I LICZNIKA
+        // Przewiń na dół
+        setTimeout(() => {
+            chatMessagesArea.scrollTop = chatMessagesArea.scrollHeight;
+        }, 100);
+
+        // --- LOGIKA POWIADOMIEŃ (DŹWIĘK + DYMEK) ---
         snapshot.docChanges().forEach(change => {
             if (change.type === "added" && !initialLoad) {
                 const msg = change.doc.data();
@@ -21685,17 +21697,37 @@ function initChat() {
                 // Jeśli wiadomość nie jest ode mnie
                 if (msg.uid !== currentUserProfile.uid) {
                     
-                    // Jeśli NIE jestem w zakładce czatu -> zwiększ licznik
-                    if (!isChatTabActive || spolecznoscSection.style.display === 'none') {
+                    // Sprawdź czy użytkownik NIE patrzy teraz na czat
+                    // LUB czy przeglądarka jest zminimalizowana
+                    const isChatHidden = (!isChatTabActive || spolecznoscSection.style.display === 'none' || document.hidden);
+
+                    if (isChatHidden) {
+                        // 1. Zwiększ licznik nieprzeczytanych
                         unreadMessagesCount++;
                         updateUnreadDashboard();
                         
-                        // Wyślij powiadomienie przeglądarkowe
+                        // 2. Odtwórz Dźwięk 🔊
+                        playNotificationSound();
+
+                        // 3. Wibracja (Android) 📳
+                        if (navigator.vibrate) {
+                            navigator.vibrate([200, 100, 200]);
+                        }
+
+                        // 4. Powiadomienie Systemowe (Pasek powiadomień) 🔔
                         if (Notification.permission === "granted") {
-                            new Notification(`Wiadomość od: ${msg.autor}`, {
+                            const notification = new Notification(`Nowa wiadomość: ${msg.autor}`, {
                                 body: msg.tresc,
-                                icon: 'logo.jpg'
+                                icon: 'logo.jpg',
+                                tag: 'chat-msg'
                             });
+
+                            // Kliknięcie w powiadomienie otwiera aplikację
+                            notification.onclick = function() {
+                                window.focus();
+                                if (menuSpolecznoscBtn) menuSpolecznoscBtn.click();
+                                notification.close();
+                            };
                         }
                     }
                 }
@@ -21703,11 +21735,19 @@ function initChat() {
         });
         
         initialLoad = false;
-        chatMessagesArea.scrollTop = chatMessagesArea.scrollHeight; // Przewiń na dół
 
     }, error => {
         console.error("Błąd czatu:", error);
     });
+}
+
+// Funkcja pomocnicza do dźwięku
+function playNotificationSound() {
+    const audio = document.getElementById('notificationSound');
+    if (audio) {
+        audio.currentTime = 0; 
+        audio.play().catch(e => console.warn("Przeglądarka zablokowała dźwięk (brak interakcji):", e));
+    }
 }
 
 function renderMessage(msg) {
