@@ -4937,11 +4937,12 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
     
     <div style="padding: 10px; background: #fff; border-bottom: 1px solid #ccc; display: flex; justify-content: space-between; align-items: center;">
         <button id="spolecznoscBackBtn" class="btn ghost small">⬅ Menu</button>
+        
+       <button id="btnEnableNotifications" class="btn small" style="background-color: #ff9800; color: white; border: none; margin-right: 5px;">🔔 Włącz Powiadomienia</button>
         <div style="display: flex; gap: 10px;">
             
             <button id="tabChatBtn" class="btn primary small">💬 Czat Zespołu</button>
             <button id="tabWiedzaBtn" class="btn small">📚 Baza Wiedzy</button>
-            <button id="btnEnableNotifications" class="btn small" style="background-color: #ff9800; color: white; border: none; margin-right: 5px;">🔔 Włącz Powiadomienia</button>
         </div>
     </div>
 
@@ -21657,6 +21658,38 @@ if (tabWiedzaBtn) tabWiedzaBtn.addEventListener('click', openWiedzaTab);
 // --- 2. LOGIKA CZATU (CORE) ---
 
 // ✅ NOWA FUNKCJA INIT CHAT Z POWIADOMIENIAMI
+// ============================================================
+// 1. OBSŁUGA PRZYCISKU "WŁĄCZ POWIADOMIENIA"
+// (To musi być w kodzie, żeby przeglądarka pozwoliła na Push)
+// ============================================================
+const btnEnableNotif = document.getElementById('btnEnableNotifications');
+
+if (btnEnableNotif) {
+    // Jeśli już mamy zgodę, ukryj przycisk
+    if (Notification.permission === 'granted') {
+        btnEnableNotif.style.display = 'none';
+    }
+
+    btnEnableNotif.addEventListener('click', () => {
+        Notification.requestPermission().then(permission => {
+            if (permission === "granted") {
+                alert("✅ Powiadomienia włączone! Teraz otrzymasz dymki o nowych wiadomościach.");
+                btnEnableNotif.style.display = 'none'; // Ukryj przycisk
+                
+                // Test dźwięku (żeby odblokować audio w przeglądarce)
+                const audio = document.getElementById('notificationSound');
+                if(audio) audio.play().catch(e => console.log(e));
+            } else {
+                alert("❌ Zablokowałeś powiadomienia. Musisz je odblokować w ustawieniach przeglądarki (kłódka przy adresie).");
+            }
+        });
+    });
+}
+
+// ============================================================
+// 2. POPRAWIONA FUNKCJA INIT CHAT
+// (Zastąp swoją starą funkcję tym kodem)
+// ============================================================
 function initChat() {
     // Zapobiegamy podwójnemu nasłuchiwaniu
     if (chatListenerUnsubscribe) return; 
@@ -21664,12 +21697,7 @@ function initChat() {
     if (!currentUserProfile || !currentUserProfile['ID lecznicy']) return;
     
     const clinicId = currentUserProfile['ID lecznicy'];
-    console.log("Uruchamianie nasłuchu czatu z powiadomieniami...");
-
-    // Prośba o uprawnienia do powiadomień systemowych
-    if ("Notification" in window && Notification.permission !== "granted") {
-        Notification.requestPermission();
-    }
+    console.log("Uruchamianie nasłuchu czatu...");
 
     const q = db.collection('czat_wiadomosci')
         .where('id_lecznicy', '==', clinicId)
@@ -21691,7 +21719,7 @@ function initChat() {
             chatMessagesArea.scrollTop = chatMessagesArea.scrollHeight;
         }, 100);
 
-        // --- LOGIKA POWIADOMIEŃ (DŹWIĘK + DYMEK) ---
+        // --- LOGIKA POWIADOMIEŃ (POPRAWIONA) ---
         snapshot.docChanges().forEach(change => {
             if (change.type === "added" && !initialLoad) {
                 const msg = change.doc.data();
@@ -21699,36 +21727,41 @@ function initChat() {
                 // Jeśli wiadomość nie jest ode mnie
                 if (msg.uid !== currentUserProfile.uid) {
                     
-                    // Sprawdź czy użytkownik NIE patrzy teraz na czat
-                    // LUB czy przeglądarka jest zminimalizowana
-                    const isChatHidden = (!isChatTabActive || spolecznoscSection.style.display === 'none' || document.hidden);
+                    // Sprawdź czy aplikacja jest w tle (zminimalizowana lub inna zakładka)
+                    const isAppHidden = document.hidden || spolecznoscSection.style.display === 'none' || !isChatTabActive;
 
-                    if (isChatHidden) {
-                        // 1. Zwiększ licznik nieprzeczytanych
+                    if (isAppHidden) {
+                        // 1. Zwiększ licznik w dashboardzie
                         unreadMessagesCount++;
                         updateUnreadDashboard();
                         
-                        // 2. Odtwórz Dźwięk 🔊
-                        playNotificationSound();
+                        // 2. Odtwórz Dźwięk (Fix zacinania)
+                        const audio = document.getElementById('notificationSound');
+                        if (audio) {
+                            audio.currentTime = 0; // Przewiń na start (kluczowe!)
+                            audio.play().catch(e => console.log("Audio zablokowane (brak interakcji)."));
+                        }
 
-                        // 3. Wibracja (Android) 📳
+                        // 3. Wibracja
                         if (navigator.vibrate) {
                             navigator.vibrate([200, 100, 200]);
                         }
 
-                        // 4. Powiadomienie Systemowe (Pasek powiadomień) 🔔
+                        // 4. Powiadomienie Systemowe (Push)
                         if (Notification.permission === "granted") {
-                            const notification = new Notification(`Nowa wiadomość: ${msg.autor}`, {
+                            const notification = new Notification(`Wiadomość od: ${msg.autor}`, {
                                 body: msg.tresc,
-                                icon: 'logo.jpg',
-                                tag: 'chat-msg'
+                                icon: 'logo.jpg', 
+                                tag: 'chat-msg',     // Grupuje, żeby nie było spamu
+                                renotify: true,      // 🔥 TO JEST NAJWAŻNIEJSZE! Wymusza dźwięk/wibrację przy każdej nowej wiadomości
+                                requireInteraction: true // Dymek nie zniknie sam, dopóki nie klikniesz
                             });
 
-                            // Kliknięcie w powiadomienie otwiera aplikację
+                            // Kliknięcie otwiera aplikację
                             notification.onclick = function() {
-                                window.focus();
-                                if (menuSpolecznoscBtn) menuSpolecznoscBtn.click();
+                                window.focus(); 
                                 notification.close();
+                                if (menuSpolecznoscBtn) menuSpolecznoscBtn.click();
                             };
                         }
                     }
@@ -25209,109 +25242,7 @@ if (btnSmsToDoctor) {
         window.location.href = finalLink;
     });
 }
-    // --- 1. Obsługa przycisku WŁĄCZ POWIADOMIENIA ---
-const btnEnableNotif = document.getElementById('btnEnableNotifications');
-
-if (btnEnableNotif) {
-    // Sprawdź status na starcie - jeśli już włączone, ukryj przycisk
-    if (Notification.permission === 'granted') {
-        btnEnableNotif.style.display = 'none';
-    }
-
-    btnEnableNotif.addEventListener('click', () => {
-        Notification.requestPermission().then(permission => {
-            if (permission === "granted") {
-                alert("✅ Powiadomienia włączone! Teraz otrzymasz dymki o nowych wiadomościach.");
-                btnEnableNotif.style.display = 'none'; // Ukryj przycisk
-                
-                // Test dźwięku
-                const audio = document.getElementById('notificationSound');
-                if(audio) audio.play();
-            } else {
-                alert("❌ Zablokowałeś powiadomienia w przeglądarce. Musisz je odblokować w ustawieniach strony (kłódka przy adresie).");
-            }
-        });
-    });
-}
-
-// --- 2. POPRAWIONA FUNKCJA CZATU (Fix dla tła) ---
-function initChat() {
-    if (chatListenerUnsubscribe) return; 
-    if (!currentUserProfile || !currentUserProfile['ID lecznicy']) return;
-    
-    const clinicId = currentUserProfile['ID lecznicy'];
-    console.log("Start czatu...");
-
-    const q = db.collection('czat_wiadomosci')
-        .where('id_lecznicy', '==', clinicId)
-        .orderBy('timestamp', 'asc')
-        .limitToLast(50);
-
-    let initialLoad = true; 
-
-    chatListenerUnsubscribe = q.onSnapshot(snapshot => {
-        chatMessagesArea.innerHTML = ''; 
-        
-        snapshot.forEach(doc => {
-            const msg = { id: doc.id, ...doc.data() };
-            renderMessage(msg);
-        });
-
-        setTimeout(() => {
-            chatMessagesArea.scrollTop = chatMessagesArea.scrollHeight;
-        }, 100);
-
-        snapshot.docChanges().forEach(change => {
-            if (change.type === "added" && !initialLoad) {
-                const msg = change.doc.data();
-                
-                // Jeśli wiadomość od KOGOŚ INNEGO
-                if (msg.uid !== currentUserProfile.uid) {
-                    
-                    // Sprawdź czy aplikacja jest w tle
-                    const isAppHidden = document.hidden || spolecznoscSection.style.display === 'none' || !isChatTabActive;
-
-                    if (isAppHidden) {
-                        unreadMessagesCount++;
-                        updateUnreadDashboard();
-                        
-                        // 1. DŹWIĘK
-                        const audio = document.getElementById('notificationSound');
-                        if (audio) {
-                            audio.volume = 1.0;
-                            // Resetuj czas i graj (to naprawia "zacinanie" po 1 razie)
-                            audio.currentTime = 0; 
-                            audio.play().catch(e => console.log("Audio zablokowane przez przeglądarkę (wymagana interakcja)."));
-                        }
-
-                        // 2. WIBRACJA
-                        if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
-
-                        // 3. PUSH (DYMEK SYSTEMOWY)
-                        if (Notification.permission === "granted") {
-                            // ✅ KLUCZOWA POPRAWKA: 'renotify: true' wymusza wibrację/dźwięk przy każdym nowym dymku
-                            // 'requireInteraction: true' sprawia, że dymek nie znika sam
-                            const notification = new Notification(`Wiadomość od: ${msg.autor}`, {
-                                body: msg.tresc,
-                                icon: 'logo.jpg', 
-                                tag: 'chat-msg',     // Grupuje wiadomości, żeby nie spamować pulpitu
-                                renotify: true,      // ‼️ TO NAPRAWIA BRAK POWIADOMIENIA PRZY KOLEJNEJ WIADOMOŚCI
-                                requireInteraction: true // Dymek wisi dopóki nie klikniesz
-                            });
-
-                            notification.onclick = function() {
-                                window.focus(); // Przywróć okno na wierzch
-                                notification.close();
-                                if (menuSpolecznoscBtn) menuSpolecznoscBtn.click();
-                            };
-                        }
-                    }
-                }
-            }
-        });
-        initialLoad = false;
-    });
-}
+  
 </script>
 </body>
 </html>
