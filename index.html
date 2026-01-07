@@ -21687,7 +21687,7 @@ if (btnEnableNotif) {
 }
 
 // ============================================================
-// POPRAWIONA FUNKCJA INIT CHAT (Wersja agresywna)
+// WERSJA PWA (SERVICE WORKER) - Najmocniejszy typ powiadomień
 // ============================================================
 function initChat() {
     if (chatListenerUnsubscribe) return; 
@@ -21695,7 +21695,7 @@ function initChat() {
     if (!currentUserProfile || !currentUserProfile['ID lecznicy']) return;
     
     const clinicId = currentUserProfile['ID lecznicy'];
-    console.log("Uruchamianie nasłuchu czatu...");
+    console.log("Uruchamianie nasłuchu czatu (tryb PWA)...");
 
     const q = db.collection('czat_wiadomosci')
         .where('id_lecznicy', '==', clinicId)
@@ -21716,7 +21716,6 @@ function initChat() {
             chatMessagesArea.scrollTop = chatMessagesArea.scrollHeight;
         }, 100);
 
-        // --- LOGIKA POWIADOMIEŃ ---
         snapshot.docChanges().forEach(change => {
             if (change.type === "added" && !initialLoad) {
                 const msg = change.doc.data();
@@ -21724,65 +21723,56 @@ function initChat() {
                 // Jeśli wiadomość nie jest ode mnie
                 if (msg.uid !== currentUserProfile.uid) {
                     
-                    // Sprawdź czy aplikacja jest w tle
-                    // (Dodaliśmy document.visibilityState, to pewniejsza metoda)
-                    const isAppHidden = document.hidden || document.visibilityState === 'hidden' || spolecznoscSection.style.display === 'none' || !isChatTabActive;
+                    // Sprawdź czy użytkownik nie patrzy na czat
+                    // Używamy visibilityState - to najpewniejsza metoda na Androidzie
+                    const isAppHidden = document.visibilityState === 'hidden' || spolecznoscSection.style.display === 'none' || !isChatTabActive;
 
                     if (isAppHidden) {
-                        console.log("🔔 Próba wysłania powiadomienia dla:", msg.tresc);
-
-                        // 1. Zwiększ licznik
+                        console.log("🔔 Nowa wiadomość w tle. Próbuję wywołać Service Worker...");
+                        
+                        // 1. Licznik
                         unreadMessagesCount++;
                         updateUnreadDashboard();
-                        
-                        // 2. Dźwięk z HTML (Próba odtworzenia)
+
+                        // 2. Dźwięk (Próba z HTML Audio - działa na komputerach, rzadziej na mobile w tle)
                         const audio = document.getElementById('notificationSound');
-                        if (audio) {
-                            audio.currentTime = 0;
-                            audio.play().catch(e => console.warn("Audio zablokowane:", e));
-                        }
+                        if (audio) { audio.currentTime = 0; audio.play().catch(e => {}); }
 
                         // 3. Wibracja
                         if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
 
-                        // 4. PUSH (DYMEK) - WERSJA AGRESYWNA
-                        if (Notification.permission === "granted") {
-                            try {
-                                // Generujemy UNIKALNY tag. To sprawia, że system nie "scala" powiadomień po cichu.
-                                const uniqueTag = 'msg-' + Date.now(); 
-
-                                const notification = new Notification(`Wiadomość od: ${msg.autor}`, {
+                        // 4. 🔥 SYSTEMOWE POWIADOMIENIE PRZEZ SERVICE WORKER 🔥
+                        // To jest ta zmiana, która sprawia, że działa jak "Messenger"
+                        if (Notification.permission === "granted" && 'serviceWorker' in navigator) {
+                            navigator.serviceWorker.ready.then(registration => {
+                                registration.showNotification(`Wiadomość od: ${msg.autor}`, {
                                     body: msg.tresc,
                                     icon: 'logo.jpg', 
-                                    tag: uniqueTag,      // UNIKALNY TAG = ZAWSZE DŹWIĘK
-                                    renotify: true,      // Wymuś wibrację
-                                    requireInteraction: true, // Nie znikaj sam
-                                    silent: false        // Upewnij się, że nie jest wyciszone
+                                    badge: 'logo.jpg', // Mała ikona na pasku (Android)
+                                    tag: 'chat-msg-' + Date.now(), // Unikalny tag = zawsze nowy dźwięk
+                                    renotify: true,
+                                    vibrate: [200, 100, 200], // Wibracja systemowa
+                                    data: { url: window.location.href } // Kliknięcie otwiera tę stronę
                                 });
-
-                                notification.onclick = function() {
-                                    window.focus(); 
-                                    notification.close();
-                                    if (menuSpolecznoscBtn) menuSpolecznoscBtn.click();
-                                };
-                            } catch (err) {
-                                console.error("Błąd tworzenia powiadomienia:", err);
-                            }
-                        } else {
-                            console.warn("Brak uprawnień do powiadomień (Notification.permission = " + Notification.permission + ")");
+                            });
+                        } 
+                        // Fallback dla starego sposobu (jeśli SW nie jest gotowy)
+                        else if (Notification.permission === "granted") {
+                             new Notification(`Wiadomość od: ${msg.autor}`, {
+                                body: msg.tresc,
+                                icon: 'logo.jpg'
+                            });
                         }
                     }
                 }
             }
         });
-        
         initialLoad = false;
 
     }, error => {
         console.error("Błąd czatu:", error);
     });
 }
-
 // Funkcja pomocnicza do dźwięku
 function playNotificationSound() {
     const audio = document.getElementById('notificationSound');
