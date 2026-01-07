@@ -4936,6 +4936,7 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
     <div style="padding: 10px; background: #fff; border-bottom: 1px solid #ccc; display: flex; justify-content: space-between; align-items: center;">
         <button id="spolecznoscBackBtn" class="btn ghost small">⬅ Menu</button>
         <div style="display: flex; gap: 10px;">
+            <button id="btnEnableNotifications" class="btn small" title="Włącz powiadomienia" style="background: #fff3e0; border: 1px solid #ffb74d;">🔕</button>
             <button id="tabChatBtn" class="btn primary small">💬 Czat Zespołu</button>
             <button id="tabWiedzaBtn" class="btn small">📚 Baza Wiedzy</button>
         </div>
@@ -16788,18 +16789,41 @@ try {
         'arcCardClient',        // Archiwum Kart
         'arcReceiptClient'      // Archiwum Paragonów
     ];
+/* ======================================================== */
+/* ✅ MODUŁ 6 (UNIWERSALNY): Logika Modala Klienta (Kalkulator + Raporty + Archiwum + ANALIZA) */
+/* ======================================================== */
+try {
+    // --- Zmienne dla modala wyszukiwania ---
+    const uniClientSearchModal = document.getElementById('calcClientSearchModal'); 
+    const uniClientSearchInput = document.getElementById('calcClientSearchInputModal');
+    const uniClientSearchList = document.getElementById('calcClientSearchListModal');
+    const uniClientSearchCloseBtn = document.getElementById('calcClientSearchCloseBtn');
+    
+    // Zmienna przechowująca, które pole wywołało modal
+    let activeClientInputTrigger = null; 
+
+    // ✅ ZMIANA TUTAJ: Dodano 'anClientInput' do listy
+    const clientInputIds = [
+        'calcKlientInput',      // Kalkulator
+        'reportClientInput',    // Raporty
+        'arcCardClient',        // Archiwum Kart
+        'arcReceiptClient',     // Archiwum Paragonów
+        'anClientInput'         // <--- 🆕 NOWE POLE (ANALIZA)
+    ];
 
     // 1. Inicjalizacja pól (blokada pisania, dodanie kursora, podpięcie listenera)
     clientInputIds.forEach(id => {
         const inputEl = document.getElementById(id);
         if (inputEl) {
-            // Ustawiamy styl, żeby wyglądało jak przycisk
+            // Stylizacja na "przycisk"
             inputEl.style.cursor = 'pointer';
             inputEl.setAttribute('readonly', true); // Blokada klawiatury na mobilnych
             inputEl.placeholder = "Kliknij, aby wybrać klienta...";
             
-            // Podpinamy otwieranie modala
-            // Usuwamy stare listenery (klonowanie) aby uniknąć dublowania
+            // Usuwamy atrybut 'list', żeby natywna podpowiedź nie wyskakiwała
+            inputEl.removeAttribute('list'); 
+
+            // Podpinamy otwieranie modala (zabezpieczenie przed dublowaniem listenerów)
             const newInputEl = inputEl.cloneNode(true);
             inputEl.parentNode.replaceChild(newInputEl, inputEl);
             
@@ -16807,11 +16831,10 @@ try {
                 e.preventDefault();
                 openUniversalClientModal(e.target);
             });
-            
-            // Dla kalkulatora musimy przywrócić nasłuchiwanie na 'input' do długu (jeśli było)
-            // Ale tutaj obsłużymy to centralnie w funkcji wyboru
         }
     });
+
+    // ... (reszta funkcji openUniversalClientModal, closeUniversalClientModal itp. bez zmian) ...
 
     // 2. Funkcja Otwierająca Modal
     function openUniversalClientModal(triggerElement) {
@@ -21649,6 +21672,61 @@ if (tabWiedzaBtn) tabWiedzaBtn.addEventListener('click', openWiedzaTab);
 
 // --- 2. LOGIKA CZATU (CORE) ---
 
+/* ======================================================== */
+/* ✅ NOWOŚĆ: OBSŁUGA POWIADOMIEŃ PUSH (Dzwoneczek)         */
+/* ======================================================== */
+
+const btnEnableNotifications = document.getElementById('btnEnableNotifications');
+
+// 1. Obsługa przycisku włączania powiadomień
+if (btnEnableNotifications) {
+    // Sprawdź obecny stan przy starcie
+    if (Notification.permission === 'granted') {
+        btnEnableNotifications.textContent = '🔔'; // Ikona włączonego dzwonka
+        btnEnableNotifications.style.background = '#e8f5e9';
+        btnEnableNotifications.style.borderColor = '#27ae60';
+        btnEnableNotifications.title = "Powiadomienia są aktywne";
+    }
+
+    btnEnableNotifications.addEventListener('click', () => {
+        if (!('Notification' in window)) {
+            alert("Twoja przeglądarka nie obsługuje powiadomień.");
+            return;
+        }
+
+        // Zapytaj o zgodę
+        Notification.requestPermission().then(permission => {
+            if (permission === "granted") {
+                btnEnableNotifications.textContent = '🔔';
+                btnEnableNotifications.style.background = '#e8f5e9';
+                btnEnableNotifications.style.borderColor = '#27ae60';
+                
+                // Wyślij testowe powiadomienie
+                sendPushNotification("Powiadomienia włączone!", "Będziesz otrzymywać wiadomości od zespołu.");
+            } else {
+                alert("Brak zgody na powiadomienia. Zmień ustawienia w przeglądarce (kłódka przy adresie).");
+            }
+        });
+    });
+}
+
+// 2. Funkcja pomocnicza wysyłająca Push przez Service Worker
+function sendPushNotification(title, body) {
+    // Sprawdź czy mamy zgodę i czy Service Worker jest aktywny
+    if (Notification.permission === 'granted' && navigator.serviceWorker) {
+        navigator.serviceWorker.ready.then(registration => {
+            registration.showNotification(title, {
+                body: body,
+                icon: 'logo.jpg', // Upewnij się, że masz plik logo.jpg w folderze
+                vibrate: [200, 100, 200],
+                tag: 'chat-msg', // Taguje wiadomości, aby nie spamować (nadpisuje poprzednią)
+                renotify: true   // Wibruje przy każdej nowej wiadomości
+            });
+        });
+    }
+}
+
+// 3. Główna funkcja czatu
 function initChat() {
     // Zapobiegamy podwójnemu nasłuchiwaniu
     if (chatListenerUnsubscribe) return; 
@@ -21657,11 +21735,6 @@ function initChat() {
     
     const clinicId = currentUserProfile['ID lecznicy'];
     console.log("Uruchamianie nasłuchu czatu...");
-
-    // Prośba o powiadomienia
-    if ("Notification" in window && Notification.permission !== "granted") {
-        Notification.requestPermission();
-    }
 
     const q = db.collection('czat_wiadomosci')
         .where('id_lecznicy', '==', clinicId)
@@ -21678,33 +21751,41 @@ function initChat() {
             renderMessage(msg);
         });
 
-        // LOGIKA POWIADOMIEŃ I LICZNIKA
+        // --- LOGIKA POWIADOMIEŃ I LICZNIKA ---
         snapshot.docChanges().forEach(change => {
             if (change.type === "added" && !initialLoad) {
                 const msg = change.doc.data();
                 
-                // Jeśli wiadomość nie jest ode mnie
+                // Sprawdź czy wiadomość nie jest ode mnie
                 if (msg.uid !== currentUserProfile.uid) {
                     
-                    // Jeśli NIE jestem w zakładce czatu -> zwiększ licznik
-                    if (!isChatTabActive || spolecznoscSection.style.display === 'none') {
+                    // Sprawdź warunki wysłania powiadomienia:
+                    // 1. Aplikacja zminimalizowana (hidden) LUB
+                    // 2. Użytkownik jest w innej sekcji niż 'spolecznoscSection' LUB
+                    // 3. Użytkownik jest w sekcji społeczności, ale w zakładce 'Wiedza' (nie 'Czat')
+                    
+                    const isAppHidden = document.visibilityState === 'hidden';
+                    const isSectionHidden = spolecznoscSection.style.display === 'none';
+                    const isTabInactive = !isChatTabActive; // Zmienna globalna ustawiana przy przełączaniu zakładek
+
+                    if (isAppHidden || isSectionHidden || isTabInactive) {
                         unreadMessagesCount++;
                         updateUnreadDashboard();
                         
-                        // Wyślij powiadomienie przeglądarkowe
-                        if (Notification.permission === "granted") {
-                            new Notification(`Wiadomość od: ${msg.autor}`, {
-                                body: msg.tresc,
-                                icon: 'logo.jpg'
-                            });
-                        }
+                        // ✅ WYŚLIJ POWIADOMIENIE PUSH PRZEZ SW
+                        // (Wiadomość systemowa została wyłączona w saveVisitBtn, 
+                        // więc tutaj przychodzą tylko wiadomości od ludzi)
+                        sendPushNotification(`Nowa wiadomość: ${msg.autor}`, msg.tresc);
                     }
                 }
             }
         });
         
         initialLoad = false;
-        chatMessagesArea.scrollTop = chatMessagesArea.scrollHeight; // Przewiń na dół
+        // Przewijanie na dół
+        setTimeout(() => {
+             chatMessagesArea.scrollTop = chatMessagesArea.scrollHeight;
+        }, 100);
 
     }, error => {
         console.error("Błąd czatu:", error);
