@@ -24881,46 +24881,7 @@ function getInnerCardHTML_110mm(card) {
  * ✅ NOWA FUNKCJA: Ładuje historię celów wizyt do <datalist>
  * Pobiera ostatnie 50 wizyt zalogowanego użytkownika.
  */
-async function loadVisitPurposeHistory() {
-    const dataList = document.getElementById('listaCelowWizyt');
-    if (!dataList || !currentUserProfile) return;
 
-    dataList.innerHTML = ''; // Wyczyść stare opcje
-
-    try {
-        // Pobieramy ostatnie 50 wizyt tego lekarza (zamiast filtrować datą, bierzemy po prostu najnowsze)
-        // To jest szybsze i nie wymaga skomplikowanych indeksów.
-        const q = db.collection("wizyty")
-            .where("lekarz_uid", "==", currentUserProfile.uid)
-            .orderBy("dataWizyty", "desc") // Najnowsze pierwsze
-            .limit(50);
-
-        const snapshot = await q.get();
-        
-        // Używamy Set, aby automatycznie usunąć duplikaty
-        const uniquePurposes = new Set();
-
-        snapshot.docs.forEach(doc => {
-            const data = doc.data();
-            if (data.celWizyty && data.celWizyty.trim().length > 1) {
-                uniquePurposes.add(data.celWizyty.trim());
-            }
-        });
-
-        // Wypełnij datalist
-        uniquePurposes.forEach(purpose => {
-            const opt = document.createElement('option');
-            opt.value = purpose;
-            dataList.appendChild(opt);
-        });
-
-        console.log(`Załadowano ${uniquePurposes.size} unikalnych celów wizyt do podpowiedzi.`);
-
-    } catch (error) {
-        console.error("Błąd ładowania historii celów wizyt:", error);
-        // Jeśli błąd indeksu, to nic nie szkodzi, po prostu nie będzie podpowiedzi
-    }
-}
     /* ======================================================== */
 /* ✅ POPRAWKA: Brakujące funkcje list historii (Cel i Opis) */
 /* ======================================================== */
