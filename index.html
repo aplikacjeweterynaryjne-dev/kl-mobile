@@ -5630,22 +5630,66 @@ function goToPrevRow() {
 /**
  * Zapisuje bieżący wiersz i przechodzi do następnego wiersza w formularzu.
  */
+/**
+ * Zapisuje bieżący wiersz i przechodzi do następnego wiersza w formularzu.
+ * ✅ POPRAWKA UX: Dla Wiersza 1 i 10 wymusza najpierw otwarcie zakładki Produkt.
+ */
 function goToNextRow() {
-    console.log("Moduł 5: goToNextRow");
+    console.log("Moduł 5: goToNextRow (Smart Navigation)");
     const sel = formRowSelect;
+    const currentIdx = parseInt(sel.value, 10); // Pobierz aktualny indeks wiersza
+
+    // --- 1. SPECJALNA LOGIKA DLA WIERSZA 1 (Index 0) i WIERSZA 10 (Index 9) ---
+    // Zapobiega pominięciu wpisania produktu przez odruchowe kliknięcie strzałki
+    if (currentIdx === 0 || currentIdx === 9) {
+        
+        // Sprawdzamy, czy pole produktu jest puste
+        const productValue = document.getElementById('formLek').value.trim();
+        // Sprawdzamy, czy jesteśmy na zakładce 'Dane' (czyli użytkownik jeszcze nie wszedł w produkt)
+        const isTabDaneActive = document.getElementById('tabDane').classList.contains('active-tab');
+
+        // WARUNEK: Jeśli jesteśmy na zakładce "Dane" LUB nie wybrano produktu
+        if (isTabDaneActive || productValue === "") {
+            
+            // A. Najpierw zapisz to co użytkownik wpisał w "Dane" (Opis, Liczba, Rozpoznanie)
+            saveRow(currentIdx);
+
+            // B. Przełącz wizualnie na zakładkę "Produkt"
+            if (typeof switchRowTab === 'function') {
+                switchRowTab('produkt');
+            }
+
+            // C. Symuluj kliknięcie w pole produktu, aby otworzyć Modal Wyszukiwania
+            const lekInput = document.getElementById('formLek');
+            if (lekInput) {
+                showToast("Uzupełnij produkt dla tego wiersza.", "info", 2000);
+                setTimeout(() => {
+                    lekInput.click(); // To otworzy modal produktów
+                    lekInput.focus();
+                }, 50);
+            }
+
+            // 🛑 STOP: Nie przechodzimy do następnego wiersza!
+            return; 
+        }
+    }
+    // --- KONIEC SPECJALNEJ LOGIKI ---
+
+
+    // --- 2. STANDARDOWA NAWIGACJA (Dla reszty wierszy lub gdy produkt jest już wybrany) ---
     const prevIdx = parseInt(sel.dataset.prevIndex, 10);
     
-    // 1. Autozapis bieżącego wiersza
+    // Autozapis bieżącego wiersza
     if (!isNaN(prevIdx)) {
         saveRow(prevIdx);
     }
     
-    // 2. Przejdź do następnego indeksu
+    // Przejdź do następnego indeksu w liście
     if (sel.selectedIndex < sel.options.length - 1) {
         sel.selectedIndex++;
     }
     
-    // 3. Wywołaj zdarzenie 'change', aby odświeżyć formularz
+    // Wywołaj zdarzenie 'change', aby odświeżyć formularz i wczytać nowy wiersz
     sel.dispatchEvent(new Event('change'));
 }
 /* ✅ KONIEC: Moduł 5 - Funkcje */
