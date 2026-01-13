@@ -12724,6 +12724,11 @@ async function loadArchiveReceiptUsers() {
 if(loadArchiveReceiptUsersBtn) loadArchiveReceiptUsersBtn.addEventListener('click', loadArchiveReceiptUsers);
 
 // ✅ ZASTĄP CAŁĄ FUNKCJĘ TYM KODEM (Zadanie 2 i 3)
+/**
+ * Wczytuje paragony dla użytkownika.
+ * ✅ POPRAWKA: Sortowanie hybrydowe (Data Wizyty -> Czas Utworzenia).
+ * Dzięki temu paragony z tego samego dnia są ułożone chronologicznie.
+ */
 async function loadReceiptsForUser(lekarz_uid) {
     const tableBody = document.getElementById('archiveReceiptTableBody');
     const filterControls = document.getElementById('archiveReceiptFilterControls');
@@ -12738,10 +12743,10 @@ async function loadReceiptsForUser(lekarz_uid) {
     filterControls.style.display = 'none';
 
     let q; 
+    // Pobieranie danych (Sortujemy wstępnie po dacie wizyty, resztę zrobi JS)
     if (lekarz_uid === "ALL") {
         console.log("Wczytywanie paragonów dla: WSZYSCY");
         if (currentUserProfile.Rola === 'administrator') {
-            // ✅ ZMIANA SORTOWANIA: orderBy("data", "desc")
             q = db.collection("archiwumParagony").orderBy("data", "desc");
         } else {
             const userClinicId = currentUserProfile['ID lecznicy'];
@@ -12749,14 +12754,12 @@ async function loadReceiptsForUser(lekarz_uid) {
                   tableBody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 20px; color: red;">Błąd: Twój profil nie ma przypisanego ID lecznicy.</td></tr>';
                   return;
             }
-            // ✅ ZMIANA SORTOWANIA
             q = db.collection("archiwumParagony")
                     .where("id_lecznicy", "==", userClinicId)
                     .orderBy("data", "desc");
         }
     } else {
         console.log(`Wczytywanie paragonów dla UID: ${lekarz_uid}`);
-        // ✅ ZMIANA SORTOWANIA
         q = db.collection("archiwumParagony")
                   .where("lekarz_uid", "==", lekarz_uid)
                   .orderBy("data", "desc");
@@ -12771,10 +12774,28 @@ async function loadReceiptsForUser(lekarz_uid) {
             return;
         }
         
+        // 1. Konwersja na tablicę obiektów
+        let receiptsArray = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+        // 2. ✅ ZAAWANSOWANE SORTOWANIE (JS)
+        // Sortujemy najpierw po dacie wizyty, a przy remisie po czasie utworzenia (createdAt)
+        receiptsArray.sort((a, b) => {
+            // A. Sortuj po dacie wizyty (Malejąco: najnowsze dni na górze)
+            if (b.data !== a.data) {
+                return b.data.localeCompare(a.data);
+            }
+            
+            // B. Jeśli ten sam dzień -> Sortuj po czasie utworzenia (Malejąco: 18:00 nad 08:00)
+            // Używamy bezpiecznego dostępu, bo stare rekordy mogą nie mieć 'createdAt'
+            const timeA = a.createdAt ? a.createdAt.toMillis() : 0;
+            const timeB = b.createdAt ? b.createdAt.toMillis() : 0;
+            return timeB - timeA; 
+        });
+
         tableBody.innerHTML = ''; 
         
-        snapshot.docs.forEach(doc => {
-            const receipt = { id: doc.id, ...doc.data() };
+        // 3. Renderowanie posortowanej listy
+        receiptsArray.forEach(receipt => {
             const tr = document.createElement('tr');
             
             const statusColor = receipt.status === "Zapłacone" ? "green" : (receipt.status === "Dług" ? "red" : "#555");
@@ -12822,7 +12843,7 @@ async function loadReceiptsForUser(lekarz_uid) {
 
             // Komórka 6: Suma
             const tdSuma = document.createElement('td');
-            tdSuma.textContent = formatPrice(suma);
+            tdSuma.textContent = (typeof formatPrice === 'function') ? formatPrice(suma) : suma.toFixed(2) + " zł";
             tdSuma.style.textAlign = 'right';
             tr.appendChild(tdSuma);
 
@@ -12863,11 +12884,8 @@ async function loadReceiptsForUser(lekarz_uid) {
     } catch (error) {
         console.error(`Błąd wczytywania paragonów dla ${lekarz_uid}:`, error);
         
-        // Obsługa błędu indeksu (Kluczowe przy zmianie sortowania!)
         if (error.code === 'failed-precondition') {
-             alert("⚠️ BŁĄD INDEKSU FIREBASE!\n\nZmieniłeś sposób sortowania (po dacie). Firebase wymaga nowego indeksu.\n\n1. Otwórz konsolę przeglądarki (F12 lub Prawy Przycisk -> Zbadaj -> Konsola).\n2. Kliknij w długi link w komunikacie błędu Firebase.\n3. Zaakceptuj utworzenie indeksu w konsoli Firebase.");
-             console.error("KLIKNIJ LINK PONIŻEJ, ABY UTWORZYĆ INDEKS:");
-             console.error(error.message); // To wyświetli link
+             alert("⚠️ BŁĄD INDEKSU FIREBASE!\n\nWymagany nowy indeks w bazie danych. Sprawdź konsolę (F12) i kliknij w link.");
              tableBody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 20px; color: red;">Wymagany nowy indeks w bazie danych. Sprawdź konsolę (F12).</td></tr>';
         } else {
              tableBody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 20px; color: red;">Wystąpił błąd podczas wczytywania paragonów.</td></tr>';
