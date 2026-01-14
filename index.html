@@ -16170,75 +16170,81 @@ if (tabZarzadzajMagazynamiBtn) {
         });
     }
 
- // Funkcja dynamicznie tworząca wiersz produktu w formularzu (ZMODYFIKOWANA)
-    function addSchemaProductLine(productData = null) {
-        const lineDiv = document.createElement('div');
-        lineDiv.className = 'schema-product-line';
+// Funkcja dynamicznie tworząca wiersz produktu w formularzu (WERSJA POPRAWIONA: Pola edytowalne)
+function addSchemaProductLine(productData = null) {
+    const lineDiv = document.createElement('div');
+    lineDiv.className = 'schema-product-line';
+    
+    // Użyj danych z 'productData' lub pustych stringów
+    const produktNazwa = productData ? productData.produkt : '';
+    const iloscWartosc = productData ? productData.ilosc : '';
+    const dawkowanieWartosc = productData ? productData.dawkowanie : '';
+    const karencjaWartosc = productData ? productData.karencja : '';
+    const wierszWartosc = productData ? productData.wierszDocelowy : 0;
+
+    lineDiv.innerHTML = `
+        <button type="button" class="btn-remove-line" title="Usuń tę linię">X</button>
         
-        // Użyj danych z 'productData' lub pustych stringów
-        const produktNazwa = productData ? productData.produkt : '';
-        const iloscWartosc = productData ? productData.ilosc : '';
-        const dawkowanieWartosc = productData ? productData.dawkowanie : '';
-        const karencjaWartosc = productData ? productData.karencja : '';
-        const wierszWartosc = productData ? productData.wierszDocelowy : 0;
-
-        lineDiv.innerHTML = `
-            <button type="button" class="btn-remove-line" title="Usuń tę linię">X</button>
-            
-            <div class="col-full">
-                <label>Produkt leczniczy (Wybierz z listy)</label>
-                <input type="text" class="schema-produkt-trigger" placeholder="Kliknij, aby wybrać produkt..." value="${produktNazwa}" readonly style="cursor: pointer; background: #fff;">
-            </div>
-            
-            <div>
-                <label>Ilość</label>
-                <input type="number" class="schema-ilosc" placeholder="0" value="${iloscWartosc}">
-            </div>
-            <div>
-                <label>Dawkowanie (auto)</label>
-                <input type="text" class="schema-dawkowanie" value="${dawkowanieWartosc}" readonly style="background: #eee;">
-            </div>
-
-            <div>
-                <label>Karencja (auto)</label>
-                <input type="text" class="schema-karencja" value="${karencjaWartosc}" readonly style="background: #eee;">
-            </div>
-            
-            <div>
-                <label>Wiersz w karcie</label>
-                <select class="schema-wiersz">
-                    <option value="0">Wiersz 1</option>
-                    <option value="1">Wiersz 2</option>
-                    <option value="2">Wiersz 3</option>
-                    <option value="3">Wiersz 4</option>
-                    <option value="4">Wiersz 5</option>
-                    <option value="5">Wiersz 6</option>
-                    <option value="6">Wiersz 7</option>
-                    <option value="7">Wiersz 8</option>
-                    <option value="8">Wiersz 9</option>
-                    <option value="9">Pozostawione 1</option>
-                    <option value="10">Pozostawione 2</option>
-                    <option value="11">Pozostawione 3</option>
-                </select>
-            </div>
-        `;
+        <div class="col-full">
+            <label>Produkt leczniczy (Wybierz z listy)</label>
+            <input type="text" class="schema-produkt-trigger" placeholder="Kliknij, aby wybrać produkt..." value="${produktNazwa}" readonly style="cursor: pointer; background: #fff;">
+        </div>
         
-        // Ustaw domyślną wartość <select>
-        lineDiv.querySelector('.schema-wiersz').value = wierszWartosc;
+        <div>
+            <label>Ilość</label>
+            <input type="number" class="schema-ilosc" placeholder="0" value="${iloscWartosc}">
+        </div>
+        
+        <div>
+            <label>Dawkowanie</label>
+            <input type="text" class="schema-dawkowanie" value="${dawkowanieWartosc}" placeholder="Wpisz lub zaciągnie auto...">
+        </div>
 
-        // Auto-uzupełnianie (teraz jako listener 'click')
-        lineDiv.querySelector('.schema-produkt-trigger').addEventListener('click', function(e) {
-            // Otwórz nowy modal wyszukiwania produktów dla schematów
-            openSchemaProductSearch(lineDiv); // Przekaż 'lineDiv' jako cel
-        });
+        <div>
+            <label>Karencja</label>
+            <input type="text" class="schema-karencja" value="${karencjaWartosc}" placeholder="Wpisz lub zaciągnie auto...">
+        </div>
+        
+        <div>
+            <label>Wiersz w karcie</label>
+            <select class="schema-wiersz">
+                <option value="0">Wiersz 1</option>
+                <option value="1">Wiersz 2</option>
+                <option value="2">Wiersz 3</option>
+                <option value="3">Wiersz 4</option>
+                <option value="4">Wiersz 5</option>
+                <option value="5">Wiersz 6</option>
+                <option value="6">Wiersz 7</option>
+                <option value="7">Wiersz 8</option>
+                <option value="8">Wiersz 9</option>
+                <option value="9">Pozostawione 1</option>
+                <option value="10">Pozostawione 2</option>
+                <option value="11">Pozostawione 3</option>
+            </select>
+        </div>
+    `;
+    
+    // Ustaw domyślną wartość <select>
+    lineDiv.querySelector('.schema-wiersz').value = wierszWartosc;
 
-        // Logika usuwania linii
-        lineDiv.querySelector('.btn-remove-line').addEventListener('click', (e) => {
-            e.target.parentElement.remove();
-        });
+    // Auto-uzupełnianie (Listener wyboru produktu)
+    lineDiv.querySelector('.schema-produkt-trigger').addEventListener('click', function(e) {
+        // Otwórz modal wyszukiwania produktów dla schematów
+        // (Upewnij się, że funkcja openSchemaProductSearch jest dostępna w Twoim kodzie - powinna być z poprzednich kroków)
+        if (typeof openSchemaProductSearch === 'function') {
+            openSchemaProductSearch(lineDiv); 
+        } else {
+            console.error("Błąd: Brak funkcji openSchemaProductSearch");
+        }
+    });
 
-        schemaProductList.appendChild(lineDiv);
-    }
+    // Logika usuwania linii
+    lineDiv.querySelector('.btn-remove-line').addEventListener('click', (e) => {
+        e.target.parentElement.remove();
+    });
+
+    schemaProductList.appendChild(lineDiv);
+}
 
 
     // Zapisywanie Schematu
