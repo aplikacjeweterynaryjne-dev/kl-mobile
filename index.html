@@ -16539,26 +16539,41 @@ function checkSchemaFit(schema, startingIndex) {
  * NAPRAWIONY BŁĄD: Zapobiega czyszczeniu pól Opis i Liczba w wierszu kontrolującym schemat.
  */
 /* ======================================================== */
-/* ✅ ZAKTUALIZOWANA LOGIKA applySchema (FIX: Smart Cell)   */
+/* ✅ ZAKTUALIZOWANA LOGIKA applySchema (FIX: Smart Cell + Mnożnik) */
 /* ======================================================== */
 function applySchema(event) {
     const input = event.target;
     const oryginalnaNazwaRozpoznania = input.value.trim();
     const rozpoznanieKey = oryginalnaNazwaRozpoznania.toLowerCase();
 
-    // 1. Sprawdź checkbox
+    // 1. Sprawdź checkbox "Użyj schematów"
     const schemaCheckbox = document.getElementById('schemaCheckbox');
     if (!schemaCheckbox || !schemaCheckbox.checked) {
         return;
     }
 
-    // 2. Znajdź schemat
+    // 2. Znajdź schemat w cache
     const schema = cachedSchemaMap.get(rozpoznanieKey);
     if (!schema) {
-        return;
+        return; // Nie ma takiego schematu, więc użytkownik po prostu coś wpisuje
     }
 
     console.log("Znaleziono pasujący schemat:", schema.rozpoznanie);
+    
+    // --- NOWOŚĆ: Zapytaj o liczbę sztuk OD RAZU ---
+    let mnoznik = 1;
+    const userResponse = prompt(`Wybrano schemat: "${schema.rozpoznanie}".\n\nPodaj liczbę leczonych zwierząt, aby przeliczyć dawki:`, "1");
+
+    if (userResponse === null) {
+        // Użytkownik kliknął Anuluj -> Czyścimy pole i przerywamy
+        input.value = '';
+        return;
+    }
+
+    mnoznik = parseFloat(userResponse.replace(',', '.')) || 1;
+    if (mnoznik <= 0) mnoznik = 1; // Zabezpieczenie
+    // ----------------------------------------------
+
     const logicalRows = rowsEditable();
     if (logicalRows.length === 0) return;
 
@@ -16595,19 +16610,22 @@ function applySchema(event) {
         return;
     }
 
-    // 5. Pobierz mnożnik zwierząt
-    const controllerRow = logicalRows[currentIndex];
+    // 5. ZAKTUALIZUJ POLE "LICZBA" (W tabeli lub formularzu)
+    const controllerRow = logicalRows[actualStartingIndex]; // Wiersz "główny" schematu
     const liczbaInput = controllerRow.cells[2].querySelector('input[type="number"]');
-    let liczbaZwierzaDlaSchematu = 1;
-    if (liczbaInput && liczbaInput.value.trim() !== '') {
-        const parsed = parseInt(liczbaInput.value, 10);
-        if (!isNaN(parsed) && parsed > 0) liczbaZwierzaDlaSchematu = parsed;
+    const liczbaInputId = 'liczba-zwierzat-' + actualStartingIndex;
+
+    // A. Jeśli jesteśmy w formularzu -> wpisz do inputa formularza
+    if (inFormModal) {
+        const formLiczba = document.getElementById('formLiczba');
+        if (formLiczba) formLiczba.value = mnoznik;
     }
     
-    // Obsługa ID dla dynamicznego przeliczania (Bez zmian)
-    const liczbaInputId = 'liczba-zwierzat-' + currentIndex;
+    // B. Zawsze wpisz też do wiersza tabeli (bo formularz może być zamknięty lub synchronizowany)
     if (liczbaInput) {
+        liczbaInput.value = mnoznik;
         liczbaInput.id = liczbaInputId;
+        // Podpinamy listener, żeby późniejsza ręczna zmiana liczby też przeliczała
         liczbaInput.removeEventListener('input', handleLiczbaChange);
         liczbaInput.addEventListener('input', handleLiczbaChange);
     }
@@ -16618,14 +16636,20 @@ function applySchema(event) {
 
     if (firstLeczenieProduct) {
         const targetIndex = actualStartingIndex + firstLeczenieProduct.wierszDocelowy;
-        if (targetIndex < logicalRows.length) logicalRows[targetIndex].cells[3].querySelector('input').value = schema.rozpoznanie;
+        if (targetIndex < logicalRows.length) {
+            const diagInput = logicalRows[targetIndex].cells[3].querySelector('input');
+            if (diagInput) diagInput.value = schema.rozpoznanie;
+        }
     }
     if (firstPozostawioneProduct) {
         const targetIndex = actualStartingIndex + firstPozostawioneProduct.wierszDocelowy;
-        if (targetIndex < logicalRows.length) logicalRows[targetIndex].cells[3].querySelector('input').value = schema.rozpoznanie;
+        if (targetIndex < logicalRows.length) {
+            const diagInput = logicalRows[targetIndex].cells[3].querySelector('input');
+            if (diagInput) diagInput.value = schema.rozpoznanie;
+        }
     }
 
-    // 7. Wypełnij produkty (TU JEST ZMIANA)
+    // 7. Wypełnij produkty (Z MNOŻENIEM)
     schema.produkty.forEach(p => {
         const targetRowIndex = actualStartingIndex + p.wierszDocelowy;
 
@@ -16640,20 +16664,28 @@ function applySchema(event) {
                 // Seria
                 row.cells[5].textContent = p.seria || '';
 
-                // Ilość (Przeliczanie)
+                // Ilość (Przeliczanie RAZY MNOŻNIK)
                 const iloscInput = row.cells[6].querySelector('input[type="number"]');
+                
+                // Bazowa ilość z definicji schematu (na 1 sztukę)
                 let schemaIlosc = 0;
                 if (p.ilosc) schemaIlosc = parseFloat(String(p.ilosc).replace(',', '.')) || 0;
-                const finalIlosc = schemaIlosc * liczbaZwierzaDlaSchematu;
+                
+                // Finalna ilość = baza * wpisany mnożnik
+                const finalIlosc = schemaIlosc * mnoznik;
 
                 if (iloscInput) {
                     let finalValue = finalIlosc;
+                    // Formatowanie, żeby nie było 10.00000001
                     if (finalIlosc % 1 !== 0) finalValue = finalIlosc.toFixed(2);
+                    
                     iloscInput.value = finalValue > 0 ? String(finalValue) : '';
                     
-                    // Tagowanie dla dynamicznych zmian
+                    // Tagowanie dla dynamicznych zmian w przyszłości
                     iloscInput.dataset.schemaBaseQty = String(schemaIlosc);
                     iloscInput.dataset.schemaControllerId = liczbaInputId;
+                    
+                    // Jeśli użytkownik zmieni ręcznie ilość, zrywamy połączenie z licznikiem zwierząt
                     iloscInput.removeEventListener('keydown', handleIloscOverride);
                     iloscInput.addEventListener('keydown', handleIloscOverride);
                 }
@@ -16667,21 +16699,16 @@ function applySchema(event) {
                     row.cells[6].appendChild(document.createTextNode(' ' + dawkaText));
                 }
 
-                // ⬇️⬇️⬇️ ✅ FIX 1: OBSŁUGA SMART CELL (IKONA KALENDARZA) ⬇️⬇️⬇️
-                // Sprawdzamy czy w kolumnie 8 (index 7) jest nasz specjalny input
+                // Karencja (Smart Cell - FIX)
                 const smartInput = row.cells[7].querySelector('input.karencja-input');
-                
                 if (smartInput) {
-                    // Jeśli to Smart Cell (Pozostawione), wpisujemy wartość do inputa
-                    // Dzięki temu NIE nadpisujemy HTML-a komórki i ikona zostaje!
+                    // Jeśli to Smart Cell, wpisujemy wartość do inputa
                     smartInput.value = p.karencja || '';
-                    // Aktualizujemy też atrybut dla druku
                     row.cells[7].dataset.printValue = p.karencja || '';
                 } else {
-                    // Jeśli to zwykła komórka (Leczenie na miejscu), wpisujemy tekst
+                    // Jeśli zwykła komórka, wpisujemy jako tekst
                     row.cells[7].textContent = p.karencja || '';
                 }
-                // ⬆️⬆️⬆️ KONIEC FIXA ⬆️⬆️⬆️
 
                 row.cells[4].dataset.printValue = p.produkt;
                 row.classList.add('highlight-row');
@@ -16693,27 +16720,22 @@ function applySchema(event) {
         }
     });
 
-    // 8. Odśwież formularz (jeśli otwarty)
+    // 8. Odśwież formularz (jeśli otwarty i w trybie formularza)
     if (inFormModal) {
-        const currentRow = logicalRows[currentIndex];
-        currentRow.cells[1].textContent = document.getElementById('formOpis').value; 
-        const inpLiczba = currentRow.cells[2].querySelector('input');
-        if (inpLiczba) inpLiczba.value = document.getElementById('formLiczba').value;
-        const inpRozpoznanie = currentRow.cells[3].querySelector('input');
-        if (inpRozpoznanie) inpRozpoznanie.value = input.value;
-
+        // Musimy zaktualizować pola formularza wartościami z właśnie wypełnionego wiersza
+        const currentRow = logicalRows[actualStartingIndex];
+        
+        document.getElementById('formOpis').value = currentRow.cells[1].querySelector('input') ? currentRow.cells[1].querySelector('input').value : currentRow.cells[1].textContent;
+        document.getElementById('formLiczba').value = mnoznik;
+        
+        // Ważne: Wywołaj selectRowInForm, aby odświeżyć detale produktu (Ilość/Dawka)
+        // Ale zrób to z małym opóźnieniem, żeby eventy input się przetworzyły
         setTimeout(() => {
-            selectRowInForm(currentIndex); 
-        }, 0);
-    } else {
-        const formRowSelect = document.getElementById('formRowSelect');
-        if(formRowSelect) {
-            formRowSelect.value = currentIndex;
-            formRowSelect.dispatchEvent(new Event('change'));
-        }
-    }
+            selectRowInForm(actualStartingIndex); 
+        }, 50);
+    } 
     
-    showToast(`Zastosowano schemat: ${schema.rozpoznanie}`, 'success');
+    showToast(`Zastosowano schemat: ${schema.rozpoznanie} dla ${mnoznik} szt.`, 'success');
 }
 
 /* ======================================================== */
