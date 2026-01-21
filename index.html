@@ -9905,9 +9905,11 @@ function createEmptyProductRow() {
     return tr;
 }
 
+/* ======================================================== */
+/* ✅ POPRAWIONA OBSŁUGA KLIKNIĘĆ W TABELI PRODUKTÓW       */
+/* (Naprawia wczytywanie Nr Serii do edycji)               */
+/* ======================================================== */
 if (produktTableBody) {
-
-    // --- A. TWOJA ISTNIEJĄCA LOGIKA (Edycja i Usuwanie - 'click') ---
     produktTableBody.addEventListener('click', async (e) => {
         const target = e.target;
 
@@ -9920,7 +9922,6 @@ if (produktTableBody) {
                 const doc = await db.collection("leki").doc(docId).get();
                 if (!doc.exists) {
                     alert('Błąd: Nie znaleziono produktu w bazie danych.');
-                    console.error(`Nie znaleziono produktu o ID: ${docId}`);
                     return;
                 }
                 const data = doc.data();
@@ -9928,9 +9929,14 @@ if (produktTableBody) {
 
                 productFormTitle.textContent = 'Edytuj produkt';
                 productFormDocId.value = docId; // Ustaw ID do edycji
+                
+                // Wypełnianie pól formularza
                 productFormNazwa.value = data.nazwa || '';
                 productFormPlu.value = data.plu || '';
-                // Upewnij się, że cena i stan są liczbami w formularzu
+                
+                // ✅ TU BYŁ BŁĄD: Teraz wczytujemy Nr Serii
+                productFormNrSerii.value = data.nrSerii || ''; 
+
                 productFormCena.value = data.cena !== undefined ? parseFloat(data.cena) : '';
                 productFormDawkowanie.value = data.dawkowanie || '';
                 productFormKarencja.value = data.karencja || '';
@@ -9944,25 +9950,24 @@ if (produktTableBody) {
             }
         }
 
-        // --- USUWANIE PRODUKTU ---
+        // --- USUWANIE PRODUKTU (Bez zmian) ---
         if (target.classList.contains('btn-delete-product')) {
             const docId = target.dataset.id;
             const row = target.closest('tr');
             const productName = row.cells[0].textContent;
 
             if (confirm(`Czy na pewno chcesz usunąć produkt: "${productName}"? \n\nTej operacji nie można cofnąć.`)) {
-                console.log(`Próba usunięcia produktu o ID: ${docId}`);
                 try {
                     await db.collection("leki").doc(docId).delete();
                     alert('Produkt usunięty pomyślnie.');
-                    console.log(`Produkt ${docId} usunięty.`);
-                    // Usuń produkt z cache i przeładuj tabelę oraz listy
+                    
+                    // Usuń produkt z cache i przeładuj tabelę
                     if (cachedProducts) {
                         cachedProducts = cachedProducts.filter(p => p.id !== docId);
-                        renderProductTable(cachedProducts); // Odśwież tabelę z cache
-                        refreshProductDataLists(); // Odśwież globalne listy
+                        renderProductTable(cachedProducts); 
+                        refreshProductDataLists(); 
                     } else {
-                        loadAndCacheProducts(); // Jeśli cache był pusty, załaduj na nowo
+                        loadAndCacheProducts(); 
                     }
                 } catch (error) {
                     console.error('Błąd usuwania produktu: ', error);
@@ -9971,6 +9976,7 @@ if (produktTableBody) {
             }
         }
     });
+}
 
     // --- B. NOWA LOGIKA (Inteligentne Wklejanie - FIX PUSTYCH PÓL) ---
     // To jest ten poprawiony fragment, który nie gubi pustych wierszy z Excela
@@ -10072,20 +10078,28 @@ if (produktTableBody) {
 /**
 * Przycisk "Dodaj nowy produkt" - otwiera pusty modal
 */
+/**
+ * Przycisk "Dodaj nowy produkt" - otwiera pusty modal
+ * ✅ POPRAWKA: Czyści pole Nr Serii przed otwarciem
+ */
 if (addNewProductBtn) {
-addNewProductBtn.addEventListener('click', () => {
-console.log("Otwieranie modala dodawania nowego produktu.");
-productFormTitle.textContent = 'Dodaj nowy produkt';
-productFormDocId.value = ''; // Wyczyść ID - tryb dodawania
-productFormNazwa.value = '';
-productFormPlu.value = '';
-productFormCena.value = '';
-productFormDawkowanie.value = '';
-productFormKarencja.value = '';
-productFormStan.value = '';
-productFormModal.style.display = 'flex';
-productFormNazwa.focus();
-});
+    addNewProductBtn.addEventListener('click', () => {
+        console.log("Otwieranie modala dodawania nowego produktu.");
+        productFormTitle.textContent = 'Dodaj nowy produkt';
+        productFormDocId.value = ''; // Wyczyść ID - tryb dodawania
+        
+        // Resetowanie wszystkich pól
+        productFormNazwa.value = '';
+        productFormPlu.value = '';
+        productFormNrSerii.value = ''; // ✅ DODANO CZYSZCZENIE
+        productFormCena.value = '';
+        productFormDawkowanie.value = '';
+        productFormKarencja.value = '';
+        productFormStan.value = '';
+        
+        productFormModal.style.display = 'flex';
+        productFormNazwa.focus();
+    });
 }
 // ✅ DODANY LISTENER DLA "Dodaj nowego pracownika"
 if (addNewKonfiguracjaBtn) {
