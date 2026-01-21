@@ -9091,16 +9091,12 @@ if(productUnitDisplay) productUnitDisplay.textContent = '';
 * Renderuje tabelę produktów na podstawie przekazanej tablicy danych.
 * Zawiera sortowanie wg nazwy.
 */
-/**
- * Renderuje tabelę produktów na podstawie przekazanej tablicy danych.
- * Zawiera sortowanie wg nazwy.
- */
 function renderProductTable(productsData) {
     if (!produktTableBody) return;
     produktTableBody.innerHTML = ''; // Wyczyść tabelę
 
     if (!productsData || productsData.length === 0) {
-        // Zmieniamy colspan na 7 (było 8), bo usuwamy jedną kolumnę
+        // Colspan = 7, ponieważ mamy 7 nagłówków (Nazwa, PLU, Seria, Cena, Dawkowanie, Karencja, Akcje)
         produktTableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 10px;">Brak produktów w bazie danych.</td></tr>';
         return;
     }
@@ -9120,14 +9116,16 @@ function renderProductTable(productsData) {
         const tr = document.createElement('tr');
         tr.dataset.id = produkt.id; // ID dokumentu z Firestore
 
-        // Formatowanie ceny
-        const cenaFormatted = formatPrice(parseFloat(produkt.cena) || 0);
+        // Formatowanie ceny (bezpieczne sprawdzenie czy funkcja istnieje)
+        const cenaFormatted = (typeof formatPrice === 'function') 
+            ? formatPrice(parseFloat(produkt.cena) || 0) 
+            : (parseFloat(produkt.cena) || 0).toFixed(2) + ' zł';
 
-        // USUNIĘTO LINIĘ: <td data-label="Stan mag." ... >
+        // ✅ KLUCZOWE: Dodano kolumnę Nr Serii (trzecia pozycja)
         tr.innerHTML = `
             <td data-label="Nazwa">${produkt.nazwa || 'Brak nazwy'}</td>
             <td data-label="PLU">${produkt.plu || ''}</td>
-            <td data-label="Nr Serii">${produkt.nrSerii || ''}</td> 
+            <td data-label="Nr Serii" style="color: #2980b9; font-weight: 600;">${produkt.nrSerii || ''}</td>
             <td data-label="Cena (zł)" style="text-align: right;">${cenaFormatted}</td>
             <td data-label="J.m. / Dawkowanie">${produkt.dawkowanie || ''}</td>
             <td data-label="Karencja">${produkt.karencja || ''}</td>
@@ -9140,12 +9138,12 @@ function renderProductTable(productsData) {
     });
     console.log("Renderowanie tabeli produktów zakończone.");
 
-    // Pokaż powiązane UI po renderowaniu
-    if(productSearchRow) productSearchRow.style.display = 'block';
-    if(addNewProductBtn) addNewProductBtn.style.display = 'inline-block';
-    if(productImportActionsContainer) productImportActionsContainer.style.display = 'flex';
-    if(loadProductsBtn) loadProductsBtn.style.display = 'none';
-    if(refreshProductsBtn) refreshProductsBtn.style.display = 'inline-block';
+    // Pokaż powiązane UI po renderowaniu (zabezpieczenie typeof na wypadek braku elementów)
+    if(typeof productSearchRow !== 'undefined') productSearchRow.style.display = 'block';
+    if(typeof addNewProductBtn !== 'undefined') addNewProductBtn.style.display = 'inline-block';
+    if(typeof productImportActionsContainer !== 'undefined') productImportActionsContainer.style.display = 'flex';
+    if(typeof loadProductsBtn !== 'undefined') loadProductsBtn.style.display = 'none';
+    if(typeof refreshProductsBtn !== 'undefined') refreshProductsBtn.style.display = 'inline-block';
 }
 /**
 * Pobiera dane produktów ('leki') z Firestore, zapisuje do cache i wywołuje renderowanie.
@@ -10146,17 +10144,22 @@ console.log("Anulowano edycję/dodawanie produktu.");
 * Przycisk "Zapisz" w modalu produktu (obsługuje Dodawanie i Aktualizację)
 */
 
+/**
+ * Przycisk "Zapisz" w modalu produktu (obsługuje Dodawanie i Aktualizację)
+ * ✅ POPRAWKA: Prawidłowo aktualizuje cache (w tym nr serii) po edycji.
+ */
 if (saveProductBtn) {
     saveProductBtn.addEventListener('click', async () => {
         const nazwa = productFormNazwa.value.trim();
         const plu = productFormPlu.value.trim();
-        // Przekształć cenę i stan na liczby, domyślnie 0 jeśli puste lub błędne
+        const nrSerii = productFormNrSerii.value.trim(); // ✅ Pobieramy Nr Serii
+        
         const cena = parseFloat(productFormCena.value) || 0;
         const dawkowanie = productFormDawkowanie.value.trim();
         const karencja = productFormKarencja.value.trim();
         const stanMagazynowy = parseInt(productFormStan.value) || 0;
 
-        const docId = productFormDocId.value; // ID edytowanego produktu lub pusty
+        const docId = productFormDocId.value; 
 
         if (!nazwa) {
             alert('Nazwa produktu jest wymagana.');
@@ -10164,68 +10167,64 @@ if (saveProductBtn) {
             return;
         }
 
-        // ✅ KROK D (NOWOŚĆ): Pobieramy ID lecznicy zalogowanego użytkownika
         const userClinicId = currentUserProfile['ID lecznicy'];
-        
-        // Zabezpieczenie: Jeśli to nie administrator i brakuje ID, blokujemy zapis
         if (!userClinicId && currentUserProfile.Rola !== 'administrator') {
-            alert("Błąd: Nie można zapisać produktu bez przypisanej lecznicy.");
-            return;
+             alert("Błąd: Nie można zapisać produktu bez przypisanej lecznicy.");
+             return;
         }
 
+        // Przygotuj obiekt danych
         const productData = {
-            id_lecznicy: userClinicId, // <--- TO JEST KLUCZOWA ZMIANA
+            id_lecznicy: userClinicId,
             nazwa: nazwa,
             plu: plu,
+            nrSerii: nrSerii, // ✅ Zapisujemy Nr Serii do obiektu
             cena: cena, 
             dawkowanie: dawkowanie,
             karencja: karencja,
             stanMagazynowy: stanMagazynowy 
         };
 
-        console.log(`Próba zapisu produktu. ID: ${docId || '(nowy)'}`, productData);
         saveProductBtn.disabled = true;
         saveProductBtn.textContent = 'Zapisywanie...';
 
         try {
-            let savedDocId = docId; // Zmienna do przechowywania ID po zapisie
+            let savedDocId = docId;
+            
             if (docId) {
-                // --- Tryb Aktualizacji (UPDATE) ---
-                console.log(`Aktualizowanie produktu ${docId}...`);
+                // --- UPDATE ---
+                // Upewnij się, że aktualizujemy KONKRETNY dokument o ID = docId
                 await db.collection("leki").doc(docId).update(productData);
                 showToast('Produkt zaktualizowany.', 'success');
-                console.log(`Produkt ${docId} zaktualizowany.`);
-                // Zaktualizuj wpis w cache
+                
+                // Aktualizuj cache lokalny (żeby tabela odświeżyła się natychmiast)
                 if (cachedProducts) {
                     const index = cachedProducts.findIndex(p => p.id === docId);
                     if (index !== -1) {
+                        // Nadpisz obiekt w tablicy nowymi danymi
                         cachedProducts[index] = { id: docId, ...productData };
                     }
                 }
             } else {
-                // --- Tryb Dodawania (CREATE) ---
-                console.log("Dodawanie nowego produktu...");
+                // --- CREATE ---
                 const docRef = await db.collection("leki").add(productData);
-                savedDocId = docRef.id; // Pobierz ID nowo dodanego dokumentu
+                savedDocId = docRef.id;
                 showToast('Nowy produkt dodany.', 'success');
-                console.log(`Produkt dodany z ID: ${savedDocId}.`);
-                // Dodaj nowy wpis do cache
+                
                 if (cachedProducts) {
                     cachedProducts.push({ id: savedDocId, ...productData });
                 } else {
-                    cachedProducts = [{ id: savedDocId, ...productData }]; // Zainicjuj cache jeśli był pusty
+                    cachedProducts = [{ id: savedDocId, ...productData }];
                 }
             }
 
-            // Zamknij modal i odśwież widok
             productFormModal.style.display = 'none'; 
             
-            if (cachedProducts) {
-                renderProductTable(cachedProducts);
-                refreshProductDataLists();
-            } else {
-                loadAndCacheProducts(); 
-            }
+            // ✅ Odśwież widok tabeli używając zaktualizowanego cache
+            renderProductTable(cachedProducts);
+            
+            // ✅ Odśwież globalne mapy (żeby kalkulator i karta widziały nową serię)
+            refreshProductDataLists();
 
         } catch (error) {
             console.error('Błąd zapisu produktu: ', error);
@@ -10235,6 +10234,7 @@ if (saveProductBtn) {
             saveProductBtn.textContent = 'Zapisz';
         }
     });
+}
 }
 // ✅ KONIEC: LOGIKA CRUD DLA BAZY PRODUKTÓW
 // ========================================================
