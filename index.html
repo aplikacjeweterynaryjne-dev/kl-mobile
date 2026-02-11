@@ -16921,7 +16921,23 @@ try {
             // Ale tutaj obsłużymy to centralnie w funkcji wyboru
         }
     });
+// ⬇️⬇️⬇️ TUTAJ WKLEJ TEN NOWY FRAGMENT ⬇️⬇️⬇️
 
+    // Dodatkowy "bajer": Czyszczenie Prawym Przyciskiem Myszy (lub długim przytrzymaniem)
+    clientInputIds.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.addEventListener('contextmenu', (e) => {
+                e.preventDefault(); // Nie pokazuj menu przeglądarki
+                if (confirm("Czy chcesz wyczyścić filtr klienta?")) {
+                    el.value = '';
+                    el.dispatchEvent(new Event('input', { bubbles: true }));
+                }
+            });
+        }
+    });
+
+    // ⬆️⬆️⬆️ KONIEC WKLEJANIA ⬆️⬆️⬆️
     // 2. Funkcja Otwierająca Modal
     function openUniversalClientModal(triggerElement) {
         if (!uniClientSearchModal) return;
@@ -16945,67 +16961,101 @@ try {
         // Nie czyścimy activeClientInputTrigger od razu, może się przydać
     }
 
-    // 4. Wypełnianie Listy
-    function populateAndFilterUniversalList() {
-        const dataList = document.getElementById('klientList');
-        const rawText = uniClientSearchInput.value.trim();
-        const filterText = normalizePL(rawText);
-        
-        uniClientSearchList.innerHTML = '';
-        
-        // Opcja "Użyj wpisanego" (pozwala wpisać kogoś spoza bazy)
-        if (rawText.length > 0) {
-            const customDiv = document.createElement('div');
-            customDiv.className = 'client-search-item';
-            customDiv.style.backgroundColor = '#e8f5e9'; 
-            customDiv.style.borderBottom = '2px solid #6A994E';
-            customDiv.innerHTML = `<strong>➕ Użyj wpisanego:</strong> "${rawText}"`;
-            customDiv.addEventListener('click', () => selectUniversalClient(rawText));
-            uniClientSearchList.appendChild(customDiv);
-        }
-
-        if (!dataList || dataList.options.length === 0) {
-            const infoDiv = document.createElement('div');
-            infoDiv.className = 'client-search-item';
-            infoDiv.style.color = '#999';
-            infoDiv.textContent = 'Brak bazy klientów.';
-            uniClientSearchList.appendChild(infoDiv);
-            return;
-        }
-
-        let foundItems = 0;
-        const options = Array.from(dataList.options);
-        options.sort((a, b) => (a.value || '').localeCompare(b.value || '', 'pl'));
-
-        options.forEach(opt => {
-            const nazwa = opt.value || '';
-            const adres = opt.dataset.adres || '';
-            const nrStada = opt.dataset.nrstada || ''; 
+   // 4. Wypełnianie Listy (Zaktualizowana: Opcja Czyszczenia)
+function populateAndFilterUniversalList() {
+    const dataList = document.getElementById('klientList');
+    const rawText = uniClientSearchInput.value.trim();
+    const filterText = normalizePL(rawText);
+    
+    uniClientSearchList.innerHTML = '';
+    
+    // --- ✅ NOWOŚĆ: OPCJA CZYSZCZENIA WYBORU ---
+    // Dodajemy to zawsze na górze, aby użytkownik mógł zresetować filtr
+    const clearDiv = document.createElement('div');
+    clearDiv.className = 'client-search-item';
+    clearDiv.style.backgroundColor = '#fff0f0'; // Lekko czerwone tło
+    clearDiv.style.color = '#c0392b';
+    clearDiv.style.fontWeight = 'bold';
+    clearDiv.style.borderBottom = '2px solid #e0e0e0';
+    clearDiv.innerHTML = '❌ [WYCZYŚĆ WYBÓR] - Pokaż wszystkich';
+    
+    clearDiv.addEventListener('click', () => {
+        if (activeClientInputTrigger) {
+            // 1. Wyczyść pole, które wywołało modal (np. filtr w archiwum)
+            activeClientInputTrigger.value = '';
             
-            const searchableText = normalizePL(`${nazwa} ${adres} ${nrStada}`);
+            // 2. Wyzwól zdarzenie 'input', aby funkcja filtrowania (applyCardFilters) zadziałała natychmiast
+            activeClientInputTrigger.dispatchEvent(new Event('input', { bubbles: true }));
             
-            if (filterText === '' || searchableText.includes(filterText)) {
-                const itemDiv = document.createElement('div');
-                itemDiv.className = 'client-search-item'; 
-                itemDiv.innerHTML = `
-                    <strong>${nazwa}</strong>
-                    <span class="details">
-                        ${adres ? `Adres: ${adres}` : ''}
-                        ${(adres && nrStada) ? '<br>' : ''}
-                        ${nrStada ? `Nr stada: ${nrStada}` : ''}
-                    </span>
-                `;
-                itemDiv.addEventListener('click', () => selectUniversalClient(nazwa));
-                uniClientSearchList.appendChild(itemDiv);
-                foundItems++;
-            }
-        });
-
-        if (foundItems === 0 && rawText === '') {
-             uniClientSearchList.innerHTML = '<div class="client-search-item" style="color: #999;">Brak pasujących klientów.</div>';
+            // 3. Zamknij modal
+            closeUniversalClientModal();
+            
+            // 4. (Opcjonalnie) Informacja dla użytkownika
+            // if (typeof showToast === 'function') showToast("Filtr klienta wyczyszczony.", "info");
         }
+    });
+    uniClientSearchList.appendChild(clearDiv);
+    // --- KONIEC NOWOŚCI ---
+
+    // Opcja "Użyj wpisanego" (pozwala wpisać kogoś spoza bazy - przydatne w Kalkulatorze)
+    if (rawText.length > 0) {
+        const customDiv = document.createElement('div');
+        customDiv.className = 'client-search-item';
+        customDiv.style.backgroundColor = '#e8f5e9'; 
+        customDiv.style.borderBottom = '2px solid #6A994E';
+        customDiv.innerHTML = `<strong>➕ Użyj wpisanego:</strong> "${rawText}"`;
+        customDiv.addEventListener('click', () => selectUniversalClient(rawText));
+        uniClientSearchList.appendChild(customDiv);
     }
 
+    if (!dataList || dataList.options.length === 0) {
+        const infoDiv = document.createElement('div');
+        infoDiv.className = 'client-search-item';
+        infoDiv.style.color = '#999';
+        infoDiv.textContent = 'Brak bazy klientów.';
+        uniClientSearchList.appendChild(infoDiv);
+        return;
+    }
+
+    let foundItems = 0;
+    const options = Array.from(dataList.options);
+    options.sort((a, b) => (a.value || '').localeCompare(b.value || '', 'pl'));
+
+    options.forEach(opt => {
+        const nazwa = opt.value || '';
+        const adres = opt.dataset.adres || '';
+        const nrStada = opt.dataset.nrstada || ''; 
+        
+        const searchableText = normalizePL(`${nazwa} ${adres} ${nrStada}`);
+        
+        if (filterText === '' || searchableText.includes(filterText)) {
+            const itemDiv = document.createElement('div');
+            itemDiv.className = 'client-search-item'; 
+            itemDiv.innerHTML = `
+                <strong>${nazwa}</strong>
+                <span class="details">
+                    ${adres ? `Adres: ${adres}` : ''}
+                    ${(adres && nrStada) ? '<br>' : ''}
+                    ${nrStada ? `Nr stada: ${nrStada}` : ''}
+                </span>
+            `;
+            
+            // Przekazujemy tylko nazwę do funkcji wyboru
+            itemDiv.addEventListener('click', () => selectUniversalClient(nazwa));
+            
+            uniClientSearchList.appendChild(itemDiv);
+            foundItems++;
+        }
+    });
+
+    if (foundItems === 0 && rawText === '') {
+         const emptyInfo = document.createElement('div');
+         emptyInfo.className = 'client-search-item';
+         emptyInfo.style.color = '#999';
+         emptyInfo.textContent = 'Brak pasujących klientów.';
+         uniClientSearchList.appendChild(emptyInfo);
+    }
+}
     // 5. GŁÓWNA FUNKCJA WYBORU (Routing logiki)
     function selectUniversalClient(clientName) {
         if (!activeClientInputTrigger) return;
