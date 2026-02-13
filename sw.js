@@ -53,6 +53,7 @@ self.addEventListener('activate', event => {
 
 // 🌐 Przechwytywanie zapytań (Logika hybrydowa)
 self.addEventListener('fetch', event => {
+ if (event.request.method !== 'GET') return;
   // Sprawdź, czy zapytanie dotyczy strony (nawigacji), np. index.html
   if (event.request.mode === 'navigate') {
     // --- STRATEGIA 1: Network First (dla index.html) ---
