@@ -193,7 +193,76 @@ function renderHerdList() {
         list.appendChild(div);
     });
 }
+// --- BRAKUJĄCA FUNKCJA: KALENDARZ WYCIELEŃ ---
+function renderCalvingCalendar() {
+    const container = document.getElementById('calvingList');
+    if (!container) return;
+    
+    container.innerHTML = '';
+    const events = [];
+    const today = new Date();
 
+    // Przeszukaj stado w poszukiwaniu zacielonych sztuk
+    myHerd.forEach(animal => {
+        if ((animal.type === 'krowa' || animal.type === 'jalowka') && animal.lastInsemination) {
+            const insDate = new Date(animal.lastInsemination);
+            // Oblicz datę wycielenia (zacielenie + długość ciąży z ustawień)
+            const calvingDate = addDays(insDate, mySettings.pregnancyDuration);
+            
+            // Pokaż tylko te z przyszłości lub niedawnej przeszłości (np. -30 dni)
+            // (Żeby nie pokazywać starych, jeśli rolnik zapomniał wpisać wycielenia)
+            if (calvingDate > addDays(today, -60)) { 
+                const diffTime = calvingDate - today;
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+                events.push({
+                    animal: animal.tag,
+                    date: calvingDate,
+                    daysLeft: diffDays
+                });
+            }
+        }
+    });
+
+    // Sortuj: Najbliższe wycielenia na górze
+    events.sort((a, b) => a.date - b.date);
+
+    if (events.length === 0) {
+        container.innerHTML = '<div style="text-align:center; color:#999; padding:20px;">Brak nadchodzących wycieleń.</div>';
+        return;
+    }
+
+    events.forEach(e => {
+        const div = document.createElement('div');
+        div.className = 'card';
+        div.style.marginBottom = '10px';
+        
+        // Kolorowanie paska bocznego w zależności od pilności
+        let borderSide = '4px solid #2e7d32'; // Zielony (daleko)
+        if (e.daysLeft < 14) borderSide = '4px solid #f39c12'; // Pomarańczowy (blisko)
+        if (e.daysLeft < 3) borderSide = '4px solid #c0392b';  // Czerwony (zaraz)
+
+        div.style.borderLeft = borderSide;
+        
+        let statusText = '';
+        if (e.daysLeft > 0) statusText = `Za <b>${e.daysLeft}</b> dni`;
+        else if (e.daysLeft === 0) statusText = `<b style="color:#c0392b">DZISIAJ!</b>`;
+        else statusText = `<span style="color:#777">Minęło ${Math.abs(e.daysLeft)} dni</span>`;
+
+        div.innerHTML = `
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <div>
+                    <span style="font-size:16px; font-weight:bold;">${e.animal}</span>
+                    <div style="font-size:12px; color:#555;">Termin: ${e.date.toLocaleDateString()}</div>
+                </div>
+                <div style="text-align:right;">
+                    ${statusText}
+                </div>
+            </div>
+        `;
+        container.appendChild(div);
+    });
+}
 function renderChart() {
     const ctx = document.getElementById('lactationChart');
     // Tu dodamy logikę Chart.js później (liczenie dni laktacji)
