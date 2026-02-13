@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Panel Hodowcy | KL-Mobile</title>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        /* --- STYLE BAZOWE (Podobne do aplikacji lekarza, ale z innym akcentem) --- */
+        body { font-family: 'Nunito', sans-serif; background-color: #f4f7f6; margin: 0; padding-bottom: 80px; color: #333; }
+        
+        /* Navbar dolny */
+        .bottom-nav {
+            position: fixed; bottom: 0; left: 0; width: 100%; background: #fff;
+            display: flex; justify-content: space-around; padding: 10px 0;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.05); z-index: 1000;
+        }
+        .nav-item {
+            display: flex; flex-direction: column; align-items: center;
+            font-size: 11px; color: #777; background: none; border: none; flex: 1;
+        }
+        .nav-item i { font-size: 20px; margin-bottom: 4px; }
+        .nav-item.active { color: #2e7d32; font-weight: bold; } /* Zielony rolniczy */
+
+        /* Sekcje */
+        .section { display: none; padding: 15px; animation: fadeIn 0.3s; }
+        .section.active { display: block; }
+        @keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
+
+        /* Karty */
+        .card { background: #fff; border-radius: 12px; padding: 15px; margin-bottom: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.03); }
+        .card h3 { margin-top: 0; font-size: 18px; color: #2e7d32; }
+
+        /* Dashboard Stats */
+        .stats-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+        .stat-box { background: #fff; padding: 10px; border-radius: 10px; text-align: center; border-bottom: 3px solid #ddd; }
+        .stat-box.cows { border-color: #2e7d32; }
+        .stat-box.heifers { border-color: #f39c12; }
+        .stat-box.bulls { border-color: #c0392b; }
+        .stat-val { font-size: 22px; font-weight: 800; display: block; }
+        .stat-label { font-size: 11px; color: #666; }
+
+        /* Lista Zadań */
+        .task-item { 
+            display: flex; align-items: center; justify-content: space-between; 
+            padding: 12px; border-bottom: 1px solid #eee; 
+        }
+        .task-item.urgent { border-left: 4px solid #c0392b; background: #fff5f5; }
+        .task-item.warning { border-left: 4px solid #f39c12; }
+        .task-item.info { border-left: 4px solid #3498db; }
+        
+        /* Przyciski */
+        .btn { padding: 10px 15px; border-radius: 8px; border: none; font-weight: 600; cursor: pointer; }
+        .btn-primary { background: #2e7d32; color: #fff; width: 100%; }
+        .floating-btn {
+            position: fixed; bottom: 80px; right: 20px;
+            width: 55px; height: 55px; border-radius: 50%;
+            background: #2e7d32; color: #fff; font-size: 24px;
+            display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2); z-index: 999;
+        }
+
+        /* Formularz Tabs */
+        .form-tabs { display: flex; gap: 5px; margin-bottom: 15px; border-bottom: 1px solid #ddd; }
+        .form-tab { padding: 10px; background: none; border: none; border-bottom: 3px solid transparent; font-weight: 600; color: #777; }
+        .form-tab.active { border-color: #2e7d32; color: #2e7d32; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        
+        .form-row { margin-bottom: 10px; }
+        .form-row label { display: block; font-size: 13px; font-weight: bold; margin-bottom: 4px; color: #555; }
+        .form-row input, .form-row select { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; }
+        
+        /* Modal */
+        .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: none; justify-content: center; align-items: flex-end; z-index: 2000; }
+        .modal-content { background: #fff; width: 100%; max-width: 600px; height: 90vh; border-radius: 20px 20px 0 0; padding: 20px; overflow-y: auto; animation: slideUp 0.3s; }
+        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+
+    <div id="section-dashboard" class="section active">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+            <h2 style="margin:0;">Moja Obora 🐮</h2>
+            <button id="logoutBtn" style="background:none; border:none; color:#c0392b; font-weight:bold;">Wyloguj</button>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-box cows"><span class="stat-val" id="cntCows">0</span><span class="stat-label">Krowy</span></div>
+            <div class="stat-box heifers"><span class="stat-val" id="cntHeifers">0</span><span class="stat-label">Jałówki</span></div>
+            <div class="stat-box bulls"><span class="stat-val" id="cntBulls">0</span><span class="stat-label">Byki</span></div>
+        </div>
+
+        <div class="card">
+            <h3>📅 Zadania na dziś</h3>
+            <div id="tasksList">
+                <p style="color:#777; text-align:center;">Brak zadań na dzisiaj.</p>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>📊 Faza Laktacji</h3>
+            <canvas id="lactationChart" style="max-height: 200px;"></canvas>
+        </div>
+    </div>
+
+    <div id="section-herd" class="section">
+        <input type="search" id="herdSearch" placeholder="🔍 Szukaj nr kolczyka..." style="width:100%; padding:12px; border:1px solid #ddd; border-radius:8px; margin-bottom:15px;">
+        <div id="herdList">
+            </div>
+    </div>
+
+    <div id="section-calendar" class="section">
+        <h3>Kalendarz Wycieleń</h3>
+        <div id="calvingList"></div>
+    </div>
+
+    <div id="section-docs" class="section">
+        <h3>Dokumentacja Weterynaryjna</h3>
+        <p style="font-size:12px; color:#666;">Pobieram dane z lecznicy...</p>
+        <div id="vetCardsList"></div>
+    </div>
+
+    <button class="floating-btn" id="addAnimalBtn">+</button>
+
+    <div class="bottom-nav">
+        <button class="nav-item active" data-target="section-dashboard"><i class="bi bi-grid-fill"></i>Pulpit</button>
+        <button class="nav-item" data-target="section-herd"><i class="bi bi-list-ul"></i>Stado</button>
+        <button class="nav-item" data-target="section-calendar"><i class="bi bi-calendar-event"></i>Wycielenia</button>
+        <button class="nav-item" data-target="section-docs"><i class="bi bi-file-earmark-medical"></i>Leczenie</button>
+    </div>
+
+    <div id="animalModal" class="modal">
+        <div class="modal-content">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <h3>Dodaj Zwierzę</h3>
+                <button id="closeModal" style="background:none; border:none; font-size:24px;">✕</button>
+            </div>
+
+            <div class="form-tabs">
+                <button class="form-tab active" data-tab="tab-basic">1. Dane</button>
+                <button class="form-tab" data-tab="tab-repro">2. Rozród</button>
+                <button class="form-tab" data-tab="tab-other">3. Inne</button>
+            </div>
+
+            <form id="animalForm">
+                <div id="tab-basic" class="tab-content active">
+                    <div class="form-row">
+                        <label>Nr Kolczyka *</label>
+                        <input type="text" id="inpTag" required placeholder="np. PL005...">
+                    </div>
+                    <div class="form-row">
+                        <label>Lokalizacja / Obora</label>
+                        <input type="text" id="inpLoc" placeholder="np. Stara obora">
+                    </div>
+                    <div class="form-row">
+                        <label>Rodzaj *</label>
+                        <select id="inpType" required>
+                            <option value="krowa">Krowa</option>
+                            <option value="jalowka">Jałówka</option>
+                            <option value="byk">Byk</option>
+                        </select>
+                    </div>
+                    <div class="form-row">
+                        <label>Data Urodzenia *</label>
+                        <input type="date" id="inpDob" required>
+                    </div>
+                </div>
+
+                <div id="tab-repro" class="tab-content">
+                    <div id="reproSection" class="hidden">
+                        <div class="form-row">
+                            <label>Ostatnie zacielenie</label>
+                            <input type="date" id="inpLastInsem">
+                        </div>
+                        <div class="form-row">
+                            <label>Nazwa nasienia</label>
+                            <input type="text" id="inpSemen">
+                        </div>
+                    </div>
+                    
+                    <div id="cowSection" class="hidden">
+                        <div class="form-row">
+                            <label>Ostatnie wycielenie</label>
+                            <input type="date" id="inpLastCalving">
+                        </div>
+                    </div>
+                    <p id="bullMsg" class="hidden" style="color:#666;">Brak danych rozrodczych dla byka.</p>
+                </div>
+
+                <div id="tab-other" class="tab-content">
+                     <div class="form-row">
+                        <label>Notatki</label>
+                        <input type="text" id="inpNotes">
+                    </div>
+                </div>
+
+                <div style="margin-top:20px;">
+                    <button type="submit" class="btn btn-primary">Zapisz do stada</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    
+    <script src="client.js"></script>
+</body>
+</html>
