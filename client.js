@@ -202,86 +202,102 @@ function renderChart() {
 
 // --- FORMULARZE I MODALE ---
 
-const modal = document.getElementById('animalModal');
-const form = document.getElementById('animalForm');
-const inpType = document.getElementById('inpType');
-const inpDob = document.getElementById('inpDob');
+// ✅ Ta funkcja była wywoływana, ale nie istniała. Teraz ją definiujemy.
+function setupModal() {
+    const modal = document.getElementById('animalModal');
+    const form = document.getElementById('animalForm');
+    const inpType = document.getElementById('inpType');
+    const inpDob = document.getElementById('inpDob');
+    const addBtn = document.getElementById('addAnimalBtn');
+    const closeBtn = document.getElementById('closeModal');
 
-// Logika zakładek w formularzu
-document.querySelectorAll('.form-tab').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-        e.preventDefault();
-        // Reset UI
-        document.querySelectorAll('.form-tab').forEach(b => b.classList.remove('active'));
-        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-        // Aktywuj
-        btn.classList.add('active');
-        document.getElementById(btn.dataset.tab).classList.add('active');
+    // 1. Logika zakładek w formularzu
+    document.querySelectorAll('.form-tab').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            // Reset UI
+            document.querySelectorAll('.form-tab').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            // Aktywuj
+            btn.classList.add('active');
+            const targetId = btn.dataset.tab;
+            if(document.getElementById(targetId)) {
+                document.getElementById(targetId).classList.add('active');
+            }
+        });
     });
-});
 
-// Dynamiczne pola formularza (wiek > 13m)
-function checkFormLogic() {
-    const type = inpType.value;
-    const dob = new Date(inpDob.value);
-    const today = new Date();
-    const ageMonths = monthDiff(dob, today);
+    // 2. Dynamiczne pola formularza (wiek > 13m)
+    function checkFormLogic() {
+        const type = inpType.value;
+        const dobVal = inpDob.value;
+        
+        if (!dobVal) return;
 
-    const reproSec = document.getElementById('reproSection');
-    const cowSec = document.getElementById('cowSection');
-    const bullMsg = document.getElementById('bullMsg');
+        const dob = new Date(dobVal);
+        const today = new Date();
+        const ageMonths = monthDiff(dob, today);
 
-    reproSec.classList.add('hidden');
-    cowSec.classList.add('hidden');
-    bullMsg.classList.add('hidden');
+        const reproSec = document.getElementById('reproSection');
+        const cowSec = document.getElementById('cowSection');
+        const bullMsg = document.getElementById('bullMsg');
 
-    if (type === 'byk') {
-        bullMsg.classList.remove('hidden');
-    } else {
-        // Krowa lub Jałówka
-        if (type === 'krowa' || (type === 'jalowka' && ageMonths > 13)) {
-            reproSec.classList.remove('hidden');
+        if(reproSec) reproSec.classList.add('hidden');
+        if(cowSec) cowSec.classList.add('hidden');
+        if(bullMsg) bullMsg.classList.add('hidden');
+
+        if (type === 'byk') {
+            if(bullMsg) bullMsg.classList.remove('hidden');
+        } else {
+            // Krowa lub Jałówka
+            if (type === 'krowa' || (type === 'jalowka' && ageMonths > 13)) {
+                if(reproSec) reproSec.classList.remove('hidden');
+            }
+            if (type === 'krowa') {
+                if(cowSec) cowSec.classList.remove('hidden');
+            }
         }
-        if (type === 'krowa') {
-            cowSec.classList.remove('hidden');
-        }
+    }
+
+    if(inpType) inpType.addEventListener('change', checkFormLogic);
+    if(inpDob) inpDob.addEventListener('change', checkFormLogic);
+
+    // 3. Otwieranie / Zamykanie
+    if(addBtn) addBtn.addEventListener('click', () => { modal.style.display = 'flex'; });
+    if(closeBtn) closeBtn.addEventListener('click', () => { modal.style.display = 'none'; });
+
+    // 4. Wysyłka formularza
+    if(form) {
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const newAnimal = {
+                ownerUid: currentUser.uid,
+                clinicId: currentUser['ID lecznicy'] || '', // Zabezpieczenie na brak ID
+                tag: document.getElementById('inpTag').value,
+                location: document.getElementById('inpLoc').value,
+                type: document.getElementById('inpType').value,
+                dob: document.getElementById('inpDob').value,
+                lastInsemination: document.getElementById('inpLastInsem').value || null,
+                semen: document.getElementById('inpSemen').value || null,
+                lastCalving: document.getElementById('inpLastCalving').value || null,
+                notes: document.getElementById('inpNotes').value,
+                isPregnantConfirmed: false,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            };
+
+            try {
+                await db.collection('animals').add(newAnimal);
+                alert("Zwierzę dodane!");
+                modal.style.display = 'none';
+                form.reset();
+            } catch (err) {
+                console.error("Błąd zapisu:", err);
+                alert("Błąd zapisu: " + err.message);
+            }
+        });
     }
 }
-
-inpType.addEventListener('change', checkFormLogic);
-inpDob.addEventListener('change', checkFormLogic);
-
-document.getElementById('addAnimalBtn').addEventListener('click', () => { modal.style.display = 'flex'; });
-document.getElementById('closeModal').addEventListener('click', () => { modal.style.display = 'none'; });
-
-form.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    
-    const newAnimal = {
-        ownerUid: currentUser.uid,
-        clinicId: currentUser['ID lecznicy'], // Powiązanie z kliniką
-        tag: document.getElementById('inpTag').value,
-        location: document.getElementById('inpLoc').value,
-        type: document.getElementById('inpType').value,
-        dob: document.getElementById('inpDob').value,
-        lastInsemination: document.getElementById('inpLastInsem').value || null,
-        semen: document.getElementById('inpSemen').value || null,
-        lastCalving: document.getElementById('inpLastCalving').value || null,
-        notes: document.getElementById('inpNotes').value,
-        isPregnantConfirmed: false,
-        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-    };
-
-    try {
-        await db.collection('animals').add(newAnimal);
-        alert("Zwierzę dodane!");
-        modal.style.display = 'none';
-        form.reset();
-    } catch (err) {
-        console.error(err);
-        alert("Błąd zapisu.");
-    }
-});
 
 // --- HELPERY ---
 function addDays(date, days) {
