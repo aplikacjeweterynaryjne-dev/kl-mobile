@@ -8886,6 +8886,12 @@ async function fetchUserProfile(uid) {
 
     const doc = querySnapshot.docs[0];
     currentUserProfile = { id: doc.id, ...doc.data() };
+    // ✅ NOWOŚĆ: PRZEKIEROWANIE KLIENTA
+    if (currentUserProfile.Rola === 'klient') {
+        console.log("Wykryto konto klienta. Przekierowanie...");
+        window.location.href = 'panel-klienta.html'; // Przerzuć do nowego pliku
+        return; // Zatrzymaj ładowanie index.html
+    }
     console.log("Pomyślnie pobrano profil użytkownika:", currentUserProfile);
 
     // Wczytanie cache magazynu (jeśli włączony)
@@ -11047,13 +11053,14 @@ function populateRolaSelect() {
 
     konfiguracjaFormRola.innerHTML = ''; // Wyczyść stare opcje
 
-    // Opcje dostępne dla Właściciela
+    // Opcje dostępne dla Właściciela (i Administratora, bo dziedziczy)
     const opcjeWlasciciela = [
         { value: 'pracownik', text: 'Pracownik' },
-        { value: 'właściciel', text: 'Właściciel' }
+        { value: 'właściciel', text: 'Właściciel' },
+        { value: 'klient', text: 'Klient (Hodowca)' } // ✅ NOWOŚĆ: Dodano rolę Klienta
     ];
 
-    // Opcje dostępne dla Administratora
+    // Opcje dostępne TYLKO dla Administratora (rozszerza listę właściciela)
     const opcjeAdministratora = [
         ...opcjeWlasciciela,
         { value: 'administrator', text: 'Administrator' }
@@ -11062,10 +11069,11 @@ function populateRolaSelect() {
     let opcjeDoDodania = [];
 
     if (currentUserProfile.Rola === 'administrator') {
-        console.log("Wypełnianie ról: Tryb Administratora (3 role)");
+        console.log("Wypełnianie ról: Tryb Administratora (Wszystkie role)");
         opcjeDoDodania = opcjeAdministratora;
-    } else { // Domyślnie (dla właściciela)
-        console.log("Wypełnianie ról: Tryb Właściciela (2 role)");
+    } else { 
+        // Domyślnie dla właściciela
+        console.log("Wypełnianie ról: Tryb Właściciela (Pracownik, Właściciel, Klient)");
         opcjeDoDodania = opcjeWlasciciela;
     }
 
