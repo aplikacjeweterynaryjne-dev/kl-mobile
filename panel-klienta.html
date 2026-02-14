@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        /* --- STYLE BAZOWE (bez zmian) --- */
+        /* --- STYLE BAZOWE --- */
         :root { --primary: #2e7d32; --warn: #f39c12; --danger: #c0392b; --info: #2980b9; --bg: #f4f7f6; }
         body { font-family: 'Nunito', sans-serif; background-color: var(--bg); margin: 0; padding-bottom: 90px; color: #333; -webkit-tap-highlight-color: transparent; }
         .bottom-nav { position: fixed; bottom: 0; left: 0; width: 100%; background: #fff; display: flex; justify-content: space-around; padding: 10px 0; box-shadow: 0 -2px 15px rgba(0,0,0,0.08); z-index: 1000; }
@@ -68,8 +68,6 @@
         .config-inputs { display: flex; gap: 5px; align-items: center; }
         .config-inputs input { width: 60px; padding: 5px; text-align: center; border: 1px solid #ddd; border-radius: 5px; }
         .hidden { display: none !important; }
-        
-        /* Styl dla hybrydowych dat */
         .date-input-group { display: flex; gap: 5px; align-items: center; }
         .date-btn { padding: 8px; font-size: 12px; border: 1px solid #ddd; border-radius: 5px; background: #eee; cursor: pointer; }
     </style>
@@ -114,7 +112,7 @@
         <div class="card">
             <div class="calendar-header">
                 <button onclick="changeMonth(-1)" style="background:none; border:none; font-size:20px;">❮</button>
-                <div><span id="calTitle">Listopad 2025</span><span id="calMonthCount" class="month-count-badge" title="Pokaż wycielenia w tym miesiącu">+0</span></div>
+                <div><span id="calTitle">...</span><span id="calMonthCount" class="month-count-badge" title="Pokaż wycielenia w tym miesiącu">+0</span></div>
                 <button onclick="changeMonth(1)" style="background:none; border:none; font-size:20px;">❯</button>
             </div>
             <div class="calendar-grid"><div class="cal-day-name">Pn</div><div class="cal-day-name">Wt</div><div class="cal-day-name">Śr</div><div class="cal-day-name">Cz</div><div class="cal-day-name">Pt</div><div class="cal-day-name">Sb</div><div class="cal-day-name">Nd</div></div>
@@ -158,29 +156,20 @@
                 <h2 id="cardTag" style="color:var(--primary); text-decoration:underline; margin:0;">PL-XXX</h2>
                 <button class="btn" style="padding:5px 10px; width:auto; margin:0;" onclick="toggleEditMode()">✏️ Edytuj</button>
             </div>
-
             <div id="viewMode">
                 <div style="background:#f9f9f9; padding:10px; border-radius:10px; margin:10px 0;">
-                    <strong>Podstawowe:</strong><br>
-                    Ur: <span id="cardDob"></span> (<span id="cardAge"></span>)<br>
-                    Typ: <span id="cardType"></span>
+                    <strong>Podstawowe:</strong><br>Ur: <span id="cardDob"></span> (<span id="cardAge"></span>)<br>Typ: <span id="cardType"></span>
                 </div>
                 <div style="background:#e8f5e9; padding:10px; border-radius:10px; margin-bottom:10px;">
-                    <strong>Rozród:</strong><br>
-                    Ost. wycielenie: <span id="cardLastCalving"></span><br>
-                    <span id="cardDimStat"></span><br>
-                    Ost. zacielenie: <span id="cardLastInsem"></span> (<span id="cardSemen"></span>)<br>
-                    <div style="margin-top:5px; font-weight:bold;" id="cardPregStatus"></div>
+                    <strong>Rozród:</strong><br>Ost. wycielenie: <span id="cardLastCalving"></span><br><span id="cardDimStat"></span><br>Ost. zacielenie: <span id="cardLastInsem"></span> (<span id="cardSemen"></span>)<br><div style="margin-top:5px; font-weight:bold;" id="cardPregStatus"></div>
                 </div>
             </div>
-
             <div id="editMode" class="hidden">
                 <div class="form-row"><label>Data Urodzenia</label><input type="date" id="editDob"></div>
                 <div class="form-row"><label>Data Ost. Wycielenia</label><input type="date" id="editLastCalving"></div>
-                <div class="form-row"><label>Data Ost. Zacielenia</label><input type="date" id="editLastInsem"><small>Uwaga: Edycja tej daty nie zmienia historii, tylko licznik.</small></div>
+                <div class="form-row"><label>Data Ost. Zacielenia</label><input type="date" id="editLastInsem"><small>Uwaga: Edycja tej daty nie zmienia historii.</small></div>
                 <button class="btn btn-primary" onclick="saveAnimalChanges()">Zapisz Zmiany</button>
             </div>
-
             <h3>Historia</h3>
             <div id="cardHistory" style="font-size:12px; max-height:150px; overflow-y:auto; border-top:1px solid #eee;"></div>
             <button class="btn btn-danger" id="btnDeleteAnimal" style="margin-top:20px; font-size:12px; padding:8px;">Usuń ze stada</button>
@@ -194,10 +183,10 @@
             <form id="animalForm">
                 <div class="form-row"><label>Nr Kolczyka *</label><input type="text" id="inpTag" required placeholder="PL..."></div>
                 <div class="form-row"><label>Typ *</label><select id="inpType" required><option value="krowa" selected>Krowa</option><option value="jalowka">Jałówka</option><option value="byk">Byk</option></select></div>
-                <div class="form-row"><label>Data Urodzenia *</label><div class="date-input-group"><input type="date" id="inpDob" required></div></div>
+                <div class="form-row"><label>Data Urodzenia *</label><input type="date" id="inpDob" required></div>
                 <div id="cowFields" style="background:#f9f9f9; padding:10px; border-radius:8px;">
-                    <div class="form-row"><label>Ostatnie wycielenie</label><div class="date-input-group"><input type="date" id="inpLastCalving"><button type="button" class="date-btn" onclick="setDateInput('inpLastCalving', 0)">Dziś</button><button type="button" class="date-btn" onclick="setDateInput('inpLastCalving', -1)">Wczoraj</button></div></div>
-                    <div class="form-row"><label>Ostatnie zacielenie</label><div class="date-input-group"><input type="date" id="inpLastInsem"><button type="button" class="date-btn" onclick="setDateInput('inpLastInsem', 0)">Dziś</button></div></div>
+                    <div class="form-row"><label>Ostatnie wycielenie</label><input type="date" id="inpLastCalving"></div>
+                    <div class="form-row"><label>Ostatnie zacielenie</label><input type="date" id="inpLastInsem"></div>
                     <div class="form-row"><label>Buhaj / Nasienie</label><input type="text" id="inpSemen" list="semenList" placeholder="Wpisz lub wybierz"><datalist id="semenList"></datalist></div>
                     <div class="form-row"><label>Status cielności</label><select id="inpPregStatus"><option value="unknown">Nie wiem / Do sprawdzenia</option><option value="check">Do badania (wygeneruje zadanie)</option><option value="pregnant">Potwierdzona Cielna</option></select></div>
                 </div>
@@ -224,10 +213,7 @@
                         <button type="button" class="date-btn" onclick="setDateInput('insemDate', -1)">Wczoraj</button>
                     </div>
                 </div>
-                <div class="form-row">
-                    <label>Nasienie / Buhaj</label>
-                    <input type="text" id="insemBull" list="semenList" placeholder="Wpisz lub wybierz" required>
-                </div>
+                <div class="form-row"><label>Nasienie / Buhaj</label><input type="text" id="insemBull" list="semenList" placeholder="Wpisz lub wybierz" required></div>
                 <div class="form-row"><label>Notatka</label><textarea id="insemNote" rows="2"></textarea></div>
                 <button type="submit" class="btn btn-primary">Zapisz</button>
             </form>
@@ -236,8 +222,7 @@
 
     <div id="taskConfirmModal" class="modal">
         <div class="modal-content">
-            <h3>Potwierdź wykonanie</h3>
-            <p id="taskConfirmText"></p>
+            <h3>Potwierdź wykonanie</h3><p id="taskConfirmText"></p>
             <div id="usgResultOptions" class="hidden"><p><strong>Wynik badania USG:</strong></p><div style="display:flex; gap:10px;"><button class="btn btn-primary" onclick="confirmTaskUSG(true)">✅ CIELNA</button><button class="btn btn-danger" onclick="confirmTaskUSG(false)">❌ NIECIELNA</button></div></div>
             <div id="calvingConfirmOptions" class="hidden"><div class="form-row"><label>Rzeczywista data wycielenia:</label><input type="date" id="calvingRealDate"></div><button class="btn btn-primary" onclick="confirmTaskCalvingUI()">Potwierdź Wycielenie</button><button class="btn" onclick="closeModal('taskConfirmModal')" style="background:#eee; color:#333;">Anuluj</button></div>
             <div id="standardConfirmBtns"><button class="btn btn-primary" onclick="confirmTaskStandard()">Tak, wykonano</button><button class="btn" onclick="closeModal('taskConfirmModal')" style="background:#eee; color:#333;">Anuluj</button></div>
