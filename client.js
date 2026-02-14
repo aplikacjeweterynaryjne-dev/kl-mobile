@@ -1203,6 +1203,8 @@ function renderLactationChart() {
     const ctx = canvas.getContext('2d');
     
     const buckets = [0, 0, 0, 0, 0, 0, 0];
+    // Nowa tablica przechowująca listy zwierząt dla każdego słupka
+    const bucketAnimals = [[], [], [], [], [], [], []];
     const bucketLabels = ['0-2m', '2-4m', '4-6m', '6-8m', '8-10m', '10-12m', '>12m'];
     const today = new Date();
 
@@ -1218,7 +1220,10 @@ function renderLactationChart() {
             else if (months <= 10) idx = 4;
             else if (months <= 12) idx = 5;
             else idx = 6;
+            
             buckets[idx]++;
+            // Dodajemy obiekt krowy do odpowiedniego kubełka
+            bucketAnimals[idx].push(a);
         }
     });
 
@@ -1239,13 +1244,17 @@ function renderLactationChart() {
             responsive: true,
             maintainAspectRatio: false,
             plugins: { legend: { display: false } },
-            scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
+            scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } },
+            // Dodana obsługa kliknięcia w słupek
+            onClick: (evt, activeEls) => {
+                if (activeEls.length > 0) {
+                    const idx = activeEls[0].index;
+                    const label = bucketLabels[idx];
+                    const animals = bucketAnimals[idx];
+                    // Wywołanie funkcji wyświetlającej modal z listą krów
+                    showListModal(`Krowy w laktacji: ${label}`, animals);
+                }
+            }
         }
     });
-}
-
-// Obsługa wyszukiwarki stada
-const herdSearchInput = document.getElementById('herdSearch');
-if (herdSearchInput) {
-    herdSearchInput.addEventListener('input', () => renderHerdList('all'));
 }
