@@ -12,14 +12,14 @@ if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 const auth = firebase.auth();
 
-// --- STAN APLIKACJI (ZMIENNE GLOBALNE) ---
+// --- STAN APLIKACJI ---
 let currentUser = null;
 let myHerd = [];
 let completedTasks = [];
-let myTreatments = [];
+let myTreatments = []; // Karty leczenia
 let currentTaskFilter = 'todo'; 
 let currentTypeFilter = 'all';
-let currentCalDate = new Date(); // Zadeklarowane RAZ tutaj
+let currentCalDate = new Date(); 
 let currentEditingAnimalId = null;
 
 // Ustawienia Domyślne
@@ -51,7 +51,6 @@ function initApp() {
     const dateEl = document.getElementById('welcomeDate');
     if(dateEl) dateEl.textContent = new Date().toLocaleDateString('pl-PL', { weekday: 'long', day: 'numeric', month: 'long' });
     
-    // Wstawienie numeru gospodarstwa do inputa w opcjach
     if(currentUser.numer_gospodarstwa) {
         const farmInput = document.getElementById('cfgFarmNumber');
         if(farmInput) farmInput.value = currentUser.numer_gospodarstwa;
@@ -60,7 +59,6 @@ function initApp() {
     loadSettings().then(() => {
         loadHerd(); 
         loadCompletedTasks();
-        // Ładuj leki tylko jeśli jest numer
         if(currentUser.numer_gospodarstwa) {
             loadTreatments();
         }
@@ -68,14 +66,14 @@ function initApp() {
     });
     
     setupNavigation();
-    setupModals(); // To uruchamia nasłuchiwanie formularzy
+    setupModals();
     renderCalendar(new Date());
     
     const insemDateEl = document.getElementById('insemDate');
     if(insemDateEl) insemDateEl.valueAsDate = new Date();
 }
 
-// --- FUNKCJE POMOCNICZE (GLOBALNE) ---
+// --- FUNKCJE POMOCNICZE ---
 
 function addDays(date, days) { 
     const r = new Date(date); 
@@ -134,10 +132,10 @@ function loadCompletedTasks() {
               }
           });
           generateAndRenderTasks();
-      }, error => console.error("Błąd logów (wymagany indeks):", error));
+      }, error => console.error("Błąd logów:", error));
 }
 
-// --- KARTY LECZENIA ---
+// --- KARTY LECZENIA (Integracja z Weterynarzem) ---
 
 function saveFarmNumber() {
     const farmNumInput = document.getElementById('cfgFarmNumber');
@@ -172,9 +170,6 @@ function loadTreatments() {
     const farmNumbers = farmNum.split(',').map(s => s.trim()).filter(s => s.length > 0);
     if(farmNumbers.length === 0) return;
 
-    console.log("Szukam kart dla:", farmNumbers);
-
-    // ⚠️ Szukamy w 'archiwumKarty' po polu 'header.nrStada'
     db.collection('archiwumKarty')
       .where('header.nrStada', 'in', farmNumbers)
       .limit(50)
@@ -195,7 +190,11 @@ function loadTreatments() {
       })
       .catch(error => {
           console.error("Błąd pobierania kart:", error);
-          if(container) container.innerHTML = '<div style="text-align:center; color:red; padding:20px;">Błąd pobierania. Sprawdź konsolę (indeks?).</div>';
+          if(container) container.innerHTML = `<div style="text-align:center; color:red; padding:20px;">
+            Błąd pobierania kart.<br>
+            Wymagany indeks w Firebase (Sprawdź konsolę F12).<br>
+            ${error.message}
+          </div>`;
       });
 }
 
@@ -205,7 +204,11 @@ function renderTreatments() {
     container.innerHTML = '';
 
     if(myTreatments.length === 0) {
-        container.innerHTML = '<div style="text-align:center; padding:20px; color:#999;">Brak kart leczenia dla numeru: ' + currentUser.numer_gospodarstwa + '</div>';
+        container.innerHTML = `
+            <div style="text-align:center; padding:20px; color:#999;">
+                Brak kart leczenia dla numeru: <b>${currentUser.numer_gospodarstwa}</b><br><br>
+                <small>Upewnij się, że numer wpisany w Opcjach jest identyczny jak u weterynarza.</small>
+            </div>`;
         return;
     }
 
@@ -213,90 +216,229 @@ function renderTreatments() {
         const h = card.header || {};
         const div = document.createElement('div');
         div.className = 'card';
+        // Styl "Compact" - bez tabelki leków, tylko nagłówek
         div.style.padding = '15px';
         div.style.borderLeft = '5px solid #2980b9'; 
 
-        // Wyciągnij listę leków z tabeli
-        let medsSummary = '';
-        if(card.table && Array.isArray(card.table)) {
-            const meds = card.table
-                .filter(row => row.lek && row.lek.trim() !== '')
-                .map(row => `• ${row.lek} (${row.iloscDawka || ''})`)
-                .slice(0, 5); 
-            
-            medsSummary = meds.join('<br>');
-            if(card.table.filter(r => r.lek).length > 5) medsSummary += '<br>...więcej';
-        }
-
         div.innerHTML = `
-            <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
-                <span style="font-weight:bold; font-size:16px;">📅 ${h.dataWykonania || 'Brak daty'}</span>
-                <span style="font-size:12px; color:#555; background:#eee; padding:2px 6px; border-radius:4px;">${h.nrDokumentu}</span>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
+                <span style="font-weight:bold; font-size:16px; color:#333;">📅 ${h.dataWykonania || 'Brak daty'}</span>
+                <span style="font-size:14px; color:#2980b9; font-weight:bold;">${h.nrDokumentu}</span>
             </div>
-            <div style="font-size:14px; margin-bottom:10px;">
-                <div style="color:#2980b9; font-size:12px;">Lekarz: ${h.lekarz_nazwisko || 'Weterynarz'}</div>
+            <div style="font-size:14px; margin-bottom:15px; color:#555;">
+                Lekarz: <strong>${h.lekarz_nazwisko || 'Weterynarz'}</strong>
             </div>
-            ${medsSummary ? `<div style="background:#f0f8ff; padding:10px; border-radius:5px; font-size:13px; margin-bottom:10px;">${medsSummary}</div>` : ''}
             
-            <button class="btn primary small" style="width:100%" onclick="openTreatmentDetails('${card.id}')">👁️ Zobacz szczegóły</button>
+            <button class="btn primary small" style="width:100%; background-color: #34495e;" onclick="openClientPrintWindow('${card.id}')">
+                📄 Zobacz szczegóły (A4)
+            </button>
         `;
         container.appendChild(div);
     });
 }
 
-// Funkcja globalna do otwierania szczegółów (musi być dostępna dla HTML onclick)
-function openTreatmentDetails(cardId) {
+// --- GENEROWANIE OKNA A4 (WERSJA KLIENTA) ---
+
+function openClientPrintWindow(cardId) {
     const card = myTreatments.find(c => c.id === cardId);
-    if(!card) return;
+    if (!card) return;
 
-    const listModal = document.getElementById('listModal');
-    const title = document.getElementById('listModalTitle');
-    const content = document.getElementById('listModalContent');
+    const header = card.header || {};
+    // Dodajemy podpis posiadacza, jeśli jest w obiekcie
+    header.podpisPosiadaczaImg = card.podpisPosiadacza || '';
 
-    title.textContent = `Karta: ${card.header.nrDokumentu}`;
-    content.innerHTML = '';
-
-    let html = `<div style="font-size:14px; margin-bottom:15px;">
-        <strong>Lekarz:</strong> ${card.header.lekarz_nazwisko}<br>
-        <strong>Data:</strong> ${card.header.dataWykonania}<br>
-        <strong>Stado:</strong> ${card.header.nrStada}
-    </div>`;
-
-    html += `<table style="width:100%; border-collapse:collapse; font-size:12px;">
-        <tr style="background:#eee;">
-            <th style="border:1px solid #ddd; padding:5px;">Opis</th>
-            <th style="border:1px solid #ddd; padding:5px;">Lek</th>
-            <th style="border:1px solid #ddd; padding:5px;">Karencja</th>
-        </tr>`;
-
-    if(card.table) {
-        card.table.forEach(row => {
-            if(row.lek || row.opis) {
-                // Czyścimy HTML z inputów
-                const cleanOpis = (row.opis || '').replace(/<[^>]*>?/gm, ''); 
-                const cleanLek = (row.lek || '').replace(/<[^>]*>?/gm, '');
-                const cleanKar = (row.karencja || '').replace(/<[^>]*>?/gm, '').replace('📅', '');
-                
-                html += `<tr>
-                    <td style="border:1px solid #ddd; padding:5px;">${cleanOpis}</td>
-                    <td style="border:1px solid #ddd; padding:5px;">${cleanLek} <br><small>${(row.iloscDawka || '').replace(/<[^>]*>?/gm, '')}</small></td>
-                    <td style="border:1px solid #ddd; padding:5px; color:${cleanKar ? '#c0392b' : '#333'}">${cleanKar}</td>
-                </tr>`;
-            }
-        });
-    }
-
-    html += `</table>`;
+    let rowsHTML = '';
+    const savedRows = card.table || [];
     
-    if(card.podpisPosiadacza) {
-        html += `<div style="margin-top:15px; text-align:center;"><img src="${card.podpisPosiadacza}" style="max-height:50px; border-bottom:1px solid #ccc;"><br><small>Podpis odbiorcy</small></div>`;
+    const findRowData = (logicalIndex) => savedRows.find(r => r.logicalIndex === logicalIndex);
+
+    // Funkcja czyszcząca HTML i ikony kalendarza
+    const cleanContent = (content) => {
+        if (!content) return '';
+        let text = content;
+        // Jeśli dane zawierają HTML (np. input), wyciągamy value
+        if (content.includes('<')) {
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = content;
+            const input = tempDiv.querySelector('input, textarea');
+            text = input ? (input.value + ' ' + (tempDiv.textContent || '')) : tempDiv.textContent;
+        }
+        return text.replace('📅', '').trim();
+    };
+
+    // Generujemy 13 wierszy (standard A4)
+    for (let i = 1; i <= 13; i++) {
+        let logicalIndex = -1;
+        let displayLp = '';
+
+        if (i < 10) {
+            logicalIndex = i - 1; 
+            displayLp = `${i}.`;
+        } else if (i === 10) {
+            rowsHTML += `<tr><td colspan="8" style="text-align: left; font-weight: bold; padding: 2px 4px; background-color: #f9f9f9; font-size: 10pt;">Potwierdzenie nabycia produktu leczniczego weterynaryjnego/paszy leczniczej</td></tr>`;
+            continue; 
+        } else {
+            logicalIndex = i - 2; 
+            displayLp = `${i - 10}.`; 
+        }
+
+        const rowData = findRowData(logicalIndex);
+
+        const opis = rowData ? cleanContent(rowData.opis) : '';
+        const liczba = rowData ? cleanContent(rowData.liczba) : '';
+        const rozpoznanie = rowData ? cleanContent(rowData.rozpoznanie) : '';
+        const lek = rowData ? cleanContent(rowData.lek) : '';
+        const seria = rowData ? cleanContent(rowData.seria) : '';
+        const ilosc = rowData ? cleanContent(rowData.iloscDawka) : '';
+        const karencja = rowData ? cleanContent(rowData.karencja) : '';
+
+        rowsHTML += `
+            <tr>
+                <td style="text-align: center;">${displayLp}</td>
+                <td>${opis}</td>
+                <td style="text-align: center;">${liczba}</td>
+                <td style="text-align: center;">${rozpoznanie}</td>
+                <td>${lek}</td>
+                <td style="text-align: center;">${seria}</td>
+                <td>${ilosc}</td>
+                <td>${karencja}</td>
+            </tr>
+        `;
     }
 
-    content.innerHTML = html;
-    listModal.style.display = 'flex';
+    const printWindow = window.open('', '_blank', 'width=1150,height=800,scrollbars=yes,resizable=yes');
+    if (!printWindow) { alert('Zablokowano okno.'); return; }
+
+    printWindow.document.write(generateA4HTML(header, rowsHTML));
+    printWindow.document.close();
+    printWindow.focus();
 }
 
-// --- SILNIK ZADAŃ ---
+function generateA4HTML(header, rowsHTML) {
+    return `
+        <!DOCTYPE html>
+        <html lang="pl">
+        <head>
+            <meta charset="utf-8">
+            <title>Karta Leczenia</title>
+            <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
+            <style>
+                body { font-family: 'Nunito', sans-serif; background-color: #525659; margin: 0; padding: 0; display: block; }
+                .print-controls { position: sticky; top: 0; left: 0; z-index: 1000; background: #333; padding: 10px; text-align: center; }
+                .btn { padding: 8px 20px; cursor: pointer; border-radius: 4px; border:none; font-weight:bold; font-size: 16px; margin: 0 5px; color: white; }
+                .btn-print { background: #4CAF50; }
+                .btn-close { background: #f44336; }
+
+                .page-sheet {
+                    background: white;
+                    width: 297mm; min-height: 210mm;
+                    margin: 20px auto; padding: 10mm;
+                    box-sizing: border-box; box-shadow: 0 0 15px rgba(0,0,0,0.2);
+                }
+
+                h2 { text-align: center; font-size: 12pt; margin: 0 0 5px 0; font-weight: 700; text-transform: uppercase; }
+                
+                .top-section { display: grid; grid-template-columns: 1fr 1fr 1fr; font-size: 9pt; margin-bottom: 5px; gap: 3px; }
+                .top-section div { padding: 3px 4px; border: 1px solid #000; }
+                .bold { font-weight: 700; }
+
+                table { border-collapse: collapse; width: 100%; font-size: 9pt; margin-bottom: 3px; }
+                th, td { border: 1px solid #000; padding: 2px 3px; text-align: left; vertical-align: middle; }
+                th { background-color: #EBF5E6; text-align: center; font-weight: bold; font-size: 8pt; }
+                .center-text { text-align: center; }
+                
+                p { font-size: 9pt; margin: 2px 0; }
+                
+                .signatures { display: flex; justify-content: space-between; margin-top: 10px; }
+                .sig-box { display: flex; flex-direction: column; align-items: center; width: 40%; }
+                .sig-label { font-weight: bold; margin-bottom: 0; font-size: 9pt; border-top: 1px dashed #000; padding-top: 5px; width: 100%; text-align: center; }
+                .sig-img { display: block; height: 35px; width: 100%; object-fit: contain; margin-top: 1px; }
+                .sig-name { margin-top: 0; font-size: 8pt; text-align: center; }
+
+                @media print {
+                    body { background-color: white; margin: 0; padding: 0; }
+                    .print-controls { display: none; }
+                    .page-sheet { margin: 0; padding: 0; box-shadow: none; width: 100%; transform: scale(0.85); transform-origin: top left; }
+                    @page { size: A4 landscape; margin: 0.5cm; }
+                }
+            </style>
+        </head>
+        <body>
+            <div class="print-controls">
+                <button class="btn btn-print" onclick="window.print()">🖨️ Drukuj / PDF</button>
+                <button class="btn btn-close" onclick="window.close()">❌ Zamknij</button>
+            </div>
+            
+            <div class="page-sheet">
+                <h2>KARTA LECZENIA ZWIERZĄT / EWIDENCJA LECZENIA</h2>
+                
+                <div class="top-section">
+                    <div>
+                        Nazwa i adres zakładu leczniczego:<br>
+                        <span class="bold" style="font-size: 10pt;">${header.nazwaLecznicy}</span><br>
+                        Data wykonania: <span class="bold">${header.dataWykonania}</span><br>
+                        Nr stada: <span class="bold">${header.nrStada}</span>
+                    </div>
+                    <div>
+                        Posiadacz zwierzęcia:<br>
+                        <span class="bold" style="font-size: 10pt;">${header.klient}</span><br>
+                        <span class="bold" style="font-size: 10pt;">${header.adresKlienta}</span>
+                    </div>
+                    <div>
+                        Data zgłoszenia: <span class="bold">${header.dataZgloszenia}</span><br>
+                        Nr dokumentu: <span class="bold" style="font-size: 10pt;">${header.nrDokumentu}</span>
+                    </div>
+                </div>
+
+                <table>
+                    <colgroup>
+                        <col style="width: 30px;">
+                        <col style="width: 20%;">
+                        <col style="width: 50px;">
+                        <col style="width: 15%;">
+                        <col style="width: 18%;">
+                        <col style="width: 8%;">
+                        <col style="width: 12%;">
+                        <col>
+                    </colgroup>
+                    <thead>
+                        <tr>
+                            <th rowspan="2">Lp.</th>
+                            <th rowspan="2" class="center-text">Opis zwierzęcia</th>
+                            <th rowspan="2" class="center-text">Liczba</th>
+                            <th rowspan="2" class="center-text">Rozpoznanie</th>
+                            <th colspan="3">Zastosowane produkty</th>
+                            <th rowspan="2">Karencja / Uwagi</th>
+                        </tr>
+                        <tr>
+                            <th>Nazwa</th>
+                            <th>Seria</th>
+                            <th>Ilość/Dawkowanie</th>
+                        </tr>
+                    </thead>
+                    <tbody>${rowsHTML}</tbody>
+                </table>
+
+                <p><b>Oświadczam, że nabyte produkty lecznicze weterynaryjne zostaną zastosowane zgodnie z zaleceniami.</b></p>
+
+                <div class="signatures">
+                    <div class="sig-box">
+                        <span class="sig-label">Lekarz weterynarii</span>
+                        ${header.podpisLekarzaImg ? `<img src="${header.podpisLekarzaImg}" class="sig-img">` : '<div style="height:35px;"></div>'}
+                        <span class="sig-name">${header.podpisLekarzaLinia}</span>
+                    </div>
+                    <div class="sig-box">
+                        <span class="sig-label">Podpis posiadacza zwierzęcia</span>
+                        ${header.podpisPosiadaczaImg ? `<img src="${header.podpisPosiadaczaImg}" class="sig-img">` : '<div style="height:35px;"></div>'}
+                    </div>
+                </div>
+            </div>
+        </body>
+        </html>
+    `;
+}
+
+// --- SILNIK ZADAŃ I LOGIKA STADA ---
 
 function generateAndRenderTasks() {
     const today = new Date();
@@ -322,29 +464,22 @@ function generateAndRenderTasks() {
         if (animal.usgStatus === 'negative') return; 
 
         const insDate = new Date(animal.lastInsemination);
-        const gestDays = userSettings.gestation || 280;
-        const calvingDate = addDays(insDate, gestDays);
+        const calvingDate = addDays(insDate, userSettings.gestation || 280);
         const daysSinceInsem = Math.floor((today - insDate) / (1000 * 60 * 60 * 24));
 
         if (!animal.isPregnantConfirmed) {
             checkRuleAndAddTask(generatedTasks, animal, userSettings.usg, daysSinceInsem, insDate, 'usg', calvingDate);
             checkRuleAndAddTask(generatedTasks, animal, userSettings.heat, daysSinceInsem, insDate, 'heat', calvingDate);
         }
-
-        const daysToCalving = Math.floor((calvingDate - today) / (1000 * 60 * 60 * 24));
         
-        if (animal.type === 'krowa') {
-             checkRuleAndAddTask(generatedTasks, animal, userSettings.dry, daysToCalving, calvingDate, 'dry', calvingDate, true);
-        }
+        const daysToCalving = Math.floor((calvingDate - today) / (1000 * 60 * 60 * 24));
+        if (animal.type === 'krowa') checkRuleAndAddTask(generatedTasks, animal, userSettings.dry, daysToCalving, calvingDate, 'dry', calvingDate, true);
         checkRuleAndAddTask(generatedTasks, animal, userSettings.rovac, daysToCalving, calvingDate, 'rovac', calvingDate, true);
         checkRuleAndAddTask(generatedTasks, animal, userSettings.kexxtone, daysToCalving, calvingDate, 'kexxtone', calvingDate, true);
-
+        
         userSettings.customRules.forEach((rule, idx) => {
-            if(rule.base === 'insem') {
-                checkRuleAndAddTask(generatedTasks, animal, rule, daysSinceInsem, insDate, `custom_${idx}`, calvingDate);
-            } else {
-                checkRuleAndAddTask(generatedTasks, animal, rule, daysToCalving, calvingDate, `custom_${idx}`, calvingDate, true);
-            }
+            if(rule.base === 'insem') checkRuleAndAddTask(generatedTasks, animal, rule, daysSinceInsem, insDate, `custom_${idx}`, calvingDate);
+            else checkRuleAndAddTask(generatedTasks, animal, rule, daysToCalving, calvingDate, `custom_${idx}`, calvingDate, true);
         });
         
         // Wycielenie (Bufor -5/+5)
@@ -362,7 +497,6 @@ function generateAndRenderTasks() {
             }
         }
     });
-
     renderTasks(generatedTasks);
 }
 
@@ -374,11 +508,7 @@ function checkIfTaskDone(animalId, type, refDate) {
 
 function checkRuleAndAddTask(list, animal, rule, daysCounter, refDate, type, calvDate, isReverse = false) {
     if (!rule || !rule.enabled) return;
-    
-    let isActive = false;
-    let isOverdue = false;
-    let dueDate = null;
-
+    let isActive = false; let isOverdue = false; let dueDate = null;
     if (isReverse) {
         if (daysCounter <= rule.start && daysCounter >= rule.end) isActive = true;
         if (daysCounter < rule.end) isOverdue = true;
@@ -388,22 +518,17 @@ function checkRuleAndAddTask(list, animal, rule, daysCounter, refDate, type, cal
         if (daysCounter > rule.end) isOverdue = true;
         dueDate = addDays(refDate, rule.end);
     }
-
-    if (isActive) {
-        addTask(list, animal, rule.label, dueDate, new Date(), 'warning', type, refDate, calvDate);
-    } else if (isOverdue) {
-        addTask(list, animal, rule.label, dueDate, new Date(), 'urgent', type, refDate, calvDate);
-    }
+    if (isActive) addTask(list, animal, rule.label, dueDate, new Date(), 'warning', type, refDate, calvDate);
+    else if (isOverdue) addTask(list, animal, rule.label, dueDate, new Date(), 'urgent', type, refDate, calvDate);
 }
 
 function addTask(list, animal, title, dueDate, sortDate, priority, type, insemDate, calvDate, forceOverdue = false) {
     const dateStr = dueDate.toISOString().split('T')[0];
     const taskId = `${animal.id}_${type}_${dateStr}`;
     const doneLog = completedTasks.find(t => t.taskId === taskId);
-
     let isReallyOverdue = false;
-    if (forceOverdue) { isReallyOverdue = true; } 
-    else if (priority === 'urgent' && type !== 'calving') { isReallyOverdue = true; }
+    if (forceOverdue) isReallyOverdue = true; 
+    else if (priority === 'urgent' && type !== 'calving') isReallyOverdue = true;
 
     list.push({
         id: taskId, animalId: animal.id, tag: animal.tag, title: title,
@@ -417,12 +542,10 @@ function addTask(list, animal, title, dueDate, sortDate, priority, type, insemDa
 function renderTasks(tasks) {
     const container = document.getElementById('tasksContainer');
     container.innerHTML = '';
-
-    const today = new Date();
-    today.setHours(0,0,0,0);
-    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    const today = new Date(); today.setHours(0,0,0,0);
+    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1); 
     const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-
+    
     let filtered = tasks;
 
     if (currentTaskFilter === 'done') filtered = tasks.filter(t => t.isDone);
@@ -471,42 +594,15 @@ function renderTasks(tasks) {
 function renderTaskTypeChips(allTasks) {
     const container = document.getElementById('taskTypeChips');
     container.innerHTML = '';
-    
-    const counts = {};
-    const types = new Set(['all']);
-    
-    allTasks.forEach(t => { 
-        if(!t.isDone && !t.isReallyOverdue) {
-            types.add(t.type);
-            counts[t.type] = (counts[t.type] || 0) + 1;
-        }
-    });
-    
-    const labels = {
-        'all': 'Wszystkie', 'usg': 'USG', 'heat': 'Ruja', 
-        'dry': 'Zasuszenie', 'rovac': 'Rovac', 'kexxtone': 'Kexxtone', 'calving': 'Wycielenia', 'sync': 'Synchronizacja'
-    };
-
-    const typesToShow = Array.from(types);
-    if(typesToShow.length === 0 && currentTypeFilter === 'all') typesToShow.push('all');
-
+    const counts = {}; const types = new Set(['all']);
+    allTasks.forEach(t => { if(!t.isDone && !t.isReallyOverdue) { types.add(t.type); counts[t.type] = (counts[t.type] || 0) + 1; } });
+    const labels = { 'all': 'Wszystkie', 'usg': 'USG', 'heat': 'Ruja', 'dry': 'Zasuszenie', 'rovac': 'Rovac', 'kexxtone': 'Kexxtone', 'calving': 'Wycielenia', 'sync': 'Synchronizacja' };
+    const typesToShow = Array.from(types); if(typesToShow.length === 0 && currentTypeFilter === 'all') typesToShow.push('all');
     typesToShow.forEach(type => {
         let label = labels[type];
-        if (!label && type.startsWith('custom_')) {
-            const idx = parseInt(type.split('_')[1]);
-            if (userSettings.customRules[idx]) label = userSettings.customRules[idx].label;
-            else label = 'Własne';
-        }
-        if (!label) label = type;
-
-        const count = counts[type] || 0;
-        if (type !== 'all' && count > 0) label += ` (${count})`;
-
-        const btn = document.createElement('button');
-        btn.className = `filter-chip ${currentTypeFilter === type ? 'active' : ''}`;
-        btn.textContent = label;
-        btn.onclick = () => { currentTypeFilter = type; generateAndRenderTasks(); };
-        container.appendChild(btn);
+        if (!label && type.startsWith('custom_')) { const idx = parseInt(type.split('_')[1]); if (userSettings.customRules[idx]) label = userSettings.customRules[idx].label; else label = 'Własne'; }
+        if (!label) label = type; const count = counts[type] || 0; if (type !== 'all' && count > 0) label += ` (${count})`;
+        const btn = document.createElement('button'); btn.className = `filter-chip ${currentTypeFilter === type ? 'active' : ''}`; btn.textContent = label; btn.onclick = () => { currentTypeFilter = type; generateAndRenderTasks(); }; container.appendChild(btn);
     });
 }
 
@@ -967,35 +1063,32 @@ function filterHerd(type) {
     renderHerdList(type);
 }
 
-function renderHerdList(type) { 
-    const list = document.getElementById('herdList'); list.innerHTML = '';
-    let filtered = myHerd; if (type !== 'all') filtered = myHerd.filter(a => a.type === type);
-    const search = document.getElementById('herdSearch').value.toLowerCase();
-    if (search) filtered = filtered.filter(a => a.tag.toLowerCase().includes(search));
-    document.getElementById('herdTitle').textContent = type === 'all' ? 'Pełna Lista' : `Lista: ${type.toUpperCase()}`;
-    const today = new Date();
-    filtered.forEach(a => {
-        let detailsHtml = ''; let statusIcon = '';
-        if (a.type === 'krowa' || a.type === 'jalowka') {
-            if (a.isPregnantConfirmed) statusIcon = '✅ Cielna'; else if (a.usgStatus === 'negative') statusIcon = '❌ Pusta'; else if (a.lastInsemination) statusIcon = '❓ Do badania'; else statusIcon = '⚪ Oczekiwanie';
-            const ins = a.lastInsemination ? a.lastInsemination : '-';
-            let calv = '-'; let dim = '-';
-            if (a.lastInsemination) { const est = addDays(new Date(a.lastInsemination), userSettings.gestation || 280); calv = est.toLocaleDateString('pl-PL'); }
-            if (a.lastCalving) { const days = Math.floor((today - new Date(a.lastCalving)) / (1000 * 60 * 60 * 24)); dim = `${days} dni`; }
-            detailsHtml = `<div style="font-size:11px; color:#555; margin-top:5px; display:grid; grid-template-columns: 1fr 1fr; gap:5px;"><span>💉 Ost. zac: <b>${ins}</b></span><span>👶 Termin: <b>${calv}</b></span><span>📊 Laktacja: <b>${dim}</b></span><span style="font-weight:bold; color:${a.isPregnantConfirmed?'green':'#555'}">${statusIcon}</span></div>`;
-        }
-        const div = document.createElement('div'); div.className = 'card'; div.style.padding = '10px';
-        div.innerHTML = `<div style="display:flex; justify-content:space-between; align-items:center;"><strong style="color:#2e7d32; font-size:16px;">${a.tag}</strong><span class="badge" style="background:#eee; color:#333;">${a.type}</span></div>${detailsHtml}`;
-        div.onclick = () => openAnimalCard(a.id);
-        list.appendChild(div);
+function updateDashboardStats() {
+    document.getElementById('cntCows').textContent = myHerd.filter(a => a.type === 'krowa').length;
+    document.getElementById('cntHeifers').textContent = myHerd.filter(a => a.type === 'jalowka').length;
+    document.getElementById('cntBulls').textContent = myHerd.filter(a => a.type === 'byk').length;
+}
+
+function setupNavigation() {
+    document.querySelectorAll('.nav-item').forEach(btn => {
+        btn.addEventListener('click', () => {
+            switchSection(btn.dataset.target);
+        });
+    });
+    document.getElementById('logoutBtn').addEventListener('click', () => {
+        auth.signOut();
     });
 }
-document.getElementById('herdSearch').addEventListener('input', () => renderHerdList('all'));
-function renderLactationChart() { 
-    const ctx = document.getElementById('lactationChart'); const buckets = [0, 0, 0, 0, 0, 0, 0]; const bucketAnimals = [[], [], [], [], [], [], []]; const today = new Date();
-    myHerd.forEach(a => { if (a.type === 'krowa' && a.lastCalving) { const calvDate = new Date(a.lastCalving); const months = (today - calvDate) / (1000 * 60 * 60 * 24 * 30.4); let idx = 0; if (months <= 2) idx = 0; else if (months <= 4) idx = 1; else if (months <= 6) idx = 2; else if (months <= 8) idx = 3; else if (months <= 10) idx = 4; else if (months <= 12) idx = 5; else idx = 6; buckets[idx]++; bucketAnimals[idx].push(a); } });
-    if (window.myChart) window.myChart.destroy(); window.myChart = new Chart(ctx, { type: 'bar', data: { labels: ['0-2m', '2-4m', '4-6m', '6-8m', '8-10m', '10-12m', '>12m'], datasets: [{ label: 'Sztuk', data: buckets, backgroundColor: '#2e7d32', borderRadius: 4 }] }, options: { plugins: { legend: { display: false } }, onClick: (evt, activeEls) => { if (activeEls.length > 0) { const idx = activeEls[0].index; showListModal(`Laktacja: ${window.myChart.data.labels[idx]}`, bucketAnimals[idx]); } } } });
+
+function switchSection(id) { 
+    document.querySelectorAll('.section').forEach(s => s.classList.remove('active')); 
+    document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active')); 
+    document.getElementById(id).classList.add('active'); 
+    const navBtn = document.querySelector(`.nav-item[data-target="${id}"]`); 
+    if(navBtn) navBtn.classList.add('active'); 
+    if(id === 'section-treatments') loadTreatments();
 }
+
 function addDays(date, days) { const r = new Date(date); r.setDate(r.getDate() + days); return r; }
 function changeMonth(delta) { currentCalDate.setMonth(currentCalDate.getMonth() + delta); renderCalendar(currentCalDate); }
 function renderCalendar(date) { 
