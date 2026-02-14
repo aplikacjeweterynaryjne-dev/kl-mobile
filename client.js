@@ -84,6 +84,8 @@ function loadHerd() {
           generateAndRenderTasks(); 
           renderLactationChart();
           renderCalendar(currentCalDate);
+      }, error => {
+          console.error("Błąd ładowania stada:", error);
       });
 }
 
@@ -91,6 +93,7 @@ function loadCompletedTasks() {
     const dateLimit = new Date();
     dateLimit.setDate(dateLimit.getDate() - 60); 
     
+    // UWAGA: To zapytanie wymaga indeksu w Firebase Console!
     db.collection('task_logs')
       .where('ownerUid', '==', currentUser.uid)
       .where('completedAt', '>=', dateLimit)
@@ -103,6 +106,8 @@ function loadCompletedTasks() {
               }
           });
           generateAndRenderTasks();
+      }, error => {
+          console.error("Błąd ładowania logów zadań (Sprawdź indeksy Firebase):", error);
       });
 }
 
@@ -550,7 +555,7 @@ function deleteInsemination(animalId, index) {
     });
 }
 
-// --- ZARZĄDZANIE MODALAMI I FORMULARZAMI (Fix submitów) ---
+// --- ZARZĄDZANIE MODALAMI I FORMULARZAMI ---
 
 function setupModals() {
     window.closeModal = (id) => document.getElementById(id).style.display = 'none';
@@ -558,8 +563,9 @@ function setupModals() {
     window.openAnimalModal = () => {
         document.getElementById('animalForm').reset();
         document.getElementById('animalModal').style.display = 'flex';
-        document.getElementById('cowFields').classList.remove('hidden');
+        // Domyślna krowa
         document.getElementById('inpType').value = 'krowa';
+        document.getElementById('cowFields').classList.remove('hidden');
     };
     
     document.getElementById('inpType').addEventListener('change', (e) => {
@@ -597,7 +603,7 @@ function setupModals() {
             document.getElementById('insemForm').reset();
             document.getElementById('insemDate').valueAsDate = new Date();
             closeModal('insemModal');
-        });
+        }).catch(err => alert("Błąd zapisu: " + err.message));
     });
 
     // Formularz DODAWANIA ZWIERZĘCIA
@@ -630,7 +636,7 @@ function setupModals() {
         }).then(() => {
             alert("Dodano zwierzę!");
             closeModal('animalModal');
-        });
+        }).catch(err => alert("Błąd dodawania: " + err.message));
     });
 }
 
@@ -722,7 +728,7 @@ document.getElementById('customTaskForm').addEventListener('submit', (e) => {
         alert(`Dodano nowe zadanie: ${name}`);
         renderConfig();
         document.getElementById('customTaskForm').reset();
-    });
+    }).catch(err => alert("Błąd zapisu ustawień: " + err.message));
 });
 
 function removeCustomRule(idx) {
@@ -750,7 +756,7 @@ function setDateInput(id, deltaDays) {
 function openInsemModal() { document.getElementById('insemModal').style.display = 'flex'; }
 function switchTaskFilter(mode) { currentTaskFilter = mode; document.querySelectorAll('.sub-tab').forEach(b => b.classList.remove('active')); event.target.classList.add('active'); generateAndRenderTasks(); }
 function filterHerd(type) { switchSection('section-herd'); renderHerdList(type); }
-function renderHerdList(type) { /* ... render listy stada ... */
+function renderHerdList(type) { 
     const list = document.getElementById('herdList'); list.innerHTML = '';
     let filtered = myHerd; if (type !== 'all') filtered = myHerd.filter(a => a.type === type);
     const search = document.getElementById('herdSearch').value.toLowerCase();
@@ -774,14 +780,14 @@ function renderHerdList(type) { /* ... render listy stada ... */
     });
 }
 document.getElementById('herdSearch').addEventListener('input', () => renderHerdList('all'));
-function renderLactationChart() { /* ... wykres ... */
+function renderLactationChart() { 
     const ctx = document.getElementById('lactationChart'); const buckets = [0, 0, 0, 0, 0, 0, 0]; const bucketAnimals = [[], [], [], [], [], [], []]; const today = new Date();
     myHerd.forEach(a => { if (a.type === 'krowa' && a.lastCalving) { const calvDate = new Date(a.lastCalving); const months = (today - calvDate) / (1000 * 60 * 60 * 24 * 30.4); let idx = 0; if (months <= 2) idx = 0; else if (months <= 4) idx = 1; else if (months <= 6) idx = 2; else if (months <= 8) idx = 3; else if (months <= 10) idx = 4; else if (months <= 12) idx = 5; else idx = 6; buckets[idx]++; bucketAnimals[idx].push(a); } });
     if (window.myChart) window.myChart.destroy(); window.myChart = new Chart(ctx, { type: 'bar', data: { labels: ['0-2m', '2-4m', '4-6m', '6-8m', '8-10m', '10-12m', '>12m'], datasets: [{ label: 'Sztuk', data: buckets, backgroundColor: '#2e7d32', borderRadius: 4 }] }, options: { plugins: { legend: { display: false } }, onClick: (evt, activeEls) => { if (activeEls.length > 0) { const idx = activeEls[0].index; showListModal(`Laktacja: ${window.myChart.data.labels[idx]}`, bucketAnimals[idx]); } } } });
 }
 function addDays(date, days) { const r = new Date(date); r.setDate(r.getDate() + days); return r; }
 let currentCalDate = new Date(); function changeMonth(delta) { currentCalDate.setMonth(currentCalDate.getMonth() + delta); renderCalendar(currentCalDate); }
-function renderCalendar(date) { /* ... kalendarz ... */
+function renderCalendar(date) { 
     const container = document.getElementById('calendarDays'); container.innerHTML = ''; const year = date.getFullYear(); const month = date.getMonth(); document.getElementById('calTitle').textContent = date.toLocaleDateString('pl-PL', { month: 'long', year: 'numeric' });
     let monthEvents = []; myHerd.forEach(a => { if (!a.lastInsemination || a.usgStatus === 'negative') return; const est = addDays(new Date(a.lastInsemination), userSettings.gestation || 280); if (est.getFullYear() === year && est.getMonth() === month) { monthEvents.push({ animal: a, date: est }); } }); monthEvents.sort((a,b) => a.date - b.date);
     renderCalendarEventsList(monthEvents, `Wycielenia: ${date.toLocaleDateString('pl-PL', { month: 'long' })}`);
