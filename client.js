@@ -16,7 +16,7 @@ const auth = firebase.auth();
 let currentUser = null;
 let myHerd = [];
 let completedTasks = [];
-let currentTaskFilter = 'todo'; // 'todo' | 'month' | 'overdue' | 'done'
+let currentTaskFilter = 'todo'; 
 let currentTypeFilter = 'all';
 
 // Ustawienia Domyślne
@@ -48,7 +48,7 @@ function initApp() {
     document.getElementById('welcomeDate').textContent = new Date().toLocaleDateString('pl-PL', { weekday: 'long', day: 'numeric', month: 'long' });
     
     loadSettings().then(() => {
-        loadHerd();
+        loadHerd(); // Tu wewnątrz uruchamia się silnik zadań
         loadCompletedTasks();
         renderConfig();
     });
@@ -66,6 +66,7 @@ async function loadSettings() {
         const doc = await db.collection('konfiguracja').doc(currentUser.id).collection('settings').doc('tasks').get();
         if (doc.exists) {
             const saved = doc.data();
+            // Łączymy zapisane z domyślnymi, żeby customRules nie zginęły
             userSettings = { ...DEFAULT_SETTINGS, ...saved };
         }
     } catch (e) { console.error("Błąd ustawień", e); }
@@ -78,7 +79,7 @@ function loadHerd() {
           updateDashboardStats();
           renderHerdList('all'); 
           populateInsemSelect();
-          generateAndRenderTasks();
+          generateAndRenderTasks(); // To generuje zadania i sprawdza automaty
           renderLactationChart();
           renderCalendar(currentCalDate);
       });
@@ -86,7 +87,7 @@ function loadHerd() {
 
 function loadCompletedTasks() {
     const dateLimit = new Date();
-    dateLimit.setDate(dateLimit.getDate() - 45); 
+    dateLimit.setDate(dateLimit.getDate() - 60); 
     
     db.collection('task_logs')
       .where('ownerUid', '==', currentUser.uid)
@@ -95,7 +96,6 @@ function loadCompletedTasks() {
           completedTasks = [];
           snap.forEach(doc => {
               const data = doc.data();
-              // Zabezpieczenie przed błędem daty przy szybkim dodawaniu
               if(data.completedAt) {
                   completedTasks.push({ logId: doc.id, ...data });
               }
@@ -104,7 +104,7 @@ function loadCompletedTasks() {
       });
 }
 
-// --- SILNIK ZADAŃ ---
+// --- SILNIK ZADAŃ I AUTOMATYZACJA ---
 
 function generateAndRenderTasks() {
     const today = new Date();
@@ -113,29 +113,24 @@ function generateAndRenderTasks() {
     let generatedTasks = [];
 
     myHerd.forEach(animal => {
-        // --- LOGIKA SYNCHRONIZACJI (Nowość) ---
+        // --- 1. SYNCHRONIZACJA ---
         if (animal.type === 'krowa' && animal.lastCalving) {
             const calvDate = new Date(animal.lastCalving);
             const dim = Math.floor((today - calvDate) / (1000 * 60 * 60 * 24));
 
-            // Warunki: DIM > 60, DIM < 365, Niecielna, Nie czeka na USG
             if (dim > 60 && dim < 365) {
                 if (!animal.isPregnantConfirmed && animal.usgStatus !== 'pending') {
-                    
-                    // Liczenie ilości zabiegów od ostatniego wycielenia
                     const history = animal.historyInsemination || [];
                     const insemsSinceCalving = history.filter(h => new Date(h.date) > calvDate).length;
 
-                    // Warunek: max 6 zabiegów
                     if (insemsSinceCalving <= 6) {
-                        // Dodaj zadanie na DZIŚ
                         addTask(generatedTasks, animal, 'Wykonaj synchronizację', today, today, 'warning', 'sync', null, calvDate);
                     }
                 }
             }
         }
 
-        // --- STANDARDOWE ZADANIA ---
+        // --- 2. ZADANIA STANDARDOWE ---
         if (animal.type !== 'krowa' && animal.type !== 'jalowka') return;
         if (!animal.lastInsemination) return;
         if (animal.usgStatus === 'negative') return; 
@@ -145,7 +140,7 @@ function generateAndRenderTasks() {
         const calvingDate = addDays(insDate, gestDays);
         const daysSinceInsem = Math.floor((today - insDate) / (1000 * 60 * 60 * 24));
 
-        // Zadania od inseminacji (USG, Ruja)
+        // Zadania od inseminacji
         if (!animal.isPregnantConfirmed) {
             checkRuleAndAddTask(generatedTasks, animal, userSettings.usg, daysSinceInsem, insDate, 'usg', calvingDate);
             checkRuleAndAddTask(generatedTasks, animal, userSettings.heat, daysSinceInsem, insDate, 'heat', calvingDate);
@@ -169,13 +164,29 @@ function generateAndRenderTasks() {
             }
         });
         
-        // Spodziewane Wycielenie
-        if (daysToCalving <= 10 && daysToCalving >= -10) {
-            addTask(generatedTasks, animal, 'Spodziewane Wycielenie', calvingDate, calvingDate, 'urgent', 'calving', insDate, calvingDate);
+        // --- 3. WYCIELENIE + AUTOMAT 13 DNI ---
+        if (daysToCalving <= 10 && daysToCalving >= -13) { // Pokazujemy do 13 dni po terminie
+            const isDone = checkIfTaskDone(animal.id, 'calving', calvingDate);
+            
+            // AUTOMAT: Jeśli zadanie nie jest zrobione, a minęło 13 dni od terminu
+            if (!isDone && daysToCalving <= -13) {
+                console.log(`Automat: Potwierdzam wycielenie dla ${animal.tag}`);
+                // Automatyczne wykonanie zadania (Data wykonania = data terminu)
+                confirmTaskCalving({ animalId: animal.id, dueDate: calvingDate }, calvingDate, true);
+            } else {
+                // Normalne wyświetlenie zadania
+                addTask(generatedTasks, animal, 'Spodziewane Wycielenie', calvingDate, calvingDate, 'urgent', 'calving', insDate, calvingDate);
+            }
         }
     });
 
     renderTasks(generatedTasks);
+}
+
+function checkIfTaskDone(animalId, type, refDate) {
+    const dateStr = refDate.toISOString().split('T')[0];
+    const taskId = `${animalId}_${type}_${dateStr}`;
+    return completedTasks.find(t => t.taskId === taskId);
 }
 
 function checkRuleAndAddTask(list, animal, rule, daysCounter, refDate, type, calvDate, isReverse = false) {
@@ -206,7 +217,6 @@ function addTask(list, animal, title, dueDate, sortDate, priority, type, insemDa
     const dateStr = dueDate.toISOString().split('T')[0];
     const taskId = `${animal.id}_${type}_${dateStr}`;
     
-    // Sprawdź czy zadanie jest w wykonanych (lokalnie)
     const doneLog = completedTasks.find(t => t.taskId === taskId);
 
     list.push({
@@ -266,7 +276,6 @@ function renderTasks(tasks) {
         div.className = `task-item ${t.priority} ${t.isDone ? 'done' : ''}`;
         
         const dueStr = t.dueDate.toLocaleDateString('pl-PL');
-        const insemStr = t.insemDate ? t.insemDate.toLocaleDateString('pl-PL') : '-';
         const calvStr = t.calvDate ? t.calvDate.toLocaleDateString('pl-PL') : '-';
 
         div.innerHTML = `
@@ -275,8 +284,7 @@ function renderTasks(tasks) {
                 
                 <div class="task-dates">
                     <span>📅 Termin: <b style="color:${t.priority==='urgent' && !t.isDone ? 'red':'#333'}">${dueStr}</b></span>
-                    <span>💉 Zac: ${insemStr}</span>
-                    <span>👶 Wyc: ${calvStr}</span>
+                    ${t.type === 'calving' ? '' : `<span>👶 Wyc: ${calvStr}</span>`}
                 </div>
 
                 <div class="task-animal-tag" onclick="openAnimalCard('${t.animalId}')">${t.tag}</div>
@@ -285,7 +293,7 @@ function renderTasks(tasks) {
             <div style="margin-left:10px; display:flex; align-items:center;">
                 ${t.isDone 
                     ? `<button class="btn" style="padding:5px 10px; font-size:12px; background:#ddd;" onclick="undoTask('${t.logId}')">Cofnij</button>`
-                    : `<input type="checkbox" style="transform:scale(1.5); cursor:pointer;" onclick="initiateTaskCompletion('${t.id}', '${t.type}', '${t.animalId}')">`
+                    : `<input type="checkbox" style="transform:scale(1.5); cursor:pointer;" onclick="initiateTaskCompletion('${t.id}', '${t.type}', '${t.animalId}', '${t.dueDate.toISOString()}')">`
                 }
             </div>
         `;
@@ -326,21 +334,34 @@ function renderTaskTypeChips(allTasks) {
     });
 }
 
-// --- CONFIRM & LOGIC ---
+// --- CONFIRM, WYCIELENIE I LOGIC ---
 
 let pendingTask = null;
 
-function initiateTaskCompletion(taskId, type, animalId) {
-    pendingTask = { taskId, type, animalId };
+function initiateTaskCompletion(taskId, type, animalId, dueDateStr) {
+    pendingTask = { taskId, type, animalId, dueDate: new Date(dueDateStr) };
     const modal = document.getElementById('taskConfirmModal');
     const txt = document.getElementById('taskConfirmText');
     
+    // Reset widoków w modalu
+    document.getElementById('usgResultOptions').classList.add('hidden');
+    document.getElementById('calvingConfirmOptions').classList.add('hidden');
+    document.getElementById('standardConfirmBtns').classList.add('hidden');
+
     if (type === 'usg') {
         document.getElementById('usgResultOptions').classList.remove('hidden');
-        document.getElementById('standardConfirmBtns').classList.add('hidden');
         txt.textContent = "Jaki jest wynik badania?";
+    } else if (type === 'calving') {
+        // --- LOGIKA WYCIELENIA ---
+        document.getElementById('calvingConfirmOptions').classList.remove('hidden');
+        txt.textContent = "Potwierdź datę wycielenia:";
+        
+        // Domyślna data to data terminu, ale użytkownik może zmienić
+        const d = pendingTask.dueDate;
+        // Format YYYY-MM-DD
+        const defDate = d.toISOString().split('T')[0];
+        document.getElementById('calvingRealDate').value = defDate;
     } else {
-        document.getElementById('usgResultOptions').classList.add('hidden');
         document.getElementById('standardConfirmBtns').classList.remove('hidden');
         txt.textContent = "Czy potwierdzasz wykonanie zadania?";
     }
@@ -357,32 +378,56 @@ function confirmTaskUSG(isPregnant) {
     if(!pendingTask) return;
     
     saveTaskLog(pendingTask, isPregnant ? 'Pozytywny' : 'Negatywny');
-    
     db.collection('animals').doc(pendingTask.animalId).update({
         isPregnantConfirmed: isPregnant,
         usgStatus: isPregnant ? 'positive' : 'negative'
     });
-    
     closeModal('taskConfirmModal');
 }
 
+// Nowa funkcja do potwierdzania wycielenia z UI
+function confirmTaskCalvingUI() {
+    if(!pendingTask) return;
+    const realDate = document.getElementById('calvingRealDate').value;
+    if(!realDate) return alert("Podaj datę!");
+
+    confirmTaskCalving(pendingTask, new Date(realDate), false);
+    closeModal('taskConfirmModal');
+}
+
+// Główna logika wycielenia (używana przez UI i Automat)
+function confirmTaskCalving(taskData, calvingDate, isAuto) {
+    const dateStr = calvingDate.toISOString().split('T')[0];
+    
+    // 1. Log zadania
+    saveTaskLog(taskData, `Wycielenie: ${dateStr} ${isAuto ? '(Automat)' : ''}`);
+
+    // 2. Aktualizacja Kartoteki Krowy (Nowa laktacja)
+    // Pobieramy zwierzę, żeby zaktualizować historię (opcjonalne, ale dobre)
+    // Tutaj robimy prosty update
+    db.collection('animals').doc(taskData.animalId).update({
+        lastCalving: dateStr,          // Nowa data wycielenia
+        lastInsemination: null,        // Kasujemy ciążę (reset cyklu)
+        semen: null,
+        isPregnantConfirmed: false,    // Reset statusu
+        usgStatus: 'pending',          // Reset statusu
+        type: 'krowa'                  // Jeśli była jałówką, staje się krową
+    });
+}
+
 function saveTaskLog(taskData, result) {
-    // 1. Dodaj lokalnie ("Optymistyczna aktualizacja")
-    // Tworzymy tymczasowy wpis w completedTasks, żeby UI odświeżyło się od razu
     const fakeLogId = 'temp_' + Date.now();
     completedTasks.push({
         logId: fakeLogId,
         taskId: taskData.taskId,
-        taskType: taskData.taskType,
+        taskType: taskData.type,
         animalId: taskData.animalId,
         result: result,
-        completedAt: { toDate: () => new Date() } // Symulacja timestampu Firestore
+        completedAt: { toDate: () => new Date() }
     });
 
-    // 2. Odśwież widok
     generateAndRenderTasks();
 
-    // 3. Wyślij do bazy (Snaphot listener nadpisze potem nasze fake dane prawdziwymi)
     db.collection('task_logs').add({
         ownerUid: currentUser.uid,
         taskId: taskData.taskId,
@@ -395,11 +440,9 @@ function saveTaskLog(taskData, result) {
 
 function undoTask(logId) {
     if(confirm("Cofnąć status wykonania? Zadanie wróci do listy.")) {
-        // Usuń lokalnie natychmiast
         completedTasks = completedTasks.filter(t => t.logId !== logId);
         generateAndRenderTasks();
         
-        // Usuń z bazy
         if (!logId.startsWith('temp_')) {
             db.collection('task_logs').doc(logId).delete();
         }
@@ -482,20 +525,16 @@ document.getElementById('herdSearch').addEventListener('input', () => renderHerd
 function setupModals() {
     window.closeModal = (id) => document.getElementById(id).style.display = 'none';
     
-    // Zmieniona funkcja openAnimalModal dla domyślnego widoku Krowy
     window.openAnimalModal = () => {
         document.getElementById('animalForm').reset();
         document.getElementById('animalModal').style.display = 'flex';
-        // Domyślnie Krowa -> Pokaż pola
         document.getElementById('cowFields').classList.remove('hidden');
         document.getElementById('inpType').value = 'krowa';
     };
     
     document.getElementById('inpType').addEventListener('change', (e) => {
         const type = e.target.value;
-        if(type === 'krowa') {
-            document.getElementById('cowFields').classList.remove('hidden');
-        } else if (type === 'jalowka') {
+        if(type === 'krowa' || type === 'jalowka') {
             document.getElementById('cowFields').classList.remove('hidden');
         } else {
             document.getElementById('cowFields').classList.add('hidden');
@@ -510,7 +549,7 @@ function setupModals() {
         const dob = document.getElementById('inpDob').value;
         const lastCalving = document.getElementById('inpLastCalving').value || null;
         const lastInsem = document.getElementById('inpLastInsem').value || null;
-        const semen = document.getElementById('inpSemen').value || null; // Pobranie nasienia
+        const semen = document.getElementById('inpSemen').value || null;
         const pregStatus = document.getElementById('inpPregStatus').value;
 
         let isPregnantConfirmed = false;
@@ -527,7 +566,6 @@ function setupModals() {
             if(lastInsem) usgStatus = 'pending'; 
         }
 
-        // Dodawanie historii inseminacji przy tworzeniu, jeśli podano datę
         let historyInsemination = [];
         if(lastInsem) {
             historyInsemination.push({
@@ -545,7 +583,7 @@ function setupModals() {
             dob: dob,
             lastCalving: lastCalving,
             lastInsemination: lastInsem,
-            semen: semen, // Zapisz nasienie
+            semen: semen,
             historyInsemination: historyInsemination,
             isPregnantConfirmed: isPregnantConfirmed,
             usgStatus: usgStatus,
@@ -557,7 +595,7 @@ function setupModals() {
     });
 }
 
-// --- KONFIGURACJA ---
+// --- KONFIGURACJA (FIX ZAPISU - AUTOMATYCZNY ZAPIS) ---
 
 function renderConfig() {
     const list = document.getElementById('configList');
@@ -606,9 +644,8 @@ function renderConfig() {
     });
 }
 
-function saveConfiguration() {
-    if(!confirm("Czy na pewno chcesz zapisać zmiany w ustawieniach?")) return;
-
+function saveConfiguration(silent = false) {
+    // Pobieramy dane z formularza standardowego
     ['usg', 'heat', 'dry', 'rovac', 'kexxtone'].forEach(k => {
         const s = document.getElementById(`cfg_start_${k}`);
         const e = document.getElementById(`cfg_end_${k}`);
@@ -618,6 +655,7 @@ function saveConfiguration() {
         if(en) userSettings[k].enabled = en.checked;
     });
 
+    // Pobieramy dane z formularza customowego (żeby zaktualizować edycje istniejących)
     userSettings.customRules.forEach((r, idx) => {
         const s = document.getElementById(`cfg_cust_start_${idx}`);
         const e = document.getElementById(`cfg_cust_end_${idx}`);
@@ -627,9 +665,9 @@ function saveConfiguration() {
         }
     });
 
-    db.collection('konfiguracja').doc(currentUser.id).collection('settings').doc('tasks').set(userSettings)
+    return db.collection('konfiguracja').doc(currentUser.id).collection('settings').doc('tasks').set(userSettings)
       .then(() => {
-          alert("Ustawienia zapisane pomyślnie!");
+          if(!silent) alert("Ustawienia zapisane pomyślnie!");
           generateAndRenderTasks();
       });
 }
@@ -641,23 +679,30 @@ document.getElementById('customTaskForm').addEventListener('submit', (e) => {
     const s = parseInt(document.getElementById('newCfgStart').value);
     const end = parseInt(document.getElementById('newCfgEnd').value);
 
+    // Dodaj do lokalnej
     userSettings.customRules.push({
         label: name, base: base, start: s, end: end, enabled: true
     });
     
-    renderConfig();
-    document.getElementById('customTaskForm').reset();
+    // ZAPISZ NATYCHMIAST DO BAZY (Fix znikających zadań)
+    saveConfiguration(true).then(() => {
+        alert("Dodano nowe zadanie!");
+        renderConfig();
+        document.getElementById('customTaskForm').reset();
+    });
 });
 
 function removeCustomRule(idx) {
+    if(!confirm("Usunąć to zadanie?")) return;
     userSettings.customRules.splice(idx, 1);
-    renderConfig();
+    // Zapisz od razu po usunięciu
+    saveConfiguration(true).then(() => renderConfig());
 }
 
 function resetConfiguration() {
     if(confirm("Przywrócić ustawienia domyślne?")) {
         userSettings = JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
-        renderConfig();
+        saveConfiguration(true).then(() => renderConfig());
     }
 }
 
