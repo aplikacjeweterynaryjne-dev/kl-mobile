@@ -1128,3 +1128,124 @@ function switchSection(id) {
     if(navBtn) navBtn.classList.add('active'); 
     if(id === 'section-treatments') { /* Nie ładuj auto */ }
 }
+// --- FUNKCJE RENDERUJĄCE (NAPRAWA BŁĘDÓW) ---
+
+function renderHerdList(type) {
+    const list = document.getElementById('herdList');
+    if (!list) return;
+    list.innerHTML = '';
+
+    // Filtrowanie stada
+    let filtered = type === 'all' ? myHerd : myHerd.filter(a => a.type === type);
+    
+    // Obsługa wyszukiwarki
+    const searchInput = document.getElementById('herdSearch');
+    const search = searchInput ? searchInput.value.toLowerCase() : '';
+    if (search) {
+        filtered = filtered.filter(a => a.tag.toLowerCase().includes(search));
+    }
+
+    if (filtered.length === 0) {
+        list.innerHTML = '<div style="text-align:center; padding:20px; color:#999;">Brak zwierząt do wyświetlenia.</div>';
+        return;
+    }
+
+    const today = new Date();
+
+    filtered.forEach(a => {
+        let detailsHtml = '';
+        let statusIcon = '';
+        
+        if (a.type === 'krowa' || a.type === 'jalowka') {
+            if (a.isPregnantConfirmed) statusIcon = '✅ Cielna'; 
+            else if (a.usgStatus === 'negative') statusIcon = '❌ Pusta'; 
+            else if (a.lastInsemination) statusIcon = '❓ Do badania'; 
+            else statusIcon = '⚪ Oczekiwanie';
+
+            const ins = a.lastInsemination ? a.lastInsemination : '-';
+            let calv = '-'; 
+            let dim = '-';
+
+            if (a.lastInsemination) {
+                const est = addDays(new Date(a.lastInsemination), userSettings.gestation || 280);
+                calv = est.toLocaleDateString('pl-PL');
+            }
+            if (a.lastCalving) {
+                const days = Math.floor((today - new Date(a.lastCalving)) / (1000 * 60 * 60 * 24));
+                dim = `${days} dni`;
+            }
+            detailsHtml = `<div style="font-size:11px; color:#555; margin-top:5px; display:grid; grid-template-columns: 1fr 1fr; gap:5px;">
+                <span>💉 Ost. zac: <b>${ins}</b></span>
+                <span>👶 Termin: <b>${calv}</b></span>
+                <span>📊 Laktacja: <b>${dim}</b></span>
+                <span style="font-weight:bold; color:${a.isPregnantConfirmed?'green':'#555'}">${statusIcon}</span>
+            </div>`;
+        }
+
+        const div = document.createElement('div');
+        div.className = 'card';
+        div.style.padding = '10px';
+        div.innerHTML = `
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <strong style="color:#2e7d32; font-size:16px;">${a.tag}</strong>
+                <span class="badge" style="background:#eee; color:#333; padding:2px 8px; border-radius:10px; font-size:10px;">${a.type}</span>
+            </div>
+            ${detailsHtml}
+        `;
+        div.onclick = () => openAnimalCard(a.id);
+        list.appendChild(div);
+    });
+}
+
+function renderLactationChart() {
+    const canvas = document.getElementById('lactationChart');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    
+    const buckets = [0, 0, 0, 0, 0, 0, 0];
+    const bucketLabels = ['0-2m', '2-4m', '4-6m', '6-8m', '8-10m', '10-12m', '>12m'];
+    const today = new Date();
+
+    myHerd.forEach(a => {
+        if (a.type === 'krowa' && a.lastCalving) {
+            const calvDate = new Date(a.lastCalving);
+            const months = (today - calvDate) / (1000 * 60 * 60 * 24 * 30.4);
+            let idx = 0;
+            if (months <= 2) idx = 0;
+            else if (months <= 4) idx = 1;
+            else if (months <= 6) idx = 2;
+            else if (months <= 8) idx = 3;
+            else if (months <= 10) idx = 4;
+            else if (months <= 12) idx = 5;
+            else idx = 6;
+            buckets[idx]++;
+        }
+    });
+
+    if (window.myChart) window.myChart.destroy();
+    
+    window.myChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: bucketLabels,
+            datasets: [{
+                label: 'Liczba krów',
+                data: buckets,
+                backgroundColor: '#2e7d32',
+                borderRadius: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
+        }
+    });
+}
+
+// Obsługa wyszukiwarki stada
+const herdSearchInput = document.getElementById('herdSearch');
+if (herdSearchInput) {
+    herdSearchInput.addEventListener('input', () => renderHerdList('all'));
+}
