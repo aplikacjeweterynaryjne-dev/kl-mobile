@@ -37,7 +37,6 @@ auth.onAuthStateChanged(user => {
     if (user) {
         db.collection('konfiguracja').where('uid', '==', user.uid).get().then(snap => {
             if(!snap.empty && snap.docs[0].data().Rola === 'klient') {
-                // POPRAWKA: Pobieramy ID dokumentu, żeby móc do niego zapisywać
                 currentUser = { id: snap.docs[0].id, ...snap.docs[0].data(), uid: user.uid };
                 initApp();
             } else { window.location.href = 'index.html'; }
@@ -105,7 +104,7 @@ function loadCompletedTasks() {
               }
           });
           generateAndRenderTasks();
-      }, error => console.error("Błąd logów (wymagany indeks):", error));
+      }, error => console.error("Błąd logów:", error));
 }
 
 // --- SILNIK ZADAŃ ---
@@ -166,14 +165,40 @@ function generateAndRenderTasks() {
             }
         });
         
-        // 3. WYCIELENIE (Automat)
-        if (daysToCalving <= 10 && daysToCalving >= -13) { 
+        // 3. WYCIELENIE - POPRAWIONA LOGIKA (Bufor -5/+5)
+        // dniToCalving: dodatnie = przed terminem, ujemne = po terminie
+        // Chcemy pokazać od 5 dni przed (daysToCalving <= 5)
+        // Aż do 5 dni po (daysToCalving >= -5) jako AKTYWNE
+        // Starsze niż -5 dni (np -6) jako PRZETERMINOWANE
+        
+        // Czy mieści się w oknie zainteresowania? (od 10 dni przed do 15 dni po - żeby objąć też overdue)
+        if (daysToCalving <= 10 && daysToCalving >= -15) { 
             const isDone = checkIfTaskDone(animal.id, 'calving', calvingDate);
             
+            // Automat po 13 dniach
             if (!isDone && daysToCalving <= -13) {
                 confirmTaskCalving({ animalId: animal.id, dueDate: calvingDate }, calvingDate, true);
-            } else {
-                addTask(generatedTasks, animal, 'Spodziewane Wycielenie', calvingDate, calvingDate, 'urgent', 'calving', insDate, calvingDate);
+            } else if (!isDone) {
+                
+                // Statusy dla Wycielenia:
+                // Active (Do zrobienia): od 5 dni przed do 5 dni po
+                // Overdue (Przeterminowane): więcej niż 5 dni po (czyli daysToCalving < -5)
+                
+                let priority = 'urgent';
+                let isOverdueCalving = false;
+
+                if (daysToCalving < -5) {
+                    isOverdueCalving = true; // Przeterminowane
+                } else if (daysToCalving <= 5 && daysToCalving >= -5) {
+                    priority = 'urgent'; // To jest "na teraz", ale jeszcze nie przeterminowane w sensie "zaległe"
+                    // W addTask potraktujemy to specjalnie
+                } else {
+                    priority = 'warning'; // Zbliża się (6-10 dni)
+                }
+
+                // Dodajemy zadanie.
+                // Ważne: Przekazujemy flagę isOverdueCalving, żeby funkcja renderująca wiedziała gdzie to wrzucić
+                addTask(generatedTasks, animal, 'Spodziewane Wycielenie', calvingDate, calvingDate, priority, 'calving', insDate, calvingDate, isOverdueCalving);
             }
         }
     });
@@ -195,10 +220,15 @@ function checkRuleAndAddTask(list, animal, rule, daysCounter, refDate, type, cal
     let dueDate = null;
 
     if (isReverse) {
+        // Dni PRZED wycieleniem
+        // Start: 60, End: 40. 
+        // Dziś 50 -> Active. 
+        // Dziś 30 -> Overdue (bo 30 < 40).
         if (daysCounter <= rule.start && daysCounter >= rule.end) isActive = true;
         if (daysCounter < rule.end) isOverdue = true;
         dueDate = addDays(calvDate, -rule.end);
     } else {
+        // Dni PO zacieleniu
         if (daysCounter >= rule.start && daysCounter <= rule.end) isActive = true;
         if (daysCounter > rule.end) isOverdue = true;
         dueDate = addDays(refDate, rule.end);
@@ -211,10 +241,24 @@ function checkRuleAndAddTask(list, animal, rule, daysCounter, refDate, type, cal
     }
 }
 
-function addTask(list, animal, title, dueDate, sortDate, priority, type, insemDate, calvDate) {
+// Zmodyfikowana funkcja addTask przyjmuje parametr forceOverdue
+function addTask(list, animal, title, dueDate, sortDate, priority, type, insemDate, calvDate, forceOverdue = false) {
     const dateStr = dueDate.toISOString().split('T')[0];
     const taskId = `${animal.id}_${type}_${dateStr}`;
     const doneLog = completedTasks.find(t => t.taskId === taskId);
+
+    // Jeśli forceOverdue jest true, to ustawiamy typowy znacznik dla przeterminowanych
+    // W systemie 'urgent' + !isDone to przeterminowane, ALE dla wycielenia chcemy "na teraz" jako urgent, a "stare" jako przeterminowane.
+    // Użyjemy pola 'isReallyOverdue' do filtrowania.
+    
+    let isReallyOverdue = false;
+    
+    if (forceOverdue) {
+        isReallyOverdue = true;
+    } else if (priority === 'urgent' && type !== 'calving') {
+        // Dla zwykłych zadań: urgent = overdue
+        isReallyOverdue = true;
+    }
 
     list.push({
         id: taskId,
@@ -229,7 +273,8 @@ function addTask(list, animal, title, dueDate, sortDate, priority, type, insemDa
         doneDate: doneLog ? doneLog.completedAt.toDate() : null,
         logId: doneLog ? doneLog.logId : null,
         insemDate: insemDate,
-        calvDate: calvDate
+        calvDate: calvDate,
+        isReallyOverdue: isReallyOverdue // Nowe pole do precyzyjnego filtrowania
     });
 }
 
@@ -244,15 +289,31 @@ function renderTasks(tasks) {
 
     let filtered = tasks;
 
-    if (currentTaskFilter === 'done') filtered = tasks.filter(t => t.isDone);
-    else if (currentTaskFilter === 'todo') filtered = tasks.filter(t => !t.isDone && t.priority !== 'urgent');
-    else if (currentTaskFilter === 'overdue') filtered = tasks.filter(t => !t.isDone && t.priority === 'urgent');
-    else if (currentTaskFilter === 'month') filtered = tasks.filter(t => !t.isDone && t.dueDate >= startOfMonth && t.dueDate <= endOfMonth);
+    // --- NOWA LOGIKA FILTROWANIA Z UWZGLĘDNIENIEM isReallyOverdue ---
+
+    if (currentTaskFilter === 'done') {
+        filtered = tasks.filter(t => t.isDone);
+    } 
+    else if (currentTaskFilter === 'todo') {
+        // Do zrobienia: Nie wykonane I nie są przeterminowane
+        // Wycielenie "na teraz" (np za 2 dni) ma isReallyOverdue = false, więc tu trafi.
+        filtered = tasks.filter(t => !t.isDone && !t.isReallyOverdue);
+    } 
+    else if (currentTaskFilter === 'overdue') {
+        // Tylko te, które faktycznie minęły (limit czasu przekroczony)
+        filtered = tasks.filter(t => !t.isDone && t.isReallyOverdue);
+    } 
+    else if (currentTaskFilter === 'month') {
+        // Wszystkie z tego miesiąca (nawet jeśli lekko overdue, ale data w tym msc)
+        // LUB jeśli chcemy tylko przyszłe:
+        filtered = tasks.filter(t => !t.isDone && t.dueDate >= startOfMonth && t.dueDate <= endOfMonth);
+    }
 
     if (currentTypeFilter !== 'all') filtered = filtered.filter(t => t.type === currentTypeFilter);
 
     filtered.sort((a,b) => a.dueDate - b.dueDate);
 
+    // Przekazujemy PEŁNĄ listę (niewykonanych) do licznika, żeby policzył tylko "Do zrobienia"
     renderTaskTypeChips(tasks);
 
     if (filtered.length === 0) {
@@ -266,11 +327,15 @@ function renderTasks(tasks) {
         const dueStr = t.dueDate.toLocaleDateString('pl-PL');
         const calvStr = t.calvDate ? t.calvDate.toLocaleDateString('pl-PL') : '-';
 
+        // Kolor daty: Czerwony tylko jak jest isReallyOverdue
+        const dateColor = t.isReallyOverdue ? 'red' : (t.priority === 'urgent' ? '#e67e22' : '#333'); 
+        // Orange dla pilnych (np. wycielenie teraz), Red dla przeterminowanych
+
         div.innerHTML = `
             <div style="flex:1;">
                 <div style="font-size:15px; font-weight:bold; color:#333;">${t.title}</div>
                 <div class="task-dates">
-                    <span>📅 Termin: <b style="color:${t.priority==='urgent' && !t.isDone ? 'red':'#333'}">${dueStr}</b></span>
+                    <span>📅 Termin: <b style="color:${dateColor}">${dueStr}</b></span>
                     ${t.type === 'calving' ? '' : `<span>👶 Wyc: ${calvStr}</span>`}
                 </div>
                 <div class="task-animal-tag" onclick="openAnimalCard('${t.animalId}')">${t.tag}</div>
@@ -293,8 +358,9 @@ function renderTaskTypeChips(allTasks) {
     const counts = {};
     const types = new Set(['all']);
     
+    // Zliczamy TYLKO zadania, które kwalifikują się do "DO ZROBIENIA" (czyli nie overdue)
     allTasks.forEach(t => { 
-        if(!t.isDone) {
+        if(!t.isDone && !t.isReallyOverdue) {
             types.add(t.type);
             counts[t.type] = (counts[t.type] || 0) + 1;
         }
@@ -305,7 +371,18 @@ function renderTaskTypeChips(allTasks) {
         'dry': 'Zasuszenie', 'rovac': 'Rovac', 'kexxtone': 'Kexxtone', 'calving': 'Wycielenia', 'sync': 'Synchronizacja'
     };
 
-    types.forEach(type => {
+    // Zawsze pokazuj wszystkie typy, które mają definicję, nawet jak 0
+    const definedTypes = Object.keys(labels);
+    // Dodaj customowe jeśli są w counts
+    Object.keys(counts).forEach(k => { if(!definedTypes.includes(k)) definedTypes.push(k); });
+
+    // Iterujemy po typach znalezionych w zadaniach + 'all'
+    // Albo po prostu unikalne typy z zadań "todo"
+    
+    const typesToShow = Array.from(types);
+    if(typesToShow.length === 0 && currentTypeFilter === 'all') typesToShow.push('all');
+
+    typesToShow.forEach(type => {
         let label = labels[type];
         if (!label && type.startsWith('custom_')) {
             const idx = parseInt(type.split('_')[1]);
@@ -315,6 +392,7 @@ function renderTaskTypeChips(allTasks) {
         if (!label) label = type;
 
         const count = counts[type] || 0;
+        // Pokazuj licznik tylko jeśli > 0
         if (type !== 'all' && count > 0) label += ` (${count})`;
 
         const btn = document.createElement('button');
@@ -552,7 +630,7 @@ function deleteInsemination(animalId, index) {
     });
 }
 
-// --- ZARZĄDZANIE MODALAMI I FORMULARZAMI (POPRAWIONY ADD) ---
+// --- ZARZĄDZANIE MODALAMI I FORMULARZAMI (Fix submitów) ---
 
 function setupModals() {
     window.closeModal = (id) => document.getElementById(id).style.display = 'none';
@@ -602,14 +680,14 @@ function setupModals() {
         }).catch(err => alert("Błąd zapisu: " + err.message));
     });
 
-    // Formularz DODAWANIA ZWIERZĘCIA (POPRAWIONE ZMIENNE)
+    // Formularz DODAWANIA ZWIERZĘCIA
     document.getElementById('animalForm').addEventListener('submit', (e) => {
         e.preventDefault();
         const type = document.getElementById('inpType').value;
         const tag = document.getElementById('inpTag').value;
         const dob = document.getElementById('inpDob').value;
         const lastCalving = document.getElementById('inpLastCalving').value || null;
-        const lastInsem = document.getElementById('inpLastInsem').value || null; // Zmienna to lastInsem
+        const lastInsem = document.getElementById('inpLastInsem').value || null; // Fix nazwy zmiennej
         const semen = document.getElementById('inpSemen').value || null;
         const pregStatus = document.getElementById('inpPregStatus').value;
 
@@ -625,10 +703,9 @@ function setupModals() {
             historyInsemination.push({ date: lastInsem, bull: semen || 'Nieznany', note: 'Start', added: new Date().toISOString() });
         }
 
-        // NAPRAWA: lastInsemination: lastInsem (zamiast nieistniejącej lastInsemination)
         db.collection('animals').add({
             ownerUid: currentUser.uid, tag, type, dob, lastCalving, 
-            lastInsemination: lastInsem, // TUTAJ BYŁ BŁĄD
+            lastInsemination: lastInsem, 
             semen, historyInsemination, isPregnantConfirmed, usgStatus,
             createdAt: firebase.firestore.FieldValue.serverTimestamp()
         }).then(() => {
@@ -731,7 +808,7 @@ document.getElementById('customTaskForm').addEventListener('submit', (e) => {
         alert(`Dodano nowe zadanie: ${name}`);
         renderConfig();
         document.getElementById('customTaskForm').reset();
-    }).catch(err => alert("Błąd zapisu ustawień (sprawdź uprawnienia): " + err.message));
+    }).catch(err => alert("Błąd zapisu: " + err.message));
 });
 
 function removeCustomRule(idx) {
