@@ -16,7 +16,7 @@ const auth = firebase.auth();
 let currentUser = null;
 let myHerd = [];
 let completedTasks = [];
-let myTreatments = []; // NOWE: Tablica na karty leczenia
+let myTreatments = [];
 let currentTaskFilter = 'todo'; 
 let currentTypeFilter = 'all';
 
@@ -38,7 +38,6 @@ auth.onAuthStateChanged(user => {
     if (user) {
         db.collection('konfiguracja').where('uid', '==', user.uid).get().then(snap => {
             if(!snap.empty && snap.docs[0].data().Rola === 'klient') {
-                // Pobieramy ID dokumentu i dane, w tym numer gospodarstwa
                 currentUser = { id: snap.docs[0].id, ...snap.docs[0].data(), uid: user.uid };
                 initApp();
             } else { window.location.href = 'index.html'; }
@@ -50,16 +49,15 @@ function initApp() {
     const dateEl = document.getElementById('welcomeDate');
     if(dateEl) dateEl.textContent = new Date().toLocaleDateString('pl-PL', { weekday: 'long', day: 'numeric', month: 'long' });
     
-    // Wstawienie numeru gospodarstwa do inputa w opcjach (jeśli istnieje)
+    // Wypełnij pole numeru gospodarstwa z bazy
     if(currentUser.numer_gospodarstwa) {
-        const farmInput = document.getElementById('cfgFarmNumber');
-        if(farmInput) farmInput.value = currentUser.numer_gospodarstwa;
+        document.getElementById('cfgFarmNumber').value = currentUser.numer_gospodarstwa;
     }
 
     loadSettings().then(() => {
         loadHerd(); 
         loadCompletedTasks();
-        loadTreatments(); // NOWE: Uruchomienie pobierania kart leczenia
+        loadTreatments(); 
         renderConfig();
     });
     
@@ -116,22 +114,46 @@ function loadCompletedTasks() {
       }, error => console.error("Błąd logów:", error));
 }
 
-// --- NOWOŚĆ: ŁADOWANIE KART LECZENIA ---
-function loadTreatments() {
-    const farmNum = currentUser.numer_gospodarstwa;
-    const container = document.getElementById('treatmentsList');
-    
+// --- KARTY LECZENIA (POPRAWIONE) ---
+
+function saveFarmNumber() {
+    const farmNumInput = document.getElementById('cfgFarmNumber');
+    const farmNum = farmNumInput.value.trim();
+
     if(!farmNum) {
-        if(container) container.innerHTML = '<div style="text-align:center; padding:20px; color:#999;">Wpisz numer gospodarstwa w Opcjach, aby pobrać karty.</div>';
+        alert("Wpisz numer gospodarstwa.");
         return;
     }
 
-    // Obsługa wielu numerów po przecinku (np. "PL123, PL456")
+    // 1. Zapisz do bazy
+    db.collection('konfiguracja').doc(currentUser.id).update({ 
+        numer_gospodarstwa: farmNum 
+    }).then(() => {
+        // 2. Zaktualizuj stan lokalny NATYCHMIAST
+        currentUser.numer_gospodarstwa = farmNum;
+        alert("Numer gospodarstwa zapisany! Pobieram karty leczenia...");
+        
+        // 3. Pobierz karty
+        loadTreatments();
+    }).catch(err => {
+        alert("Błąd zapisu numeru: " + err.message);
+    });
+}
+
+function loadTreatments() {
+    const container = document.getElementById('treatmentsList');
+    const farmNum = currentUser.numer_gospodarstwa;
+    
+    if(!farmNum) {
+        if(container) container.innerHTML = '<div style="text-align:center; padding:20px; color:#999;">Wpisz i ZAPISZ numer gospodarstwa w Opcjach.</div>';
+        return;
+    }
+
+    // Obsługa wielu numerów "PL1, PL2" -> ["PL1", "PL2"]
     const farmNumbers = farmNum.split(',').map(s => s.trim()).filter(s => s.length > 0);
 
     if(farmNumbers.length === 0) return;
 
-    // Pobieramy wizyty z kolekcji 'wizyty' gdzie 'numer_gospodarstwa' jest na liście
     db.collection('wizyty')
       .where('numer_gospodarstwa', 'in', farmNumbers)
       .limit(50)
@@ -141,7 +163,7 @@ function loadTreatments() {
               myTreatments.push({ id: doc.id, ...doc.data() });
           });
           
-          // Sortowanie: najnowsze na górze
+          // Sortowanie w JS (bezpieczniej bez indeksów złożonych)
           myTreatments.sort((a,b) => {
               const dA = a.data ? new Date(a.data) : new Date(0);
               const dB = b.data ? new Date(b.data) : new Date(0);
@@ -150,8 +172,8 @@ function loadTreatments() {
 
           renderTreatments();
       }, error => {
-          console.error("Błąd pobierania leczenia:", error);
-          if(container) container.innerHTML = '<div style="text-align:center; color:red; padding:20px;">Wymagany indeks w Firebase lub błąd sieci.<br>Sprawdź konsolę (F12).</div>';
+          console.error("Błąd pobierania wizyt:", error);
+          if(container) container.innerHTML = '<div style="text-align:center; color:red; padding:20px;">Nie udało się pobrać kart. Sprawdź połączenie.</div>';
       });
 }
 
@@ -161,7 +183,7 @@ function renderTreatments() {
     container.innerHTML = '';
 
     if(myTreatments.length === 0) {
-        container.innerHTML = '<div style="text-align:center; padding:20px; color:#999;">Brak kart leczenia dla Twojego numeru gospodarstwa.</div>';
+        container.innerHTML = '<div style="text-align:center; padding:20px; color:#999;">Brak kart leczenia dla numeru: ' + currentUser.numer_gospodarstwa + '</div>';
         return;
     }
 
@@ -169,9 +191,8 @@ function renderTreatments() {
         const div = document.createElement('div');
         div.className = 'card';
         div.style.padding = '15px';
-        div.style.borderLeft = '5px solid #3498db'; // Niebieski pasek
+        div.style.borderLeft = '5px solid #2980b9'; 
 
-        // Parsowanie leków
         let medsHtml = '';
         if(visit.leki && Array.isArray(visit.leki)) {
             medsHtml = visit.leki.map(l => 
@@ -252,7 +273,7 @@ function generateAndRenderTasks() {
             }
         });
         
-        // 3. Wycielenie (Automat + Bufor)
+        // 3. Wycielenie
         if (daysToCalving <= 10 && daysToCalving >= -15) { 
             const isDone = checkIfTaskDone(animal.id, 'calving', calvingDate);
             
@@ -804,15 +825,6 @@ function saveConfiguration(fromDOM = true) {
         return Promise.reject("No user config ID");
     }
 
-    // 1. Zapisz numer gospodarstwa (NOWOŚĆ)
-    const farmNum = document.getElementById('cfgFarmNumber').value;
-    if(farmNum !== undefined) {
-        db.collection('konfiguracja').doc(currentUser.id).update({ numer_gospodarstwa: farmNum });
-        currentUser.numer_gospodarstwa = farmNum;
-        loadTreatments(); // Odśwież listę po zapisie
-    }
-
-    // 2. Zapisz zadania
     if(fromDOM) {
         ['usg', 'heat', 'dry', 'rovac', 'kexxtone'].forEach(k => {
             const s = document.getElementById(`cfg_start_${k}`);
@@ -921,4 +933,16 @@ function renderCalendarEventsList(events, title) { const list = document.getElem
 function showListModal(title, animals) { document.getElementById('listModalTitle').textContent = title; const content = document.getElementById('listModalContent'); content.innerHTML = ''; animals.forEach(a => { const d = document.createElement('div'); d.className = 'card'; d.style.padding = '10px'; d.innerHTML = `🐮 <b>${a.tag}</b>`; d.onclick = () => { closeModal('listModal'); openAnimalCard(a.id); }; content.appendChild(d); }); document.getElementById('listModal').style.display = 'flex'; }
 function updateDashboardStats() { document.getElementById('cntCows').textContent = myHerd.filter(a => a.type === 'krowa').length; document.getElementById('cntHeifers').textContent = myHerd.filter(a => a.type === 'jalowka').length; document.getElementById('cntBulls').textContent = myHerd.filter(a => a.type === 'byk').length; }
 function setupNavigation() { document.querySelectorAll('.nav-item').forEach(btn => { btn.addEventListener('click', () => { switchSection(btn.dataset.target); }); }); document.getElementById('logoutBtn').addEventListener('click', () => { auth.signOut(); }); }
-function switchSection(id) { document.querySelectorAll('.section').forEach(s => s.classList.remove('active')); document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active')); document.getElementById(id).classList.add('active'); const navBtn = document.querySelector(`.nav-item[data-target="${id}"]`); if(navBtn) navBtn.classList.add('active'); }
+function switchSection(id) { 
+    document.querySelectorAll('.section').forEach(s => s.classList.remove('active')); 
+    document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active')); 
+    document.getElementById(id).classList.add('active'); 
+    const navBtn = document.querySelector(`.nav-item[data-target="${id}"]`); 
+    if(navBtn) navBtn.classList.add('active'); 
+    
+    // AUTO-ODŚWIEŻANIE KART LECZENIA PRZY WEJŚCIU W ZAKŁADKĘ
+    if(id === 'section-treatments') {
+        loadTreatments();
+    }
+}
+function addDays(date, days) { const r = new Date(date); r.setDate(r.getDate() + days); return r; }
