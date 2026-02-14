@@ -165,39 +165,23 @@ function generateAndRenderTasks() {
             }
         });
         
-        // 3. WYCIELENIE - POPRAWIONA LOGIKA (Bufor -5/+5)
-        // dniToCalving: dodatnie = przed terminem, ujemne = po terminie
-        // Chcemy pokazać od 5 dni przed (daysToCalving <= 5)
-        // Aż do 5 dni po (daysToCalving >= -5) jako AKTYWNE
-        // Starsze niż -5 dni (np -6) jako PRZETERMINOWANE
-        
-        // Czy mieści się w oknie zainteresowania? (od 10 dni przed do 15 dni po - żeby objąć też overdue)
+        // 3. WYCIELENIE (Automat)
         if (daysToCalving <= 10 && daysToCalving >= -15) { 
             const isDone = checkIfTaskDone(animal.id, 'calving', calvingDate);
             
-            // Automat po 13 dniach
             if (!isDone && daysToCalving <= -13) {
                 confirmTaskCalving({ animalId: animal.id, dueDate: calvingDate }, calvingDate, true);
             } else if (!isDone) {
-                
-                // Statusy dla Wycielenia:
-                // Active (Do zrobienia): od 5 dni przed do 5 dni po
-                // Overdue (Przeterminowane): więcej niż 5 dni po (czyli daysToCalving < -5)
-                
                 let priority = 'urgent';
                 let isOverdueCalving = false;
 
                 if (daysToCalving < -5) {
-                    isOverdueCalving = true; // Przeterminowane
+                    isOverdueCalving = true; 
                 } else if (daysToCalving <= 5 && daysToCalving >= -5) {
-                    priority = 'urgent'; // To jest "na teraz", ale jeszcze nie przeterminowane w sensie "zaległe"
-                    // W addTask potraktujemy to specjalnie
+                    priority = 'urgent'; 
                 } else {
-                    priority = 'warning'; // Zbliża się (6-10 dni)
+                    priority = 'warning'; 
                 }
-
-                // Dodajemy zadanie.
-                // Ważne: Przekazujemy flagę isOverdueCalving, żeby funkcja renderująca wiedziała gdzie to wrzucić
                 addTask(generatedTasks, animal, 'Spodziewane Wycielenie', calvingDate, calvingDate, priority, 'calving', insDate, calvingDate, isOverdueCalving);
             }
         }
@@ -220,15 +204,10 @@ function checkRuleAndAddTask(list, animal, rule, daysCounter, refDate, type, cal
     let dueDate = null;
 
     if (isReverse) {
-        // Dni PRZED wycieleniem
-        // Start: 60, End: 40. 
-        // Dziś 50 -> Active. 
-        // Dziś 30 -> Overdue (bo 30 < 40).
         if (daysCounter <= rule.start && daysCounter >= rule.end) isActive = true;
         if (daysCounter < rule.end) isOverdue = true;
         dueDate = addDays(calvDate, -rule.end);
     } else {
-        // Dni PO zacieleniu
         if (daysCounter >= rule.start && daysCounter <= rule.end) isActive = true;
         if (daysCounter > rule.end) isOverdue = true;
         dueDate = addDays(refDate, rule.end);
@@ -241,22 +220,15 @@ function checkRuleAndAddTask(list, animal, rule, daysCounter, refDate, type, cal
     }
 }
 
-// Zmodyfikowana funkcja addTask przyjmuje parametr forceOverdue
 function addTask(list, animal, title, dueDate, sortDate, priority, type, insemDate, calvDate, forceOverdue = false) {
     const dateStr = dueDate.toISOString().split('T')[0];
     const taskId = `${animal.id}_${type}_${dateStr}`;
     const doneLog = completedTasks.find(t => t.taskId === taskId);
 
-    // Jeśli forceOverdue jest true, to ustawiamy typowy znacznik dla przeterminowanych
-    // W systemie 'urgent' + !isDone to przeterminowane, ALE dla wycielenia chcemy "na teraz" jako urgent, a "stare" jako przeterminowane.
-    // Użyjemy pola 'isReallyOverdue' do filtrowania.
-    
     let isReallyOverdue = false;
-    
     if (forceOverdue) {
         isReallyOverdue = true;
     } else if (priority === 'urgent' && type !== 'calving') {
-        // Dla zwykłych zadań: urgent = overdue
         isReallyOverdue = true;
     }
 
@@ -274,7 +246,7 @@ function addTask(list, animal, title, dueDate, sortDate, priority, type, insemDa
         logId: doneLog ? doneLog.logId : null,
         insemDate: insemDate,
         calvDate: calvDate,
-        isReallyOverdue: isReallyOverdue // Nowe pole do precyzyjnego filtrowania
+        isReallyOverdue: isReallyOverdue
     });
 }
 
@@ -289,31 +261,15 @@ function renderTasks(tasks) {
 
     let filtered = tasks;
 
-    // --- NOWA LOGIKA FILTROWANIA Z UWZGLĘDNIENIEM isReallyOverdue ---
-
-    if (currentTaskFilter === 'done') {
-        filtered = tasks.filter(t => t.isDone);
-    } 
-    else if (currentTaskFilter === 'todo') {
-        // Do zrobienia: Nie wykonane I nie są przeterminowane
-        // Wycielenie "na teraz" (np za 2 dni) ma isReallyOverdue = false, więc tu trafi.
-        filtered = tasks.filter(t => !t.isDone && !t.isReallyOverdue);
-    } 
-    else if (currentTaskFilter === 'overdue') {
-        // Tylko te, które faktycznie minęły (limit czasu przekroczony)
-        filtered = tasks.filter(t => !t.isDone && t.isReallyOverdue);
-    } 
-    else if (currentTaskFilter === 'month') {
-        // Wszystkie z tego miesiąca (nawet jeśli lekko overdue, ale data w tym msc)
-        // LUB jeśli chcemy tylko przyszłe:
-        filtered = tasks.filter(t => !t.isDone && t.dueDate >= startOfMonth && t.dueDate <= endOfMonth);
-    }
+    if (currentTaskFilter === 'done') filtered = tasks.filter(t => t.isDone);
+    else if (currentTaskFilter === 'todo') filtered = tasks.filter(t => !t.isDone && !t.isReallyOverdue);
+    else if (currentTaskFilter === 'overdue') filtered = tasks.filter(t => !t.isDone && t.isReallyOverdue);
+    else if (currentTaskFilter === 'month') filtered = tasks.filter(t => !t.isDone && t.dueDate >= startOfMonth && t.dueDate <= endOfMonth);
 
     if (currentTypeFilter !== 'all') filtered = filtered.filter(t => t.type === currentTypeFilter);
 
     filtered.sort((a,b) => a.dueDate - b.dueDate);
 
-    // Przekazujemy PEŁNĄ listę (niewykonanych) do licznika, żeby policzył tylko "Do zrobienia"
     renderTaskTypeChips(tasks);
 
     if (filtered.length === 0) {
@@ -326,10 +282,7 @@ function renderTasks(tasks) {
         div.className = `task-item ${t.priority} ${t.isDone ? 'done' : ''}`;
         const dueStr = t.dueDate.toLocaleDateString('pl-PL');
         const calvStr = t.calvDate ? t.calvDate.toLocaleDateString('pl-PL') : '-';
-
-        // Kolor daty: Czerwony tylko jak jest isReallyOverdue
         const dateColor = t.isReallyOverdue ? 'red' : (t.priority === 'urgent' ? '#e67e22' : '#333'); 
-        // Orange dla pilnych (np. wycielenie teraz), Red dla przeterminowanych
 
         div.innerHTML = `
             <div style="flex:1;">
@@ -358,7 +311,6 @@ function renderTaskTypeChips(allTasks) {
     const counts = {};
     const types = new Set(['all']);
     
-    // Zliczamy TYLKO zadania, które kwalifikują się do "DO ZROBIENIA" (czyli nie overdue)
     allTasks.forEach(t => { 
         if(!t.isDone && !t.isReallyOverdue) {
             types.add(t.type);
@@ -371,14 +323,6 @@ function renderTaskTypeChips(allTasks) {
         'dry': 'Zasuszenie', 'rovac': 'Rovac', 'kexxtone': 'Kexxtone', 'calving': 'Wycielenia', 'sync': 'Synchronizacja'
     };
 
-    // Zawsze pokazuj wszystkie typy, które mają definicję, nawet jak 0
-    const definedTypes = Object.keys(labels);
-    // Dodaj customowe jeśli są w counts
-    Object.keys(counts).forEach(k => { if(!definedTypes.includes(k)) definedTypes.push(k); });
-
-    // Iterujemy po typach znalezionych w zadaniach + 'all'
-    // Albo po prostu unikalne typy z zadań "todo"
-    
     const typesToShow = Array.from(types);
     if(typesToShow.length === 0 && currentTypeFilter === 'all') typesToShow.push('all');
 
@@ -392,7 +336,6 @@ function renderTaskTypeChips(allTasks) {
         if (!label) label = type;
 
         const count = counts[type] || 0;
-        // Pokazuj licznik tylko jeśli > 0
         if (type !== 'all' && count > 0) label += ` (${count})`;
 
         const btn = document.createElement('button');
@@ -552,9 +495,18 @@ function openAnimalCard(id) {
     }
     document.getElementById('cardDimStat').innerHTML = `DIM: <b>${cowDim}</b> (Śr. stada: ${avgDim})`;
 
+    // WYPEŁNIANIE PÓL EDYCJI
+    document.getElementById('editTag').value = animal.tag;
     document.getElementById('editDob').value = animal.dob;
     document.getElementById('editLastCalving').value = animal.lastCalving || '';
     document.getElementById('editLastInsem').value = animal.lastInsemination || '';
+
+    // Ustawienie statusu cielności w edycji
+    let statusVal = 'unknown';
+    if (animal.isPregnantConfirmed) statusVal = 'pregnant';
+    else if (animal.usgStatus === 'negative') statusVal = 'negative';
+    else if (animal.usgStatus === 'pending' || (animal.lastInsemination && !animal.isPregnantConfirmed)) statusVal = 'check';
+    document.getElementById('editPregStatus').value = statusVal;
 
     const histDiv = document.getElementById('cardHistory');
     histDiv.innerHTML = '';
@@ -595,12 +547,28 @@ function toggleEditMode() {
 
 function saveAnimalChanges() {
     if(!currentEditingAnimalId) return;
+    
+    const newTag = document.getElementById('editTag').value;
     const dob = document.getElementById('editDob').value;
     const lastCalving = document.getElementById('editLastCalving').value || null;
     const lastInsem = document.getElementById('editLastInsem').value || null;
+    const newStatus = document.getElementById('editPregStatus').value;
+
+    let isPreg = false;
+    let usg = 'pending';
+
+    if(newStatus === 'pregnant') { isPreg = true; usg = 'positive'; }
+    else if(newStatus === 'negative') { isPreg = false; usg = 'negative'; }
+    else if(newStatus === 'check') { isPreg = false; usg = 'pending'; }
+    else { isPreg = false; usg = 'pending'; } // unknown
 
     db.collection('animals').doc(currentEditingAnimalId).update({
-        dob: dob, lastCalving: lastCalving, lastInsemination: lastInsem
+        tag: newTag,
+        dob: dob, 
+        lastCalving: lastCalving, 
+        lastInsemination: lastInsem,
+        isPregnantConfirmed: isPreg,
+        usgStatus: usg
     }).then(() => {
         alert("Zapisano zmiany!");
         openAnimalCard(currentEditingAnimalId);
