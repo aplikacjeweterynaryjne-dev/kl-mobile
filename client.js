@@ -76,7 +76,7 @@ function loadHerd() {
       .onSnapshot(snapshot => {
           myHerd = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
           updateDashboardStats();
-          renderHerdList('all'); // Aktualizacja listy stada
+          renderHerdList('all'); 
           populateInsemSelect();
           generateAndRenderTasks();
           renderLactationChart();
@@ -86,17 +86,19 @@ function loadHerd() {
 
 function loadCompletedTasks() {
     const dateLimit = new Date();
-    dateLimit.setDate(dateLimit.getDate() - 45); // Pobieramy nieco więcej historii
+    dateLimit.setDate(dateLimit.getDate() - 45); 
     
     db.collection('task_logs')
       .where('ownerUid', '==', currentUser.uid)
       .where('completedAt', '>=', dateLimit)
       .onSnapshot(snap => {
           completedTasks = [];
-          const now = new Date();
           snap.forEach(doc => {
               const data = doc.data();
-              completedTasks.push({ logId: doc.id, ...data });
+              // Zabezpieczenie przed błędem daty przy szybkim dodawaniu
+              if(data.completedAt) {
+                  completedTasks.push({ logId: doc.id, ...data });
+              }
           });
           generateAndRenderTasks();
       });
@@ -111,22 +113,45 @@ function generateAndRenderTasks() {
     let generatedTasks = [];
 
     myHerd.forEach(animal => {
+        // --- LOGIKA SYNCHRONIZACJI (Nowość) ---
+        if (animal.type === 'krowa' && animal.lastCalving) {
+            const calvDate = new Date(animal.lastCalving);
+            const dim = Math.floor((today - calvDate) / (1000 * 60 * 60 * 24));
+
+            // Warunki: DIM > 60, DIM < 365, Niecielna, Nie czeka na USG
+            if (dim > 60 && dim < 365) {
+                if (!animal.isPregnantConfirmed && animal.usgStatus !== 'pending') {
+                    
+                    // Liczenie ilości zabiegów od ostatniego wycielenia
+                    const history = animal.historyInsemination || [];
+                    const insemsSinceCalving = history.filter(h => new Date(h.date) > calvDate).length;
+
+                    // Warunek: max 6 zabiegów
+                    if (insemsSinceCalving <= 6) {
+                        // Dodaj zadanie na DZIŚ
+                        addTask(generatedTasks, animal, 'Wykonaj synchronizację', today, today, 'warning', 'sync', null, calvDate);
+                    }
+                }
+            }
+        }
+
+        // --- STANDARDOWE ZADANIA ---
         if (animal.type !== 'krowa' && animal.type !== 'jalowka') return;
         if (!animal.lastInsemination) return;
-        if (animal.usgStatus === 'negative') return; // Jeśli wiadomo, że pusta, nie generuj zadań ciążowych
+        if (animal.usgStatus === 'negative') return; 
 
         const insDate = new Date(animal.lastInsemination);
         const gestDays = userSettings.gestation || 280;
         const calvingDate = addDays(insDate, gestDays);
         const daysSinceInsem = Math.floor((today - insDate) / (1000 * 60 * 60 * 24));
 
-        // 1. Zadania od daty zacielenia (tylko jeśli NIE potwierdzono ciąży)
+        // Zadania od inseminacji (USG, Ruja)
         if (!animal.isPregnantConfirmed) {
             checkRuleAndAddTask(generatedTasks, animal, userSettings.usg, daysSinceInsem, insDate, 'usg', calvingDate);
             checkRuleAndAddTask(generatedTasks, animal, userSettings.heat, daysSinceInsem, insDate, 'heat', calvingDate);
         }
 
-        // 2. Zadania przed wycieleniem (liczymy dni do porodu)
+        // Zadania przed wycieleniem
         const daysToCalving = Math.floor((calvingDate - today) / (1000 * 60 * 60 * 24));
         
         if (animal.type === 'krowa') {
@@ -144,7 +169,7 @@ function generateAndRenderTasks() {
             }
         });
         
-        // Samo Wycielenie (okno +/- 10 dni)
+        // Spodziewane Wycielenie
         if (daysToCalving <= 10 && daysToCalving >= -10) {
             addTask(generatedTasks, animal, 'Spodziewane Wycielenie', calvingDate, calvingDate, 'urgent', 'calving', insDate, calvingDate);
         }
@@ -161,12 +186,10 @@ function checkRuleAndAddTask(list, animal, rule, daysCounter, refDate, type, cal
     let dueDate = null;
 
     if (isReverse) {
-        // Dni PRZED wycieleniem
         if (daysCounter <= rule.start && daysCounter >= rule.end) isActive = true;
         if (daysCounter < rule.end) isOverdue = true;
         dueDate = addDays(calvDate, -rule.end);
     } else {
-        // Dni PO zacieleniu
         if (daysCounter >= rule.start && daysCounter <= rule.end) isActive = true;
         if (daysCounter > rule.end) isOverdue = true;
         dueDate = addDays(refDate, rule.end);
@@ -183,6 +206,7 @@ function addTask(list, animal, title, dueDate, sortDate, priority, type, insemDa
     const dateStr = dueDate.toISOString().split('T')[0];
     const taskId = `${animal.id}_${type}_${dateStr}`;
     
+    // Sprawdź czy zadanie jest w wykonanych (lokalnie)
     const doneLog = completedTasks.find(t => t.taskId === taskId);
 
     list.push({
@@ -209,7 +233,6 @@ function renderTasks(tasks) {
     const today = new Date();
     today.setHours(0,0,0,0);
     
-    // Obliczanie początku i końca miesiąca dla filtra "Ten miesiąc"
     const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
     const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
 
@@ -222,7 +245,6 @@ function renderTasks(tasks) {
     } else if (currentTaskFilter === 'overdue') {
         filtered = tasks.filter(t => !t.isDone && t.priority === 'urgent');
     } else if (currentTaskFilter === 'month') {
-        // POPRAWKA: Tylko zadania z zakresu dat tego miesiąca
         filtered = tasks.filter(t => !t.isDone && t.dueDate >= startOfMonth && t.dueDate <= endOfMonth);
     }
 
@@ -280,7 +302,8 @@ function renderTaskTypeChips(allTasks) {
 
     const labels = {
         'all': 'Wszystkie', 'usg': 'USG', 'heat': 'Ruja', 
-        'dry': 'Zasuszenie', 'rovac': 'Rovac', 'kexxtone': 'Kexxtone', 'calving': 'Wycielenia'
+        'dry': 'Zasuszenie', 'rovac': 'Rovac', 'kexxtone': 'Kexxtone', 'calving': 'Wycielenia',
+        'sync': 'Synchronizacja'
     };
 
     types.forEach(type => {
@@ -344,6 +367,22 @@ function confirmTaskUSG(isPregnant) {
 }
 
 function saveTaskLog(taskData, result) {
+    // 1. Dodaj lokalnie ("Optymistyczna aktualizacja")
+    // Tworzymy tymczasowy wpis w completedTasks, żeby UI odświeżyło się od razu
+    const fakeLogId = 'temp_' + Date.now();
+    completedTasks.push({
+        logId: fakeLogId,
+        taskId: taskData.taskId,
+        taskType: taskData.taskType,
+        animalId: taskData.animalId,
+        result: result,
+        completedAt: { toDate: () => new Date() } // Symulacja timestampu Firestore
+    });
+
+    // 2. Odśwież widok
+    generateAndRenderTasks();
+
+    // 3. Wyślij do bazy (Snaphot listener nadpisze potem nasze fake dane prawdziwymi)
     db.collection('task_logs').add({
         ownerUid: currentUser.uid,
         taskId: taskData.taskId,
@@ -356,11 +395,18 @@ function saveTaskLog(taskData, result) {
 
 function undoTask(logId) {
     if(confirm("Cofnąć status wykonania? Zadanie wróci do listy.")) {
-        db.collection('task_logs').doc(logId).delete();
+        // Usuń lokalnie natychmiast
+        completedTasks = completedTasks.filter(t => t.logId !== logId);
+        generateAndRenderTasks();
+        
+        // Usuń z bazy
+        if (!logId.startsWith('temp_')) {
+            db.collection('task_logs').doc(logId).delete();
+        }
     }
 }
 
-// --- LISTA STADA (BOGATSZA) ---
+// --- LISTA STADA ---
 
 function filterHerd(type) {
     switchSection('section-herd');
@@ -435,11 +481,21 @@ document.getElementById('herdSearch').addEventListener('input', () => renderHerd
 
 function setupModals() {
     window.closeModal = (id) => document.getElementById(id).style.display = 'none';
-    window.openAnimalModal = () => document.getElementById('animalModal').style.display = 'flex';
+    
+    // Zmieniona funkcja openAnimalModal dla domyślnego widoku Krowy
+    window.openAnimalModal = () => {
+        document.getElementById('animalForm').reset();
+        document.getElementById('animalModal').style.display = 'flex';
+        // Domyślnie Krowa -> Pokaż pola
+        document.getElementById('cowFields').classList.remove('hidden');
+        document.getElementById('inpType').value = 'krowa';
+    };
     
     document.getElementById('inpType').addEventListener('change', (e) => {
         const type = e.target.value;
-        if(type === 'krowa' || type === 'jalowka') {
+        if(type === 'krowa') {
+            document.getElementById('cowFields').classList.remove('hidden');
+        } else if (type === 'jalowka') {
             document.getElementById('cowFields').classList.remove('hidden');
         } else {
             document.getElementById('cowFields').classList.add('hidden');
@@ -454,6 +510,7 @@ function setupModals() {
         const dob = document.getElementById('inpDob').value;
         const lastCalving = document.getElementById('inpLastCalving').value || null;
         const lastInsem = document.getElementById('inpLastInsem').value || null;
+        const semen = document.getElementById('inpSemen').value || null; // Pobranie nasienia
         const pregStatus = document.getElementById('inpPregStatus').value;
 
         let isPregnantConfirmed = false;
@@ -470,6 +527,17 @@ function setupModals() {
             if(lastInsem) usgStatus = 'pending'; 
         }
 
+        // Dodawanie historii inseminacji przy tworzeniu, jeśli podano datę
+        let historyInsemination = [];
+        if(lastInsem) {
+            historyInsemination.push({
+                date: lastInsem,
+                bull: semen || 'Nieznany',
+                note: 'Dodano przy rejestracji',
+                added: new Date().toISOString()
+            });
+        }
+
         db.collection('animals').add({
             ownerUid: currentUser.uid,
             tag: tag,
@@ -477,13 +545,14 @@ function setupModals() {
             dob: dob,
             lastCalving: lastCalving,
             lastInsemination: lastInsem,
+            semen: semen, // Zapisz nasienie
+            historyInsemination: historyInsemination,
             isPregnantConfirmed: isPregnantConfirmed,
             usgStatus: usgStatus,
             createdAt: firebase.firestore.FieldValue.serverTimestamp()
         }).then(() => {
             alert("Dodano zwierzę!");
             closeModal('animalModal');
-            document.getElementById('animalForm').reset();
         });
     });
 }
