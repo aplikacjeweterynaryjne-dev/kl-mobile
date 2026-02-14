@@ -51,27 +51,17 @@ function initApp() {
     const dateEl = document.getElementById('welcomeDate');
     if(dateEl) dateEl.textContent = new Date().toLocaleDateString('pl-PL', { weekday: 'long', day: 'numeric', month: 'long' });
     
-    // Wstawienie numeru gospodarstwa
     if(currentUser.numer_gospodarstwa) {
         const farmInput = document.getElementById('cfgFarmNumber');
         if(farmInput) farmInput.value = currentUser.numer_gospodarstwa;
     }
 
-    // Ustawienie domyślnych dat filtra (Ostatnie 30 dni)
-    const today = new Date();
-    const lastMonth = new Date();
-    lastMonth.setDate(today.getDate() - 30);
-    
-    const dateFromEl = document.getElementById('treatmentsDateFrom');
-    const dateToEl = document.getElementById('treatmentsDateTo');
-    
-    if(dateFromEl) dateFromEl.valueAsDate = lastMonth;
-    if(dateToEl) dateToEl.valueAsDate = today;
-
     loadSettings().then(() => {
         loadHerd(); 
         loadCompletedTasks();
-        // UWAGA: Nie ładujemy kart automatycznie ("śmietnik"). Czekamy na kliknięcie.
+        if(currentUser.numer_gospodarstwa) {
+            loadTreatments();
+        }
         renderConfig();
     });
     
@@ -110,7 +100,7 @@ async function loadSettings() {
             const saved = doc.data();
             userSettings = { ...DEFAULT_SETTINGS, ...saved };
         }
-    } catch (e) { console.error("Błąd ustawień:", e); }
+    } catch (e) { console.error("Błąd ustawień (load):", e); }
 }
 
 function loadHerd() {
@@ -145,7 +135,7 @@ function loadCompletedTasks() {
       }, error => console.error("Błąd logów:", error));
 }
 
-// --- KARTY LECZENIA (Pobieranie na żądanie z filtrem daty) ---
+// --- KARTY LECZENIA (Integracja z Weterynarzem) ---
 
 function saveFarmNumber() {
     const farmNumInput = document.getElementById('cfgFarmNumber');
@@ -160,9 +150,9 @@ function saveFarmNumber() {
         numer_gospodarstwa: farmNum 
     }).then(() => {
         currentUser.numer_gospodarstwa = farmNum;
-        alert("Numer gospodarstwa zapisany!");
+        alert("Numer gospodarstwa zapisany! Pobieram karty leczenia...");
+        loadTreatments();
         switchSection('section-treatments'); 
-        // Nie ładujemy automatycznie - użytkownik ustawi daty i kliknie przycisk
     }).catch(err => {
         alert("Błąd zapisu numeru: " + err.message);
     });
@@ -172,33 +162,16 @@ function loadTreatments() {
     const container = document.getElementById('treatmentsList');
     const farmNum = currentUser.numer_gospodarstwa;
     
-    // Pobierz daty z inputów
-    const dateFrom = document.getElementById('treatmentsDateFrom').value;
-    const dateTo = document.getElementById('treatmentsDateTo').value;
-
     if(!farmNum) {
         if(container) container.innerHTML = '<div style="text-align:center; padding:20px; color:#999;">Wpisz i ZAPISZ numer gospodarstwa w Opcjach.</div>';
-        return;
-    }
-
-    if(!dateFrom || !dateTo) {
-        alert("Wybierz zakres dat.");
         return;
     }
 
     const farmNumbers = farmNum.split(',').map(s => s.trim()).filter(s => s.length > 0);
     if(farmNumbers.length === 0) return;
 
-    if(container) container.innerHTML = '<div style="text-align:center; padding:20px; color:#555;">Pobieranie kart...</div>';
-
-    console.log(`Pobieram karty dla: ${farmNumbers} od ${dateFrom} do ${dateTo}`);
-
-    // Zapytanie z filtrem numeru stada ORAZ daty
-    // Wymaga indeksu kompozytowego w Firestore (header.nrStada ASC, header.dataWykonania ASC)
     db.collection('archiwumKarty')
       .where('header.nrStada', 'in', farmNumbers)
-      .where('header.dataWykonania', '>=', dateFrom)
-      .where('header.dataWykonania', '<=', dateTo)
       .limit(50)
       .get()
       .then(snap => {
@@ -207,7 +180,6 @@ function loadTreatments() {
               myTreatments.push({ id: doc.id, ...doc.data() });
           });
           
-          // Sortowanie malejąco (najnowsze na górze)
           myTreatments.sort((a,b) => {
               const dA = a.header?.dataWykonania ? new Date(a.header.dataWykonania) : new Date(0);
               const dB = b.header?.dataWykonania ? new Date(b.header.dataWykonania) : new Date(0);
@@ -218,11 +190,11 @@ function loadTreatments() {
       })
       .catch(error => {
           console.error("Błąd pobierania kart:", error);
-          let msg = error.message;
-          if(error.code === 'failed-precondition') {
-              msg = "Błąd indeksu bazy danych. Kliknij link w konsoli przeglądarki (F12), aby utworzyć indeks.";
-          }
-          if(container) container.innerHTML = `<div style="text-align:center; color:red; padding:20px;">${msg}</div>`;
+          if(container) container.innerHTML = `<div style="text-align:center; color:red; padding:20px;">
+            Błąd pobierania kart.<br>
+            Wymagany indeks w Firebase (Sprawdź konsolę F12).<br>
+            ${error.message}
+          </div>`;
       });
 }
 
@@ -234,8 +206,8 @@ function renderTreatments() {
     if(myTreatments.length === 0) {
         container.innerHTML = `
             <div style="text-align:center; padding:20px; color:#999;">
-                Brak kart leczenia w wybranym okresie.<br>
-                <small>Sprawdź daty i numer gospodarstwa.</small>
+                Brak kart leczenia dla numeru: <b>${currentUser.numer_gospodarstwa}</b><br><br>
+                <small>Upewnij się, że numer wpisany w Opcjach jest identyczny jak u weterynarza.</small>
             </div>`;
         return;
     }
@@ -244,31 +216,18 @@ function renderTreatments() {
         const h = card.header || {};
         const div = document.createElement('div');
         div.className = 'card';
+        // Styl "Compact" - bez tabelki leków, tylko nagłówek
         div.style.padding = '15px';
-        div.style.borderLeft = '5px solid #2e7d32'; 
+        div.style.borderLeft = '5px solid #2980b9'; 
 
-        // Lista leków (skrócona)
-        let medsSummary = '';
-        if(card.table && Array.isArray(card.table)) {
-            const meds = card.table
-                .filter(row => row.lek && row.lek.trim() !== '')
-                .map(row => `• ${row.lek} (${row.iloscDawka || ''})`)
-                .slice(0, 5);
-            
-            medsSummary = meds.join('<br>');
-            if(card.table.filter(r => r.lek).length > 5) medsSummary += '<br>...więcej';
-        }
-
-        // Zmiana: Wyświetlamy "Lecznica: ..." zamiast "Lekarz: ..."
         div.innerHTML = `
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
                 <span style="font-weight:bold; font-size:16px; color:#333;">📅 ${h.dataWykonania || 'Brak daty'}</span>
-                <span style="font-size:14px; color:#2e7d32; font-weight:bold;">${h.nrDokumentu}</span>
+                <span style="font-size:14px; color:#2980b9; font-weight:bold;">${h.nrDokumentu}</span>
             </div>
             <div style="font-size:14px; margin-bottom:15px; color:#555;">
-                Lecznica: <strong>${h.nazwaLecznicy || 'Brak nazwy'}</strong>
+                Lekarz: <strong>${h.lekarz_nazwisko || 'Weterynarz'}</strong>
             </div>
-            ${medsSummary ? `<div style="background:#f9f9f9; padding:10px; border-radius:5px; font-size:13px; margin-bottom:10px;">${medsSummary}</div>` : ''}
             
             <button class="btn primary small" style="width:100%; background-color: #34495e;" onclick="openClientPrintWindow('${card.id}')">
                 📄 Zobacz szczegóły (A4)
@@ -278,22 +237,26 @@ function renderTreatments() {
     });
 }
 
-// --- GENEROWANIE A4 (PODGLĄD 1:1 JAK U WETERYNARZA) ---
+// --- GENEROWANIE OKNA A4 (WERSJA KLIENTA) ---
 
 function openClientPrintWindow(cardId) {
     const card = myTreatments.find(c => c.id === cardId);
     if (!card) return;
 
     const header = card.header || {};
+    // Dodajemy podpis posiadacza, jeśli jest w obiekcie
     header.podpisPosiadaczaImg = card.podpisPosiadacza || '';
 
     let rowsHTML = '';
     const savedRows = card.table || [];
+    
     const findRowData = (logicalIndex) => savedRows.find(r => r.logicalIndex === logicalIndex);
 
+    // Funkcja czyszcząca HTML i ikony kalendarza
     const cleanContent = (content) => {
         if (!content) return '';
         let text = content;
+        // Jeśli dane zawierają HTML (np. input), wyciągamy value
         if (content.includes('<')) {
             const tempDiv = document.createElement('div');
             tempDiv.innerHTML = content;
@@ -303,6 +266,7 @@ function openClientPrintWindow(cardId) {
         return text.replace('📅', '').trim();
     };
 
+    // Generujemy 13 wierszy (standard A4)
     for (let i = 1; i <= 13; i++) {
         let logicalIndex = -1;
         let displayLp = '';
@@ -479,7 +443,6 @@ function generateA4HTML(header, rowsHTML) {
 function generateAndRenderTasks() {
     const today = new Date();
     today.setHours(0,0,0,0);
-
     let generatedTasks = [];
 
     myHerd.forEach(animal => {
@@ -487,68 +450,53 @@ function generateAndRenderTasks() {
         if (animal.type === 'krowa' && animal.lastCalving) {
             const calvDate = new Date(animal.lastCalving);
             const dim = Math.floor((today - calvDate) / (1000 * 60 * 60 * 24));
-
             if (dim > 60 && dim < 365) {
                 if (!animal.isPregnantConfirmed && animal.usgStatus !== 'pending') {
                     const history = animal.historyInsemination || [];
                     const insemsSinceCalving = history.filter(h => new Date(h.date) > calvDate).length;
-
-                    if (insemsSinceCalving <= 6) {
-                        addTask(generatedTasks, animal, 'Wykonaj synchronizację', today, today, 'warning', 'sync', null, calvDate);
-                    }
+                    if (insemsSinceCalving <= 6) addTask(generatedTasks, animal, 'Wykonaj synchronizację', today, today, 'warning', 'sync', null, calvDate);
                 }
             }
         }
-
-        // Standardowe
+        
         if (animal.type !== 'krowa' && animal.type !== 'jalowka') return;
         if (!animal.lastInsemination) return;
         if (animal.usgStatus === 'negative') return; 
 
         const insDate = new Date(animal.lastInsemination);
-        const gestDays = userSettings.gestation || 280;
-        const calvingDate = addDays(insDate, gestDays);
+        const calvingDate = addDays(insDate, userSettings.gestation || 280);
         const daysSinceInsem = Math.floor((today - insDate) / (1000 * 60 * 60 * 24));
 
         if (!animal.isPregnantConfirmed) {
             checkRuleAndAddTask(generatedTasks, animal, userSettings.usg, daysSinceInsem, insDate, 'usg', calvingDate);
             checkRuleAndAddTask(generatedTasks, animal, userSettings.heat, daysSinceInsem, insDate, 'heat', calvingDate);
         }
-
-        const daysToCalving = Math.floor((calvingDate - today) / (1000 * 60 * 60 * 24));
         
-        if (animal.type === 'krowa') {
-             checkRuleAndAddTask(generatedTasks, animal, userSettings.dry, daysToCalving, calvingDate, 'dry', calvingDate, true);
-        }
+        const daysToCalving = Math.floor((calvingDate - today) / (1000 * 60 * 60 * 24));
+        if (animal.type === 'krowa') checkRuleAndAddTask(generatedTasks, animal, userSettings.dry, daysToCalving, calvingDate, 'dry', calvingDate, true);
         checkRuleAndAddTask(generatedTasks, animal, userSettings.rovac, daysToCalving, calvingDate, 'rovac', calvingDate, true);
         checkRuleAndAddTask(generatedTasks, animal, userSettings.kexxtone, daysToCalving, calvingDate, 'kexxtone', calvingDate, true);
-
+        
         userSettings.customRules.forEach((rule, idx) => {
-            if(rule.base === 'insem') {
-                checkRuleAndAddTask(generatedTasks, animal, rule, daysSinceInsem, insDate, `custom_${idx}`, calvingDate);
-            } else {
-                checkRuleAndAddTask(generatedTasks, animal, rule, daysToCalving, calvingDate, `custom_${idx}`, calvingDate, true);
-            }
+            if(rule.base === 'insem') checkRuleAndAddTask(generatedTasks, animal, rule, daysSinceInsem, insDate, `custom_${idx}`, calvingDate);
+            else checkRuleAndAddTask(generatedTasks, animal, rule, daysToCalving, calvingDate, `custom_${idx}`, calvingDate, true);
         });
         
-        // Wycielenie
+        // Wycielenie (Bufor -5/+5)
         if (daysToCalving <= 10 && daysToCalving >= -15) { 
             const isDone = checkIfTaskDone(animal.id, 'calving', calvingDate);
-            
             if (!isDone && daysToCalving <= -13) {
                 confirmTaskCalving({ animalId: animal.id, dueDate: calvingDate }, calvingDate, true);
             } else if (!isDone) {
                 let priority = 'urgent';
                 let isOverdueCalving = false;
-
-                if (daysToCalving < -5) { isOverdueCalving = true; } 
-                else if (daysToCalving <= 5 && daysToCalving >= -5) { priority = 'urgent'; } 
-                else { priority = 'warning'; }
+                if (daysToCalving < -5) isOverdueCalving = true; 
+                else if (daysToCalving <= 5 && daysToCalving >= -5) priority = 'urgent'; 
+                else priority = 'warning'; 
                 addTask(generatedTasks, animal, 'Spodziewane Wycielenie', calvingDate, calvingDate, priority, 'calving', insDate, calvingDate, isOverdueCalving);
             }
         }
     });
-
     renderTasks(generatedTasks);
 }
 
@@ -560,11 +508,7 @@ function checkIfTaskDone(animalId, type, refDate) {
 
 function checkRuleAndAddTask(list, animal, rule, daysCounter, refDate, type, calvDate, isReverse = false) {
     if (!rule || !rule.enabled) return;
-    
-    let isActive = false;
-    let isOverdue = false;
-    let dueDate = null;
-
+    let isActive = false; let isOverdue = false; let dueDate = null;
     if (isReverse) {
         if (daysCounter <= rule.start && daysCounter >= rule.end) isActive = true;
         if (daysCounter < rule.end) isOverdue = true;
@@ -574,22 +518,17 @@ function checkRuleAndAddTask(list, animal, rule, daysCounter, refDate, type, cal
         if (daysCounter > rule.end) isOverdue = true;
         dueDate = addDays(refDate, rule.end);
     }
-
-    if (isActive) {
-        addTask(list, animal, rule.label, dueDate, new Date(), 'warning', type, refDate, calvDate);
-    } else if (isOverdue) {
-        addTask(list, animal, rule.label, dueDate, new Date(), 'urgent', type, refDate, calvDate);
-    }
+    if (isActive) addTask(list, animal, rule.label, dueDate, new Date(), 'warning', type, refDate, calvDate);
+    else if (isOverdue) addTask(list, animal, rule.label, dueDate, new Date(), 'urgent', type, refDate, calvDate);
 }
 
 function addTask(list, animal, title, dueDate, sortDate, priority, type, insemDate, calvDate, forceOverdue = false) {
     const dateStr = dueDate.toISOString().split('T')[0];
     const taskId = `${animal.id}_${type}_${dateStr}`;
     const doneLog = completedTasks.find(t => t.taskId === taskId);
-
     let isReallyOverdue = false;
-    if (forceOverdue) { isReallyOverdue = true; } 
-    else if (priority === 'urgent' && type !== 'calving') { isReallyOverdue = true; }
+    if (forceOverdue) isReallyOverdue = true; 
+    else if (priority === 'urgent' && type !== 'calving') isReallyOverdue = true;
 
     list.push({
         id: taskId, animalId: animal.id, tag: animal.tag, title: title,
@@ -603,12 +542,10 @@ function addTask(list, animal, title, dueDate, sortDate, priority, type, insemDa
 function renderTasks(tasks) {
     const container = document.getElementById('tasksContainer');
     container.innerHTML = '';
-
-    const today = new Date();
-    today.setHours(0,0,0,0);
-    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    const today = new Date(); today.setHours(0,0,0,0);
+    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1); 
     const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-
+    
     let filtered = tasks;
 
     if (currentTaskFilter === 'done') filtered = tasks.filter(t => t.isDone);
@@ -657,42 +594,15 @@ function renderTasks(tasks) {
 function renderTaskTypeChips(allTasks) {
     const container = document.getElementById('taskTypeChips');
     container.innerHTML = '';
-    
-    const counts = {};
-    const types = new Set(['all']);
-    
-    allTasks.forEach(t => { 
-        if(!t.isDone && !t.isReallyOverdue) {
-            types.add(t.type);
-            counts[t.type] = (counts[t.type] || 0) + 1;
-        }
-    });
-    
-    const labels = {
-        'all': 'Wszystkie', 'usg': 'USG', 'heat': 'Ruja', 
-        'dry': 'Zasuszenie', 'rovac': 'Rovac', 'kexxtone': 'Kexxtone', 'calving': 'Wycielenia', 'sync': 'Synchronizacja'
-    };
-
-    const typesToShow = Array.from(types);
-    if(typesToShow.length === 0 && currentTypeFilter === 'all') typesToShow.push('all');
-
+    const counts = {}; const types = new Set(['all']);
+    allTasks.forEach(t => { if(!t.isDone && !t.isReallyOverdue) { types.add(t.type); counts[t.type] = (counts[t.type] || 0) + 1; } });
+    const labels = { 'all': 'Wszystkie', 'usg': 'USG', 'heat': 'Ruja', 'dry': 'Zasuszenie', 'rovac': 'Rovac', 'kexxtone': 'Kexxtone', 'calving': 'Wycielenia', 'sync': 'Synchronizacja' };
+    const typesToShow = Array.from(types); if(typesToShow.length === 0 && currentTypeFilter === 'all') typesToShow.push('all');
     typesToShow.forEach(type => {
         let label = labels[type];
-        if (!label && type.startsWith('custom_')) {
-            const idx = parseInt(type.split('_')[1]);
-            if (userSettings.customRules[idx]) label = userSettings.customRules[idx].label;
-            else label = 'Własne';
-        }
-        if (!label) label = type;
-
-        const count = counts[type] || 0;
-        if (type !== 'all' && count > 0) label += ` (${count})`;
-
-        const btn = document.createElement('button');
-        btn.className = `filter-chip ${currentTypeFilter === type ? 'active' : ''}`;
-        btn.textContent = label;
-        btn.onclick = () => { currentTypeFilter = type; generateAndRenderTasks(); };
-        container.appendChild(btn);
+        if (!label && type.startsWith('custom_')) { const idx = parseInt(type.split('_')[1]); if (userSettings.customRules[idx]) label = userSettings.customRules[idx].label; else label = 'Własne'; }
+        if (!label) label = type; const count = counts[type] || 0; if (type !== 'all' && count > 0) label += ` (${count})`;
+        const btn = document.createElement('button'); btn.className = `filter-chip ${currentTypeFilter === type ? 'active' : ''}`; btn.textContent = label; btn.onclick = () => { currentTypeFilter = type; generateAndRenderTasks(); }; container.appendChild(btn);
     });
 }
 
@@ -1100,8 +1010,7 @@ function saveConfiguration(fromDOM = true) {
         });
     }
 
-    // Używamy update jeśli dokument już istnieje, aby nie nadpisać 'numer_gospodarstwa'
-    return db.collection('konfiguracja').doc(currentUser.id).collection('settings').doc('tasks').set(userSettings, {merge: true});
+    return db.collection('konfiguracja').doc(currentUser.id).collection('settings').doc('tasks').set(userSettings);
 }
 
 document.getElementById('customTaskForm').addEventListener('submit', (e) => {
@@ -1113,7 +1022,6 @@ document.getElementById('customTaskForm').addEventListener('submit', (e) => {
 
     userSettings.customRules.push({ label: name, base: base, start: s, end: end, enabled: true });
     
-    // Zapisz od razu
     saveConfiguration(false).then(() => {
         alert(`Dodano: ${name}`);
         renderConfig();
@@ -1155,35 +1063,32 @@ function filterHerd(type) {
     renderHerdList(type);
 }
 
-function renderHerdList(type) { 
-    const list = document.getElementById('herdList'); list.innerHTML = '';
-    let filtered = myHerd; if (type !== 'all') filtered = myHerd.filter(a => a.type === type);
-    const search = document.getElementById('herdSearch').value.toLowerCase();
-    if (search) filtered = filtered.filter(a => a.tag.toLowerCase().includes(search));
-    document.getElementById('herdTitle').textContent = type === 'all' ? 'Pełna Lista' : `Lista: ${type.toUpperCase()}`;
-    const today = new Date();
-    filtered.forEach(a => {
-        let detailsHtml = ''; let statusIcon = '';
-        if (a.type === 'krowa' || a.type === 'jalowka') {
-            if (a.isPregnantConfirmed) statusIcon = '✅ Cielna'; else if (a.usgStatus === 'negative') statusIcon = '❌ Pusta'; else if (a.lastInsemination) statusIcon = '❓ Do badania'; else statusIcon = '⚪ Oczekiwanie';
-            const ins = a.lastInsemination ? a.lastInsemination : '-';
-            let calv = '-'; let dim = '-';
-            if (a.lastInsemination) { const est = addDays(new Date(a.lastInsemination), userSettings.gestation || 280); calv = est.toLocaleDateString('pl-PL'); }
-            if (a.lastCalving) { const days = Math.floor((today - new Date(a.lastCalving)) / (1000 * 60 * 60 * 24)); dim = `${days} dni`; }
-            detailsHtml = `<div style="font-size:11px; color:#555; margin-top:5px; display:grid; grid-template-columns: 1fr 1fr; gap:5px;"><span>💉 Ost. zac: <b>${ins}</b></span><span>👶 Termin: <b>${calv}</b></span><span>📊 Laktacja: <b>${dim}</b></span><span style="font-weight:bold; color:${a.isPregnantConfirmed?'green':'#555'}">${statusIcon}</span></div>`;
-        }
-        const div = document.createElement('div'); div.className = 'card'; div.style.padding = '10px';
-        div.innerHTML = `<div style="display:flex; justify-content:space-between; align-items:center;"><strong style="color:#2e7d32; font-size:16px;">${a.tag}</strong><span class="badge" style="background:#eee; color:#333;">${a.type}</span></div>${detailsHtml}`;
-        div.onclick = () => openAnimalCard(a.id);
-        list.appendChild(div);
+function updateDashboardStats() {
+    document.getElementById('cntCows').textContent = myHerd.filter(a => a.type === 'krowa').length;
+    document.getElementById('cntHeifers').textContent = myHerd.filter(a => a.type === 'jalowka').length;
+    document.getElementById('cntBulls').textContent = myHerd.filter(a => a.type === 'byk').length;
+}
+
+function setupNavigation() {
+    document.querySelectorAll('.nav-item').forEach(btn => {
+        btn.addEventListener('click', () => {
+            switchSection(btn.dataset.target);
+        });
+    });
+    document.getElementById('logoutBtn').addEventListener('click', () => {
+        auth.signOut();
     });
 }
-document.getElementById('herdSearch').addEventListener('input', () => renderHerdList('all'));
-function renderLactationChart() { 
-    const ctx = document.getElementById('lactationChart'); const buckets = [0, 0, 0, 0, 0, 0, 0]; const bucketAnimals = [[], [], [], [], [], [], []]; const today = new Date();
-    myHerd.forEach(a => { if (a.type === 'krowa' && a.lastCalving) { const calvDate = new Date(a.lastCalving); const months = (today - calvDate) / (1000 * 60 * 60 * 24 * 30.4); let idx = 0; if (months <= 2) idx = 0; else if (months <= 4) idx = 1; else if (months <= 6) idx = 2; else if (months <= 8) idx = 3; else if (months <= 10) idx = 4; else if (months <= 12) idx = 5; else idx = 6; buckets[idx]++; bucketAnimals[idx].push(a); } });
-    if (window.myChart) window.myChart.destroy(); window.myChart = new Chart(ctx, { type: 'bar', data: { labels: ['0-2m', '2-4m', '4-6m', '6-8m', '8-10m', '10-12m', '>12m'], datasets: [{ label: 'Sztuk', data: buckets, backgroundColor: '#2e7d32', borderRadius: 4 }] }, options: { plugins: { legend: { display: false } }, onClick: (evt, activeEls) => { if (activeEls.length > 0) { const idx = activeEls[0].index; showListModal(`Laktacja: ${window.myChart.data.labels[idx]}`, bucketAnimals[idx]); } } } });
+
+function switchSection(id) { 
+    document.querySelectorAll('.section').forEach(s => s.classList.remove('active')); 
+    document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active')); 
+    document.getElementById(id).classList.add('active'); 
+    const navBtn = document.querySelector(`.nav-item[data-target="${id}"]`); 
+    if(navBtn) navBtn.classList.add('active'); 
+    if(id === 'section-treatments') loadTreatments();
 }
+
 function addDays(date, days) { const r = new Date(date); r.setDate(r.getDate() + days); return r; }
 function changeMonth(delta) { currentCalDate.setMonth(currentCalDate.getMonth() + delta); renderCalendar(currentCalDate); }
 function renderCalendar(date) { 
@@ -1205,5 +1110,5 @@ function switchSection(id) {
     document.getElementById(id).classList.add('active'); 
     const navBtn = document.querySelector(`.nav-item[data-target="${id}"]`); 
     if(navBtn) navBtn.classList.add('active'); 
-    // Nie ładujemy automatycznie - użytkownik musi kliknąć przycisk
+    if(id === 'section-treatments') loadTreatments();
 }
