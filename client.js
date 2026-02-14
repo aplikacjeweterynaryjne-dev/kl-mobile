@@ -37,7 +37,8 @@ auth.onAuthStateChanged(user => {
     if (user) {
         db.collection('konfiguracja').where('uid', '==', user.uid).get().then(snap => {
             if(!snap.empty && snap.docs[0].data().Rola === 'klient') {
-                currentUser = { ...snap.docs[0].data(), uid: user.uid };
+                // POPRAWKA: Pobieramy ID dokumentu, żeby móc do niego zapisywać
+                currentUser = { id: snap.docs[0].id, ...snap.docs[0].data(), uid: user.uid };
                 initApp();
             } else { window.location.href = 'index.html'; }
         });
@@ -66,12 +67,13 @@ function initApp() {
 
 async function loadSettings() {
     try {
+        if(!currentUser || !currentUser.id) return;
         const doc = await db.collection('konfiguracja').doc(currentUser.id).collection('settings').doc('tasks').get();
         if (doc.exists) {
             const saved = doc.data();
             userSettings = { ...DEFAULT_SETTINGS, ...saved };
         }
-    } catch (e) { console.error("Błąd ustawień", e); }
+    } catch (e) { console.error("Błąd ustawień (load):", e); }
 }
 
 function loadHerd() {
@@ -84,16 +86,13 @@ function loadHerd() {
           generateAndRenderTasks(); 
           renderLactationChart();
           renderCalendar(currentCalDate);
-      }, error => {
-          console.error("Błąd ładowania stada:", error);
-      });
+      }, error => console.error("Błąd stada:", error));
 }
 
 function loadCompletedTasks() {
     const dateLimit = new Date();
     dateLimit.setDate(dateLimit.getDate() - 60); 
     
-    // UWAGA: To zapytanie wymaga indeksu w Firebase Console!
     db.collection('task_logs')
       .where('ownerUid', '==', currentUser.uid)
       .where('completedAt', '>=', dateLimit)
@@ -106,9 +105,7 @@ function loadCompletedTasks() {
               }
           });
           generateAndRenderTasks();
-      }, error => {
-          console.error("Błąd ładowania logów zadań (Sprawdź indeksy Firebase):", error);
-      });
+      }, error => console.error("Błąd logów (wymagany indeks):", error));
 }
 
 // --- SILNIK ZADAŃ ---
@@ -555,7 +552,7 @@ function deleteInsemination(animalId, index) {
     });
 }
 
-// --- ZARZĄDZANIE MODALAMI I FORMULARZAMI ---
+// --- ZARZĄDZANIE MODALAMI I FORMULARZAMI (POPRAWIONY ADD) ---
 
 function setupModals() {
     window.closeModal = (id) => document.getElementById(id).style.display = 'none';
@@ -563,9 +560,8 @@ function setupModals() {
     window.openAnimalModal = () => {
         document.getElementById('animalForm').reset();
         document.getElementById('animalModal').style.display = 'flex';
-        // Domyślna krowa
-        document.getElementById('inpType').value = 'krowa';
         document.getElementById('cowFields').classList.remove('hidden');
+        document.getElementById('inpType').value = 'krowa';
     };
     
     document.getElementById('inpType').addEventListener('change', (e) => {
@@ -606,14 +602,14 @@ function setupModals() {
         }).catch(err => alert("Błąd zapisu: " + err.message));
     });
 
-    // Formularz DODAWANIA ZWIERZĘCIA
+    // Formularz DODAWANIA ZWIERZĘCIA (POPRAWIONE ZMIENNE)
     document.getElementById('animalForm').addEventListener('submit', (e) => {
         e.preventDefault();
         const type = document.getElementById('inpType').value;
         const tag = document.getElementById('inpTag').value;
         const dob = document.getElementById('inpDob').value;
         const lastCalving = document.getElementById('inpLastCalving').value || null;
-        const lastInsem = document.getElementById('inpLastInsem').value || null;
+        const lastInsem = document.getElementById('inpLastInsem').value || null; // Zmienna to lastInsem
         const semen = document.getElementById('inpSemen').value || null;
         const pregStatus = document.getElementById('inpPregStatus').value;
 
@@ -629,9 +625,11 @@ function setupModals() {
             historyInsemination.push({ date: lastInsem, bull: semen || 'Nieznany', note: 'Start', added: new Date().toISOString() });
         }
 
+        // NAPRAWA: lastInsemination: lastInsem (zamiast nieistniejącej lastInsemination)
         db.collection('animals').add({
-            ownerUid: currentUser.uid, tag, type, dob, lastCalving, lastInsemination, semen,
-            historyInsemination, isPregnantConfirmed, usgStatus,
+            ownerUid: currentUser.uid, tag, type, dob, lastCalving, 
+            lastInsemination: lastInsem, // TUTAJ BYŁ BŁĄD
+            semen, historyInsemination, isPregnantConfirmed, usgStatus,
             createdAt: firebase.firestore.FieldValue.serverTimestamp()
         }).then(() => {
             alert("Dodano zwierzę!");
@@ -640,7 +638,7 @@ function setupModals() {
     });
 }
 
-// --- KONFIGURACJA (FIX: ZAPISYWANIE BEZ CZYTANIA Z DOMU PRZY ADD) ---
+// --- KONFIGURACJA ---
 
 function renderConfig() {
     const list = document.getElementById('configList');
@@ -690,6 +688,11 @@ function renderConfig() {
 }
 
 function saveConfiguration(fromDOM = true) {
+    if(!currentUser || !currentUser.id) {
+        alert("Błąd: Nie znaleziono ID konfiguracji użytkownika.");
+        return Promise.reject("No user config ID");
+    }
+
     if(fromDOM) {
         ['usg', 'heat', 'dry', 'rovac', 'kexxtone'].forEach(k => {
             const s = document.getElementById(`cfg_start_${k}`);
@@ -728,7 +731,7 @@ document.getElementById('customTaskForm').addEventListener('submit', (e) => {
         alert(`Dodano nowe zadanie: ${name}`);
         renderConfig();
         document.getElementById('customTaskForm').reset();
-    }).catch(err => alert("Błąd zapisu ustawień: " + err.message));
+    }).catch(err => alert("Błąd zapisu ustawień (sprawdź uprawnienia): " + err.message));
 });
 
 function removeCustomRule(idx) {
