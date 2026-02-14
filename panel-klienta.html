@@ -8,201 +8,311 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        /* --- STYLE BAZOWE (Podobne do aplikacji lekarza, ale z innym akcentem) --- */
-        body { font-family: 'Nunito', sans-serif; background-color: #f4f7f6; margin: 0; padding-bottom: 80px; color: #333; }
+        /* --- STYLE BAZOWE --- */
+        :root { --primary: #2e7d32; --warn: #f39c12; --danger: #c0392b; --info: #2980b9; --bg: #f4f7f6; }
+        body { font-family: 'Nunito', sans-serif; background-color: var(--bg); margin: 0; padding-bottom: 90px; color: #333; -webkit-tap-highlight-color: transparent; }
         
-        /* Navbar dolny */
+        /* Navbar */
         .bottom-nav {
             position: fixed; bottom: 0; left: 0; width: 100%; background: #fff;
-            display: flex; justify-content: space-around; padding: 10px 0;
-            box-shadow: 0 -2px 10px rgba(0,0,0,0.05); z-index: 1000;
+            display: flex; justify-content: space-around; padding: 12px 0;
+            box-shadow: 0 -2px 15px rgba(0,0,0,0.08); z-index: 1000;
         }
-        .nav-item {
-            display: flex; flex-direction: column; align-items: center;
-            font-size: 11px; color: #777; background: none; border: none; flex: 1;
-        }
-        .nav-item i { font-size: 20px; margin-bottom: 4px; }
-        .nav-item.active { color: #2e7d32; font-weight: bold; } /* Zielony rolniczy */
+        .nav-item { display: flex; flex-direction: column; align-items: center; font-size: 10px; color: #999; background: none; border: none; flex: 1; transition: color 0.2s; }
+        .nav-item i { font-size: 22px; margin-bottom: 4px; }
+        .nav-item.active { color: var(--primary); font-weight: 800; transform: translateY(-2px); }
 
         /* Sekcje */
         .section { display: none; padding: 15px; animation: fadeIn 0.3s; }
         .section.active { display: block; }
-        @keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
+        @keyframes fadeIn { from { opacity:0; transform:translateY(5px); } to { opacity:1; transform:translateY(0); } }
 
         /* Karty */
-        .card { background: #fff; border-radius: 12px; padding: 15px; margin-bottom: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.03); }
-        .card h3 { margin-top: 0; font-size: 18px; color: #2e7d32; }
+        .card { background: #fff; border-radius: 16px; padding: 15px; margin-bottom: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.04); border: 1px solid rgba(0,0,0,0.02); }
+        .card h3 { margin-top: 0; font-size: 18px; color: var(--primary); display: flex; justify-content: space-between; align-items: center; }
 
         /* Dashboard Stats */
         .stats-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 20px; }
-        .stat-box { background: #fff; padding: 10px; border-radius: 10px; text-align: center; border-bottom: 3px solid #ddd; }
-        .stat-box.cows { border-color: #2e7d32; }
-        .stat-box.heifers { border-color: #f39c12; }
-        .stat-box.bulls { border-color: #c0392b; }
-        .stat-val { font-size: 22px; font-weight: 800; display: block; }
-        .stat-label { font-size: 11px; color: #666; }
+        .stat-box { background: #fff; padding: 15px 5px; border-radius: 12px; text-align: center; border-bottom: 4px solid #ddd; cursor: pointer; transition: transform 0.1s; box-shadow: 0 2px 5px rgba(0,0,0,0.03); }
+        .stat-box:active { transform: scale(0.95); }
+        .stat-box.cows { border-color: var(--primary); }
+        .stat-box.heifers { border-color: var(--warn); }
+        .stat-box.bulls { border-color: var(--danger); }
+        .stat-val { font-size: 24px; font-weight: 900; display: block; color: #333; }
+        .stat-label { font-size: 11px; color: #777; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; }
+
+        /* Zadania Tabs */
+        .task-tabs { display: flex; background: #e0e0e0; border-radius: 10px; padding: 4px; margin-bottom: 15px; }
+        .task-tab { flex: 1; padding: 8px; text-align: center; font-size: 12px; font-weight: 700; border-radius: 8px; border: none; background: none; color: #666; cursor: pointer; }
+        .task-tab.active { background: #fff; color: var(--primary); box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+
+        .sub-tabs { display: flex; gap: 10px; margin-bottom: 10px; overflow-x: auto; padding-bottom: 5px; }
+        .sub-tab { padding: 6px 12px; background: #fff; border: 1px solid #ddd; border-radius: 20px; font-size: 12px; white-space: nowrap; cursor: pointer; }
+        .sub-tab.active { background: var(--primary); color: #fff; border-color: var(--primary); }
 
         /* Lista Zadań */
-        .task-item { 
-            display: flex; align-items: center; justify-content: space-between; 
-            padding: 12px; border-bottom: 1px solid #eee; 
-        }
-        .task-item.urgent { border-left: 4px solid #c0392b; background: #fff5f5; }
-        .task-item.warning { border-left: 4px solid #f39c12; }
-        .task-item.info { border-left: 4px solid #3498db; }
-        
-        /* Przyciski */
-        .btn { padding: 10px 15px; border-radius: 8px; border: none; font-weight: 600; cursor: pointer; }
-        .btn-primary { background: #2e7d32; color: #fff; width: 100%; }
-        .floating-btn {
-            position: fixed; bottom: 80px; right: 20px;
-            width: 55px; height: 55px; border-radius: 50%;
-            background: #2e7d32; color: #fff; font-size: 24px;
-            display: flex; align-items: center; justify-content: center;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.2); z-index: 999;
-        }
+        .task-item { display: flex; align-items: center; justify-content: space-between; padding: 12px; border-bottom: 1px solid #f0f0f0; background: #fff; border-radius: 8px; margin-bottom: 8px; }
+        .task-item.done { opacity: 0.6; background: #f9f9f9; text-decoration: line-through; }
+        .task-item.urgent { border-left: 4px solid var(--danger); }
+        .task-item.warning { border-left: 4px solid var(--warn); }
+        .task-item.info { border-left: 4px solid var(--info); }
+        .task-animal-tag { font-weight: 800; color: var(--primary); cursor: pointer; text-decoration: underline; }
 
-        /* Formularz Tabs */
-        .form-tabs { display: flex; gap: 5px; margin-bottom: 15px; border-bottom: 1px solid #ddd; }
-        .form-tab { padding: 10px; background: none; border: none; border-bottom: 3px solid transparent; font-weight: 600; color: #777; }
-        .form-tab.active { border-color: #2e7d32; color: #2e7d32; }
-        .tab-content { display: none; }
-        .tab-content.active { display: block; }
-        
-        .form-row { margin-bottom: 10px; }
-        .form-row label { display: block; font-size: 13px; font-weight: bold; margin-bottom: 4px; color: #555; }
-        .form-row input, .form-row select { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; }
-        
+        /* Kalendarz */
+        .calendar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; font-weight: bold; font-size: 18px; }
+        .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; text-align: center; }
+        .cal-day-name { font-size: 10px; color: #999; font-weight: 700; padding: 5px 0; }
+        .cal-day { background: #fff; height: 40px; border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 12px; position: relative; border: 1px solid transparent; cursor: pointer; }
+        .cal-day.today { border-color: var(--primary); color: var(--primary); font-weight: bold; }
+        .cal-day.has-event { background: #e8f5e9; }
+        .cal-day.selected { background: var(--primary); color: #fff; }
+        .cal-dot { width: 6px; height: 6px; background: var(--danger); border-radius: 50%; position: absolute; bottom: 4px; }
+
+        /* Formularze */
+        .form-row { margin-bottom: 12px; }
+        .form-row label { display: block; font-size: 12px; font-weight: bold; margin-bottom: 4px; color: #555; }
+        .form-row input, .form-row select, .form-row textarea { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; background: #fff; box-sizing: border-box; }
+        .btn { width: 100%; padding: 14px; border-radius: 10px; border: none; font-weight: 700; font-size: 14px; cursor: pointer; margin-top: 10px; }
+        .btn-primary { background: var(--primary); color: #fff; box-shadow: 0 4px 10px rgba(46, 125, 50, 0.3); }
+        .btn-danger { background: var(--danger); color: #fff; }
+
+        /* Floating Button */
+        .fab-container { position: fixed; bottom: 85px; right: 20px; display: flex; flex-direction: column; gap: 10px; z-index: 999; }
+        .fab-btn { width: 50px; height: 50px; border-radius: 50%; border: none; color: white; font-size: 24px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(0,0,0,0.2); cursor: pointer; }
+        .fab-main { background: var(--primary); width: 60px; height: 60px; font-size: 30px; }
+        .fab-mini { background: var(--info); width: 50px; height: 50px; font-size: 20px; }
+        .fab-label { position: absolute; right: 70px; background: #333; color: #fff; padding: 5px 10px; border-radius: 5px; font-size: 12px; display: none; white-space: nowrap; }
+        .fab-wrapper:hover .fab-label { display: block; }
+
         /* Modal */
-        .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: none; justify-content: center; align-items: flex-end; z-index: 2000; }
-        .modal-content { background: #fff; width: 100%; max-width: 600px; height: 90vh; border-radius: 20px 20px 0 0; padding: 20px; overflow-y: auto; animation: slideUp 0.3s; }
-        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+        .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); display: none; justify-content: center; align-items: center; z-index: 2000; backdrop-filter: blur(3px); }
+        .modal-content { background: #fff; width: 90%; max-width: 500px; max-height: 90vh; border-radius: 20px; padding: 25px; overflow-y: auto; animation: popUp 0.3s; position: relative; }
+        @keyframes popUp { from { transform: scale(0.9); opacity:0; } to { transform: scale(1); opacity:1; } }
+        .close-modal { position: absolute; top: 15px; right: 20px; font-size: 24px; background: none; border: none; color: #999; cursor: pointer; }
 
-        .hidden { display: none; }
+        /* Status Badges */
+        .badge { padding: 4px 8px; border-radius: 12px; font-size: 10px; font-weight: bold; color: #fff; }
+        .bg-pregnant { background: var(--primary); }
+        .bg-open { background: var(--warn); }
+        .bg-fresh { background: var(--info); }
+        .bg-unknown { background: #95a5a6; }
+
+        .hidden { display: none !important; }
     </style>
 </head>
 <body>
 
     <div id="section-dashboard" class="section active">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-            <h2 style="margin:0;">Moja Obora 🐮</h2>
-            <button id="logoutBtn" style="background:none; border:none; color:#c0392b; font-weight:bold;">Wyloguj</button>
+            <div>
+                <h2 style="margin:0; font-weight:900; color:#333;">Moje Stado</h2>
+                <small id="welcomeDate" style="color:#777;">Dziś jest...</small>
+            </div>
+            <button id="logoutBtn" style="background:none; border:none; color:var(--danger); font-size:24px;"><i class="bi bi-box-arrow-right"></i></button>
         </div>
 
         <div class="stats-grid">
-            <div class="stat-box cows"><span class="stat-val" id="cntCows">0</span><span class="stat-label">Krowy</span></div>
-            <div class="stat-box heifers"><span class="stat-val" id="cntHeifers">0</span><span class="stat-label">Jałówki</span></div>
-            <div class="stat-box bulls"><span class="stat-val" id="cntBulls">0</span><span class="stat-label">Byki</span></div>
-        </div>
-
-        <div class="card">
-            <h3>📅 Zadania na dziś</h3>
-            <div id="tasksList">
-                <p style="color:#777; text-align:center;">Brak zadań na dzisiaj.</p>
+            <div class="stat-box cows" onclick="filterHerd('krowa')">
+                <span class="stat-val" id="cntCows">0</span>
+                <span class="stat-label">Krowy</span>
+            </div>
+            <div class="stat-box heifers" onclick="filterHerd('jalowka')">
+                <span class="stat-val" id="cntHeifers">0</span>
+                <span class="stat-label">Jałówki</span>
+            </div>
+            <div class="stat-box bulls" onclick="filterHerd('byk')">
+                <span class="stat-val" id="cntBulls">0</span>
+                <span class="stat-label">Byki</span>
             </div>
         </div>
 
         <div class="card">
-            <h3>📊 Faza Laktacji</h3>
+            <h3>📈 Stopień Laktacji</h3>
             <canvas id="lactationChart" style="max-height: 200px;"></canvas>
+        </div>
+
+        <div class="card">
+            <h3>📋 Zadania</h3>
+            
+            <div class="task-tabs">
+                <button class="task-tab active" onclick="switchTaskTime('today')">DZIŚ</button>
+                <button class="task-tab" onclick="switchTaskTime('month')">TEN MIESIĄC</button>
+            </div>
+
+            <div class="sub-tabs">
+                <button class="sub-tab active" onclick="filterTasks('todo')">Do zrobienia</button>
+                <button class="sub-tab" onclick="filterTasks('overdue')">Przeterminowane</button>
+                <button class="sub-tab" onclick="filterTasks('done')">Wykonane</button>
+            </div>
+
+            <div id="tasksContainer">
+                </div>
         </div>
     </div>
 
     <div id="section-herd" class="section">
-        <input type="search" id="herdSearch" placeholder="🔍 Szukaj nr kolczyka..." style="width:100%; padding:12px; border:1px solid #ddd; border-radius:8px; margin-bottom:15px;">
-        <div id="herdList">
-            </div>
+        <h2 id="herdTitle">Pełna Lista</h2>
+        <div style="display:flex; gap:10px; margin-bottom:15px;">
+            <input type="search" id="herdSearch" placeholder="🔍 Szukaj kolczyka..." style="flex:1; padding:12px; border:1px solid #ddd; border-radius:10px;">
+            <button onclick="filterHerd('all')" style="background:#eee; border:none; padding:0 15px; border-radius:10px;">Reset</button>
+        </div>
+        <div id="herdList"></div>
     </div>
 
     <div id="section-calendar" class="section">
-        <h3>Kalendarz Wycieleń</h3>
-        <div id="calvingList"></div>
+        <div class="card">
+            <div class="calendar-header">
+                <button onclick="changeMonth(-1)" style="background:none; border:none; font-size:20px;">❮</button>
+                <span id="calTitle">Listopad 2025</span>
+                <button onclick="changeMonth(1)" style="background:none; border:none; font-size:20px;">❯</button>
+            </div>
+            <div class="calendar-grid">
+                <div class="cal-day-name">Pn</div><div class="cal-day-name">Wt</div><div class="cal-day-name">Śr</div><div class="cal-day-name">Cz</div><div class="cal-day-name">Pt</div><div class="cal-day-name">Sb</div><div class="cal-day-name">Nd</div>
+            </div>
+            <div id="calendarDays" class="calendar-grid"></div>
+        </div>
+        
+        <h3 id="calSelectedDateTitle">Wydarzenia w dniu...</h3>
+        <div id="calEventsList">
+            <p style="color:#999; text-align:center;">Wybierz dzień z kalendarza.</p>
+        </div>
     </div>
 
-    <div id="section-docs" class="section">
-        <h3>Dokumentacja Weterynaryjna</h3>
-        <p style="font-size:12px; color:#666;">Pobieram dane z lecznicy...</p>
-        <div id="vetCardsList"></div>
+    <div id="section-insem" class="section">
+        <h2>💉 Nowe Zacielenie</h2>
+        <div class="card">
+            <form id="insemForm">
+                <div class="form-row">
+                    <label>Nr Kolczyka (Wybierz z listy)</label>
+                    <select id="insemTag" required></select>
+                </div>
+                <div class="form-row">
+                    <label>Data Zacielenia</label>
+                    <input type="date" id="insemDate" required>
+                </div>
+                <div class="form-row">
+                    <label>Nazwa Nasienia / Buhaja</label>
+                    <input type="text" id="insemBull" placeholder="np. BB-001" required>
+                </div>
+                <div class="form-row">
+                    <label>Notatka (Opcjonalnie)</label>
+                    <textarea id="insemNote" rows="2"></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary">Zapisz Inseminację</button>
+            </form>
+        </div>
+        <div class="card">
+            <h3>Ostatnio dodane</h3>
+            <div id="recentInsemList" style="font-size:12px;"></div>
+        </div>
     </div>
 
-    <button class="floating-btn" id="addAnimalBtn">+</button>
+    <div class="fab-container">
+        <div class="fab-wrapper" style="position:relative; display:flex; align-items:center; justify-content:flex-end;">
+            <div class="fab-label">Dodaj Inseminację</div>
+            <button class="fab-btn fab-mini" onclick="goToInsem()"><i class="bi bi-droplet"></i></button>
+        </div>
+        <div class="fab-wrapper" style="position:relative; display:flex; align-items:center; justify-content:flex-end;">
+            <div class="fab-label">Dodaj Zwierzę</div>
+            <button class="fab-btn fab-main" onclick="openAnimalModal()"><i class="bi bi-plus"></i></button>
+        </div>
+    </div>
 
     <div class="bottom-nav">
         <button class="nav-item active" data-target="section-dashboard"><i class="bi bi-grid-fill"></i>Pulpit</button>
         <button class="nav-item" data-target="section-herd"><i class="bi bi-list-ul"></i>Stado</button>
-        <button class="nav-item" data-target="section-calendar"><i class="bi bi-calendar-event"></i>Wycielenia</button>
-        <button class="nav-item" data-target="section-docs"><i class="bi bi-file-earmark-medical"></i>Leczenie</button>
+        <button class="nav-item" data-target="section-calendar"><i class="bi bi-calendar-date"></i>Kalendarz</button>
+        <button class="nav-item" data-target="section-insem"><i class="bi bi-heart-pulse"></i>Rozród</button>
+    </div>
+
+    <div id="animalCardModal" class="modal">
+        <div class="modal-content" style="max-height: 95vh;">
+            <button class="close-modal" onclick="closeModal('animalCardModal')">✕</button>
+            <h2 id="cardTag" style="color:var(--primary); text-decoration:underline;">PL-XXX</h2>
+            
+            <div class="badge-container" id="cardBadges" style="margin-bottom:10px;"></div>
+
+            <div style="background:#f9f9f9; padding:10px; border-radius:10px; margin-bottom:10px;">
+                <strong>Podstawowe:</strong><br>
+                Ur: <span id="cardDob"></span> (<span id="cardAge"></span>)<br>
+                Typ: <span id="cardType"></span><br>
+                Lokalizacja: <span id="cardLoc"></span>
+            </div>
+
+            <div style="background:#e8f5e9; padding:10px; border-radius:10px; margin-bottom:10px;">
+                <strong>Rozród:</strong><br>
+                Ostatnie wycielenie: <span id="cardLastCalving"></span><br>
+                Dni laktacji: <span id="cardDim"></span><br>
+                Ostatnie zacielenie: <span id="cardLastInsem"></span> (<span id="cardSemen"></span>)<br>
+                Status ciąży: <span id="cardPregStatus" style="font-weight:bold;"></span>
+            </div>
+
+            <h3>Historia Zdarzeń</h3>
+            <div id="cardHistory" style="font-size:12px; max-height:150px; overflow-y:auto; border-top:1px solid #eee;">
+                Ładowanie...
+            </div>
+            
+            <button class="btn btn-danger" id="btnDeleteAnimal" style="margin-top:20px; font-size:12px; padding:8px;">Usuń ze stada</button>
+        </div>
     </div>
 
     <div id="animalModal" class="modal">
         <div class="modal-content">
-            <div style="display:flex; justify-content:space-between; align-items:center;">
-                <h3>Dodaj Zwierzę</h3>
-                <button id="closeModal" style="background:none; border:none; font-size:24px;">✕</button>
-            </div>
-
-            <div class="form-tabs">
-                <button class="form-tab active" data-tab="tab-basic">1. Dane</button>
-                <button class="form-tab" data-tab="tab-repro">2. Rozród</button>
-                <button class="form-tab" data-tab="tab-other">3. Inne</button>
-            </div>
-
+            <button class="close-modal" onclick="closeModal('animalModal')">✕</button>
+            <h3>Dodaj Zwierzę</h3>
             <form id="animalForm">
-                <div id="tab-basic" class="tab-content active">
+                <div class="form-row">
+                    <label>Nr Kolczyka *</label>
+                    <input type="text" id="inpTag" required placeholder="PL...">
+                </div>
+                <div class="form-row">
+                    <label>Typ *</label>
+                    <select id="inpType" required>
+                        <option value="krowa">Krowa</option>
+                        <option value="jalowka">Jałówka</option>
+                        <option value="byk">Byk</option>
+                    </select>
+                </div>
+                <div class="form-row">
+                    <label>Data Urodzenia *</label>
+                    <input type="date" id="inpDob" required>
+                </div>
+                <div class="form-row">
+                    <label>Lokalizacja</label>
+                    <input type="text" id="inpLoc">
+                </div>
+                
+                <div id="cowFields" class="hidden" style="background:#f9f9f9; padding:10px; border-radius:8px;">
                     <div class="form-row">
-                        <label>Nr Kolczyka *</label>
-                        <input type="text" id="inpTag" required placeholder="np. PL005...">
+                        <label>Ostatnie wycielenie</label>
+                        <input type="date" id="inpLastCalving">
                     </div>
                     <div class="form-row">
-                        <label>Lokalizacja / Obora</label>
-                        <input type="text" id="inpLoc" placeholder="np. Stara obora">
-                    </div>
-                    <div class="form-row">
-                        <label>Rodzaj *</label>
-                        <select id="inpType" required>
-                            <option value="krowa">Krowa</option>
-                            <option value="jalowka">Jałówka</option>
-                            <option value="byk">Byk</option>
-                        </select>
-                    </div>
-                    <div class="form-row">
-                        <label>Data Urodzenia *</label>
-                        <input type="date" id="inpDob" required>
+                        <label>Ostatnie zacielenie</label>
+                        <input type="date" id="inpLastInsem">
                     </div>
                 </div>
 
-                <div id="tab-repro" class="tab-content">
-                    <div id="reproSection" class="hidden">
-                        <div class="form-row">
-                            <label>Ostatnie zacielenie</label>
-                            <input type="date" id="inpLastInsem">
-                        </div>
-                        <div class="form-row">
-                            <label>Nazwa nasienia</label>
-                            <input type="text" id="inpSemen">
-                        </div>
-                    </div>
-                    
-                    <div id="cowSection" class="hidden">
-                        <div class="form-row">
-                            <label>Ostatnie wycielenie</label>
-                            <input type="date" id="inpLastCalving">
-                        </div>
-                    </div>
-                    <p id="bullMsg" class="hidden" style="color:#666;">Brak danych rozrodczych dla byka.</p>
-                </div>
-
-                <div id="tab-other" class="tab-content">
-                     <div class="form-row">
-                        <label>Notatki</label>
-                        <input type="text" id="inpNotes">
-                    </div>
-                </div>
-
-                <div style="margin-top:20px;">
-                    <button type="submit" class="btn btn-primary">Zapisz do stada</button>
-                </div>
+                <button type="submit" class="btn btn-primary">Dodaj do stada</button>
             </form>
+        </div>
+    </div>
+
+    <div id="taskConfirmModal" class="modal">
+        <div class="modal-content">
+            <h3>Potwierdź wykonanie</h3>
+            <p id="taskConfirmText">Czy wykonałeś zadanie?</p>
+            
+            <div id="usgResultOptions" class="hidden">
+                <p><strong>Jaki jest wynik badania?</strong></p>
+                <button class="btn btn-primary" onclick="confirmTaskUSG(true)">✅ Cielna (Pozytywny)</button>
+                <button class="btn btn-danger" onclick="confirmTaskUSG(false)">❌ Niecielna (Negatywny)</button>
+            </div>
+
+            <div id="standardConfirmBtns">
+                <button class="btn btn-primary" onclick="confirmTaskStandard()">Tak, wykonano</button>
+                <button class="btn" onclick="closeModal('taskConfirmModal')" style="background:#eee; color:#333;">Anuluj</button>
+            </div>
         </div>
     </div>
 
