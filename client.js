@@ -16,6 +16,7 @@ const auth = firebase.auth();
 let currentUser = null;
 let myHerd = [];
 let completedTasks = [];
+let myTreatments = []; // NOWE: Tablica na karty leczenia
 let currentTaskFilter = 'todo'; 
 let currentTypeFilter = 'all';
 
@@ -37,6 +38,7 @@ auth.onAuthStateChanged(user => {
     if (user) {
         db.collection('konfiguracja').where('uid', '==', user.uid).get().then(snap => {
             if(!snap.empty && snap.docs[0].data().Rola === 'klient') {
+                // Pobieramy ID dokumentu i dane, w tym numer gospodarstwa
                 currentUser = { id: snap.docs[0].id, ...snap.docs[0].data(), uid: user.uid };
                 initApp();
             } else { window.location.href = 'index.html'; }
@@ -48,9 +50,16 @@ function initApp() {
     const dateEl = document.getElementById('welcomeDate');
     if(dateEl) dateEl.textContent = new Date().toLocaleDateString('pl-PL', { weekday: 'long', day: 'numeric', month: 'long' });
     
+    // Wstawienie numeru gospodarstwa do inputa w opcjach (jeśli istnieje)
+    if(currentUser.numer_gospodarstwa) {
+        const farmInput = document.getElementById('cfgFarmNumber');
+        if(farmInput) farmInput.value = currentUser.numer_gospodarstwa;
+    }
+
     loadSettings().then(() => {
         loadHerd(); 
         loadCompletedTasks();
+        loadTreatments(); // NOWE: Uruchomienie pobierania kart leczenia
         renderConfig();
     });
     
@@ -107,6 +116,85 @@ function loadCompletedTasks() {
       }, error => console.error("Błąd logów:", error));
 }
 
+// --- NOWOŚĆ: ŁADOWANIE KART LECZENIA ---
+function loadTreatments() {
+    const farmNum = currentUser.numer_gospodarstwa;
+    const container = document.getElementById('treatmentsList');
+    
+    if(!farmNum) {
+        if(container) container.innerHTML = '<div style="text-align:center; padding:20px; color:#999;">Wpisz numer gospodarstwa w Opcjach, aby pobrać karty.</div>';
+        return;
+    }
+
+    // Obsługa wielu numerów po przecinku (np. "PL123, PL456")
+    const farmNumbers = farmNum.split(',').map(s => s.trim()).filter(s => s.length > 0);
+
+    if(farmNumbers.length === 0) return;
+
+    // Pobieramy wizyty z kolekcji 'wizyty' gdzie 'numer_gospodarstwa' jest na liście
+    db.collection('wizyty')
+      .where('numer_gospodarstwa', 'in', farmNumbers)
+      .limit(50)
+      .onSnapshot(snap => {
+          myTreatments = [];
+          snap.forEach(doc => {
+              myTreatments.push({ id: doc.id, ...doc.data() });
+          });
+          
+          // Sortowanie: najnowsze na górze
+          myTreatments.sort((a,b) => {
+              const dA = a.data ? new Date(a.data) : new Date(0);
+              const dB = b.data ? new Date(b.data) : new Date(0);
+              return dB - dA;
+          });
+
+          renderTreatments();
+      }, error => {
+          console.error("Błąd pobierania leczenia:", error);
+          if(container) container.innerHTML = '<div style="text-align:center; color:red; padding:20px;">Wymagany indeks w Firebase lub błąd sieci.<br>Sprawdź konsolę (F12).</div>';
+      });
+}
+
+function renderTreatments() {
+    const container = document.getElementById('treatmentsList');
+    if(!container) return;
+    container.innerHTML = '';
+
+    if(myTreatments.length === 0) {
+        container.innerHTML = '<div style="text-align:center; padding:20px; color:#999;">Brak kart leczenia dla Twojego numeru gospodarstwa.</div>';
+        return;
+    }
+
+    myTreatments.forEach(visit => {
+        const div = document.createElement('div');
+        div.className = 'card';
+        div.style.padding = '15px';
+        div.style.borderLeft = '5px solid #3498db'; // Niebieski pasek
+
+        // Parsowanie leków
+        let medsHtml = '';
+        if(visit.leki && Array.isArray(visit.leki)) {
+            medsHtml = visit.leki.map(l => 
+                `<div>• <b>${l.nazwa}</b> (${l.ilosc} ${l.jednostka||''}) ${l.karencja ? '<span style="color:red; font-weight:bold; font-size:10px;">[KARENCJA]</span>' : ''}</div>`
+            ).join('');
+        }
+
+        div.innerHTML = `
+            <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
+                <span style="font-weight:bold; font-size:16px;">📅 ${visit.data}</span>
+                <span style="font-size:12px; color:#555; background:#eee; padding:2px 6px; border-radius:4px;">${visit.numer_gospodarstwa}</span>
+            </div>
+            <div style="font-size:14px; margin-bottom:10px;">
+                <div style="color:#2980b9; font-size:12px;">Lekarz: ${visit.lekarz || 'Weterynarz'}</div>
+                <div style="margin-top:5px;"><strong>Diagnoza:</strong> ${visit.rozpoznanie || '-'}</div>
+            </div>
+            ${medsHtml ? `<div style="background:#f0f8ff; padding:10px; border-radius:5px; font-size:13px; margin-bottom:5px;">${medsHtml}</div>` : ''}
+            ${visit.zalecenia ? `<div style="font-size:12px; color:#d35400; margin-top:8px; font-style:italic;">⚠️ Zalecenia: ${visit.zalecenia}</div>` : ''}
+        `;
+        container.appendChild(div);
+    });
+}
+
 // --- SILNIK ZADAŃ ---
 
 function generateAndRenderTasks() {
@@ -116,7 +204,7 @@ function generateAndRenderTasks() {
     let generatedTasks = [];
 
     myHerd.forEach(animal => {
-        // 1. SYNCHRONIZACJA
+        // 1. Synchronizacja
         if (animal.type === 'krowa' && animal.lastCalving) {
             const calvDate = new Date(animal.lastCalving);
             const dim = Math.floor((today - calvDate) / (1000 * 60 * 60 * 24));
@@ -133,7 +221,7 @@ function generateAndRenderTasks() {
             }
         }
 
-        // 2. STANDARDOWE
+        // 2. Standardowe
         if (animal.type !== 'krowa' && animal.type !== 'jalowka') return;
         if (!animal.lastInsemination) return;
         if (animal.usgStatus === 'negative') return; 
@@ -156,7 +244,6 @@ function generateAndRenderTasks() {
         checkRuleAndAddTask(generatedTasks, animal, userSettings.rovac, daysToCalving, calvingDate, 'rovac', calvingDate, true);
         checkRuleAndAddTask(generatedTasks, animal, userSettings.kexxtone, daysToCalving, calvingDate, 'kexxtone', calvingDate, true);
 
-        // Custom
         userSettings.customRules.forEach((rule, idx) => {
             if(rule.base === 'insem') {
                 checkRuleAndAddTask(generatedTasks, animal, rule, daysSinceInsem, insDate, `custom_${idx}`, calvingDate);
@@ -165,7 +252,7 @@ function generateAndRenderTasks() {
             }
         });
         
-        // 3. WYCIELENIE (Automat)
+        // 3. Wycielenie (Automat + Bufor)
         if (daysToCalving <= 10 && daysToCalving >= -15) { 
             const isDone = checkIfTaskDone(animal.id, 'calving', calvingDate);
             
@@ -175,13 +262,9 @@ function generateAndRenderTasks() {
                 let priority = 'urgent';
                 let isOverdueCalving = false;
 
-                if (daysToCalving < -5) {
-                    isOverdueCalving = true; 
-                } else if (daysToCalving <= 5 && daysToCalving >= -5) {
-                    priority = 'urgent'; 
-                } else {
-                    priority = 'warning'; 
-                }
+                if (daysToCalving < -5) { isOverdueCalving = true; } 
+                else if (daysToCalving <= 5 && daysToCalving >= -5) { priority = 'urgent'; } 
+                else { priority = 'warning'; }
                 addTask(generatedTasks, animal, 'Spodziewane Wycielenie', calvingDate, calvingDate, priority, 'calving', insDate, calvingDate, isOverdueCalving);
             }
         }
@@ -226,26 +309,14 @@ function addTask(list, animal, title, dueDate, sortDate, priority, type, insemDa
     const doneLog = completedTasks.find(t => t.taskId === taskId);
 
     let isReallyOverdue = false;
-    if (forceOverdue) {
-        isReallyOverdue = true;
-    } else if (priority === 'urgent' && type !== 'calving') {
-        isReallyOverdue = true;
-    }
+    if (forceOverdue) { isReallyOverdue = true; } 
+    else if (priority === 'urgent' && type !== 'calving') { isReallyOverdue = true; }
 
     list.push({
-        id: taskId,
-        animalId: animal.id,
-        tag: animal.tag,
-        title: title,
-        dueDate: dueDate,
-        sortDate: sortDate,
-        priority: priority,
-        type: type,
-        isDone: !!doneLog,
-        doneDate: doneLog ? doneLog.completedAt.toDate() : null,
-        logId: doneLog ? doneLog.logId : null,
-        insemDate: insemDate,
-        calvDate: calvDate,
+        id: taskId, animalId: animal.id, tag: animal.tag, title: title,
+        dueDate: dueDate, sortDate: sortDate, priority: priority, type: type,
+        isDone: !!doneLog, doneDate: doneLog ? doneLog.completedAt.toDate() : null,
+        logId: doneLog ? doneLog.logId : null, insemDate: insemDate, calvDate: calvDate,
         isReallyOverdue: isReallyOverdue
     });
 }
@@ -430,7 +501,7 @@ function undoTask(logId) {
     }
 }
 
-// --- POPULACJA LIST (DATALISTS) ---
+// --- POPULACJA LIST ---
 
 function populateLists() {
     const tagList = document.getElementById('tagList');
@@ -495,13 +566,11 @@ function openAnimalCard(id) {
     }
     document.getElementById('cardDimStat').innerHTML = `DIM: <b>${cowDim}</b> (Śr. stada: ${avgDim})`;
 
-    // WYPEŁNIANIE PÓL EDYCJI
     document.getElementById('editTag').value = animal.tag;
     document.getElementById('editDob').value = animal.dob;
     document.getElementById('editLastCalving').value = animal.lastCalving || '';
     document.getElementById('editLastInsem').value = animal.lastInsemination || '';
 
-    // Ustawienie statusu cielności w edycji
     let statusVal = 'unknown';
     if (animal.isPregnantConfirmed) statusVal = 'pregnant';
     else if (animal.usgStatus === 'negative') statusVal = 'negative';
@@ -560,8 +629,7 @@ function saveAnimalChanges() {
     if(newStatus === 'pregnant') { isPreg = true; usg = 'positive'; }
     else if(newStatus === 'negative') { isPreg = false; usg = 'negative'; }
     else if(newStatus === 'check') { isPreg = false; usg = 'pending'; }
-    else { isPreg = false; usg = 'pending'; } // unknown
-
+    
     db.collection('animals').doc(currentEditingAnimalId).update({
         tag: newTag,
         dob: dob, 
@@ -598,7 +666,7 @@ function deleteInsemination(animalId, index) {
     });
 }
 
-// --- ZARZĄDZANIE MODALAMI I FORMULARZAMI (Fix submitów) ---
+// --- ZARZĄDZANIE MODALAMI ---
 
 function setupModals() {
     window.closeModal = (id) => document.getElementById(id).style.display = 'none';
@@ -619,7 +687,6 @@ function setupModals() {
         }
     });
 
-    // Formularz INSEMINACJI
     document.getElementById('insemForm').addEventListener('submit', (e) => {
         e.preventDefault();
         const tagVal = document.getElementById('insemTagInput').value; 
@@ -629,7 +696,7 @@ function setupModals() {
 
         const animal = myHerd.find(a => a.tag === tagVal);
         if(!animal) {
-            alert("Nie znaleziono zwierzęcia o takim numerze! Sprawdź listę.");
+            alert("Nie znaleziono zwierzęcia! Sprawdź listę.");
             return;
         }
 
@@ -645,17 +712,16 @@ function setupModals() {
             document.getElementById('insemForm').reset();
             document.getElementById('insemDate').valueAsDate = new Date();
             closeModal('insemModal');
-        }).catch(err => alert("Błąd zapisu: " + err.message));
+        }).catch(err => alert("Błąd: " + err.message));
     });
 
-    // Formularz DODAWANIA ZWIERZĘCIA
     document.getElementById('animalForm').addEventListener('submit', (e) => {
         e.preventDefault();
         const type = document.getElementById('inpType').value;
         const tag = document.getElementById('inpTag').value;
         const dob = document.getElementById('inpDob').value;
         const lastCalving = document.getElementById('inpLastCalving').value || null;
-        const lastInsem = document.getElementById('inpLastInsem').value || null; // Fix nazwy zmiennej
+        const lastInsem = document.getElementById('inpLastInsem').value || null;
         const semen = document.getElementById('inpSemen').value || null;
         const pregStatus = document.getElementById('inpPregStatus').value;
 
@@ -679,7 +745,7 @@ function setupModals() {
         }).then(() => {
             alert("Dodano zwierzę!");
             closeModal('animalModal');
-        }).catch(err => alert("Błąd dodawania: " + err.message));
+        }).catch(err => alert("Błąd: " + err.message));
     });
 }
 
@@ -734,10 +800,19 @@ function renderConfig() {
 
 function saveConfiguration(fromDOM = true) {
     if(!currentUser || !currentUser.id) {
-        alert("Błąd: Nie znaleziono ID konfiguracji użytkownika.");
+        alert("Błąd: Brak ID użytkownika.");
         return Promise.reject("No user config ID");
     }
 
+    // 1. Zapisz numer gospodarstwa (NOWOŚĆ)
+    const farmNum = document.getElementById('cfgFarmNumber').value;
+    if(farmNum !== undefined) {
+        db.collection('konfiguracja').doc(currentUser.id).update({ numer_gospodarstwa: farmNum });
+        currentUser.numer_gospodarstwa = farmNum;
+        loadTreatments(); // Odśwież listę po zapisie
+    }
+
+    // 2. Zapisz zadania
     if(fromDOM) {
         ['usg', 'heat', 'dry', 'rovac', 'kexxtone'].forEach(k => {
             const s = document.getElementById(`cfg_start_${k}`);
@@ -768,25 +843,23 @@ document.getElementById('customTaskForm').addEventListener('submit', (e) => {
     const s = parseInt(document.getElementById('newCfgStart').value);
     const end = parseInt(document.getElementById('newCfgEnd').value);
 
-    userSettings.customRules.push({
-        label: name, base: base, start: s, end: end, enabled: true
-    });
+    userSettings.customRules.push({ label: name, base: base, start: s, end: end, enabled: true });
     
     saveConfiguration(false).then(() => {
-        alert(`Dodano nowe zadanie: ${name}`);
+        alert(`Dodano: ${name}`);
         renderConfig();
         document.getElementById('customTaskForm').reset();
     }).catch(err => alert("Błąd zapisu: " + err.message));
 });
 
 function removeCustomRule(idx) {
-    if(!confirm("Usunąć to zadanie?")) return;
+    if(!confirm("Usunąć?")) return;
     userSettings.customRules.splice(idx, 1);
     saveConfiguration(false).then(() => renderConfig());
 }
 
 function resetConfiguration() {
-    if(confirm("Przywrócić ustawienia domyślne?")) {
+    if(confirm("Przywrócić domyślne?")) {
         userSettings = JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
         saveConfiguration(false).then(() => renderConfig());
     }
