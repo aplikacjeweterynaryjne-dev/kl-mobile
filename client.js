@@ -12,13 +12,14 @@ if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 const auth = firebase.auth();
 
-// --- STAN APLIKACJI ---
+// --- STAN APLIKACJI (ZMIENNE GLOBALNE) ---
 let currentUser = null;
 let myHerd = [];
 let completedTasks = [];
 let myTreatments = [];
 let currentTaskFilter = 'todo'; 
 let currentTypeFilter = 'all';
+let currentCalDate = new Date(); // Zadeklarowane RAZ tutaj
 
 // Ustawienia Domyślne
 const DEFAULT_SETTINGS = {
@@ -38,7 +39,6 @@ auth.onAuthStateChanged(user => {
     if (user) {
         db.collection('konfiguracja').where('uid', '==', user.uid).get().then(snap => {
             if(!snap.empty && snap.docs[0].data().Rola === 'klient') {
-                // Pobieramy dane użytkownika + ID dokumentu
                 currentUser = { id: snap.docs[0].id, ...snap.docs[0].data(), uid: user.uid };
                 initApp();
             } else { window.location.href = 'index.html'; }
@@ -50,7 +50,7 @@ function initApp() {
     const dateEl = document.getElementById('welcomeDate');
     if(dateEl) dateEl.textContent = new Date().toLocaleDateString('pl-PL', { weekday: 'long', day: 'numeric', month: 'long' });
     
-    // WSTAWIENIE ZAPAMIĘTANEGO NUMERU DO POLA W OPCJACH
+    // Wstawienie numeru gospodarstwa do inputa w opcjach
     if(currentUser.numer_gospodarstwa) {
         const farmInput = document.getElementById('cfgFarmNumber');
         if(farmInput) farmInput.value = currentUser.numer_gospodarstwa;
@@ -59,7 +59,7 @@ function initApp() {
     loadSettings().then(() => {
         loadHerd(); 
         loadCompletedTasks();
-        // Jeśli numer jest już znany, ładujemy leki od razu
+        // Ładuj leki tylko jeśli jest numer
         if(currentUser.numer_gospodarstwa) {
             loadTreatments();
         }
@@ -67,7 +67,7 @@ function initApp() {
     });
     
     setupNavigation();
-    setupModals();
+    setupModals(); // To uruchamia nasłuchiwanie formularzy
     renderCalendar(new Date());
     
     const insemDateEl = document.getElementById('insemDate');
@@ -119,26 +119,22 @@ function loadCompletedTasks() {
       }, error => console.error("Błąd logów:", error));
 }
 
-// --- KARTY LECZENIA (POPRAWIONE) ---
+// --- KARTY LECZENIA ---
 
 function saveFarmNumber() {
     const farmNumInput = document.getElementById('cfgFarmNumber');
-    const farmNum = farmNumInput.value.trim(); // Usuwamy zbędne spacje
+    const farmNum = farmNumInput.value.trim();
 
     if(!farmNum) {
         alert("Wpisz numer gospodarstwa.");
         return;
     }
 
-    // 1. Zapisz do bazy
     db.collection('konfiguracja').doc(currentUser.id).update({ 
         numer_gospodarstwa: farmNum 
     }).then(() => {
-        // 2. Zaktualizuj stan lokalny NATYCHMIAST
         currentUser.numer_gospodarstwa = farmNum;
         alert("Numer gospodarstwa zapisany! Pobieram karty leczenia...");
-        
-        // 3. Pobierz karty i przełącz widok
         loadTreatments();
         switchSection('section-treatments'); 
     }).catch(err => {
@@ -148,7 +144,6 @@ function saveFarmNumber() {
 
 function loadTreatments() {
     const container = document.getElementById('treatmentsList');
-    // Pobieramy numer z currentUser (który jest odświeżany przy starcie i przy zapisie)
     const farmNum = currentUser.numer_gospodarstwa;
     
     if(!farmNum) {
@@ -156,12 +151,9 @@ function loadTreatments() {
         return;
     }
 
-    // Obsługa wielu numerów po przecinku (np. "PL123, PL456")
     const farmNumbers = farmNum.split(',').map(s => s.trim()).filter(s => s.length > 0);
-
     if(farmNumbers.length === 0) return;
 
-    // Pobieramy wizyty z kolekcji 'wizyty' gdzie 'numer_gospodarstwa' jest na liście
     db.collection('wizyty')
       .where('numer_gospodarstwa', 'in', farmNumbers)
       .limit(50)
@@ -171,7 +163,6 @@ function loadTreatments() {
               myTreatments.push({ id: doc.id, ...doc.data() });
           });
           
-          // Sortowanie: najnowsze na górze
           myTreatments.sort((a,b) => {
               const dA = a.data ? new Date(a.data) : new Date(0);
               const dB = b.data ? new Date(b.data) : new Date(0);
@@ -180,12 +171,8 @@ function loadTreatments() {
 
           renderTreatments();
       }, error => {
-          console.error("Błąd pobierania leczenia (może brak indeksu?):", error);
-          if(container) container.innerHTML = `<div style="text-align:center; color:red; padding:20px;">
-            Błąd pobierania danych.<br>
-            Sprawdź konsolę (F12) czy nie ma linku do utworzenia indeksu.<br>
-            ${error.message}
-          </div>`;
+          console.error("Błąd pobierania wizyt:", error);
+          if(container) container.innerHTML = '<div style="text-align:center; color:red; padding:20px;">Błąd pobierania. Sprawdź konsolę (wymagany indeks?).</div>';
       });
 }
 
@@ -195,11 +182,7 @@ function renderTreatments() {
     container.innerHTML = '';
 
     if(myTreatments.length === 0) {
-        container.innerHTML = `
-            <div style="text-align:center; padding:20px; color:#999;">
-                Brak kart leczenia dla numeru: <b>${currentUser.numer_gospodarstwa}</b><br><br>
-                <small>Upewnij się, że weterynarz wpisał DOKŁADNIE taki sam numer (wielkość liter ma znaczenie).</small>
-            </div>`;
+        container.innerHTML = '<div style="text-align:center; padding:20px; color:#999;">Brak kart leczenia dla numeru: ' + currentUser.numer_gospodarstwa + '</div>';
         return;
     }
 
@@ -207,9 +190,8 @@ function renderTreatments() {
         const div = document.createElement('div');
         div.className = 'card';
         div.style.padding = '15px';
-        div.style.borderLeft = '5px solid #3498db'; // Niebieski pasek
+        div.style.borderLeft = '5px solid #2980b9'; 
 
-        // Parsowanie leków
         let medsHtml = '';
         if(visit.leki && Array.isArray(visit.leki)) {
             medsHtml = visit.leki.map(l => 
@@ -457,8 +439,6 @@ function renderTaskTypeChips(allTasks) {
 
 // --- CONFIRM, WYCIELENIE ---
 
-let pendingTask = null;
-
 function initiateTaskCompletion(taskId, type, animalId, dueDateStr) {
     pendingTask = { taskId, type, animalId, dueDate: new Date(dueDateStr) };
     const modal = document.getElementById('taskConfirmModal');
@@ -539,7 +519,7 @@ function undoTask(logId) {
     }
 }
 
-// --- POPULACJA LIST ---
+// --- POPULACJA LIST (DATALISTS) ---
 
 function populateLists() {
     const tagList = document.getElementById('tagList');
@@ -704,18 +684,26 @@ function deleteInsemination(animalId, index) {
     });
 }
 
-// --- ZARZĄDZANIE MODALAMI ---
+// --- ZARZĄDZANIE MODALAMI I FORMULARZAMI (GLOBALNIE DOSTĘPNE) ---
+
+// ZMIANA: Funkcje otwierające modale zdefiniowane globalnie, a nie wewnątrz setupModals
+function openAnimalModal() {
+    document.getElementById('animalForm').reset();
+    document.getElementById('animalModal').style.display = 'flex';
+    document.getElementById('cowFields').classList.remove('hidden');
+    document.getElementById('inpType').value = 'krowa';
+}
+
+function openInsemModal() { 
+    document.getElementById('insemModal').style.display = 'flex'; 
+}
+
+function closeModal(id) {
+    document.getElementById(id).style.display = 'none';
+}
 
 function setupModals() {
-    window.closeModal = (id) => document.getElementById(id).style.display = 'none';
-    
-    window.openAnimalModal = () => {
-        document.getElementById('animalForm').reset();
-        document.getElementById('animalModal').style.display = 'flex';
-        document.getElementById('cowFields').classList.remove('hidden');
-        document.getElementById('inpType').value = 'krowa';
-    };
-    
+    // Listenery
     document.getElementById('inpType').addEventListener('change', (e) => {
         const type = e.target.value;
         if(type === 'krowa' || type === 'jalowka') {
@@ -734,7 +722,7 @@ function setupModals() {
 
         const animal = myHerd.find(a => a.tag === tagVal);
         if(!animal) {
-            alert("Nie znaleziono zwierzęcia! Sprawdź listę.");
+            alert("Nie znaleziono zwierzęcia o takim numerze! Sprawdź listę.");
             return;
         }
 
@@ -750,7 +738,7 @@ function setupModals() {
             document.getElementById('insemForm').reset();
             document.getElementById('insemDate').valueAsDate = new Date();
             closeModal('insemModal');
-        }).catch(err => alert("Błąd: " + err.message));
+        }).catch(err => alert("Błąd zapisu: " + err.message));
     });
 
     document.getElementById('animalForm').addEventListener('submit', (e) => {
@@ -783,7 +771,7 @@ function setupModals() {
         }).then(() => {
             alert("Dodano zwierzę!");
             closeModal('animalModal');
-        }).catch(err => alert("Błąd: " + err.message));
+        }).catch(err => alert("Błąd dodawania: " + err.message));
     });
 }
 
@@ -842,15 +830,6 @@ function saveConfiguration(fromDOM = true) {
         return Promise.reject("No user config ID");
     }
 
-    // 1. Zapisz numer gospodarstwa (NOWOŚĆ)
-    const farmNum = document.getElementById('cfgFarmNumber').value;
-    if(farmNum !== undefined) {
-        db.collection('konfiguracja').doc(currentUser.id).update({ numer_gospodarstwa: farmNum });
-        currentUser.numer_gospodarstwa = farmNum;
-        loadTreatments(); // Odśwież listę po zapisie
-    }
-
-    // 2. Zapisz zadania
     if(fromDOM) {
         ['usg', 'heat', 'dry', 'rovac', 'kexxtone'].forEach(k => {
             const s = document.getElementById(`cfg_start_${k}`);
@@ -881,29 +860,31 @@ document.getElementById('customTaskForm').addEventListener('submit', (e) => {
     const s = parseInt(document.getElementById('newCfgStart').value);
     const end = parseInt(document.getElementById('newCfgEnd').value);
 
-    userSettings.customRules.push({ label: name, base: base, start: s, end: end, enabled: true });
+    userSettings.customRules.push({
+        label: name, base: base, start: s, end: end, enabled: true
+    });
     
     saveConfiguration(false).then(() => {
-        alert(`Dodano: ${name}`);
+        alert(`Dodano nowe zadanie: ${name}`);
         renderConfig();
         document.getElementById('customTaskForm').reset();
     }).catch(err => alert("Błąd zapisu: " + err.message));
 });
 
 function removeCustomRule(idx) {
-    if(!confirm("Usunąć?")) return;
+    if(!confirm("Usunąć to zadanie?")) return;
     userSettings.customRules.splice(idx, 1);
     saveConfiguration(false).then(() => renderConfig());
 }
 
 function resetConfiguration() {
-    if(confirm("Przywrócić domyślne?")) {
+    if(confirm("Przywrócić ustawienia domyślne?")) {
         userSettings = JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
         saveConfiguration(false).then(() => renderConfig());
     }
 }
 
-// --- HELPERY ---
+// --- HELPERY I NAV ---
 
 function setDateInput(id, deltaDays) {
     const el = document.getElementById(id);
@@ -912,64 +893,210 @@ function setDateInput(id, deltaDays) {
     el.valueAsDate = d;
 }
 
-function openInsemModal() { document.getElementById('insemModal').style.display = 'flex'; }
-function switchTaskFilter(mode) { currentTaskFilter = mode; document.querySelectorAll('.sub-tab').forEach(b => b.classList.remove('active')); event.target.classList.add('active'); generateAndRenderTasks(); }
-function filterHerd(type) { switchSection('section-herd'); renderHerdList(type); }
-function renderHerdList(type) { 
-    const list = document.getElementById('herdList'); list.innerHTML = '';
-    let filtered = myHerd; if (type !== 'all') filtered = myHerd.filter(a => a.type === type);
-    const search = document.getElementById('herdSearch').value.toLowerCase();
-    if (search) filtered = filtered.filter(a => a.tag.toLowerCase().includes(search));
-    document.getElementById('herdTitle').textContent = type === 'all' ? 'Pełna Lista' : `Lista: ${type.toUpperCase()}`;
-    const today = new Date();
-    filtered.forEach(a => {
-        let detailsHtml = ''; let statusIcon = '';
-        if (a.type === 'krowa' || a.type === 'jalowka') {
-            if (a.isPregnantConfirmed) statusIcon = '✅ Cielna'; else if (a.usgStatus === 'negative') statusIcon = '❌ Pusta'; else if (a.lastInsemination) statusIcon = '❓ Do badania'; else statusIcon = '⚪ Oczekiwanie';
-            const ins = a.lastInsemination ? a.lastInsemination : '-';
-            let calv = '-'; let dim = '-';
-            if (a.lastInsemination) { const est = addDays(new Date(a.lastInsemination), userSettings.gestation || 280); calv = est.toLocaleDateString('pl-PL'); }
-            if (a.lastCalving) { const days = Math.floor((today - new Date(a.lastCalving)) / (1000 * 60 * 60 * 24)); dim = `${days} dni`; }
-            detailsHtml = `<div style="font-size:11px; color:#555; margin-top:5px; display:grid; grid-template-columns: 1fr 1fr; gap:5px;"><span>💉 Ost. zac: <b>${ins}</b></span><span>👶 Termin: <b>${calv}</b></span><span>📊 Laktacja: <b>${dim}</b></span><span style="font-weight:bold; color:${a.isPregnantConfirmed?'green':'#555'}">${statusIcon}</span></div>`;
-        }
-        const div = document.createElement('div'); div.className = 'card'; div.style.padding = '10px';
-        div.innerHTML = `<div style="display:flex; justify-content:space-between; align-items:center;"><strong style="color:#2e7d32; font-size:16px;">${a.tag}</strong><span class="badge" style="background:#eee; color:#333;">${a.type}</span></div>${detailsHtml}`;
-        div.onclick = () => openAnimalCard(a.id);
-        list.appendChild(div);
+function switchTaskFilter(mode) {
+    currentTaskFilter = mode;
+    document.querySelectorAll('.sub-tab').forEach(b => b.classList.remove('active'));
+    // Fix: jeśli wywołane z HTML, 'event' może być niedostępny
+    if(window.event && window.event.target) window.event.target.classList.add('active');
+    generateAndRenderTasks();
+}
+
+function filterHerd(type) {
+    switchSection('section-herd');
+    renderHerdList(type);
+}
+
+function updateDashboardStats() {
+    document.getElementById('cntCows').textContent = myHerd.filter(a => a.type === 'krowa').length;
+    document.getElementById('cntHeifers').textContent = myHerd.filter(a => a.type === 'jalowka').length;
+    document.getElementById('cntBulls').textContent = myHerd.filter(a => a.type === 'byk').length;
+}
+
+function setupNavigation() {
+    document.querySelectorAll('.nav-item').forEach(btn => {
+        btn.addEventListener('click', () => {
+            switchSection(btn.dataset.target);
+        });
+    });
+    document.getElementById('logoutBtn').addEventListener('click', () => {
+        auth.signOut();
     });
 }
-document.getElementById('herdSearch').addEventListener('input', () => renderHerdList('all'));
-function renderLactationChart() { 
-    const ctx = document.getElementById('lactationChart'); const buckets = [0, 0, 0, 0, 0, 0, 0]; const bucketAnimals = [[], [], [], [], [], [], []]; const today = new Date();
-    myHerd.forEach(a => { if (a.type === 'krowa' && a.lastCalving) { const calvDate = new Date(a.lastCalving); const months = (today - calvDate) / (1000 * 60 * 60 * 24 * 30.4); let idx = 0; if (months <= 2) idx = 0; else if (months <= 4) idx = 1; else if (months <= 6) idx = 2; else if (months <= 8) idx = 3; else if (months <= 10) idx = 4; else if (months <= 12) idx = 5; else idx = 6; buckets[idx]++; bucketAnimals[idx].push(a); } });
-    if (window.myChart) window.myChart.destroy(); window.myChart = new Chart(ctx, { type: 'bar', data: { labels: ['0-2m', '2-4m', '4-6m', '6-8m', '8-10m', '10-12m', '>12m'], datasets: [{ label: 'Sztuk', data: buckets, backgroundColor: '#2e7d32', borderRadius: 4 }] }, options: { plugins: { legend: { display: false } }, onClick: (evt, activeEls) => { if (activeEls.length > 0) { const idx = activeEls[0].index; showListModal(`Laktacja: ${window.myChart.data.labels[idx]}`, bucketAnimals[idx]); } } } });
-}
-function addDays(date, days) { const r = new Date(date); r.setDate(r.getDate() + days); return r; }
-let currentCalDate = new Date(); function changeMonth(delta) { currentCalDate.setMonth(currentCalDate.getMonth() + delta); renderCalendar(currentCalDate); }
-function renderCalendar(date) { 
-    const container = document.getElementById('calendarDays'); container.innerHTML = ''; const year = date.getFullYear(); const month = date.getMonth(); document.getElementById('calTitle').textContent = date.toLocaleDateString('pl-PL', { month: 'long', year: 'numeric' });
-    let monthEvents = []; myHerd.forEach(a => { if (!a.lastInsemination || a.usgStatus === 'negative') return; const est = addDays(new Date(a.lastInsemination), userSettings.gestation || 280); if (est.getFullYear() === year && est.getMonth() === month) { monthEvents.push({ animal: a, date: est }); } }); monthEvents.sort((a,b) => a.date - b.date);
-    renderCalendarEventsList(monthEvents, `Wycielenia: ${date.toLocaleDateString('pl-PL', { month: 'long' })}`);
-    document.getElementById('calMonthCount').textContent = `+${monthEvents.length}`;
-    const firstDay = new Date(year, month, 1).getDay(); const daysInMonth = new Date(year, month + 1, 0).getDate(); let startOffset = firstDay === 0 ? 6 : firstDay - 1;
-    for (let i = 0; i < startOffset; i++) container.appendChild(document.createElement('div'));
-    for (let d = 1; d <= daysInMonth; d++) { const dayDiv = document.createElement('div'); dayDiv.className = 'cal-day'; dayDiv.textContent = d; const dayEvents = monthEvents.filter(e => e.date.getDate() === d); if (dayEvents.length > 0) { dayDiv.classList.add('has-event'); const dot = document.createElement('div'); dot.className = 'cal-dot'; dayDiv.appendChild(dot); dayDiv.onclick = () => { renderCalendarEventsList(dayEvents, `Wycielenia: ${d}.${month+1}`); }; } const t = new Date(); if (d === t.getDate() && month === t.getMonth() && year === t.getFullYear()) dayDiv.classList.add('today'); container.appendChild(dayDiv); }
-}
-function renderCalendarEventsList(events, title) { const list = document.getElementById('calEventsList'); list.innerHTML = ''; document.getElementById('calSelectedDateTitle').textContent = title; if (events.length === 0) { list.innerHTML = '<p style="color:#999; text-align:center;">Brak wydarzeń</p>'; return; } events.forEach(e => { const el = document.createElement('div'); el.className = 'card'; el.style.padding = '10px'; const dateStr = e.date.toLocaleDateString('pl-PL'); el.innerHTML = `<div style="display:flex; justify-content:space-between; align-items:center;"><span>🐮 <b>${e.animal.tag}</b></span><span style="font-size:11px; color:#555;">${dateStr}</span></div><div style="font-size:11px; color:#2e7d32;">Spodziewane wycielenie</div>`; el.onclick = () => openAnimalCard(e.animal.id); list.appendChild(el); }); }
-function showListModal(title, animals) { document.getElementById('listModalTitle').textContent = title; const content = document.getElementById('listModalContent'); content.innerHTML = ''; animals.forEach(a => { const d = document.createElement('div'); d.className = 'card'; d.style.padding = '10px'; d.innerHTML = `🐮 <b>${a.tag}</b>`; d.onclick = () => { closeModal('listModal'); openAnimalCard(a.id); }; content.appendChild(d); }); document.getElementById('listModal').style.display = 'flex'; }
-function updateDashboardStats() { document.getElementById('cntCows').textContent = myHerd.filter(a => a.type === 'krowa').length; document.getElementById('cntHeifers').textContent = myHerd.filter(a => a.type === 'jalowka').length; document.getElementById('cntBulls').textContent = myHerd.filter(a => a.type === 'byk').length; }
-function setupNavigation() { document.querySelectorAll('.nav-item').forEach(btn => { btn.addEventListener('click', () => { switchSection(btn.dataset.target); }); }); document.getElementById('logoutBtn').addEventListener('click', () => { auth.signOut(); }); }
-function switchSection(id) { 
-    document.querySelectorAll('.section').forEach(s => s.classList.remove('active')); 
-    document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active')); 
-    document.getElementById(id).classList.add('active'); 
-    const navBtn = document.querySelector(`.nav-item[data-target="${id}"]`); 
-    if(navBtn) navBtn.classList.add('active'); 
+
+function switchSection(id) {
+    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+    document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
     
-    // AUTO-ODŚWIEŻANIE KART LECZENIA PRZY WEJŚCIU W ZAKŁADKĘ
+    const target = document.getElementById(id);
+    if(target) target.classList.add('active');
+    
+    const navBtn = document.querySelector(`.nav-item[data-target="${id}"]`);
+    if(navBtn) navBtn.classList.add('active');
+    
     if(id === 'section-treatments') {
         loadTreatments();
     }
 }
-function addDays(date, days) { const r = new Date(date); r.setDate(r.getDate() + days); return r; }
-let currentCalDate = new Date(); function changeMonth(delta) { currentCalDate.setMonth(currentCalDate.getMonth() + delta); renderCalendar(currentCalDate); }
+
+function addDays(date, days) {
+    const r = new Date(date);
+    r.setDate(r.getDate() + days);
+    return r;
+}
+
+function changeMonth(delta) {
+    currentCalDate.setMonth(currentCalDate.getMonth() + delta);
+    renderCalendar(currentCalDate);
+}
+
+// --- KALENDARZ ---
+
+function renderCalendar(date) {
+    const container = document.getElementById('calendarDays');
+    container.innerHTML = '';
+    
+    const year = date.getFullYear();
+    const month = date.getMonth();
+    
+    const titleEl = document.getElementById('calTitle');
+    titleEl.textContent = date.toLocaleDateString('pl-PL', { month: 'long', year: 'numeric' });
+    
+    let monthEvents = [];
+    myHerd.forEach(a => {
+        if (!a.lastInsemination || a.usgStatus === 'negative') return;
+        const est = addDays(new Date(a.lastInsemination), userSettings.gestation || 280);
+        if (est.getFullYear() === year && est.getMonth() === month) {
+            monthEvents.push({ animal: a, date: est });
+        }
+    });
+
+    monthEvents.sort((a,b) => a.date - b.date);
+
+    renderCalendarEventsList(monthEvents, `Wycielenia: ${date.toLocaleDateString('pl-PL', { month: 'long' })}`);
+
+    const countBadge = document.getElementById('calMonthCount');
+    countBadge.textContent = `+${monthEvents.length}`;
+    countBadge.onclick = () => renderCalendarEventsList(monthEvents, `Wycielenia: ${date.toLocaleDateString('pl-PL', { month: 'long' })}`);
+
+    const firstDay = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    let startOffset = firstDay === 0 ? 6 : firstDay - 1;
+
+    for (let i = 0; i < startOffset; i++) container.appendChild(document.createElement('div'));
+
+    for (let d = 1; d <= daysInMonth; d++) {
+        const dayDiv = document.createElement('div');
+        dayDiv.className = 'cal-day';
+        dayDiv.textContent = d;
+
+        const dayEvents = monthEvents.filter(e => e.date.getDate() === d);
+        
+        if (dayEvents.length > 0) {
+            dayDiv.classList.add('has-event');
+            const dot = document.createElement('div');
+            dot.className = 'cal-dot';
+            dayDiv.appendChild(dot);
+            
+            dayDiv.onclick = () => {
+                renderCalendarEventsList(dayEvents, `Wycielenia: ${d}.${month+1}`);
+            };
+        }
+
+        const t = new Date();
+        if (d === t.getDate() && month === t.getMonth() && year === t.getFullYear()) dayDiv.classList.add('today');
+
+        container.appendChild(dayDiv);
+    }
+}
+
+function renderCalendarEventsList(events, title) {
+    const list = document.getElementById('calEventsList');
+    list.innerHTML = '';
+    document.getElementById('calSelectedDateTitle').textContent = title;
+    
+    if (events.length === 0) {
+        list.innerHTML = '<p style="color:#999; text-align:center;">Brak wydarzeń</p>';
+        return;
+    }
+
+    events.forEach(e => {
+        const el = document.createElement('div');
+        el.className = 'card';
+        el.style.padding = '10px';
+        const dateStr = e.date.toLocaleDateString('pl-PL');
+        el.innerHTML = `
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <span>🐮 <b>${e.animal.tag}</b></span>
+                <span style="font-size:11px; color:#555;">${dateStr}</span>
+            </div>
+            <div style="font-size:11px; color:#2e7d32;">Spodziewane wycielenie</div>
+        `;
+        el.onclick = () => openAnimalCard(e.animal.id);
+        list.appendChild(el);
+    });
+}
+
+// --- WYKRES LAKTACJI ---
+
+function renderLactationChart() {
+    const ctx = document.getElementById('lactationChart');
+    const buckets = [0, 0, 0, 0, 0, 0, 0];
+    const bucketAnimals = [[], [], [], [], [], [], []];
+    const today = new Date();
+
+    myHerd.forEach(a => {
+        if (a.type === 'krowa' && a.lastCalving) {
+            const calvDate = new Date(a.lastCalving);
+            const months = (today - calvDate) / (1000 * 60 * 60 * 24 * 30.4);
+            
+            let idx = 0;
+            if (months <= 2) idx = 0;
+            else if (months <= 4) idx = 1;
+            else if (months <= 6) idx = 2;
+            else if (months <= 8) idx = 3;
+            else if (months <= 10) idx = 4;
+            else if (months <= 12) idx = 5;
+            else idx = 6;
+
+            buckets[idx]++;
+            bucketAnimals[idx].push(a);
+        }
+    });
+
+    if (window.myChart) window.myChart.destroy();
+    window.myChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: ['0-2m', '2-4m', '4-6m', '6-8m', '8-10m', '10-12m', '>12m'],
+            datasets: [{
+                label: 'Sztuk', data: buckets, backgroundColor: '#2e7d32', borderRadius: 4
+            }]
+        },
+        options: {
+            plugins: { legend: { display: false } },
+            onClick: (evt, activeEls) => {
+                if (activeEls.length > 0) {
+                    const idx = activeEls[0].index;
+                    showListModal(`Laktacja: ${window.myChart.data.labels[idx]}`, bucketAnimals[idx]);
+                }
+            }
+        }
+    });
+}
+
+function showListModal(title, animals) {
+    document.getElementById('listModalTitle').textContent = title;
+    const content = document.getElementById('listModalContent');
+    content.innerHTML = '';
+    
+    animals.forEach(a => {
+        const d = document.createElement('div');
+        d.className = 'card';
+        d.style.padding = '10px';
+        d.innerHTML = `🐮 <b>${a.tag}</b>`;
+        d.onclick = () => { closeModal('listModal'); openAnimalCard(a.id); };
+        content.appendChild(d);
+    });
+    
+    document.getElementById('listModal').style.display = 'flex';
+}
