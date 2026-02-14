@@ -38,6 +38,7 @@ auth.onAuthStateChanged(user => {
     if (user) {
         db.collection('konfiguracja').where('uid', '==', user.uid).get().then(snap => {
             if(!snap.empty && snap.docs[0].data().Rola === 'klient') {
+                // Pobieramy dane użytkownika + ID dokumentu
                 currentUser = { id: snap.docs[0].id, ...snap.docs[0].data(), uid: user.uid };
                 initApp();
             } else { window.location.href = 'index.html'; }
@@ -49,15 +50,19 @@ function initApp() {
     const dateEl = document.getElementById('welcomeDate');
     if(dateEl) dateEl.textContent = new Date().toLocaleDateString('pl-PL', { weekday: 'long', day: 'numeric', month: 'long' });
     
-    // Wypełnij pole numeru gospodarstwa z bazy
+    // WSTAWIENIE ZAPAMIĘTANEGO NUMERU DO POLA W OPCJACH
     if(currentUser.numer_gospodarstwa) {
-        document.getElementById('cfgFarmNumber').value = currentUser.numer_gospodarstwa;
+        const farmInput = document.getElementById('cfgFarmNumber');
+        if(farmInput) farmInput.value = currentUser.numer_gospodarstwa;
     }
 
     loadSettings().then(() => {
         loadHerd(); 
         loadCompletedTasks();
-        loadTreatments(); 
+        // Jeśli numer jest już znany, ładujemy leki od razu
+        if(currentUser.numer_gospodarstwa) {
+            loadTreatments();
+        }
         renderConfig();
     });
     
@@ -118,7 +123,7 @@ function loadCompletedTasks() {
 
 function saveFarmNumber() {
     const farmNumInput = document.getElementById('cfgFarmNumber');
-    const farmNum = farmNumInput.value.trim();
+    const farmNum = farmNumInput.value.trim(); // Usuwamy zbędne spacje
 
     if(!farmNum) {
         alert("Wpisz numer gospodarstwa.");
@@ -133,8 +138,9 @@ function saveFarmNumber() {
         currentUser.numer_gospodarstwa = farmNum;
         alert("Numer gospodarstwa zapisany! Pobieram karty leczenia...");
         
-        // 3. Pobierz karty
+        // 3. Pobierz karty i przełącz widok
         loadTreatments();
+        switchSection('section-treatments'); 
     }).catch(err => {
         alert("Błąd zapisu numeru: " + err.message);
     });
@@ -142,6 +148,7 @@ function saveFarmNumber() {
 
 function loadTreatments() {
     const container = document.getElementById('treatmentsList');
+    // Pobieramy numer z currentUser (który jest odświeżany przy starcie i przy zapisie)
     const farmNum = currentUser.numer_gospodarstwa;
     
     if(!farmNum) {
@@ -149,11 +156,12 @@ function loadTreatments() {
         return;
     }
 
-    // Obsługa wielu numerów "PL1, PL2" -> ["PL1", "PL2"]
+    // Obsługa wielu numerów po przecinku (np. "PL123, PL456")
     const farmNumbers = farmNum.split(',').map(s => s.trim()).filter(s => s.length > 0);
 
     if(farmNumbers.length === 0) return;
 
+    // Pobieramy wizyty z kolekcji 'wizyty' gdzie 'numer_gospodarstwa' jest na liście
     db.collection('wizyty')
       .where('numer_gospodarstwa', 'in', farmNumbers)
       .limit(50)
@@ -163,7 +171,7 @@ function loadTreatments() {
               myTreatments.push({ id: doc.id, ...doc.data() });
           });
           
-          // Sortowanie w JS (bezpieczniej bez indeksów złożonych)
+          // Sortowanie: najnowsze na górze
           myTreatments.sort((a,b) => {
               const dA = a.data ? new Date(a.data) : new Date(0);
               const dB = b.data ? new Date(b.data) : new Date(0);
@@ -172,8 +180,12 @@ function loadTreatments() {
 
           renderTreatments();
       }, error => {
-          console.error("Błąd pobierania wizyt:", error);
-          if(container) container.innerHTML = '<div style="text-align:center; color:red; padding:20px;">Nie udało się pobrać kart. Sprawdź połączenie.</div>';
+          console.error("Błąd pobierania leczenia (może brak indeksu?):", error);
+          if(container) container.innerHTML = `<div style="text-align:center; color:red; padding:20px;">
+            Błąd pobierania danych.<br>
+            Sprawdź konsolę (F12) czy nie ma linku do utworzenia indeksu.<br>
+            ${error.message}
+          </div>`;
       });
 }
 
@@ -183,7 +195,11 @@ function renderTreatments() {
     container.innerHTML = '';
 
     if(myTreatments.length === 0) {
-        container.innerHTML = '<div style="text-align:center; padding:20px; color:#999;">Brak kart leczenia dla numeru: ' + currentUser.numer_gospodarstwa + '</div>';
+        container.innerHTML = `
+            <div style="text-align:center; padding:20px; color:#999;">
+                Brak kart leczenia dla numeru: <b>${currentUser.numer_gospodarstwa}</b><br><br>
+                <small>Upewnij się, że weterynarz wpisał DOKŁADNIE taki sam numer (wielkość liter ma znaczenie).</small>
+            </div>`;
         return;
     }
 
@@ -191,8 +207,9 @@ function renderTreatments() {
         const div = document.createElement('div');
         div.className = 'card';
         div.style.padding = '15px';
-        div.style.borderLeft = '5px solid #2980b9'; 
+        div.style.borderLeft = '5px solid #3498db'; // Niebieski pasek
 
+        // Parsowanie leków
         let medsHtml = '';
         if(visit.leki && Array.isArray(visit.leki)) {
             medsHtml = visit.leki.map(l => 
@@ -825,6 +842,15 @@ function saveConfiguration(fromDOM = true) {
         return Promise.reject("No user config ID");
     }
 
+    // 1. Zapisz numer gospodarstwa (NOWOŚĆ)
+    const farmNum = document.getElementById('cfgFarmNumber').value;
+    if(farmNum !== undefined) {
+        db.collection('konfiguracja').doc(currentUser.id).update({ numer_gospodarstwa: farmNum });
+        currentUser.numer_gospodarstwa = farmNum;
+        loadTreatments(); // Odśwież listę po zapisie
+    }
+
+    // 2. Zapisz zadania
     if(fromDOM) {
         ['usg', 'heat', 'dry', 'rovac', 'kexxtone'].forEach(k => {
             const s = document.getElementById(`cfg_start_${k}`);
@@ -946,3 +972,4 @@ function switchSection(id) {
     }
 }
 function addDays(date, days) { const r = new Date(date); r.setDate(r.getDate() + days); return r; }
+let currentCalDate = new Date(); function changeMonth(delta) { currentCalDate.setMonth(currentCalDate.getMonth() + delta); renderCalendar(currentCalDate); }
