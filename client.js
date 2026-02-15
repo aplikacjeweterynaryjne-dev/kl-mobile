@@ -567,22 +567,33 @@ function renderTasks(allTasks) {
     if (!container) return;
     container.innerHTML = '';
     const today = new Date(); today.setHours(0,0,0,0);
-    const limitDate = addDays(today, -14); // Filtr 14 dni
+    const limitDate = addDays(today, -14); 
 
     let filtered = allTasks.filter(t => {
-        // Usuwamy z widoku wykonane/spóźnione starsze niż 14 dni
-        if (t.dueDate < limitDate && (t.isDone || t.isReallyOverdue)) return false;
+        // 1. Usuwamy tylko stare, wykonane zadania (starsze niż 14 dni)
+        if (t.dueDate < limitDate && t.isDone) return false;
 
+        // 2. Logika Zakładek
         if (currentTaskFilter === 'done') return t.isDone;
-        if (currentTaskFilter === 'todo') return !t.isDone && !t.isReallyOverdue;
-        if (currentTaskFilter === 'overdue') return !t.isDone && t.isReallyOverdue;
+        
+        if (currentTaskFilter === 'todo') {
+            // "Do zrobienia" to te, które nie są gotowe i nie są jeszcze spóźnione (czyli żółte)
+            return !t.isDone && !t.isReallyOverdue;
+        }
+        
+        if (currentTaskFilter === 'overdue') {
+            // "Przeterminowane" to tylko te, które przekroczyły końcowy termin (czerwone)
+            return !t.isDone && t.isReallyOverdue;
+        }
         
         if (currentTaskFilter === 'month') {
+            // "Ten miesiąc" - pokazuje wszystko co wypada w tym miesiącu i nie jest jeszcze zrobione
             const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
             const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-            return !t.isDone && t.dueDate >= today && t.dueDate >= startOfMonth && t.dueDate <= endOfMonth;
+            return !t.isDone && t.dueDate >= startOfMonth && t.dueDate <= endOfMonth;
         }
-        return true;
+        
+        return true; // Widok "Wszystkie"
     });
 
     if (currentTypeFilter !== 'all') {
@@ -635,14 +646,7 @@ function renderTasks(allTasks) {
     if (filtered.length === 0) {
         container.innerHTML = '<div style="text-align:center; padding:20px; color:#999;">Brak zadań w tym widoku.</div>';
     }
-
     renderTaskTypeChips(allTasks);
-}
-
-function checkIfTaskDone(animalId, type, refDate) {
-    const dateStr = refDate.toISOString().split('T')[0];
-    const taskId = `${animalId}_${type}_${dateStr}`;
-    return completedTasks.find(t => t.taskId === taskId);
 }
 
 function checkRuleAndAddTask(list, animal, rule, daysCounter, refDate, type, calvDate, isReverse = false) {
@@ -650,16 +654,14 @@ function checkRuleAndAddTask(list, animal, rule, daysCounter, refDate, type, cal
     let isActive = false; let isOverdue = false; let dueDate = null;
     
     if (isReverse) {
-        // Logika dla Zasuszenia (dni DO wycielenia)
-        // Zadanie jest AKTYWNE (żółte), gdy mieści się w przedziale (np. 60 - 40 dni)
+        // Zasuszenie: daysCounter to dni DO porodu
+        // Aktywne (żółte) jeśli jesteśmy w oknie (np. 60-40 dni przed)
         if (daysCounter <= rule.start && daysCounter >= rule.end) isActive = true;
-        
-        // Zadanie jest PRZETERMINOWANE (czerwone), gdy zostało MNIEJ dni niż koniec przedziału (np. < 40 dni)
+        // Przeterminowane (czerwone) jeśli do porodu zostało mniej niż koniec okna (np. 39 dni)
         if (daysCounter < rule.end) isOverdue = true;
-        
         dueDate = addDays(calvDate, -rule.end);
     } else {
-        // Logika dla USG/Rui (dni PO inseminacji)
+        // USG/Ruja: daysCounter to dni PO inseminacji
         if (daysCounter >= rule.start && daysCounter <= rule.end) isActive = true;
         if (daysCounter > rule.end) isOverdue = true;
         dueDate = addDays(refDate, rule.end);
@@ -667,8 +669,11 @@ function checkRuleAndAddTask(list, animal, rule, daysCounter, refDate, type, cal
 
     if (isReverse && animal.isDriedOff && ['dry', 'rovac', 'kexxtone'].includes(type)) return;
 
-    if (isActive) addTask(list, animal, rule.label, dueDate, new Date(), 'warning', type, refDate, calvDate);
-    else if (isOverdue) addTask(list, animal, rule.label, dueDate, new Date(), 'urgent', type, refDate, calvDate, true);
+    if (isActive) {
+        addTask(list, animal, rule.label, dueDate, new Date(), 'warning', type, refDate, calvDate, false);
+    } else if (isOverdue) {
+        addTask(list, animal, rule.label, dueDate, new Date(), 'urgent', type, refDate, calvDate, true);
+    }
 }
 
 function addTask(list, animal, title, dueDate, sortDate, priority, type, insemDate, calvDate, forceOverdue = false) {
