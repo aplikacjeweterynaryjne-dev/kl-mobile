@@ -733,62 +733,49 @@ function renderTaskTypeChips(allTasks) {
     const counts = {}; 
     const types = new Set(['all']);
     
-    // 1. LICZENIE: Musi być identyczne z filtrami w renderTasks
     allTasks.forEach(t => {
-        let fitsActiveTab = false;
-        
-        if (currentTaskFilter === 'done' && t.isDone) fitsActiveTab = true;
-        else if (currentTaskFilter === 'todo' && !t.isDone) fitsActiveTab = true;
-        else if (currentTaskFilter === 'overdue' && !t.isDone && t.isReallyOverdue) fitsActiveTab = true;
-        else if (currentTaskFilter === 'month' && !t.isDone) fitsActiveTab = true;
+        let shouldBeVisible = false;
 
-        if (fitsActiveTab) {
+        // Logika licznika musi być IDENTYCZNA z logiką wyświetlania listy:
+        if (currentTaskFilter === 'todo') {
+            // Tylko niewykonane i NIEPRZETERMINOWANE
+            if (!t.isDone && !t.isReallyOverdue) shouldBeVisible = true;
+        } 
+        else if (currentTaskFilter === 'overdue') {
+            // Tylko niewykonane i PRZETERMINOWANE
+            if (!t.isDone && t.isReallyOverdue) shouldBeVisible = true;
+        } 
+        else if (currentTaskFilter === 'done') {
+            if (t.isDone) shouldBeVisible = true;
+        }
+        else if (currentTaskFilter === 'month') {
+            // W widoku miesiąca zazwyczaj też ukrywamy przeterminowane, by nie śmieciły
+            if (!t.isDone && !t.isReallyOverdue) shouldBeVisible = true;
+        }
+
+        if (shouldBeVisible) {
             types.add(t.type);
             counts[t.type] = (counts[t.type] || 0) + 1;
         }
     });
 
-    const labels = { 
-        'all': 'Wszystkie', 
-        'usg': 'USG', 
-        'heat': 'Ruja', 
-        'dry': 'Zasuszenie', 
-        'rovac': 'Rovac', 
-        'kexxtone': 'Kexxtone', 
-        'calving': 'Wycielenia', 
-        'sync': 'Synchronizacja' 
-    };
-
-    // 2. GENEROWANIE PRZYCISKÓW
+    const labels = { 'all': 'Wszystkie', 'usg': 'USG', 'heat': 'Ruja', 'dry': 'Zasuszenie', 'rovac': 'Rovac', 'kexxtone': 'Kexxtone', 'calving': 'Wycielenia', 'sync': 'Synchronizacja' };
+    
     const typesToShow = Array.from(types);
-    if (typesToShow.length === 1 && currentTypeFilter === 'all') {
-        // Zawsze pokazuj "Wszystkie", nawet jak lista jest pusta
-    }
-
     typesToShow.forEach(type => {
-        let label = labels[type];
-        
-        // Obsługa własnych reguł
-        if (!label && type.startsWith('custom_')) {
-            const idx = parseInt(type.split('_')[1]);
-            label = (userSettings.customRules[idx]) ? userSettings.customRules[idx].label : 'Własne';
-        }
-        if (!label) label = type;
-
+        let label = labels[type] || type;
         const count = counts[type] || 0;
-        // Dodajemy liczbę do etykiety (oprócz przycisku "Wszystkie")
-        const buttonText = (type === 'all') ? label : `${label} (${count})`;
-
+        
+        // Wyświetlaj licznik tylko jeśli > 0 i nie dla "Wszystkie"
+        const finalLabel = (type === 'all') ? label : `${label} (${count})`;
+        
         const btn = document.createElement('button');
         btn.className = `filter-chip ${currentTypeFilter === type ? 'active' : ''}`;
-        btn.textContent = buttonText;
-        
+        btn.textContent = finalLabel;
         btn.onclick = () => { 
             currentTypeFilter = type; 
-            // Używamy renderowania z pamięci globalnej, żeby nie przeliczać bazy niepotrzebnie
-            renderTasks(window.myAllTasksGlobal || allTasks); 
+            renderTasks(allTasks); 
         };
-        
         container.appendChild(btn);
     });
 }
