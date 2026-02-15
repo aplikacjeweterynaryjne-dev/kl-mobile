@@ -827,22 +827,23 @@ function openAnimalCard(id) {
         histDiv.appendChild(row);
     });
 
-    document.getElementById('btnDeleteAnimal').onclick = () => {
+   document.getElementById('btnDeleteAnimal').onclick = () => {
         if(confirm("Usunąć trwale?")) {
             db.collection('animals').doc(id).delete();
             closeModal('animalCardModal');
         }
     };
-const calvHistDiv = document.getElementById('cardCalvingHistory'); 
-    if(calvHistDiv) {
-        calvHistDiv.innerHTML = '<h4 style="margin-top:15px; color:#2e7d32;">Historia wycieleń:</h4>';
+
+    // Usunięto powtórną deklarację const calvHistDiv, bo była wyżej w tej samej funkcji
+    const calvDiv = document.getElementById('cardCalvingHistory'); 
+    if(calvDiv) {
+        calvDiv.innerHTML = '<h4 style="margin-top:15px; color:#2e7d32;">Historia wycieleń:</h4>';
         const ch = animal.historyCalving || [];
         if(ch.length === 0) {
-            calvHistDiv.innerHTML += '<div style="font-size:12px; color:#999;">Brak zarejestrowanych wycieleń.</div>';
+            calvDiv.innerHTML += '<div style="font-size:12px; color:#999;">Brak zarejestrowanych wycieleń.</div>';
         } else {
-            // Sortujemy od najnowszego
             [...ch].reverse().forEach(c => {
-                calvHistDiv.innerHTML += `<div style="font-size:12px; padding:5px 0; border-bottom:1px solid #eee; display:flex; justify-content:space-between;">
+                calvDiv.innerHTML += `<div style="font-size:12px; padding:5px 0; border-bottom:1px solid #eee;">
                     <span>🍼 Data: <b>${c.date}</b></span>
                 </div>`;
             });
@@ -1121,8 +1122,11 @@ function setDateInput(id, deltaDays) {
 
 function switchTaskFilter(mode) {
     currentTaskFilter = mode;
-    document.querySelectorAll('.sub-tab').forEach(b => b.classList.remove('active'));
-    if(window.event && window.event.target) window.event.target.classList.add('active');
+    document.querySelectorAll('.sub-tab').forEach(b => {
+        b.classList.remove('active');
+        // Dodatkowe sprawdzenie, by podświetlić właściwy guzik
+        if(b.getAttribute('onclick')?.includes(mode)) b.classList.add('active');
+    });
     generateAndRenderTasks();
 }
 
