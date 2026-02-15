@@ -987,7 +987,7 @@ function renderConfig() {
 
     ['usg', 'heat', 'dry', 'rovac', 'kexxtone'].forEach(k => createInput(k, userSettings[k]));
 
-    userSettings.customRules.forEach((rule, idx) => {
+userSettings.customRules.forEach((rule, idx) => {
         const div = document.createElement('div');
         div.className = 'config-item';
         div.innerHTML = `
@@ -998,7 +998,9 @@ function renderConfig() {
             <div class="config-inputs">
                 <input type="number" id="cfg_cust_start_${idx}" value="${rule.start}"> - 
                 <input type="number" id="cfg_cust_end_${idx}" value="${rule.end}">
-                <button class="btn-danger" style="padding:2px 8px;" onclick="removeCustomRule(${idx})">X</button>
+                <button class="btn-danger" style="width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; margin-left: 5px; border-radius: 6px; padding: 0;" onclick="removeCustomRule(${idx})">
+                    <i class="bi bi-trash"></i>
+                </button>
             </div>
         `;
         list.appendChild(div);
@@ -1159,8 +1161,8 @@ function showListModal(title, animals) {
             ${detailsHtml}`;
 
         div.onclick = () => {
-            // Nie zamykamy listModal, po prostu otwieramy kartę na wierzchu
-            openAnimalCard(a.id);
+            closeModal('listModal'); // Najpierw zamykamy listę z wykresu
+            openAnimalCard(a.id);    // Potem otwieramy kartę krowy
         };
         contentEl.appendChild(div);
     });
