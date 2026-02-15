@@ -679,11 +679,26 @@ function confirmTaskCalvingUI() {
 
 function confirmTaskCalving(taskData, calvingDate, isAuto) {
     const dateStr = calvingDate.toISOString().split('T')[0];
+    
+    // Pobieramy aktualne dane zwierzęcia, aby nie nadpisać historii
+    const animal = myHerd.find(a => a.id === taskData.animalId);
+    let historyCalving = animal.historyCalving || [];
+    
+    // Dodajemy nową datę do tablicy historii
+    historyCalving.push({
+        date: dateStr,
+        note: isAuto ? "Automatyczne potwierdzenie" : "Ręczne potwierdzenie"
+    });
+
     saveTaskLog(taskData, `Wycielenie: ${dateStr} ${isAuto ? '(Automat)' : ''}`);
+
     db.collection('animals').doc(taskData.animalId).update({
         lastCalving: dateStr,
-        lastInsemination: null, semen: null,
-        isPregnantConfirmed: false, usgStatus: 'pending',
+        historyCalving: historyCalving, // ZAPISUJEMY HISTORIĘ
+        lastInsemination: null,
+        semen: null,
+        isPregnantConfirmed: false,
+        usgStatus: 'pending',
         type: 'krowa'
     });
 }
@@ -804,7 +819,21 @@ function openAnimalCard(id) {
             closeModal('animalCardModal');
         }
     };
-
+const calvHistDiv = document.getElementById('cardCalvingHistory'); 
+    if(calvHistDiv) {
+        calvHistDiv.innerHTML = '<h4 style="margin-top:15px; color:#2e7d32;">Historia wycieleń:</h4>';
+        const ch = animal.historyCalving || [];
+        if(ch.length === 0) {
+            calvHistDiv.innerHTML += '<div style="font-size:12px; color:#999;">Brak zarejestrowanych wycieleń.</div>';
+        } else {
+            // Sortujemy od najnowszego
+            [...ch].reverse().forEach(c => {
+                calvHistDiv.innerHTML += `<div style="font-size:12px; padding:5px 0; border-bottom:1px solid #eee; display:flex; justify-content:space-between;">
+                    <span>🍼 Data: <b>${c.date}</b></span>
+                </div>`;
+            });
+        }
+    }
     document.getElementById('animalCardModal').style.display = 'flex';
 }
 
