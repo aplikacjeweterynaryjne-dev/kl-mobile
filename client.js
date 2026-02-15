@@ -563,8 +563,9 @@ function generateAndRenderTasks() {
         }
     });
 
-    // NA KONCU WYWOŁUJEMY RENDEROWANIE
-    renderTasks(generatedTasks);
+    // --- KLUCZOWA ZMIANA TUTAJ ---
+    window.myAllTasksGlobal = generatedTasks; // Zapisujemy do "pamięci" guzika
+    renderTasks(generatedTasks);             // Rysujemy listę
 }
 function renderTasks(allTasks) {
     const container = document.getElementById('tasksContainer');
@@ -632,20 +633,27 @@ function renderTasks(allTasks) {
     });
 
     // 5. PRZYCISK POKAŻ WSZYSTKIE / ZWIŃ
-  // Wewnątrz renderTasks, fragment z przyciskiem:
+  // 5. PRZYCISK POKAŻ WSZYSTKIE / ZWIŃ
     if (filtered.length > LIMIT) {
         const btnRow = document.createElement('div');
         btnRow.style.textAlign = 'center';
+        
+        // Używamy window.myAllTasksGlobal, żeby funkcja miała dostęp do danych przy przeładowaniu
         if (!showAll) {
-            btnRow.innerHTML = `<button class="btn" style="background:#f0f4f8; color:var(--info); font-size:12px; padding:10px; width:100%; border:1px dashed var(--info); margin-top:10px;" 
-                onclick="window.showAllTasks=true; renderTasks(window.myAllTasksGlobal);">POKAŻ WSZYSTKIE (${filtered.length})</button>`;
+            btnRow.innerHTML = `
+                <button class="btn" style="background:#f0f4f8; color:var(--info); font-size:12px; padding:10px; width:100%; border:1px dashed var(--info); margin-top:10px;" 
+                onclick="window.showAllTasks=true; renderTasks(window.myAllTasksGlobal);">
+                    POKAŻ WSZYSTKIE (${filtered.length}) <i class="bi bi-chevron-down"></i>
+                </button>`;
         } else {
-            btnRow.innerHTML = `<button class="btn" style="background:#fff; color:#999; font-size:12px; padding:10px; width:100%; border:1px solid #eee; margin-top:10px;" 
-                onclick="window.showAllTasks=false; renderTasks(window.myAllTasksGlobal);">ZWIŃ LISTĘ</button>`;
+            btnRow.innerHTML = `
+                <button class="btn" style="background:#fff; color:#999; font-size:12px; padding:10px; width:100%; border:1px solid #eee; margin-top:10px;" 
+                onclick="window.showAllTasks=false; renderTasks(window.myAllTasksGlobal);">
+                    ZWIŃ LISTĘ <i class="bi bi-chevron-up"></i>
+                </button>`;
         }
         container.appendChild(btnRow);
     }
-
     // 6. OBSŁUGA PUSTEGO STANU
     if (filtered.length === 0) {
         container.innerHTML = '<div style="text-align:center; padding:20px; color:#999;">Brak zadań w tym widoku.</div>';
