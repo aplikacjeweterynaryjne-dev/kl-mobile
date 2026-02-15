@@ -808,14 +808,17 @@ function openAnimalCard(id) {
     if(cardTypeEl) cardTypeEl.textContent = animal.type;
 
     // Punkt 11: Historia wycieleń
-    const calvHistDiv = document.getElementById('cardCalvingHistory');
+ const calvHistDiv = document.getElementById('cardCalvingHistory');
     if(calvHistDiv) {
-        calvHistDiv.innerHTML = '<h4 style="margin-top:10px; color:#2e7d32;">Historia wycieleń:</h4>';
+        calvHistDiv.innerHTML = ''; // Czyścimy stare wpisy, nie dodajemy nagłówka
         const ch = animal.historyCalving || [];
-        if(ch.length === 0) calvHistDiv.innerHTML += '<small style="color:#999;">Brak danych</small>';
-        [...ch].reverse().forEach(c => {
-            calvHistDiv.innerHTML += `<div style="font-size:12px; padding:5px 0; border-bottom:1px solid #eee;">🍼 Data: <b>${c.date}</b> <small>(${c.note || ''})</small></div>`;
-        });
+        if(ch.length === 0) {
+            calvHistDiv.innerHTML = '<small style="color:#999;">Brak danych</small>';
+        } else {
+            [...ch].reverse().forEach(c => {
+                calvHistDiv.innerHTML += `<div style="font-size:12px; border-bottom:1px solid #eee; padding:3px;">🍼 Data: <b>${c.date}</b></div>`;
+            });
+        }
     }
     const today = new Date();
     let totalDim = 0;
