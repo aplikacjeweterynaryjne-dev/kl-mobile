@@ -569,33 +569,25 @@ function renderTasks(allTasks) {
     const today = new Date(); today.setHours(0,0,0,0);
     const limitDate = addDays(today, -14); 
 
-    let filtered = allTasks.filter(t => {
-        // 1. Usuwamy tylko stare, wykonane zadania (starsze niż 14 dni)
+ let filtered = allTasks.filter(t => {
         if (t.dueDate < limitDate && t.isDone) return false;
 
-        // 2. Logika Zakładek
         if (currentTaskFilter === 'done') return t.isDone;
         
-        // Wewnątrz renderTasks zmień warunek dla 'todo':
-if (currentTaskFilter === 'todo') {
-    // Pokazuj zadania, które nie są zrobione, nie są jeszcze spóźnione (czerwone)
-    // USUNIĘTO warunek t.dueDate <= today, aby widzieć zadania "w toku"
-    return !t.isDone && !t.isReallyOverdue; 
-}
+        // "DO ZROBIENIA" - teraz pokazuje wszystko, co jest do zrobienia (żółte), 
+        // nawet jeśli termin techniczny (koniec okienka) jest za kilka dni.
+        if (currentTaskFilter === 'todo') return !t.isDone && !t.isReallyOverdue;
         
-        if (currentTaskFilter === 'overdue') {
-            // "Przeterminowane" to tylko te, które przekroczyły końcowy termin (czerwone)
-            return !t.isDone && t.isReallyOverdue;
-        }
+        // "PRZETERMINOWANE" - tylko to, co już "uciekło" (czerwone)
+        if (currentTaskFilter === 'overdue') return !t.isDone && t.isReallyOverdue;
         
+        // "TEN MIESIĄC" - pokazuje wszystko, co wypada w tym miesiącu (i punktowe USG, i zakresowe Zasuszenie)
         if (currentTaskFilter === 'month') {
-            // "Ten miesiąc" - pokazuje wszystko co wypada w tym miesiącu i nie jest jeszcze zrobione
             const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
             const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
             return !t.isDone && t.dueDate >= startOfMonth && t.dueDate <= endOfMonth;
         }
-        
-        return true; // Widok "Wszystkie"
+        return true;
     });
 
     if (currentTypeFilter !== 'all') {
@@ -656,34 +648,44 @@ function checkRuleAndAddTask(list, animal, rule, daysCounter, refDate, type, cal
     let isActive = false; 
     let isOverdue = false; 
     let dueDate = null;
+    
+    // Ustalamy dzisiejszą datę do porównań
     const today = new Date();
     today.setHours(0,0,0,0);
     
     if (isReverse) {
-        // ZASUSZENIE (liczymy wstecz od porodu)
-        dueDate = addDays(calvDate, -rule.end); // Termin to np. 40 dni przed porodem
+        // --- ZASUSZENIE / ROVAC / KEXXTONE (liczymy wstecz od wycielenia) ---
+        dueDate = addDays(calvDate, -rule.end); 
         
-        // Czy jesteśmy w okienku (np. między 60 a 40 dniem do porodu)?
+        // Aktywne (żółte), gdy jesteśmy w oknie (np. między 60 a 40 dniem do porodu)
         if (daysCounter <= rule.start && daysCounter >= rule.end) isActive = true;
-        // Czy termin końcowy już minął (zostało mniej niż 40 dni)?
+        // Przeterminowane (czerwone), gdy zostało mniej dni niż koniec okna (np. < 40 dni)
         if (daysCounter < rule.end) isOverdue = true;
+
+        // FIX DATY KRYCIA: Pobieramy faktyczną datę ostatniego krycia zwierzęcia, 
+        // zamiast używać refDate (którym w tym przypadku jest błędnie calvDate)
+        const actualInsemDate = animal.lastInsemination ? new Date(animal.lastInsemination) : null;
+
+        if (isReverse && animal.isDriedOff && ['dry', 'rovac', 'kexxtone'].includes(type)) return;
+
+        if (isActive) {
+            addTask(list, animal, rule.label, dueDate, today, 'warning', type, actualInsemDate, calvDate, false);
+        } else if (isOverdue) {
+            addTask(list, animal, rule.label, dueDate, today, 'urgent', type, actualInsemDate, calvDate, true);
+        }
+
     } else {
-        // USG / RUJA (liczymy do przodu od krycia)
-        dueDate = addDays(refDate, rule.end); // Termin to np. 30 dni po kryciu
+        // --- USG / RUJA (liczymy w przód od krycia) ---
+        dueDate = addDays(refDate, rule.end); 
         
         if (daysCounter >= rule.start && daysCounter <= rule.end) isActive = true;
         if (daysCounter > rule.end) isOverdue = true;
-    }
 
-    if (isReverse && animal.isDriedOff && ['dry', 'rovac', 'kexxtone'].includes(type)) return;
-
-    // Decyzja o kolorze i zakładce:
-    if (isActive) {
-        // Zółte (Ostrzeżenie) -> Trafia do "Do zrobienia"
-        addTask(list, animal, rule.label, dueDate, new Date(), 'warning', type, refDate, calvDate, false);
-    } else if (isOverdue) {
-        // Czerwone (Pilne) -> Trafia do "Przeterminowane"
-        addTask(list, animal, rule.label, dueDate, new Date(), 'urgent', type, refDate, calvDate, true);
+        if (isActive) {
+            addTask(list, animal, rule.label, dueDate, today, 'warning', type, refDate, calvDate, false);
+        } else if (isOverdue) {
+            addTask(list, animal, rule.label, dueDate, today, 'urgent', type, refDate, calvDate, true);
+        }
     }
 }
 function addTask(list, animal, title, dueDate, sortDate, priority, type, insemDate, calvDate, forceOverdue = false) {
@@ -691,14 +693,18 @@ function addTask(list, animal, title, dueDate, sortDate, priority, type, insemDa
     const taskId = `${animal.id}_${type}_${dateStr}`; 
     const doneLog = completedTasks.find(t => t.taskId === taskId);
     const isDone = !!doneLog;
-    let isReallyOverdue = forceOverdue || (priority === 'urgent' && type !== 'calving');
+    
+    // Zapewniamy, że insemDate i calvDate to obiekty Date dla renderera
+    const finalInsem = insemDate ? new Date(insemDate) : null;
+    const finalCalv = calvDate ? new Date(calvDate) : null;
 
     list.push({
         id: taskId, animalId: animal.id, tag: animal.tag, title: title,
         dueDate: dueDate, sortDate: sortDate, priority: priority, type: type,
         isDone: isDone, logId: isDone ? doneLog.logId : null, 
-        insemDate: insemDate, calvDate: calvDate,
-        isReallyOverdue: isReallyOverdue
+        insemDate: finalInsem, 
+        calvDate: finalCalv,
+        isReallyOverdue: forceOverdue
     });
 }
 
