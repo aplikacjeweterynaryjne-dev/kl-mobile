@@ -712,34 +712,34 @@ function renderTaskTypeChips(allTasks) {
     allTasks.forEach(t => {
         if (t.dueDate < limitDate && (t.isDone || t.isReallyOverdue) && t.type !== 'calving') return;
 
-  let visibleInTab = false;
-    const today = new Date();
-    today.setHours(0,0,0,0);
+let visibleInTab = false;
+const today = new Date();
+today.setHours(0,0,0,0);
 
-    // Definiujemy zakres miesiąca raz dla porównań
-    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-    const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
 
-    // Licznik musi idealnie pokrywać się z tym, co filtruje renderTasks:
-    if (currentTaskFilter === 'todo') {
-        visibleInTab = !t.isDone && !t.isReallyOverdue;
-    } 
-    else if (currentTaskFilter === 'overdue') {
-        visibleInTab = !t.isDone && t.isReallyOverdue;
-    } 
-    else if (currentTaskFilter === 'done') {
-        visibleInTab = t.isDone;
-    } 
-    else if (currentTaskFilter === 'month') {
-        // Kluczowa poprawka: Licznik zlicza tylko te zadania, 
-        // które są niezrobione I mieszczą się w obecnym miesiącu
-        visibleInTab = !t.isDone && t.dueDate >= startOfMonth && t.dueDate <= endOfMonth;
-    }
+if (currentTaskFilter === 'todo') {
+    // Zadanie jest do zrobienia, jeśli nie jest gotowe i NIE jest jeszcze przeterminowane
+    visibleInTab = !t.isDone && !t.isReallyOverdue;
+} 
+else if (currentTaskFilter === 'overdue') {
+    // Zadanie jest przeterminowane (czerwone)
+    visibleInTab = !t.isDone && t.isReallyOverdue;
+} 
+else if (currentTaskFilter === 'done') {
+    visibleInTab = t.isDone;
+} 
+else if (currentTaskFilter === 'month') {
+    // WIDOK MIESIĄCA: Pokazuj zadania, których termin (dueDate) przypada na ten miesiąc,
+    // niezależnie od tego czy są już przeterminowane, czy jeszcze "na czas"
+    visibleInTab = !t.isDone && (t.dueDate >= startOfMonth && t.dueDate <= endOfMonth);
+}
 
-    if (visibleInTab) {
-        types.add(t.type);
-        counts[t.type] = (counts[t.type] || 0) + 1;
-    }
+if (visibleInTab) {
+    types.add(t.type);
+    counts[t.type] = (counts[t.type] || 0) + 1;
+}
     });
 
     const labels = { 'all': 'Wszystkie', 'usg': 'USG', 'heat': 'Ruja', 'dry': 'Zasuszenie', 'rovac': 'Rovac', 'kexxtone': 'Kexxtone', 'calving': 'Wycielenia', 'sync': 'Synchronizacja' };
