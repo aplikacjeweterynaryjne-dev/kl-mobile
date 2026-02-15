@@ -524,9 +524,10 @@ function generateAndRenderTasks() {
             }
         }
         
-        if (animal.type !== 'krowa' && animal.type !== 'jalowka') return;
-        if (!animal.lastInsemination) return;
-        if (animal.usgStatus === 'negative') return; 
+      if (animal.type !== 'krowa' && animal.type !== 'jalowka') return;
+if (!animal.lastInsemination) return;
+// Jeśli krowa jest potwierdzona jako cielna, NIE przerywaj (pokazuj zasuszenie)
+if (animal.usgStatus === 'negative' && !animal.isPregnantConfirmed) return;; 
 
         const insDate = new Date(animal.lastInsemination);
         const calvingDate = addDays(insDate, userSettings.gestation || 280);
@@ -686,8 +687,14 @@ function checkRuleAndAddTask(list, animal, rule, daysCounter, refDate, type, cal
 
 function addTask(list, animal, title, dueDate, sortDate, priority, type, insemDate, calvDate, forceOverdue = false) {
     const dateStr = dueDate.toISOString().split('T')[0];
-    const taskId = `${animal.id}_${type}_${dateStr}`;
+    // taskId musi być unikalne dla tego konkretnego cyklu (dodajemy rok wycielenia do ID)
+    const taskId = `${animal.id}_${type}_${dateStr}`; 
+    
     const doneLog = completedTasks.find(t => t.taskId === taskId);
+    
+    // Jeśli zadanie jest już w logach jako wykonane, nie dodajemy go do listy "do zrobienia"
+    if (doneLog) return; 
+
     let isReallyOverdue = false;
     if (forceOverdue) isReallyOverdue = true; 
     else if (priority === 'urgent' && type !== 'calving') isReallyOverdue = true;
@@ -695,8 +702,8 @@ function addTask(list, animal, title, dueDate, sortDate, priority, type, insemDa
     list.push({
         id: taskId, animalId: animal.id, tag: animal.tag, title: title,
         dueDate: dueDate, sortDate: sortDate, priority: priority, type: type,
-        isDone: !!doneLog, doneDate: doneLog ? doneLog.completedAt.toDate() : null,
-        logId: doneLog ? doneLog.logId : null, insemDate: insemDate, calvDate: calvDate,
+        isDone: false, doneDate: null, logId: null, 
+        insemDate: insemDate, calvDate: calvDate,
         isReallyOverdue: isReallyOverdue
     });
 }
