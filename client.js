@@ -22,6 +22,7 @@ let currentTypeFilter = 'all';
 let currentCalDate = new Date(); 
 let currentEditingAnimalId = null;
 let activeHerdFilters = [];
+window.showAllTasks = false;
 // Ustawienia Domyślne
 const DEFAULT_SETTINGS = {
     usg: { enabled: true, start: 45, end: 180, base: 'insem', label: 'Badanie USG' },
@@ -494,12 +495,11 @@ function generateAndRenderTasks() {
     today.setHours(0,0,0,0);
     let generatedTasks = [];
 
- myHerd.forEach(animal => {
-        // --- START MODYFIKACJI: AUTOMAT ZASUSZENIA ---
+    myHerd.forEach(animal => {
+        // --- AUTOMAT ZASUSZENIA ---
         const todayForStatus = new Date();
         todayForStatus.setHours(0,0,0,0);
         
-        // Obliczanie dni do wycielenia dla statusu zasuszenia
         let daysToCalvAuto = 999;
         if (animal.lastInsemination && animal.isPregnantConfirmed) {
             const estCalv = addDays(new Date(animal.lastInsemination), userSettings.gestation || 280);
@@ -510,9 +510,8 @@ function generateAndRenderTasks() {
         if (animal.type === 'krowa' && animal.isPregnantConfirmed && daysToCalvAuto <= 40 && !animal.isDriedOff) {
             db.collection('animals').doc(animal.id).update({ isDriedOff: true });
         }
-        // --- KONIEC MODYFIKACJI AUTOMATU ---
 
-        // Twoja oryginalna Synchronizacja (pozostaje bez zmian)
+        // Synchronizacja
         if (animal.type === 'krowa' && animal.lastCalving) {
             const calvDate = new Date(animal.lastCalving);
             const dim = Math.floor((today - calvDate) / (1000 * 60 * 60 * 24));
@@ -524,8 +523,6 @@ function generateAndRenderTasks() {
                 }
             }
         }
-        
-        // Dalsza część Twojej pętli (if animal.type !== 'krowa'...)
         
         if (animal.type !== 'krowa' && animal.type !== 'jalowka') return;
         if (!animal.lastInsemination) return;
@@ -550,7 +547,7 @@ function generateAndRenderTasks() {
             else checkRuleAndAddTask(generatedTasks, animal, rule, daysToCalving, calvingDate, `custom_${idx}`, calvingDate, true);
         });
         
-        // Wycielenie (Bufor -5/+5)
+        // Wycielenie
         if (daysToCalving <= 10 && daysToCalving >= -15) { 
             const isDone = checkIfTaskDone(animal.id, 'calving', calvingDate);
             if (!isDone && daysToCalving <= -13) {
@@ -565,9 +562,70 @@ function generateAndRenderTasks() {
             }
         }
     });
+
+    // NA KONCU WYWOŁUJEMY RENDEROWANIE
     renderTasks(generatedTasks);
 }
+function renderTasks(allTasks) {
+    const container = document.getElementById('tasksContainer');
+    if (!container) return;
+    container.innerHTML = '';
 
+    // Filtrujemy tylko zadania do wykonania (niezrobione) dla głównej listy
+    let filtered = allTasks.filter(t => !t.isDone);
+    
+    // Sortowanie: Przeterminowane i pilne na górę
+    filtered.sort((a, b) => a.dueDate - b.dueDate);
+
+    // LIMIT 5 SZTUK
+    const LIMIT = 5;
+    const showAll = window.showAllTasks || false;
+    const visibleTasks = showAll ? filtered : filtered.slice(0, LIMIT);
+
+    visibleTasks.forEach(t => {
+        const animal = myHerd.find(a => a.id === t.animalId) || {};
+        const div = document.createElement('div');
+        div.className = `task-item ${t.priority}`;
+        
+        const dueStr = t.dueDate.toLocaleDateString('pl-PL');
+        const lastInsemDate = animal.lastInsemination ? `💉 Krycie: <b>${animal.lastInsemination}</b>` : '';
+        const calvDateInfo = animal.lastCalving ? `🍼 Ost. Wyc: <b>${animal.lastCalving}</b>` : '';
+        const dateColor = t.isReallyOverdue ? 'red' : (t.priority === 'urgent' ? '#e67e22' : '#333'); 
+
+        div.innerHTML = `
+            <div style="flex: 1;">
+                <div style="font-size:15px; font-weight:bold; color:#333;">${t.title}</div>
+                <div style="font-size: 11px; color: #777; margin: 4px 0; line-height: 1.4;">
+                    Termin: <b style="color:${dateColor}">${dueStr}</b><br>
+                    ${lastInsemDate}<br>
+                    ${calvDateInfo}
+                </div>
+                <div class="task-animal-tag" onclick="openAnimalCard('${t.animalId}')">${t.tag}</div>
+            </div>
+            <div class="task-check-wrapper">
+                <input type="checkbox" onclick="initiateTaskCompletion('${t.id}', '${t.type}', '${t.animalId}', '${t.dueDate.toISOString()}')">
+            </div>
+        `;
+        container.appendChild(div);
+    });
+
+    // PRZYCISK ROZWIJANIA
+    if (filtered.length > LIMIT) {
+        const btnRow = document.createElement('div');
+        btnRow.style.textAlign = 'center';
+        if (!showAll) {
+            btnRow.innerHTML = `<button class="btn" style="background:#f0f4f8; color:var(--info); font-size:12px; padding:10px; width:100%; border:1px dashed var(--info); margin-top:10px;" 
+                onclick="window.showAllTasks=true; generateAndRenderTasks();">POKAŻ WSZYSTKIE (${filtered.length}) <i class="bi bi-chevron-down"></i></button>`;
+        } else {
+            btnRow.innerHTML = `<button class="btn" style="background:#fff; color:#999; font-size:12px; padding:10px; width:100%; border:1px solid #eee; margin-top:10px;" 
+                onclick="window.showAllTasks=false; generateAndRenderTasks();">ZWIŃ LISTĘ <i class="bi bi-chevron-up"></i></button>`;
+        }
+        container.appendChild(btnRow);
+    }
+
+    // Aktualizacja chipów (kategorii) na górze
+    renderTaskTypeChips(allTasks);
+}
 function checkIfTaskDone(animalId, type, refDate) {
     const dateStr = refDate.toISOString().split('T')[0];
     const taskId = `${animalId}_${type}_${dateStr}`;
