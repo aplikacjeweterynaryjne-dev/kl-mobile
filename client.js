@@ -21,12 +21,13 @@ let currentTaskFilter = 'todo';
 let currentTypeFilter = 'all';
 let currentCalDate = new Date(); 
 let currentEditingAnimalId = null;
-
+let activeHerdFilters = [];
 // Ustawienia Domyślne
 const DEFAULT_SETTINGS = {
     usg: { enabled: true, start: 45, end: 180, base: 'insem', label: 'Badanie USG' },
     heat: { enabled: true, start: 18, end: 24, base: 'insem', label: 'Powtórka Rui' },
     dry: { enabled: true, start: 40, end: 60, base: 'calving_minus', label: 'Zasuszenie' },
+    sync: { enabled: true, start: 60, end: 70, base: 'calving', label: 'Synchronizacja' }, // DODANO
     rovac: { enabled: true, start: 21, end: 28, base: 'calving_minus', label: 'Rovac' },
     kexxtone: { enabled: true, start: 7, end: 14, base: 'calving_minus', label: 'Kexxtone' },
     gestation: 280, 
@@ -769,7 +770,20 @@ function openAnimalCard(id) {
 
     document.getElementById('cardTag').textContent = animal.tag;
     document.getElementById('cardDob').textContent = animal.dob;
-    
+    // Punkt 7: Wyświetlanie typu zwierzęcia
+    const cardTypeEl = document.getElementById('cardType');
+    if(cardTypeEl) cardTypeEl.textContent = animal.type;
+
+    // Punkt 11: Historia wycieleń
+    const calvHistDiv = document.getElementById('cardCalvingHistory');
+    if(calvHistDiv) {
+        calvHistDiv.innerHTML = '<h4 style="margin-top:10px; color:#2e7d32;">Historia wycieleń:</h4>';
+        const ch = animal.historyCalving || [];
+        if(ch.length === 0) calvHistDiv.innerHTML += '<small style="color:#999;">Brak danych</small>';
+        [...ch].reverse().forEach(c => {
+            calvHistDiv.innerHTML += `<div style="font-size:12px; padding:5px 0; border-bottom:1px solid #eee;">🍼 Data: <b>${c.date}</b> <small>(${c.note || ''})</small></div>`;
+        });
+    }
     const today = new Date();
     let totalDim = 0;
     let countDim = 0;
@@ -956,6 +970,7 @@ function setupModals() {
         const type = document.getElementById('inpType').value;
         const tag = document.getElementById('inpTag').value;
         const dob = document.getElementById('inpDob').value;
+        const location = document.getElementById('inpLocation')?.value || '';
         const lastCalving = document.getElementById('inpLastCalving').value || null;
         const lastInsem = document.getElementById('inpLastInsem').value || null;
         const semen = document.getElementById('inpSemen').value || null;
@@ -975,6 +990,7 @@ function setupModals() {
 
         db.collection('animals').add({
             ownerUid: currentUser.uid, tag, type, dob, lastCalving, 
+            location: location, // DODAJ TO
             lastInsemination: lastInsem, 
             semen, historyInsemination, isPregnantConfirmed, usgStatus,
             createdAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -1014,7 +1030,7 @@ function renderConfig() {
         list.appendChild(div);
     };
 
-    ['usg', 'heat', 'dry', 'rovac', 'kexxtone'].forEach(k => createInput(k, userSettings[k]));
+    ['usg', 'heat', 'sync', 'dry', 'rovac', 'kexxtone'].forEach(k => createInput(k, userSettings[k]));
 
 userSettings.customRules.forEach((rule, idx) => {
         const div = document.createElement('div');
@@ -1207,17 +1223,56 @@ function switchSection(id) {
     if(navBtn) navBtn.classList.add('active'); 
     if(id === 'section-treatments') { /* Nie ładuj auto */ }
 }
+function toggleHerdFilter(filter) {
+    const idx = activeHerdFilters.indexOf(filter);
+    if (idx > -1) activeHerdFilters.splice(idx, 1);
+    else activeHerdFilters.push(filter);
+    
+    // Wizualna zmiana koloru przycisku
+    const btn = document.getElementById('f-' + filter);
+    if(btn) btn.classList.toggle('active');
+    
+    renderHerdList(); 
+}
 // --- FUNKCJE RENDERUJĄCE (NAPRAWA BŁĘDÓW) ---
 
-function renderHerdList(type) {
+function renderHerdList() {
     const list = document.getElementById('herdList');
     if (!list) return;
     list.innerHTML = '';
 
-    // Filtrowanie stada
-    let filtered = type === 'all' ? myHerd : myHerd.filter(a => a.type === type);
-    
-    // Obsługa wyszukiwarki
+    // Tworzymy kopię stada do filtrowania i sortowania
+    let filtered = [...myHerd];
+
+    // --- PUNKT 13: SORTOWANIE DOMYŚLNE ---
+    // Hierarchia: Puste -> Do USG -> Cielne -> Jałówki niekryte -> Byki/Inne
+    filtered.sort((a, b) => {
+        const getPriority = (s) => {
+            if (s.usgStatus === 'negative' || s.usgStatus === 'unknown') return 1; // Niecielne (Puste)
+            if (s.usgStatus === 'pending' || (s.lastInsemination && !s.isPregnantConfirmed)) return 2; // Do USG / Badania
+            if (s.isPregnantConfirmed) return 3; // Cielne potwierdzone
+            if (s.type === 'jalowka' && !s.lastInsemination) return 4; // Jałówki jeszcze nie kryte
+            return 5; // Byki i pozostałe
+        };
+        return getPriority(a) - getPriority(b);
+    });
+
+    // --- PUNKT 12: OBSŁUGA WIELU FILTRÓW JEDNOCZEŚNIE ---
+    if (activeHerdFilters.length > 0) {
+        filtered = filtered.filter(a => {
+            // Sprawdzamy statusy cielności
+            if (activeHerdFilters.includes('cielne') && a.isPregnantConfirmed) return true;
+            if (activeHerdFilters.includes('puste') && (s.usgStatus === 'negative' || s.usgStatus === 'unknown')) return true;
+            if (activeHerdFilters.includes('usg') && a.usgStatus === 'pending') return true;
+            
+            // Sprawdzamy typy zwierząt
+            if (activeHerdFilters.includes(a.type)) return true;
+            
+            return false;
+        });
+    }
+
+    // Obsługa wyszukiwarki (Search Bar)
     const searchInput = document.getElementById('herdSearch');
     const search = searchInput ? searchInput.value.toLowerCase() : '';
     if (search) {
@@ -1225,7 +1280,7 @@ function renderHerdList(type) {
     }
 
     if (filtered.length === 0) {
-        list.innerHTML = '<div style="text-align:center; padding:20px; color:#999;">Brak zwierząt do wyświetlenia.</div>';
+        list.innerHTML = '<div style="text-align:center; padding:20px; color:#999;">Brak zwierząt pasujących do filtrów.</div>';
         return;
     }
 
@@ -1237,7 +1292,7 @@ function renderHerdList(type) {
         
         if (a.type === 'krowa' || a.type === 'jalowka') {
             if (a.isPregnantConfirmed) statusIcon = '✅ Cielna'; 
-            else if (a.usgStatus === 'negative') statusIcon = '❌ Pusta'; 
+            else if (a.usgStatus === 'negative' || a.usgStatus === 'unknown') statusIcon = '❌ Pusta'; 
             else if (a.lastInsemination) statusIcon = '❓ Do badania'; 
             else statusIcon = '⚪ Oczekiwanie';
 
