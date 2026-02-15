@@ -1018,45 +1018,70 @@ function setupModals() {
         }).catch(err => alert("Błąd: " + err.message));
     });
 
-    document.getElementById('animalForm').addEventListener('submit', (e) => {
+document.getElementById('animalForm').addEventListener('submit', (e) => {
         e.preventDefault();
+        
+        // 1. Podstawowe dane
         const type = document.getElementById('inpType').value;
         const tag = document.getElementById('inpTag').value;
         const dob = document.getElementById('inpDob').value;
-        const locVal = document.getElementById('inpLocation')?.value || '';
-        const mTag = document.getElementById('inpMother')?.value || ''; // Matka
-        const fSemen = document.getElementById('inpFather')?.value || ''; // Ojciec
+        
+        // 2. NOWE POLA: Lokalizacja i Rodzina
+        const location = document.getElementById('inpLocation')?.value || '';
+        const motherTag = document.getElementById('inpMother')?.value || '';
+        const fatherSemen = document.getElementById('inpFather')?.value || '';
+
+        // 3. Dane rozrodcze (to co zniknęło)
+        const lastCalving = document.getElementById('inpLastCalving').value || null;
         const lastInsem = document.getElementById('inpLastInsem').value || null;
-        const semen = document.getElementById('inpSemen').value || null;
+        const semen = document.getElementById('inpSemen')?.value || null;
         const pregStatus = document.getElementById('inpPregStatus').value;
 
+        // Logika statusu cielności
         let isPregnantConfirmed = false;
         let usgStatus = 'pending';
 
-        if (pregStatus === 'pregnant') { isPregnantConfirmed = true; usgStatus = 'positive'; } 
-        else if (pregStatus === 'check') { isPregnantConfirmed = false; usgStatus = 'pending'; } 
-        else { usgStatus = 'negative'; if(lastInsem) usgStatus = 'pending'; }
-
-        let historyInsemination = [];
-        if(lastInsem) {
-            historyInsemination.push({ date: lastInsem, bull: semen || 'Nieznany', note: 'Start', added: new Date().toISOString() });
+        if (pregStatus === 'pregnant') { 
+            isPregnantConfirmed = true; 
+            usgStatus = 'positive'; 
+        } else if (pregStatus === 'check') { 
+            isPregnantConfirmed = false; 
+            usgStatus = 'pending'; 
+        } else { 
+            usgStatus = 'negative'; 
+            if(lastInsem) usgStatus = 'pending'; 
         }
 
-      db.collection('animals').add({
-            ownerUid: currentUser.uid, 
-            tag, 
-            type, 
-            dob, 
-            location: locVal,
-            motherTag: mTag, 
-            fatherSemen: fSemen,
-            lastCalving: document.getElementById('inpLastCalving').value || null, 
-            location: location, // DODAJ TO
-            lastInsemination: lastInsem, 
-            semen, historyInsemination, isPregnantConfirmed, usgStatus,
+        // Budowanie historii inseminacji na start, jeśli podano datę
+        let historyInsemination = [];
+        if(lastInsem) {
+            historyInsemination.push({ 
+                date: lastInsem, 
+                bull: semen || 'Nieznany', 
+                note: 'Wpis początkowy', 
+                added: new Date().toISOString() 
+            });
+        }
+
+        // 4. ZAPIS DO FIREBASE (Wszystkie pola razem)
+        db.collection('animals').add({
+            ownerUid: currentUser.uid,
+            tag: tag,
+            type: type,
+            dob: dob,
+            location: location,
+            motherTag: motherTag,
+            fatherSemen: fatherSemen,
+            lastCalving: lastCalving,
+            lastInsemination: lastInsem,
+            semen: semen,
+            historyInsemination: historyInsemination,
+            isPregnantConfirmed: isPregnantConfirmed,
+            usgStatus: usgStatus,
+            historyCalving: [],
             createdAt: firebase.firestore.FieldValue.serverTimestamp()
         }).then(() => {
-            alert("Dodano zwierzę!");
+            alert("Dodano zwierzę do stada!");
             closeModal('animalModal');
         }).catch(err => alert("Błąd: " + err.message));
     });
