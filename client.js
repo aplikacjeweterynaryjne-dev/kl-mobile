@@ -494,8 +494,25 @@ function generateAndRenderTasks() {
     today.setHours(0,0,0,0);
     let generatedTasks = [];
 
-    myHerd.forEach(animal => {
-        // Synchronizacja
+ myHerd.forEach(animal => {
+        // --- START MODYFIKACJI: AUTOMAT ZASUSZENIA ---
+        const todayForStatus = new Date();
+        todayForStatus.setHours(0,0,0,0);
+        
+        // Obliczanie dni do wycielenia dla statusu zasuszenia
+        let daysToCalvAuto = 999;
+        if (animal.lastInsemination && animal.isPregnantConfirmed) {
+            const estCalv = addDays(new Date(animal.lastInsemination), userSettings.gestation || 280);
+            daysToCalvAuto = Math.floor((estCalv - todayForStatus) / (1000 * 60 * 60 * 24));
+        }
+
+        // Automat: Jeśli krowa jest cielna i < 40 dni do wycielenia, a nie jest zasuszona -> Zmień status w bazie
+        if (animal.type === 'krowa' && animal.isPregnantConfirmed && daysToCalvAuto <= 40 && !animal.isDriedOff) {
+            db.collection('animals').doc(animal.id).update({ isDriedOff: true });
+        }
+        // --- KONIEC MODYFIKACJI AUTOMATU ---
+
+        // Twoja oryginalna Synchronizacja (pozostaje bez zmian)
         if (animal.type === 'krowa' && animal.lastCalving) {
             const calvDate = new Date(animal.lastCalving);
             const dim = Math.floor((today - calvDate) / (1000 * 60 * 60 * 24));
@@ -507,6 +524,8 @@ function generateAndRenderTasks() {
                 }
             }
         }
+        
+        // Dalsza część Twojej pętli (if animal.type !== 'krowa'...)
         
         if (animal.type !== 'krowa' && animal.type !== 'jalowka') return;
         if (!animal.lastInsemination) return;
@@ -688,18 +707,34 @@ function initiateTaskCompletion(taskId, type, animalId, dueDateStr) {
 
 function confirmTaskStandard() {
     if(!pendingTask) return;
-    saveTaskLog(pendingTask, null);
+    
+    // Jeśli to zadanie zasuszenia, zaktualizuj status krowy
+    if (pendingTask.type === 'dry') {
+        db.collection('animals').doc(pendingTask.animalId).update({ isDriedOff: true });
+        alert("Krowa została oznaczona jako zasuszona.");
+    }
+
+    saveTaskLog(pendingTask, "Wykonano");
     closeModal('taskConfirmModal');
 }
 
 function confirmTaskUSG(isPregnant) {
     if(!pendingTask) return;
-    saveTaskLog(pendingTask, isPregnant ? 'Pozytywny' : 'Negatywny');
-    db.collection('animals').doc(pendingTask.animalId).update({
+    
+    const updateData = {
         isPregnantConfirmed: isPregnant,
         usgStatus: isPregnant ? 'positive' : 'negative'
+    };
+
+    db.collection('animals').doc(pendingTask.animalId).update(updateData).then(() => {
+        if (!isPregnant) {
+            // Komunikat informacyjny dla użytkownika
+            alert("Sztuka pusta. Status zaktualizowany. Krowa kwalifikuje się do synchronizacji (Zadanie pojawi się na liście zadań).");
+        }
+        closeModal('taskConfirmModal');
     });
-    closeModal('taskConfirmModal');
+
+    saveTaskLog(pendingTask, isPregnant ? 'Pozytywny' : 'Negatywny');
 }
 
 function confirmTaskCalvingUI() {
@@ -873,7 +908,7 @@ function openAnimalCard(id) {
     document.getElementById('editDob').value = animal.dob;
     document.getElementById('editLastCalving').value = animal.lastCalving || '';
     document.getElementById('editLastInsem').value = animal.lastInsemination || '';
-
+    if(document.getElementById('editSemen')) document.getElementById('editSemen').value = animal.semen || '';
     let statusVal = 'unknown';
     if (animal.isPregnantConfirmed) statusVal = 'pregnant';
     else if (animal.usgStatus === 'negative') statusVal = 'negative';
@@ -946,7 +981,7 @@ function saveAnimalChanges() {
     const location = document.getElementById('editLocation').value || '';
     const motherTag = document.getElementById('editMother').value || '';
     const fatherSemen = document.getElementById('editFather').value || '';
-
+    const lastSemen = document.getElementById('editSemen')?.value || '';
     // Logika statusu cielności (Twoja oryginalna)
     let isPreg = false;
     let usg = 'pending';
@@ -1024,7 +1059,43 @@ function setupModals() {
             document.getElementById('cowFields').classList.add('hidden');
         }
     });
+// --- NOWOŚĆ: Automatyczna podpowiedź statusu przy dodawaniu ---
+    document.getElementById('inpLastInsem').addEventListener('change', (e) => {
+        const insemDateVal = e.target.value;
+        if (!insemDateVal) return;
 
+        const insemDate = new Date(insemDateVal);
+        const today = new Date();
+        today.setHours(0,0,0,0);
+        
+        const diff = Math.floor((today - insemDate) / (1000 * 60 * 60 * 24));
+        const statusSelect = document.getElementById('inpPregStatus');
+
+        if (diff < 0) {
+            alert("Data zacielenia nie może być z przyszłości!");
+            e.target.value = '';
+            return;
+        }
+
+        // Logika podpowiedzi:
+        if (diff < 30) {
+            // Poniżej 30 dni - status "Pusta" (bo za wcześnie na USG)
+            statusSelect.value = 'negative'; 
+            alert("Od zacielenia minęło tylko " + diff + " dni. Status ustawiony na 'Pusta' (Za wcześnie na USG).");
+        } else {
+            // 30 dni i więcej - status "Do USG"
+            statusSelect.value = 'check';
+        }
+    });
+    // --- TUTAJ WKLEJ ---
+    document.getElementById('inpLastCalving').addEventListener('change', (e) => {
+        if (e.target.value) {
+            // Jeśli wpisujesz datę wycielenia, krowa na start jest "Pusta"
+            document.getElementById('inpPregStatus').value = 'negative';
+            // Czyścimy datę zacielenia, bo po wycieleniu krowa jest pusta
+            document.getElementById('inpLastInsem').value = '';
+        }
+    });
     document.getElementById('insemForm').addEventListener('submit', (e) => {
         e.preventDefault();
         const tagVal = document.getElementById('insemTagInput').value; 
@@ -1107,6 +1178,7 @@ document.getElementById('animalForm').addEventListener('submit', (e) => {
             location: location,
             motherTag: motherTag,
             fatherSemen: fatherSemen,
+            semen: lastSemen,
             lastCalving: lastCalving,
             lastInsemination: lastInsem,
             semen: semen,
