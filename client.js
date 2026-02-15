@@ -586,10 +586,12 @@ function renderTasks(allTasks) {
 
     if (currentTaskFilter === 'done') {
         filtered = allTasks.filter(t => t.isDone);
-    } else if (currentTaskFilter === 'todo') {
-        filtered = allTasks.filter(t => !t.isDone && !t.isReallyOverdue);
-    } else if (currentTaskFilter === 'overdue') {
-        filtered = allTasks.filter(t => !t.isDone && t.isReallyOverdue);
+   } else if (currentTaskFilter === 'todo') {
+    // Pokazuj wszystko co nie jest zrobione (bieżące + spóźnione)
+    filtered = allTasks.filter(t => !t.isDone);
+} else if (currentTaskFilter === 'overdue') {
+    // Tutaj zostawiamy tylko spóźnione dla osobnej zakładki
+    filtered = allTasks.filter(t => !t.isDone && t.isReallyOverdue);
     } else if (currentTaskFilter === 'month') {
         const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
         const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
@@ -725,22 +727,69 @@ function addTask(list, animal, title, dueDate, sortDate, priority, type, insemDa
 
 function renderTaskTypeChips(allTasks) {
     const container = document.getElementById('taskTypeChips');
+    if (!container) return;
     container.innerHTML = '';
-    const counts = {}; const types = new Set(['all']);
-    allTasks.forEach(t => { 
-    // Pokazujemy przyciski dla wszystkich typów zadań, które nie są wykonane
-    if(!t.isDone) { 
-        types.add(t.type); 
-        counts[t.type] = (counts[t.type] || 0) + 1; 
-    } 
-});
-    const labels = { 'all': 'Wszystkie', 'usg': 'USG', 'heat': 'Ruja', 'dry': 'Zasuszenie', 'rovac': 'Rovac', 'kexxtone': 'Kexxtone', 'calving': 'Wycielenia', 'sync': 'Synchronizacja' };
-    const typesToShow = Array.from(types); if(typesToShow.length === 0 && currentTypeFilter === 'all') typesToShow.push('all');
+    
+    const counts = {}; 
+    const types = new Set(['all']);
+    
+    // 1. LICZENIE: Musi być identyczne z filtrami w renderTasks
+    allTasks.forEach(t => {
+        let fitsActiveTab = false;
+        
+        if (currentTaskFilter === 'done' && t.isDone) fitsActiveTab = true;
+        else if (currentTaskFilter === 'todo' && !t.isDone) fitsActiveTab = true;
+        else if (currentTaskFilter === 'overdue' && !t.isDone && t.isReallyOverdue) fitsActiveTab = true;
+        else if (currentTaskFilter === 'month' && !t.isDone) fitsActiveTab = true;
+
+        if (fitsActiveTab) {
+            types.add(t.type);
+            counts[t.type] = (counts[t.type] || 0) + 1;
+        }
+    });
+
+    const labels = { 
+        'all': 'Wszystkie', 
+        'usg': 'USG', 
+        'heat': 'Ruja', 
+        'dry': 'Zasuszenie', 
+        'rovac': 'Rovac', 
+        'kexxtone': 'Kexxtone', 
+        'calving': 'Wycielenia', 
+        'sync': 'Synchronizacja' 
+    };
+
+    // 2. GENEROWANIE PRZYCISKÓW
+    const typesToShow = Array.from(types);
+    if (typesToShow.length === 1 && currentTypeFilter === 'all') {
+        // Zawsze pokazuj "Wszystkie", nawet jak lista jest pusta
+    }
+
     typesToShow.forEach(type => {
         let label = labels[type];
-        if (!label && type.startsWith('custom_')) { const idx = parseInt(type.split('_')[1]); if (userSettings.customRules[idx]) label = userSettings.customRules[idx].label; else label = 'Własne'; }
-        if (!label) label = type; const count = counts[type] || 0; if (type !== 'all' && count > 0) label += ` (${count})`;
-        const btn = document.createElement('button'); btn.className = `filter-chip ${currentTypeFilter === type ? 'active' : ''}`; btn.textContent = label; btn.onclick = () => { currentTypeFilter = type; generateAndRenderTasks(); }; container.appendChild(btn);
+        
+        // Obsługa własnych reguł
+        if (!label && type.startsWith('custom_')) {
+            const idx = parseInt(type.split('_')[1]);
+            label = (userSettings.customRules[idx]) ? userSettings.customRules[idx].label : 'Własne';
+        }
+        if (!label) label = type;
+
+        const count = counts[type] || 0;
+        // Dodajemy liczbę do etykiety (oprócz przycisku "Wszystkie")
+        const buttonText = (type === 'all') ? label : `${label} (${count})`;
+
+        const btn = document.createElement('button');
+        btn.className = `filter-chip ${currentTypeFilter === type ? 'active' : ''}`;
+        btn.textContent = buttonText;
+        
+        btn.onclick = () => { 
+            currentTypeFilter = type; 
+            // Używamy renderowania z pamięci globalnej, żeby nie przeliczać bazy niepotrzebnie
+            renderTasks(window.myAllTasksGlobal || allTasks); 
+        };
+        
+        container.appendChild(btn);
     });
 }
 
