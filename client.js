@@ -454,7 +454,39 @@ function generateA4HTML(header, rowsHTML) {
         </html>
     `;
 }
+// --- NOWA LOGIKA STATUSÓW ---
+function getDetailedStatus(a) {
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    const calvDate = a.lastCalving ? new Date(a.lastCalving) : null;
+    const insDate = a.lastInsemination ? new Date(a.lastInsemination) : null;
+    const diffCalv = calvDate ? Math.floor((today - calvDate) / (1000 * 60 * 60 * 24)) : null;
 
+    // 1. Cielna (Potwierdzona)
+    if (a.isPregnantConfirmed) return { text: '✅ Cielna', color: 'green', category: 'cielne' };
+    
+    // 2. Zasuszona
+    if (a.isDriedOff) return { text: '❄️ Zasuszona', color: '#7f8c8d', category: 'inne' };
+
+    // 3. Logika po inseminacji (ale jeszcze nie potwierdzona)
+    if (insDate) {
+        const diffInsem = Math.floor((today - insDate) / (1000 * 60 * 60 * 24));
+        if (a.usgStatus === 'negative') return { text: '❌ Pusta (po USG)', color: '#c0392b', category: 'puste' };
+        if (diffInsem < 30) return { text: '⏳ Za wcześnie na USG', color: '#9b59b6', category: 'inne' };
+        return { text: '❓ Do badania USG', color: '#f39c12', category: 'usg' };
+    }
+
+    // 4. Logika po wycieleniu (bez inseminacji)
+    if (calvDate) {
+        if (diffCalv <= 60) return { text: '🍼 Wycielona < 60 dni', color: '#2980b9', category: 'puste' };
+        if (diffCalv > 365) return { text: '⚠️ Niecielna > 1 rok', color: '#e74c3c', category: 'puste' };
+    }
+
+    // 5. Jałówki i pozostałe puste
+    if (a.type === 'jalowka' && !insDate) return { text: '⚪ Jałówka (niekryta)', color: '#7f8c8d', category: 'jalowka' };
+
+    return { text: '⚪ Pusta', color: '#7f8c8d', category: 'puste' };
+}
 // --- SILNIK ZADAŃ I LOGIKA STADA ---
 
 function generateAndRenderTasks() {
@@ -1336,79 +1368,95 @@ function renderHerdList() {
     if (!list) return;
     list.innerHTML = '';
 
-    // Tworzymy kopię stada do filtrowania i sortowania
+    // 1. Przygotowanie danych i filtrów
     let filtered = [...myHerd];
+    const searchInput = document.getElementById('herdSearch');
+    const search = searchInput ? searchInput.value.toLowerCase() : '';
 
-    // --- PUNKT 13: SORTOWANIE DOMYŚLNE ---
-    // Hierarchia: Puste -> Do USG -> Cielne -> Jałówki niekryte -> Byki/Inne
-    filtered.sort((a, b) => {
-        const getPriority = (s) => {
-            if (s.usgStatus === 'negative' || s.usgStatus === 'unknown') return 1; // Niecielne (Puste)
-            if (s.usgStatus === 'pending' || (s.lastInsemination && !s.isPregnantConfirmed)) return 2; // Do USG / Badania
-            if (s.isPregnantConfirmed) return 3; // Cielne potwierdzone
-            if (s.type === 'jalowka' && !s.lastInsemination) return 4; // Jałówki jeszcze nie kryte
-            return 5; // Byki i pozostałe
-        };
-        return getPriority(a) - getPriority(b);
+    // 2. OBLICZANIE LICZNIKÓW DLA PRZYCISKÓW (FILTRÓW)
+    const counts = { puste: 0, usg: 0, cielne: 0, jalowka: 0, krowa: 0, byk: 0 };
+    
+    myHerd.forEach(a => {
+        const s = getDetailedStatus(a); // Ta funkcja musi być dodana nad renderHerdList
+        if (s.category === 'puste') counts.puste++;
+        if (s.category === 'usg') counts.usg++;
+        if (a.isPregnantConfirmed) counts.cielne++;
+        if (a.type === 'jalowka') counts.jalowka++;
+        if (a.type === 'krowa') counts.krowa++;
+        if (a.type === 'byk') counts.byk++;
     });
 
-    // --- PUNKT 12: OBSŁUGA WIELU FILTRÓW JEDNOCZEŚNIE ---
+    // Wpisanie liczb do HTML (nawiasy w przyciskach)
+    for (let key in counts) {
+        const el = document.getElementById(`count-${key}`);
+        if (el) el.textContent = `(${counts[key]})`;
+    }
+
+    // 3. FILTROWANIE (Obsługa wielu filtrów jednocześnie + wyszukiwarka)
     if (activeHerdFilters.length > 0) {
         filtered = filtered.filter(a => {
-            // Sprawdzamy statusy cielności
+            const s = getDetailedStatus(a);
+            // Sprawdzamy kategorie statusów
             if (activeHerdFilters.includes('cielne') && a.isPregnantConfirmed) return true;
-            if (activeHerdFilters.includes('puste') && (a.usgStatus === 'negative' || a.usgStatus === 'unknown')) return true;
-            if (activeHerdFilters.includes('usg') && a.usgStatus === 'pending') return true;
-            
+            if (activeHerdFilters.includes('puste') && s.category === 'puste') return true;
+            if (activeHerdFilters.includes('usg') && s.category === 'usg') return true;
             // Sprawdzamy typy zwierząt
             if (activeHerdFilters.includes(a.type)) return true;
-            
             return false;
         });
     }
 
-    // Obsługa wyszukiwarki (Search Bar)
-    const searchInput = document.getElementById('herdSearch');
-    const search = searchInput ? searchInput.value.toLowerCase() : '';
     if (search) {
         filtered = filtered.filter(a => a.tag.toLowerCase().includes(search));
     }
+
+    // 4. SORTOWANIE DOMYŚLNE (Hierarchia ważności)
+    filtered.sort((a, b) => {
+        const getPriority = (x) => {
+            const s = getDetailedStatus(x);
+            if (s.category === 'usg') return 1;           // Najpierw te do badania
+            if (s.category === 'puste') return 2;         // Potem puste (w tym alarmowe)
+            if (x.isPregnantConfirmed) return 3;         // Potem cielne
+            if (x.type === 'jalowka' && !x.lastInsemination) return 4;
+            return 5;                                    // Reszta (byki itp.)
+        };
+        return getPriority(a) - getPriority(b);
+    });
 
     if (filtered.length === 0) {
         list.innerHTML = '<div style="text-align:center; padding:20px; color:#999;">Brak zwierząt pasujących do filtrów.</div>';
         return;
     }
 
+    // 5. GENEROWANIE KART ZWIERZĄT
     const today = new Date();
-
     filtered.forEach(a => {
-        let detailsHtml = '';
-        let statusIcon = '';
+        const statusInfo = getDetailedStatus(a); // Pobranie inteligentnego statusu
         
+        let detailsHtml = '';
         if (a.type === 'krowa' || a.type === 'jalowka') {
-            if (a.isPregnantConfirmed) statusIcon = '✅ Cielna'; 
-            else if (a.usgStatus === 'negative' || a.usgStatus === 'unknown') statusIcon = '❌ Pusta'; 
-            else if (a.lastInsemination) statusIcon = '❓ Do badania'; 
-            else statusIcon = '⚪ Oczekiwanie';
-
             const ins = a.lastInsemination ? a.lastInsemination : '-';
-            let calv = '-'; 
-            let dim = '-';
+            let calvTermin = '-';
+            let dimLabel = '-';
 
             if (a.lastInsemination) {
                 const est = addDays(new Date(a.lastInsemination), userSettings.gestation || 280);
-                calv = est.toLocaleDateString('pl-PL');
+                calvTermin = est.toLocaleDateString('pl-PL');
             }
             if (a.lastCalving) {
                 const days = Math.floor((today - new Date(a.lastCalving)) / (1000 * 60 * 60 * 24));
-                dim = `${days} dni`;
+                dimLabel = `${days} dni`;
             }
-            detailsHtml = `<div style="font-size:11px; color:#555; margin-top:5px; display:grid; grid-template-columns: 1fr 1fr; gap:5px;">
-                <span>💉 Ost. zac: <b>${ins}</b></span>
-                <span>👶 Termin: <b>${calv}</b></span>
-                <span>📊 Laktacja: <b>${dim}</b></span>
-                <span style="font-weight:bold; color:${a.isPregnantConfirmed?'green':'#555'}">${statusIcon}</span>
-            </div>`;
+
+            detailsHtml = `
+                <div style="font-size:11px; color:#555; margin-top:5px; display:grid; grid-template-columns: 1fr 1fr; gap:5px;">
+                    <span>💉 Ost. zac: <b>${ins}</b></span>
+                    <span>👶 Termin: <b>${calvTermin}</b></span>
+                    <span>📊 Laktacja: <b>${dimLabel}</b></span>
+                    <span style="font-weight:bold; color:${statusInfo.color}; grid-column: span 2; font-size: 12px; margin-top: 2px;">
+                        ${statusInfo.text}
+                    </span>
+                </div>`;
         }
 
         const div = document.createElement('div');
