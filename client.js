@@ -1206,7 +1206,6 @@ document.getElementById('animalForm').addEventListener('submit', (e) => {
             location: location,
             motherTag: motherTag,
             fatherSemen: fatherSemen,
-            semen: lastSemen,
             lastCalving: lastCalving,
             lastInsemination: lastInsem,
             semen: semen,
