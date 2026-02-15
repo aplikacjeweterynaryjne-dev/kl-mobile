@@ -632,15 +632,16 @@ function renderTasks(allTasks) {
     });
 
     // 5. PRZYCISK POKAŻ WSZYSTKIE / ZWIŃ
+  // Wewnątrz renderTasks, fragment z przyciskiem:
     if (filtered.length > LIMIT) {
         const btnRow = document.createElement('div');
         btnRow.style.textAlign = 'center';
         if (!showAll) {
             btnRow.innerHTML = `<button class="btn" style="background:#f0f4f8; color:var(--info); font-size:12px; padding:10px; width:100%; border:1px dashed var(--info); margin-top:10px;" 
-                onclick="window.showAllTasks=true; renderTasks(myAllTasksGlobal);">POKAŻ WSZYSTKIE (${filtered.length}) <i class="bi bi-chevron-down"></i></button>`;
+                onclick="window.showAllTasks=true; renderTasks(window.myAllTasksGlobal);">POKAŻ WSZYSTKIE (${filtered.length})</button>`;
         } else {
             btnRow.innerHTML = `<button class="btn" style="background:#fff; color:#999; font-size:12px; padding:10px; width:100%; border:1px solid #eee; margin-top:10px;" 
-                onclick="window.showAllTasks=false; renderTasks(myAllTasksGlobal);">ZWIŃ LISTĘ <i class="bi bi-chevron-up"></i></button>`;
+                onclick="window.showAllTasks=false; renderTasks(window.myAllTasksGlobal);">ZWIŃ LISTĘ</button>`;
         }
         container.appendChild(btnRow);
     }
