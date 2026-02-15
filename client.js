@@ -484,7 +484,7 @@ function getDetailedStatus(a) {
     }
 
     // 5. Jałówki i pozostałe puste
-    if (a.type === 'jalowka' && !insDate) return { text: '⚪ Jałówka (niekryta)', color: '#7f8c8d', category: 'jalowka' };
+    if (a.type === 'jalowka' && !insDate) return { text: '⚪ Jałówka (niekryta)', color: '#7f8c8d', category: 'puste' };
 
     return { text: '⚪ Pusta', color: '#7f8c8d', category: 'puste' };
 }
