@@ -1266,7 +1266,7 @@ function renderHerdList() {
         filtered = filtered.filter(a => {
             // Sprawdzamy statusy cielności
             if (activeHerdFilters.includes('cielne') && a.isPregnantConfirmed) return true;
-            if (activeHerdFilters.includes('puste') && (s.usgStatus === 'negative' || s.usgStatus === 'unknown')) return true;
+            if (activeHerdFilters.includes('puste') && (a.usgStatus === 'negative' || a.usgStatus === 'unknown')) return true;
             if (activeHerdFilters.includes('usg') && a.usgStatus === 'pending') return true;
             
             // Sprawdzamy typy zwierząt
