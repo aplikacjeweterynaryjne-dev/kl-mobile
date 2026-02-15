@@ -567,7 +567,12 @@ function renderTasks(tasks) {
     if (currentTaskFilter === 'done') filtered = tasks.filter(t => t.isDone);
     else if (currentTaskFilter === 'todo') filtered = tasks.filter(t => !t.isDone && !t.isReallyOverdue);
     else if (currentTaskFilter === 'overdue') filtered = tasks.filter(t => !t.isDone && t.isReallyOverdue);
-    else if (currentTaskFilter === 'month') filtered = tasks.filter(t => !t.isDone && t.dueDate >= startOfMonth && t.dueDate <= endOfMonth);
+    else if (currentTaskFilter === 'month') {
+    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    // DODANO: && t.dueDate >= today (wyklucza stare zadania z widoku miesiąca)
+    filtered = tasks.filter(t => !t.isDone && t.dueDate >= today && t.dueDate >= startOfMonth && t.dueDate <= endOfMonth);
+}
 
     if (currentTypeFilter !== 'all') filtered = filtered.filter(t => t.type === currentTypeFilter);
 
@@ -1117,7 +1122,50 @@ function renderCalendar(date) {
     for (let d = 1; d <= daysInMonth; d++) { const dayDiv = document.createElement('div'); dayDiv.className = 'cal-day'; dayDiv.textContent = d; const dayEvents = monthEvents.filter(e => e.date.getDate() === d); if (dayEvents.length > 0) { dayDiv.classList.add('has-event'); const dot = document.createElement('div'); dot.className = 'cal-dot'; dayDiv.appendChild(dot); dayDiv.onclick = () => { renderCalendarEventsList(dayEvents, `Wycielenia: ${d}.${month+1}`); }; } const t = new Date(); if (d === t.getDate() && month === t.getMonth() && year === t.getFullYear()) dayDiv.classList.add('today'); container.appendChild(dayDiv); }
 }
 function renderCalendarEventsList(events, title) { const list = document.getElementById('calEventsList'); list.innerHTML = ''; document.getElementById('calSelectedDateTitle').textContent = title; if (events.length === 0) { list.innerHTML = '<p style="color:#999; text-align:center;">Brak wydarzeń</p>'; return; } events.forEach(e => { const el = document.createElement('div'); el.className = 'card'; el.style.padding = '10px'; const dateStr = e.date.toLocaleDateString('pl-PL'); el.innerHTML = `<div style="display:flex; justify-content:space-between; align-items:center;"><span>🐮 <b>${e.animal.tag}</b></span><span style="font-size:11px; color:#555;">${dateStr}</span></div><div style="font-size:11px; color:#2e7d32;">Spodziewane wycielenie</div>`; el.onclick = () => openAnimalCard(e.animal.id); list.appendChild(el); }); }
-function showListModal(title, animals) { document.getElementById('listModalTitle').textContent = title; const content = document.getElementById('listModalContent'); content.innerHTML = ''; animals.forEach(a => { const d = document.createElement('div'); d.className = 'card'; d.style.padding = '10px'; d.innerHTML = `🐮 <b>${a.tag}</b>`; d.onclick = () => { closeModal('listModal'); openAnimalCard(a.id); }; content.appendChild(d); }); document.getElementById('listModal').style.display = 'flex'; }
+function showListModal(title, animals) {
+    const modal = document.getElementById('listModal');
+    const contentEl = document.getElementById('listModalContent');
+    document.getElementById('listModalTitle').textContent = title;
+    contentEl.innerHTML = '';
+
+    animals.forEach(a => {
+        const div = document.createElement('div');
+        div.className = 'card';
+        div.style.padding = '10px';
+        div.style.marginBottom = '10px';
+
+        // Logika identyczna jak w renderHerdList (Stado)
+        let detailsHtml = '';
+        const today = new Date();
+        if (a.type === 'krowa' || a.type === 'jalowka') {
+            const ins = a.lastInsemination || '-';
+            let calv = '-';
+            if (a.lastInsemination) {
+                const est = addDays(new Date(a.lastInsemination), userSettings.gestation || 280);
+                calv = est.toLocaleDateString('pl-PL');
+            }
+            detailsHtml = `
+                <div style="font-size:11px; color:#555; margin-top:5px; display:grid; grid-template-columns: 1fr 1fr; gap:5px;">
+                    <span>💉 Ost. zac: <b>${ins}</b></span>
+                    <span>👶 Termin: <b>${calv}</b></span>
+                </div>`;
+        }
+
+        div.innerHTML = `
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <strong style="color:#2e7d32; font-size:16px;">${a.tag}</strong>
+                <span class="badge" style="background:#eee; color:#333;">${a.type}</span>
+            </div>
+            ${detailsHtml}`;
+
+        div.onclick = () => {
+            // Nie zamykamy listModal, po prostu otwieramy kartę na wierzchu
+            openAnimalCard(a.id);
+        };
+        contentEl.appendChild(div);
+    });
+    modal.style.display = 'flex';
+}
 function updateDashboardStats() { document.getElementById('cntCows').textContent = myHerd.filter(a => a.type === 'krowa').length; document.getElementById('cntHeifers').textContent = myHerd.filter(a => a.type === 'jalowka').length; document.getElementById('cntBulls').textContent = myHerd.filter(a => a.type === 'byk').length; }
 function setupNavigation() { document.querySelectorAll('.nav-item').forEach(btn => { btn.addEventListener('click', () => { switchSection(btn.dataset.target); }); }); document.getElementById('logoutBtn').addEventListener('click', () => { auth.signOut(); }); }
 function switchSection(id) { 
