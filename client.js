@@ -490,6 +490,8 @@ function getDetailedStatus(a) {
 }
 // --- SILNIK ZADAŃ I LOGIKA STADA ---
 
+// --- SILNIK ZADAŃ I LOGIKA STADA (WERSJA OSTATECZNA Z POPRAWKAMI) ---
+
 function generateAndRenderTasks() {
     const today = new Date();
     today.setHours(0,0,0,0);
@@ -497,21 +499,17 @@ function generateAndRenderTasks() {
 
     myHerd.forEach(animal => {
         // --- AUTOMAT ZASUSZENIA ---
-        const todayForStatus = new Date();
-        todayForStatus.setHours(0,0,0,0);
-        
         let daysToCalvAuto = 999;
         if (animal.lastInsemination && animal.isPregnantConfirmed) {
             const estCalv = addDays(new Date(animal.lastInsemination), userSettings.gestation || 280);
-            daysToCalvAuto = Math.floor((estCalv - todayForStatus) / (1000 * 60 * 60 * 24));
+            daysToCalvAuto = Math.floor((estCalv - today) / (1000 * 60 * 60 * 24));
         }
 
-        // Automat: Jeśli krowa jest cielna i < 40 dni do wycielenia, a nie jest zasuszona -> Zmień status w bazie
         if (animal.type === 'krowa' && animal.isPregnantConfirmed && daysToCalvAuto <= 40 && !animal.isDriedOff) {
             db.collection('animals').doc(animal.id).update({ isDriedOff: true });
         }
 
-        // Synchronizacja
+        // --- SYNCHRONIZACJA ---
         if (animal.type === 'krowa' && animal.lastCalving) {
             const calvDate = new Date(animal.lastCalving);
             const dim = Math.floor((today - calvDate) / (1000 * 60 * 60 * 24));
@@ -524,17 +522,10 @@ function generateAndRenderTasks() {
             }
         }
         
-if (animal.type !== 'krowa' && animal.type !== 'jalowka') return;
-
-// Jeśli nie ma inseminacji, może potrzebować synchronizacji po wycieleniu - sprawdzamy to dalej.
-// Ale jeśli nie ma inseminacji I nie ma wycielenia, to nic nie zrobimy.
-if (!animal.lastInsemination && !animal.lastCalving) return;
-
-// Jeśli krowa ma status "Pusta" (negative) i nie jest potwierdzona jako cielna, 
-// to nie liczymy dla niej zadań ciążowych (USG/Zasuszenie), ale pozwalamy na Synchronizację.
-if (animal.usgStatus === 'negative' && !animal.isPregnantConfirmed) {
-    // Tutaj pozwalamy przejść tylko jeśli kod synchronizacji jest wyżej.
-}
+        if (animal.type !== 'krowa' && animal.type !== 'jalowka') return;
+        if (!animal.lastInsemination) return;
+        // Naprawiony warunek: nie blokuje cielnych krów do zasuszenia
+        if (animal.usgStatus === 'negative' && !animal.isPregnantConfirmed) return; 
 
         const insDate = new Date(animal.lastInsemination);
         const calvingDate = addDays(insDate, userSettings.gestation || 280);
@@ -555,114 +546,99 @@ if (animal.usgStatus === 'negative' && !animal.isPregnantConfirmed) {
             else checkRuleAndAddTask(generatedTasks, animal, rule, daysToCalving, calvingDate, `custom_${idx}`, calvingDate, true);
         });
         
-        // Wycielenie
         if (daysToCalving <= 10 && daysToCalving >= -15) { 
             const isDone = checkIfTaskDone(animal.id, 'calving', calvingDate);
             if (!isDone && daysToCalving <= -13) {
                 confirmTaskCalving({ animalId: animal.id, dueDate: calvingDate }, calvingDate, true);
             } else if (!isDone) {
-                let priority = 'urgent';
-                let isOverdueCalving = false;
-                if (daysToCalving < -5) isOverdueCalving = true; 
-                else if (daysToCalving <= 5 && daysToCalving >= -5) priority = 'urgent'; 
-                else priority = 'warning'; 
+                let priority = (daysToCalving <= 5 && daysToCalving >= -5) ? 'urgent' : 'warning';
+                let isOverdueCalving = (daysToCalving < -5); 
                 addTask(generatedTasks, animal, 'Spodziewane Wycielenie', calvingDate, calvingDate, priority, 'calving', insDate, calvingDate, isOverdueCalving);
             }
         }
     });
 
-    // --- KLUCZOWA ZMIANA TUTAJ ---
-    window.myAllTasksGlobal = generatedTasks; // Zapisujemy do "pamięci" guzika
-    renderTasks(generatedTasks);             // Rysujemy listę
+    window.myAllTasksGlobal = generatedTasks;
+    renderTasks(generatedTasks);
 }
+
 function renderTasks(allTasks) {
     const container = document.getElementById('tasksContainer');
     if (!container) return;
     container.innerHTML = '';
     const today = new Date(); today.setHours(0,0,0,0);
+    const limitDate = addDays(today, -14); // Filtr 14 dni
 
-    // 1. LOGIKA FILTROWANIA ZAKŁADEK
-    let filtered = allTasks;
-    if (currentTaskFilter === 'done') {
-        filtered = allTasks.filter(t => t.isDone);
-    } else if (currentTaskFilter === 'todo') {
-        // "Do zrobienia" to te, które NIE są zrobione i NIE są spóźnione
-        filtered = allTasks.filter(t => !t.isDone && !t.isReallyOverdue);
-    } else if (currentTaskFilter === 'overdue') {
-        // "Przeterminowane" to te, które NIE są zrobione i SĄ spóźnione
-        filtered = allTasks.filter(t => !t.isDone && t.isReallyOverdue);
-    } else if (currentTaskFilter === 'month') {
-        const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-        const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-        filtered = allTasks.filter(t => !t.isDone && t.dueDate >= today && t.dueDate >= startOfMonth && t.dueDate <= endOfMonth);
-    }
+    let filtered = allTasks.filter(t => {
+        // Usuwamy z widoku wykonane/spóźnione starsze niż 14 dni
+        if (t.dueDate < limitDate && (t.isDone || t.isReallyOverdue)) return false;
 
-    // Filtrowanie po typie (USG, Zasuszenie itd.)
+        if (currentTaskFilter === 'done') return t.isDone;
+        if (currentTaskFilter === 'todo') return !t.isDone && !t.isReallyOverdue;
+        if (currentTaskFilter === 'overdue') return !t.isDone && t.isReallyOverdue;
+        
+        if (currentTaskFilter === 'month') {
+            const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+            const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+            return !t.isDone && t.dueDate >= today && t.dueDate >= startOfMonth && t.dueDate <= endOfMonth;
+        }
+        return true;
+    });
+
     if (currentTypeFilter !== 'all') {
         filtered = filtered.filter(t => t.type === currentTypeFilter);
     }
 
-    // 2. SORTOWANIE
     filtered.sort((a, b) => a.dueDate - b.dueDate);
 
-    // 3. LOGIKA LIMITU 5 SZTUK
     const LIMIT = 5;
     const showAll = window.showAllTasks || false;
     const visibleTasks = showAll ? filtered : filtered.slice(0, LIMIT);
 
-    // 4. GENEROWANIE KART
     visibleTasks.forEach(t => {
         const div = document.createElement('div');
         div.className = `task-item ${t.priority} ${t.isDone ? 'done' : ''}`;
         
         const dueStr = t.dueDate.toLocaleDateString('pl-PL');
-        
-        // FORMATOWANIE DAT DO WYŚWIETLENIA (Krycie i Przewidywane wycielenie)
-        const insemStr = t.insemDate ? (t.insemDate instanceof Date ? t.insemDate.toLocaleDateString('pl-PL') : t.insemDate) : '-';
-        const estCalvStr = t.calvDate ? (t.calvDate instanceof Date ? t.calvDate.toLocaleDateString('pl-PL') : t.calvDate) : '-';
-        
+        const insemStr = t.insemDate ? (new Date(t.insemDate).toLocaleDateString('pl-PL')) : '-';
+        const estCalvStr = t.calvDate ? (new Date(t.calvDate).toLocaleDateString('pl-PL')) : '-';
         const dateColor = t.isReallyOverdue ? 'red' : (t.priority === 'urgent' ? '#e67e22' : '#333'); 
 
         div.innerHTML = `
             <div style="flex: 1;">
                 <div style="font-size:15px; font-weight:bold; color:#333;">${t.title}</div>
                 <div style="font-size: 11px; color: #777; margin: 4px 0; line-height: 1.4;">
-                    Termin zadania: <b style="color:${dateColor}">${dueStr}</b><br>
+                    Termin: <b style="color:${dateColor}">${dueStr}</b><br>
                     💉 Krycie: <b>${insemStr}</b> | 🍼 Przew. poród: <b>${estCalvStr}</b>
                 </div>
                 <div class="task-animal-tag" onclick="openAnimalCard('${t.animalId}')">${t.tag}</div>
             </div>
             <div class="task-check-wrapper">
                 ${t.isDone 
-                    ? `<button class="btn" style="padding:5px 10px; font-size:12px; background:#ddd; width:auto; margin:0;" onclick="undoTask('${t.logId}')">Cofnij</button>`
-                    : `<input type="checkbox" style="transform:scale(1.5); cursor:pointer;" onclick="initiateTaskCompletion('${t.id}', '${t.type}', '${t.animalId}', '${t.dueDate.toISOString()}')">`
+                    ? `<button class="btn" style="padding:5px 10px; font-size:11px; background:#ddd;" onclick="undoTask('${t.logId}')">Cofnij</button>`
+                    : `<input type="checkbox" style="transform:scale(1.5);" onclick="initiateTaskCompletion('${t.id}', '${t.type}', '${t.animalId}', '${t.dueDate.toISOString()}')">`
                 }
             </div>
         `;
         container.appendChild(div);
     });
 
-    // 5. PRZYCISK POKAŻ WSZYSTKIE / ZWIŃ
     if (filtered.length > LIMIT) {
         const btnRow = document.createElement('div');
         btnRow.style.textAlign = 'center';
-        if (!showAll) {
-            btnRow.innerHTML = `<button class="btn" style="background:#f0f4f8; color:var(--info); font-size:12px; padding:10px; width:100%; border:1px dashed var(--info); margin-top:10px;" 
-                onclick="window.showAllTasks=true; renderTasks(window.myAllTasksGlobal);">POKAŻ WSZYSTKIE (${filtered.length}) <i class="bi bi-chevron-down"></i></button>`;
-        } else {
-            btnRow.innerHTML = `<button class="btn" style="background:#fff; color:#999; font-size:12px; padding:10px; width:100%; border:1px solid #eee; margin-top:10px;" 
-                onclick="window.showAllTasks=false; renderTasks(window.myAllTasksGlobal);">ZWIŃ LISTĘ <i class="bi bi-chevron-up"></i></button>`;
-        }
+        const btnLabel = showAll ? "ZWIŃ LISTĘ" : `POKAŻ WSZYSTKIE (${filtered.length})`;
+        btnRow.innerHTML = `<button class="btn" style="background:#f0f4f8; color:var(--info); font-size:12px; padding:10px; width:100%; border:1px dashed var(--info); margin-top:10px;" 
+            onclick="window.showAllTasks=${!showAll}; renderTasks(window.myAllTasksGlobal);">${btnLabel}</button>`;
         container.appendChild(btnRow);
     }
 
-    // 6. OBSŁUGA PUSTEGO STANU
     if (filtered.length === 0) {
         container.innerHTML = '<div style="text-align:center; padding:20px; color:#999;">Brak zadań w tym widoku.</div>';
     }
 
     renderTaskTypeChips(allTasks);
 }
+
 function checkIfTaskDone(animalId, type, refDate) {
     const dateStr = refDate.toISOString().split('T')[0];
     const taskId = `${animalId}_${type}_${dateStr}`;
@@ -674,42 +650,33 @@ function checkRuleAndAddTask(list, animal, rule, daysCounter, refDate, type, cal
     let isActive = false; let isOverdue = false; let dueDate = null;
     
     if (isReverse) {
-        // Dla zadań typu "dry", "rovac", "kexxtone"
         if (daysCounter <= rule.start && daysCounter >= rule.end) isActive = true;
         if (daysCounter < rule.end) isOverdue = true;
         dueDate = addDays(calvDate, -rule.end);
     } else {
-        // Dla zadań typu "usg", "heat"
         if (daysCounter >= rule.start && daysCounter <= rule.end) isActive = true;
         if (daysCounter > rule.end) isOverdue = true;
         dueDate = addDays(refDate, rule.end);
     }
 
-    // WAŻNE: Nie dodawaj zadania, jeśli krowa ma już status zasuszonej (dla typu dry/rovac/kexxtone)
-    if (isReverse && animal.isDriedOff && (type === 'dry' || type === 'rovac' || type === 'kexxtone')) return;
+    if (isReverse && animal.isDriedOff && ['dry', 'rovac', 'kexxtone'].includes(type)) return;
 
     if (isActive) addTask(list, animal, rule.label, dueDate, new Date(), 'warning', type, refDate, calvDate);
-    else if (isOverdue) addTask(list, animal, rule.label, dueDate, new Date(), 'urgent', type, refDate, calvDate);
+    else if (isOverdue) addTask(list, animal, rule.label, dueDate, new Date(), 'urgent', type, refDate, calvDate, true);
 }
 
 function addTask(list, animal, title, dueDate, sortDate, priority, type, insemDate, calvDate, forceOverdue = false) {
     const dateStr = dueDate.toISOString().split('T')[0];
     const taskId = `${animal.id}_${type}_${dateStr}`; 
-    
-    // Sprawdzamy czy zadanie jest wykonane
     const doneLog = completedTasks.find(t => t.taskId === taskId);
     const isDone = !!doneLog;
-
-    // Ustalamy czy jest przeterminowane
     let isReallyOverdue = forceOverdue || (priority === 'urgent' && type !== 'calving');
 
     list.push({
         id: taskId, animalId: animal.id, tag: animal.tag, title: title,
         dueDate: dueDate, sortDate: sortDate, priority: priority, type: type,
-        isDone: isDone, 
-        logId: isDone ? doneLog.logId : null, 
-        insemDate: insemDate, // To jest data ostatniego krycia
-        calvDate: calvDate,   // To jest PROGNOZOWANA data porodu
+        isDone: isDone, logId: isDone ? doneLog.logId : null, 
+        insemDate: insemDate, calvDate: calvDate,
         isReallyOverdue: isReallyOverdue
     });
 }
@@ -718,53 +685,34 @@ function renderTaskTypeChips(allTasks) {
     const container = document.getElementById('taskTypeChips');
     if (!container) return;
     container.innerHTML = '';
-    
-    const counts = {}; 
-    const types = new Set(['all']);
-    
+    const counts = {}; const types = new Set(['all']);
+    const today = new Date(); today.setHours(0,0,0,0);
+    const limitDate = addDays(today, -14);
+
     allTasks.forEach(t => {
-        let shouldBeVisible = false;
+        if (t.dueDate < limitDate && (t.isDone || t.isReallyOverdue) && t.type !== 'calving') return;
 
-        // Logika licznika musi być IDENTYCZNA z logiką wyświetlania listy:
-        if (currentTaskFilter === 'todo') {
-            // Tylko niewykonane i NIEPRZETERMINOWANE
-            if (!t.isDone && !t.isReallyOverdue) shouldBeVisible = true;
-        } 
-        else if (currentTaskFilter === 'overdue') {
-            // Tylko niewykonane i PRZETERMINOWANE
-            if (!t.isDone && t.isReallyOverdue) shouldBeVisible = true;
-        } 
-        else if (currentTaskFilter === 'done') {
-            if (t.isDone) shouldBeVisible = true;
-        }
-        else if (currentTaskFilter === 'month') {
-            // W widoku miesiąca zazwyczaj też ukrywamy przeterminowane, by nie śmieciły
-            if (!t.isDone && !t.isReallyOverdue) shouldBeVisible = true;
-        }
+        let visibleInTab = false;
+        if (currentTaskFilter === 'todo' && !t.isDone && !t.isReallyOverdue) visibleInTab = true;
+        else if (currentTaskFilter === 'overdue' && !t.isDone && t.isReallyOverdue) visibleInTab = true;
+        else if (currentTaskFilter === 'done' && t.isDone) visibleInTab = true;
+        else if (currentTaskFilter === 'month' && !t.isDone) visibleInTab = true;
 
-        if (shouldBeVisible) {
+        if (visibleInTab) {
             types.add(t.type);
             counts[t.type] = (counts[t.type] || 0) + 1;
         }
     });
 
     const labels = { 'all': 'Wszystkie', 'usg': 'USG', 'heat': 'Ruja', 'dry': 'Zasuszenie', 'rovac': 'Rovac', 'kexxtone': 'Kexxtone', 'calving': 'Wycielenia', 'sync': 'Synchronizacja' };
-    
-    const typesToShow = Array.from(types);
-    typesToShow.forEach(type => {
+    Array.from(types).forEach(type => {
         let label = labels[type] || type;
         const count = counts[type] || 0;
-        
-        // Wyświetlaj licznik tylko jeśli > 0 i nie dla "Wszystkie"
         const finalLabel = (type === 'all') ? label : `${label} (${count})`;
-        
         const btn = document.createElement('button');
         btn.className = `filter-chip ${currentTypeFilter === type ? 'active' : ''}`;
         btn.textContent = finalLabel;
-        btn.onclick = () => { 
-            currentTypeFilter = type; 
-            renderTasks(allTasks); 
-        };
+        btn.onclick = () => { currentTypeFilter = type; renderTasks(allTasks); };
         container.appendChild(btn);
     });
 }
