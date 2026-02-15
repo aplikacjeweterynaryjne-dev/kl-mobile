@@ -610,10 +610,11 @@ function renderTasks(allTasks) {
     });
 
     // PRZYCISK ROZWIJANIA
+  // PRZYCISK ROZWIJANIA (wewnątrz funkcji renderTasks)
     if (filtered.length > LIMIT) {
         const btnRow = document.createElement('div');
         btnRow.style.textAlign = 'center';
-        if (!showAll) {
+        if (!window.showAllTasks) {
             btnRow.innerHTML = `<button class="btn" style="background:#f0f4f8; color:var(--info); font-size:12px; padding:10px; width:100%; border:1px dashed var(--info); margin-top:10px;" 
                 onclick="window.showAllTasks=true; generateAndRenderTasks();">POKAŻ WSZYSTKIE (${filtered.length}) <i class="bi bi-chevron-down"></i></button>`;
         } else {
@@ -662,63 +663,6 @@ function addTask(list, animal, title, dueDate, sortDate, priority, type, insemDa
         isDone: !!doneLog, doneDate: doneLog ? doneLog.completedAt.toDate() : null,
         logId: doneLog ? doneLog.logId : null, insemDate: insemDate, calvDate: calvDate,
         isReallyOverdue: isReallyOverdue
-    });
-}
-
-function renderTasks(tasks) {
-    const container = document.getElementById('tasksContainer');
-    container.innerHTML = '';
-    const today = new Date(); today.setHours(0,0,0,0);
-    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1); 
-    const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-    
-    let filtered = tasks;
-
-    if (currentTaskFilter === 'done') filtered = tasks.filter(t => t.isDone);
-    else if (currentTaskFilter === 'todo') filtered = tasks.filter(t => !t.isDone && !t.isReallyOverdue);
-    else if (currentTaskFilter === 'overdue') filtered = tasks.filter(t => !t.isDone && t.isReallyOverdue);
-    else if (currentTaskFilter === 'month') {
-    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-    const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-    // DODANO: && t.dueDate >= today (wyklucza stare zadania z widoku miesiąca)
-    filtered = tasks.filter(t => !t.isDone && t.dueDate >= today && t.dueDate >= startOfMonth && t.dueDate <= endOfMonth);
-}
-
-    if (currentTypeFilter !== 'all') filtered = filtered.filter(t => t.type === currentTypeFilter);
-
-    filtered.sort((a,b) => a.dueDate - b.dueDate);
-
-    renderTaskTypeChips(tasks);
-
-    if (filtered.length === 0) {
-        container.innerHTML = '<div style="text-align:center; padding:20px; color:#999;">Brak zadań w tym widoku.</div>';
-        return;
-    }
-
-    filtered.forEach(t => {
-        const div = document.createElement('div');
-        div.className = `task-item ${t.priority} ${t.isDone ? 'done' : ''}`;
-        const dueStr = t.dueDate.toLocaleDateString('pl-PL');
-        const calvStr = t.calvDate ? t.calvDate.toLocaleDateString('pl-PL') : '-';
-        const dateColor = t.isReallyOverdue ? 'red' : (t.priority === 'urgent' ? '#e67e22' : '#333'); 
-
-        div.innerHTML = `
-            <div style="flex:1;">
-                <div style="font-size:15px; font-weight:bold; color:#333;">${t.title}</div>
-                <div class="task-dates">
-                    <span>📅 Termin: <b style="color:${dateColor}">${dueStr}</b></span>
-                    ${t.type === 'calving' ? '' : `<span>👶 Wyc: ${calvStr}</span>`}
-                </div>
-                <div class="task-animal-tag" onclick="openAnimalCard('${t.animalId}')">${t.tag}</div>
-            </div>
-            <div style="margin-left:10px; display:flex; align-items:center;">
-                ${t.isDone 
-                    ? `<button class="btn" style="padding:5px 10px; font-size:12px; background:#ddd;" onclick="undoTask('${t.logId}')">Cofnij</button>`
-                    : `<input type="checkbox" style="transform:scale(1.5); cursor:pointer;" onclick="initiateTaskCompletion('${t.id}', '${t.type}', '${t.animalId}', '${t.dueDate.toISOString()}')">`
-                }
-            </div>
-        `;
-        container.appendChild(div);
     });
 }
 
