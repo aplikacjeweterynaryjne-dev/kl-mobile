@@ -735,17 +735,17 @@ function populateLists() {
     tagList.innerHTML = '';
     semenList.innerHTML = '';
     
-    const tagMap = new Set();
     const semenMap = new Set();
 
     myHerd.forEach(a => {
-        if(!tagMap.has(a.tag)) {
-            const opt = document.createElement('option');
-            opt.value = a.tag; 
-            tagList.appendChild(opt);
-            tagMap.add(a.tag);
-        }
+        // Lista kolczyków (dla inseminacji i wyboru matki)
+        const opt = document.createElement('option');
+        opt.value = a.tag;
+        tagList.appendChild(opt);
+
+        // Zbierz wszystkie użyte nazwy nasienia
         if(a.semen) semenMap.add(a.semen);
+        if(a.fatherSemen) semenMap.add(a.fatherSemen);
         if(a.historyInsemination) {
             a.historyInsemination.forEach(h => { if(h.bull) semenMap.add(h.bull); });
         }
@@ -770,6 +770,39 @@ function openAnimalCard(id) {
 
     document.getElementById('cardTag').textContent = animal.tag;
     document.getElementById('cardDob').textContent = animal.dob;
+    // --- NOWA SEKCJA: RODZINA I POCHODZENIE ---
+    
+    // 1. Wyświetlanie Matki i Ojca (Pobieranie z bazy)
+    if(document.getElementById('cardMother')) {
+        document.getElementById('cardMother').textContent = animal.motherTag || 'Brak danych';
+    }
+    if(document.getElementById('cardFather')) {
+        document.getElementById('cardFather').textContent = animal.fatherSemen || 'Brak danych';
+    }
+
+    // 2. Wyświetlanie Lokalizacji (jeśli pominąłeś wcześniej)
+    if(document.getElementById('cardLocation')) {
+        document.getElementById('cardLocation').textContent = animal.location || 'Brak danych';
+    }
+
+    // 3. Pobieranie i wyświetlanie potomstwa (Dzieci)
+    const offspringDiv = document.getElementById('cardOffspring');
+    if(offspringDiv) {
+        // Szukamy w stadzie zwierząt, które w polu motherTag mają kolczyk aktualnie otwartej krowy
+        const offspring = myHerd.filter(a => a.motherTag === animal.tag);
+        if(offspring.length > 0) {
+            offspringDiv.innerHTML = offspring.map(child => 
+                `<div onclick="closeModal('animalCardModal'); openAnimalCard('${child.id}')" 
+                      style="padding:8px; border-bottom:1px solid #eee; color:#1976d2; cursor:pointer; display:flex; align-items:center; gap:10px;">
+                    <i class="bi bi-cow"></i> 
+                    <span><b>${child.tag}</b> (${child.type === 'jalowka' ? 'Jałówka' : child.type})</span>
+                </div>`
+            ).join('');
+        } else {
+            offspringDiv.innerHTML = '<div style="color:#999; font-size:12px; padding:5px;">Brak zarejestrowanego potomstwa.</div>';
+        }
+    }
+    // --- KONIEC SEKCJI RODZINNEJ ---
     // Punkt 7: Wyświetlanie typu zwierzęcia
     const cardTypeEl = document.getElementById('cardType');
     if(cardTypeEl) cardTypeEl.textContent = animal.type;
@@ -867,29 +900,48 @@ function toggleEditMode() {
 function saveAnimalChanges() {
     if(!currentEditingAnimalId) return;
     
+    // Pobieranie podstawowych wartości
     const newTag = document.getElementById('editTag').value;
     const dob = document.getElementById('editDob').value;
     const lastCalving = document.getElementById('editLastCalving').value || null;
     const lastInsem = document.getElementById('editLastInsem').value || null;
     const newStatus = document.getElementById('editPregStatus').value;
+    
+    // NOWE POLA: Lokalizacja, Matka, Ojciec
+    const location = document.getElementById('editLocation').value || '';
+    const motherTag = document.getElementById('editMother').value || '';
+    const fatherSemen = document.getElementById('editFather').value || '';
 
+    // Logika statusu cielności (Twoja oryginalna)
     let isPreg = false;
     let usg = 'pending';
 
-    if(newStatus === 'pregnant') { isPreg = true; usg = 'positive'; }
-    else if(newStatus === 'negative') { isPreg = false; usg = 'negative'; }
-    else if(newStatus === 'check') { isPreg = false; usg = 'pending'; }
+    if(newStatus === 'pregnant') { 
+        isPreg = true; usg = 'positive'; 
+    } else if(newStatus === 'negative') { 
+        isPreg = false; usg = 'negative'; 
+    } else if(newStatus === 'check') { 
+        isPreg = false; usg = 'pending'; 
+    }
     
+    // Aktualizacja w bazie Firebase
     db.collection('animals').doc(currentEditingAnimalId).update({
         tag: newTag,
         dob: dob, 
         lastCalving: lastCalving, 
         lastInsemination: lastInsem,
         isPregnantConfirmed: isPreg,
-        usgStatus: usg
+        usgStatus: usg,
+        // Zapisywanie nowych pól pochodzenia i miejsca
+        location: location,
+        motherTag: motherTag,
+        fatherSemen: fatherSemen
     }).then(() => {
         alert("Zapisano zmiany!");
         openAnimalCard(currentEditingAnimalId);
+    }).catch(err => {
+        console.error("Błąd zapisu:", err);
+        alert("Błąd podczas zapisywania zmian.");
     });
 }
 
@@ -971,8 +1023,9 @@ function setupModals() {
         const type = document.getElementById('inpType').value;
         const tag = document.getElementById('inpTag').value;
         const dob = document.getElementById('inpDob').value;
-        const location = document.getElementById('inpLocation')?.value || '';
-        const lastCalving = document.getElementById('inpLastCalving').value || null;
+        const locVal = document.getElementById('inpLocation')?.value || '';
+        const mTag = document.getElementById('inpMother')?.value || ''; // Matka
+        const fSemen = document.getElementById('inpFather')?.value || ''; // Ojciec
         const lastInsem = document.getElementById('inpLastInsem').value || null;
         const semen = document.getElementById('inpSemen').value || null;
         const pregStatus = document.getElementById('inpPregStatus').value;
@@ -989,8 +1042,15 @@ function setupModals() {
             historyInsemination.push({ date: lastInsem, bull: semen || 'Nieznany', note: 'Start', added: new Date().toISOString() });
         }
 
-        db.collection('animals').add({
-            ownerUid: currentUser.uid, tag, type, dob, lastCalving, 
+      db.collection('animals').add({
+            ownerUid: currentUser.uid, 
+            tag, 
+            type, 
+            dob, 
+            location: locVal,
+            motherTag: mTag, 
+            fatherSemen: fSemen,
+            lastCalving: document.getElementById('inpLastCalving').value || null, 
             location: location, // DODAJ TO
             lastInsemination: lastInsem, 
             semen, historyInsemination, isPregnantConfirmed, usgStatus,
@@ -1039,12 +1099,13 @@ userSettings.customRules.forEach((rule, idx) => {
         div.innerHTML = `
             <div style="display:flex; flex-direction:column;">
                 <span>${rule.label}</span>
-                <span style="font-size:10px; color:#999;">${getBaseText(rule.base)}</span>
+                <small style="color:#999;">${getBaseText(rule.base)}</small>
             </div>
             <div class="config-inputs">
-                <input type="number" id="cfg_cust_start_${idx}" value="${rule.start}"> - 
+                <input type="number" id="cfg_cust_start_${idx}" value="${rule.start}">
                 <input type="number" id="cfg_cust_end_${idx}" value="${rule.end}">
-                <button class="btn-danger" style="width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; margin-left: 5px; border-radius: 6px; padding: 0;" onclick="removeCustomRule(${idx})">
+                <input type="checkbox" id="cfg_cust_enable_${idx}" ${rule.enabled ? 'checked' : ''} style="width:20px; height:20px;">
+                <button class="btn-danger" style="width:34px; height:34px; display:flex; align-items:center; justify-content:center; border-radius:6px; padding:0;" onclick="removeCustomRule(${idx})">
                     <i class="bi bi-trash"></i>
                 </button>
             </div>
@@ -1069,12 +1130,14 @@ function saveConfiguration(fromDOM = true) {
             if(en) userSettings[k].enabled = en.checked;
         });
 
-        userSettings.customRules.forEach((r, idx) => {
+       userSettings.customRules.forEach((r, idx) => {
             const s = document.getElementById(`cfg_cust_start_${idx}`);
             const e = document.getElementById(`cfg_cust_end_${idx}`);
+            const en = document.getElementById(`cfg_cust_enable_${idx}`);
             if(s && e) {
                 r.start = parseInt(s.value);
                 r.end = parseInt(e.value);
+                if(en) r.enabled = en.checked;
             }
         });
     }
