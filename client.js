@@ -524,10 +524,17 @@ function generateAndRenderTasks() {
             }
         }
         
-      if (animal.type !== 'krowa' && animal.type !== 'jalowka') return;
-if (!animal.lastInsemination) return;
-// Jeśli krowa jest potwierdzona jako cielna, NIE przerywaj (pokazuj zasuszenie)
-if (animal.usgStatus === 'negative' && !animal.isPregnantConfirmed) return;; 
+if (animal.type !== 'krowa' && animal.type !== 'jalowka') return;
+
+// Jeśli nie ma inseminacji, może potrzebować synchronizacji po wycieleniu - sprawdzamy to dalej.
+// Ale jeśli nie ma inseminacji I nie ma wycielenia, to nic nie zrobimy.
+if (!animal.lastInsemination && !animal.lastCalving) return;
+
+// Jeśli krowa ma status "Pusta" (negative) i nie jest potwierdzona jako cielna, 
+// to nie liczymy dla niej zadań ciążowych (USG/Zasuszenie), ale pozwalamy na Synchronizację.
+if (animal.usgStatus === 'negative' && !animal.isPregnantConfirmed) {
+    // Tutaj pozwalamy przejść tylko jeśli kod synchronizacji jest wyżej.
+}
 
         const insDate = new Date(animal.lastInsemination);
         const calvingDate = addDays(insDate, userSettings.gestation || 280);
@@ -672,28 +679,34 @@ function checkIfTaskDone(animalId, type, refDate) {
 function checkRuleAndAddTask(list, animal, rule, daysCounter, refDate, type, calvDate, isReverse = false) {
     if (!rule || !rule.enabled) return;
     let isActive = false; let isOverdue = false; let dueDate = null;
+    
     if (isReverse) {
+        // Dla zadań typu "dry", "rovac", "kexxtone"
         if (daysCounter <= rule.start && daysCounter >= rule.end) isActive = true;
         if (daysCounter < rule.end) isOverdue = true;
         dueDate = addDays(calvDate, -rule.end);
     } else {
+        // Dla zadań typu "usg", "heat"
         if (daysCounter >= rule.start && daysCounter <= rule.end) isActive = true;
         if (daysCounter > rule.end) isOverdue = true;
         dueDate = addDays(refDate, rule.end);
     }
+
+    // WAŻNE: Nie dodawaj zadania, jeśli krowa ma już status zasuszonej (dla typu dry/rovac/kexxtone)
+    if (isReverse && animal.isDriedOff && (type === 'dry' || type === 'rovac' || type === 'kexxtone')) return;
+
     if (isActive) addTask(list, animal, rule.label, dueDate, new Date(), 'warning', type, refDate, calvDate);
     else if (isOverdue) addTask(list, animal, rule.label, dueDate, new Date(), 'urgent', type, refDate, calvDate);
 }
 
 function addTask(list, animal, title, dueDate, sortDate, priority, type, insemDate, calvDate, forceOverdue = false) {
     const dateStr = dueDate.toISOString().split('T')[0];
-    // taskId musi być unikalne dla tego konkretnego cyklu (dodajemy rok wycielenia do ID)
     const taskId = `${animal.id}_${type}_${dateStr}`; 
     
     const doneLog = completedTasks.find(t => t.taskId === taskId);
     
-    // Jeśli zadanie jest już w logach jako wykonane, nie dodajemy go do listy "do zrobienia"
-    if (doneLog) return; 
+    // Jeśli zadanie jest wykonane, zapisujemy to w obiekcie zadania
+    const isDone = !!doneLog;
 
     let isReallyOverdue = false;
     if (forceOverdue) isReallyOverdue = true; 
@@ -702,7 +715,9 @@ function addTask(list, animal, title, dueDate, sortDate, priority, type, insemDa
     list.push({
         id: taskId, animalId: animal.id, tag: animal.tag, title: title,
         dueDate: dueDate, sortDate: sortDate, priority: priority, type: type,
-        isDone: false, doneDate: null, logId: null, 
+        isDone: isDone, 
+        doneDate: isDone ? doneLog.completedAt : null, 
+        logId: isDone ? doneLog.logId : null, 
         insemDate: insemDate, calvDate: calvDate,
         isReallyOverdue: isReallyOverdue
     });
@@ -712,7 +727,13 @@ function renderTaskTypeChips(allTasks) {
     const container = document.getElementById('taskTypeChips');
     container.innerHTML = '';
     const counts = {}; const types = new Set(['all']);
-    allTasks.forEach(t => { if(!t.isDone && !t.isReallyOverdue) { types.add(t.type); counts[t.type] = (counts[t.type] || 0) + 1; } });
+    allTasks.forEach(t => { 
+    // Pokazujemy przyciski dla wszystkich typów zadań, które nie są wykonane
+    if(!t.isDone) { 
+        types.add(t.type); 
+        counts[t.type] = (counts[t.type] || 0) + 1; 
+    } 
+});
     const labels = { 'all': 'Wszystkie', 'usg': 'USG', 'heat': 'Ruja', 'dry': 'Zasuszenie', 'rovac': 'Rovac', 'kexxtone': 'Kexxtone', 'calving': 'Wycielenia', 'sync': 'Synchronizacja' };
     const typesToShow = Array.from(types); if(typesToShow.length === 0 && currentTypeFilter === 'all') typesToShow.push('all');
     typesToShow.forEach(type => {
