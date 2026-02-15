@@ -581,29 +581,28 @@ function renderTasks(allTasks) {
     container.innerHTML = '';
     const today = new Date(); today.setHours(0,0,0,0);
 
-    // 1. LOGIKA FILTROWANIA ZAKŁADEK (todo, overdue, done, month)
+    // 1. LOGIKA FILTROWANIA ZAKŁADEK
     let filtered = allTasks;
-
     if (currentTaskFilter === 'done') {
         filtered = allTasks.filter(t => t.isDone);
-   } else if (currentTaskFilter === 'todo') {
-    // Pokazuj wszystko co nie jest zrobione (bieżące + spóźnione)
-    filtered = allTasks.filter(t => !t.isDone);
-} else if (currentTaskFilter === 'overdue') {
-    // Tutaj zostawiamy tylko spóźnione dla osobnej zakładki
-    filtered = allTasks.filter(t => !t.isDone && t.isReallyOverdue);
+    } else if (currentTaskFilter === 'todo') {
+        // "Do zrobienia" to te, które NIE są zrobione i NIE są spóźnione
+        filtered = allTasks.filter(t => !t.isDone && !t.isReallyOverdue);
+    } else if (currentTaskFilter === 'overdue') {
+        // "Przeterminowane" to te, które NIE są zrobione i SĄ spóźnione
+        filtered = allTasks.filter(t => !t.isDone && t.isReallyOverdue);
     } else if (currentTaskFilter === 'month') {
         const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
         const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
         filtered = allTasks.filter(t => !t.isDone && t.dueDate >= today && t.dueDate >= startOfMonth && t.dueDate <= endOfMonth);
     }
 
-    // Dodatkowe filtrowanie po typie (chipy: USG, Ruja itd.)
+    // Filtrowanie po typie (USG, Zasuszenie itd.)
     if (currentTypeFilter !== 'all') {
         filtered = filtered.filter(t => t.type === currentTypeFilter);
     }
 
-    // 2. SORTOWANIE (Chronologicznie)
+    // 2. SORTOWANIE
     filtered.sort((a, b) => a.dueDate - b.dueDate);
 
     // 3. LOGIKA LIMITU 5 SZTUK
@@ -611,24 +610,25 @@ function renderTasks(allTasks) {
     const showAll = window.showAllTasks || false;
     const visibleTasks = showAll ? filtered : filtered.slice(0, LIMIT);
 
-    // 4. GENEROWANIE KART ZADANIA
+    // 4. GENEROWANIE KART
     visibleTasks.forEach(t => {
-        const animal = myHerd.find(a => a.id === t.animalId) || {};
         const div = document.createElement('div');
         div.className = `task-item ${t.priority} ${t.isDone ? 'done' : ''}`;
         
         const dueStr = t.dueDate.toLocaleDateString('pl-PL');
-        const lastInsemDate = animal.lastInsemination ? `💉 Krycie: <b>${animal.lastInsemination}</b>` : '';
-        const calvDateInfo = animal.lastCalving ? `🍼 Ost. Wyc: <b>${animal.lastCalving}</b>` : '';
+        
+        // FORMATOWANIE DAT DO WYŚWIETLENIA (Krycie i Przewidywane wycielenie)
+        const insemStr = t.insemDate ? (t.insemDate instanceof Date ? t.insemDate.toLocaleDateString('pl-PL') : t.insemDate) : '-';
+        const estCalvStr = t.calvDate ? (t.calvDate instanceof Date ? t.calvDate.toLocaleDateString('pl-PL') : t.calvDate) : '-';
+        
         const dateColor = t.isReallyOverdue ? 'red' : (t.priority === 'urgent' ? '#e67e22' : '#333'); 
 
         div.innerHTML = `
             <div style="flex: 1;">
                 <div style="font-size:15px; font-weight:bold; color:#333;">${t.title}</div>
                 <div style="font-size: 11px; color: #777; margin: 4px 0; line-height: 1.4;">
-                    Termin: <b style="color:${dateColor}">${dueStr}</b><br>
-                    ${lastInsemDate}<br>
-                    ${calvDateInfo}
+                    Termin zadania: <b style="color:${dateColor}">${dueStr}</b><br>
+                    💉 Krycie: <b>${insemStr}</b> | 🍼 Przew. poród: <b>${estCalvStr}</b>
                 </div>
                 <div class="task-animal-tag" onclick="openAnimalCard('${t.animalId}')">${t.tag}</div>
             </div>
@@ -643,33 +643,24 @@ function renderTasks(allTasks) {
     });
 
     // 5. PRZYCISK POKAŻ WSZYSTKIE / ZWIŃ
-  // 5. PRZYCISK POKAŻ WSZYSTKIE / ZWIŃ
     if (filtered.length > LIMIT) {
         const btnRow = document.createElement('div');
         btnRow.style.textAlign = 'center';
-        
-        // Używamy window.myAllTasksGlobal, żeby funkcja miała dostęp do danych przy przeładowaniu
         if (!showAll) {
-            btnRow.innerHTML = `
-                <button class="btn" style="background:#f0f4f8; color:var(--info); font-size:12px; padding:10px; width:100%; border:1px dashed var(--info); margin-top:10px;" 
-                onclick="window.showAllTasks=true; renderTasks(window.myAllTasksGlobal);">
-                    POKAŻ WSZYSTKIE (${filtered.length}) <i class="bi bi-chevron-down"></i>
-                </button>`;
+            btnRow.innerHTML = `<button class="btn" style="background:#f0f4f8; color:var(--info); font-size:12px; padding:10px; width:100%; border:1px dashed var(--info); margin-top:10px;" 
+                onclick="window.showAllTasks=true; renderTasks(window.myAllTasksGlobal);">POKAŻ WSZYSTKIE (${filtered.length}) <i class="bi bi-chevron-down"></i></button>`;
         } else {
-            btnRow.innerHTML = `
-                <button class="btn" style="background:#fff; color:#999; font-size:12px; padding:10px; width:100%; border:1px solid #eee; margin-top:10px;" 
-                onclick="window.showAllTasks=false; renderTasks(window.myAllTasksGlobal);">
-                    ZWIŃ LISTĘ <i class="bi bi-chevron-up"></i>
-                </button>`;
+            btnRow.innerHTML = `<button class="btn" style="background:#fff; color:#999; font-size:12px; padding:10px; width:100%; border:1px solid #eee; margin-top:10px;" 
+                onclick="window.showAllTasks=false; renderTasks(window.myAllTasksGlobal);">ZWIŃ LISTĘ <i class="bi bi-chevron-up"></i></button>`;
         }
         container.appendChild(btnRow);
     }
+
     // 6. OBSŁUGA PUSTEGO STANU
     if (filtered.length === 0) {
         container.innerHTML = '<div style="text-align:center; padding:20px; color:#999;">Brak zadań w tym widoku.</div>';
     }
 
-    // Aktualizacja chipów (kategorii) na górze
     renderTaskTypeChips(allTasks);
 }
 function checkIfTaskDone(animalId, type, refDate) {
@@ -705,22 +696,20 @@ function addTask(list, animal, title, dueDate, sortDate, priority, type, insemDa
     const dateStr = dueDate.toISOString().split('T')[0];
     const taskId = `${animal.id}_${type}_${dateStr}`; 
     
+    // Sprawdzamy czy zadanie jest wykonane
     const doneLog = completedTasks.find(t => t.taskId === taskId);
-    
-    // Jeśli zadanie jest wykonane, zapisujemy to w obiekcie zadania
     const isDone = !!doneLog;
 
-    let isReallyOverdue = false;
-    if (forceOverdue) isReallyOverdue = true; 
-    else if (priority === 'urgent' && type !== 'calving') isReallyOverdue = true;
+    // Ustalamy czy jest przeterminowane
+    let isReallyOverdue = forceOverdue || (priority === 'urgent' && type !== 'calving');
 
     list.push({
         id: taskId, animalId: animal.id, tag: animal.tag, title: title,
         dueDate: dueDate, sortDate: sortDate, priority: priority, type: type,
         isDone: isDone, 
-        doneDate: isDone ? doneLog.completedAt : null, 
         logId: isDone ? doneLog.logId : null, 
-        insemDate: insemDate, calvDate: calvDate,
+        insemDate: insemDate, // To jest data ostatniego krycia
+        calvDate: calvDate,   // To jest PROGNOZOWANA data porodu
         isReallyOverdue: isReallyOverdue
     });
 }
