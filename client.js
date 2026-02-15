@@ -650,10 +650,16 @@ function checkRuleAndAddTask(list, animal, rule, daysCounter, refDate, type, cal
     let isActive = false; let isOverdue = false; let dueDate = null;
     
     if (isReverse) {
+        // Logika dla Zasuszenia (dni DO wycielenia)
+        // Zadanie jest AKTYWNE (żółte), gdy mieści się w przedziale (np. 60 - 40 dni)
         if (daysCounter <= rule.start && daysCounter >= rule.end) isActive = true;
+        
+        // Zadanie jest PRZETERMINOWANE (czerwone), gdy zostało MNIEJ dni niż koniec przedziału (np. < 40 dni)
         if (daysCounter < rule.end) isOverdue = true;
+        
         dueDate = addDays(calvDate, -rule.end);
     } else {
+        // Logika dla USG/Rui (dni PO inseminacji)
         if (daysCounter >= rule.start && daysCounter <= rule.end) isActive = true;
         if (daysCounter > rule.end) isOverdue = true;
         dueDate = addDays(refDate, rule.end);
@@ -692,7 +698,8 @@ function renderTaskTypeChips(allTasks) {
     allTasks.forEach(t => {
         if (t.dueDate < limitDate && (t.isDone || t.isReallyOverdue) && t.type !== 'calving') return;
 
-        let visibleInTab = false;
+      let visibleInTab = false;
+        // Licznik musi idealnie pokrywać się z tym, co filtruje renderTasks:
         if (currentTaskFilter === 'todo' && !t.isDone && !t.isReallyOverdue) visibleInTab = true;
         else if (currentTaskFilter === 'overdue' && !t.isDone && t.isReallyOverdue) visibleInTab = true;
         else if (currentTaskFilter === 'done' && t.isDone) visibleInTab = true;
