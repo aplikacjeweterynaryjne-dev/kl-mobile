@@ -873,7 +873,7 @@ function openAnimalCard(id) {
     // Usunięto powtórną deklarację const calvHistDiv, bo była wyżej w tej samej funkcji
     const calvDiv = document.getElementById('cardCalvingHistory'); 
     if(calvDiv) {
-        calvDiv.innerHTML = '<h4 style="margin-top:15px; color:#2e7d32;">Historia wycieleń:</h4>';
+        calvDiv.innerHTML = '<h4 style="margin-top:15px; color:#2e7d32;">Wycielenia:</h4>';
         const ch = animal.historyCalving || [];
         if(ch.length === 0) {
             calvDiv.innerHTML += '<div style="font-size:12px; color:#999;">Brak zarejestrowanych wycieleń.</div>';
