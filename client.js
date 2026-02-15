@@ -576,10 +576,12 @@ function renderTasks(allTasks) {
         // 2. Logika Zakładek
         if (currentTaskFilter === 'done') return t.isDone;
         
-        if (currentTaskFilter === 'todo') {
-            // "Do zrobienia" to te, które nie są gotowe i nie są jeszcze spóźnione (czyli żółte)
-            return !t.isDone && !t.isReallyOverdue;
-        }
+        // Wewnątrz renderTasks zmień warunek dla 'todo':
+if (currentTaskFilter === 'todo') {
+    // Pokazuj zadania, które nie są zrobione, nie są jeszcze spóźnione (czerwone)
+    // USUNIĘTO warunek t.dueDate <= today, aby widzieć zadania "w toku"
+    return !t.isDone && !t.isReallyOverdue; 
+}
         
         if (currentTaskFilter === 'overdue') {
             // "Przeterminowane" to tylko te, które przekroczyły końcowy termin (czerwone)
@@ -651,31 +653,39 @@ function renderTasks(allTasks) {
 
 function checkRuleAndAddTask(list, animal, rule, daysCounter, refDate, type, calvDate, isReverse = false) {
     if (!rule || !rule.enabled) return;
-    let isActive = false; let isOverdue = false; let dueDate = null;
+    let isActive = false; 
+    let isOverdue = false; 
+    let dueDate = null;
+    const today = new Date();
+    today.setHours(0,0,0,0);
     
     if (isReverse) {
-        // Zasuszenie: daysCounter to dni DO porodu
-        // Aktywne (żółte) jeśli jesteśmy w oknie (np. 60-40 dni przed)
+        // ZASUSZENIE (liczymy wstecz od porodu)
+        dueDate = addDays(calvDate, -rule.end); // Termin to np. 40 dni przed porodem
+        
+        // Czy jesteśmy w okienku (np. między 60 a 40 dniem do porodu)?
         if (daysCounter <= rule.start && daysCounter >= rule.end) isActive = true;
-        // Przeterminowane (czerwone) jeśli do porodu zostało mniej niż koniec okna (np. 39 dni)
+        // Czy termin końcowy już minął (zostało mniej niż 40 dni)?
         if (daysCounter < rule.end) isOverdue = true;
-        dueDate = addDays(calvDate, -rule.end);
     } else {
-        // USG/Ruja: daysCounter to dni PO inseminacji
+        // USG / RUJA (liczymy do przodu od krycia)
+        dueDate = addDays(refDate, rule.end); // Termin to np. 30 dni po kryciu
+        
         if (daysCounter >= rule.start && daysCounter <= rule.end) isActive = true;
         if (daysCounter > rule.end) isOverdue = true;
-        dueDate = addDays(refDate, rule.end);
     }
 
     if (isReverse && animal.isDriedOff && ['dry', 'rovac', 'kexxtone'].includes(type)) return;
 
+    // Decyzja o kolorze i zakładce:
     if (isActive) {
+        // Zółte (Ostrzeżenie) -> Trafia do "Do zrobienia"
         addTask(list, animal, rule.label, dueDate, new Date(), 'warning', type, refDate, calvDate, false);
     } else if (isOverdue) {
+        // Czerwone (Pilne) -> Trafia do "Przeterminowane"
         addTask(list, animal, rule.label, dueDate, new Date(), 'urgent', type, refDate, calvDate, true);
     }
 }
-
 function addTask(list, animal, title, dueDate, sortDate, priority, type, insemDate, calvDate, forceOverdue = false) {
     const dateStr = dueDate.toISOString().split('T')[0];
     const taskId = `${animal.id}_${type}_${dateStr}`; 
