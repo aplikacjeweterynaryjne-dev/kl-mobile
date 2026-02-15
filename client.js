@@ -582,11 +582,14 @@ function renderTasks(allTasks) {
         if (currentTaskFilter === 'overdue') return !t.isDone && t.isReallyOverdue;
         
         // "TEN MIESIĄC" - pokazuje wszystko, co wypada w tym miesiącu (i punktowe USG, i zakresowe Zasuszenie)
-        if (currentTaskFilter === 'month') {
-            const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-            const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-            return !t.isDone && t.dueDate >= startOfMonth && t.dueDate <= endOfMonth;
-        }
+      if (currentTaskFilter === 'month') {
+    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    
+    // Pokazuj zadania, których TERMIN (dueDate) wypada w tym miesiącu
+    // LUB zadania USG/inne, które są aktywne (niezrobione) i ich termin przypada na ten miesiąc
+    return !t.isDone && t.dueDate >= startOfMonth && t.dueDate <= endOfMonth;
+}
         return true;
     });
 
@@ -653,40 +656,30 @@ function checkRuleAndAddTask(list, animal, rule, daysCounter, refDate, type, cal
     const today = new Date();
     today.setHours(0,0,0,0);
     
-    if (isReverse) {
-        // --- ZASUSZENIE / ROVAC / KEXXTONE (liczymy wstecz od wycielenia) ---
-        dueDate = addDays(calvDate, -rule.end); 
-        
-        // Aktywne (żółte), gdy jesteśmy w oknie (np. między 60 a 40 dniem do porodu)
-        if (daysCounter <= rule.start && daysCounter >= rule.end) isActive = true;
-        // Przeterminowane (czerwone), gdy zostało mniej dni niż koniec okna (np. < 40 dni)
-        if (daysCounter < rule.end) isOverdue = true;
+if (isReverse) {
+    // --- ZASUSZENIE / ROVAC / KEXXTONE ---
+    dueDate = addDays(calvDate, -rule.end); // Termin ostateczny
 
-        // FIX DATY KRYCIA: Pobieramy faktyczną datę ostatniego krycia zwierzęcia, 
-        // zamiast używać refDate (którym w tym przypadku jest błędnie calvDate)
-        const actualInsemDate = animal.lastInsemination ? new Date(animal.lastInsemination) : null;
-
-        if (isReverse && animal.isDriedOff && ['dry', 'rovac', 'kexxtone'].includes(type)) return;
-
-        if (isActive) {
-            addTask(list, animal, rule.label, dueDate, today, 'warning', type, actualInsemDate, calvDate, false);
-        } else if (isOverdue) {
-            addTask(list, animal, rule.label, dueDate, today, 'urgent', type, actualInsemDate, calvDate, true);
-        }
-
-    } else {
-        // --- USG / RUJA (liczymy w przód od krycia) ---
-        dueDate = addDays(refDate, rule.end); 
-        
-        if (daysCounter >= rule.start && daysCounter <= rule.end) isActive = true;
-        if (daysCounter > rule.end) isOverdue = true;
-
-        if (isActive) {
-            addTask(list, animal, rule.label, dueDate, today, 'warning', type, refDate, calvDate, false);
-        } else if (isOverdue) {
-            addTask(list, animal, rule.label, dueDate, today, 'urgent', type, refDate, calvDate, true);
-        }
+    // Aktywne (żółte): jesteśmy wewnątrz okna (np. między 60 a 40 dniem do porodu)
+    if (daysCounter <= rule.start && daysCounter >= rule.end) {
+        isActive = true;
+        isOverdue = false;
+    } 
+    // Przeterminowane (czerwone): termin 'end' minął (np. zostało tylko 39 dni do porodu)
+    else if (daysCounter < rule.end) {
+        isActive = false;
+        isOverdue = true;
     }
+
+    const actualInsemDate = animal.lastInsemination ? new Date(animal.lastInsemination) : null;
+    if (animal.isDriedOff && ['dry', 'rovac', 'kexxtone'].includes(type)) return;
+
+    if (isActive) {
+        addTask(list, animal, rule.label, dueDate, today, 'warning', type, actualInsemDate, calvDate, false);
+    } else if (isOverdue) {
+        addTask(list, animal, rule.label, dueDate, today, 'urgent', type, actualInsemDate, calvDate, true);
+    }
+}
 }
 function addTask(list, animal, title, dueDate, sortDate, priority, type, insemDate, calvDate, forceOverdue = false) {
     const dateStr = dueDate.toISOString().split('T')[0];
@@ -719,17 +712,34 @@ function renderTaskTypeChips(allTasks) {
     allTasks.forEach(t => {
         if (t.dueDate < limitDate && (t.isDone || t.isReallyOverdue) && t.type !== 'calving') return;
 
-      let visibleInTab = false;
-        // Licznik musi idealnie pokrywać się z tym, co filtruje renderTasks:
-        if (currentTaskFilter === 'todo' && !t.isDone && !t.isReallyOverdue) visibleInTab = true;
-        else if (currentTaskFilter === 'overdue' && !t.isDone && t.isReallyOverdue) visibleInTab = true;
-        else if (currentTaskFilter === 'done' && t.isDone) visibleInTab = true;
-        else if (currentTaskFilter === 'month' && !t.isDone) visibleInTab = true;
+  let visibleInTab = false;
+    const today = new Date();
+    today.setHours(0,0,0,0);
 
-        if (visibleInTab) {
-            types.add(t.type);
-            counts[t.type] = (counts[t.type] || 0) + 1;
-        }
+    // Definiujemy zakres miesiąca raz dla porównań
+    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+
+    // Licznik musi idealnie pokrywać się z tym, co filtruje renderTasks:
+    if (currentTaskFilter === 'todo') {
+        visibleInTab = !t.isDone && !t.isReallyOverdue;
+    } 
+    else if (currentTaskFilter === 'overdue') {
+        visibleInTab = !t.isDone && t.isReallyOverdue;
+    } 
+    else if (currentTaskFilter === 'done') {
+        visibleInTab = t.isDone;
+    } 
+    else if (currentTaskFilter === 'month') {
+        // Kluczowa poprawka: Licznik zlicza tylko te zadania, 
+        // które są niezrobione I mieszczą się w obecnym miesiącu
+        visibleInTab = !t.isDone && t.dueDate >= startOfMonth && t.dueDate <= endOfMonth;
+    }
+
+    if (visibleInTab) {
+        types.add(t.type);
+        counts[t.type] = (counts[t.type] || 0) + 1;
+    }
     });
 
     const labels = { 'all': 'Wszystkie', 'usg': 'USG', 'heat': 'Ruja', 'dry': 'Zasuszenie', 'rovac': 'Rovac', 'kexxtone': 'Kexxtone', 'calving': 'Wycielenia', 'sync': 'Synchronizacja' };
