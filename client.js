@@ -570,22 +570,41 @@ function renderTasks(allTasks) {
     const container = document.getElementById('tasksContainer');
     if (!container) return;
     container.innerHTML = '';
+    const today = new Date(); today.setHours(0,0,0,0);
 
-    // Filtrujemy tylko zadania do wykonania (niezrobione) dla głównej listy
-    let filtered = allTasks.filter(t => !t.isDone);
-    
-    // Sortowanie: Przeterminowane i pilne na górę
+    // 1. LOGIKA FILTROWANIA ZAKŁADEK (todo, overdue, done, month)
+    let filtered = allTasks;
+
+    if (currentTaskFilter === 'done') {
+        filtered = allTasks.filter(t => t.isDone);
+    } else if (currentTaskFilter === 'todo') {
+        filtered = allTasks.filter(t => !t.isDone && !t.isReallyOverdue);
+    } else if (currentTaskFilter === 'overdue') {
+        filtered = allTasks.filter(t => !t.isDone && t.isReallyOverdue);
+    } else if (currentTaskFilter === 'month') {
+        const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+        const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+        filtered = allTasks.filter(t => !t.isDone && t.dueDate >= today && t.dueDate >= startOfMonth && t.dueDate <= endOfMonth);
+    }
+
+    // Dodatkowe filtrowanie po typie (chipy: USG, Ruja itd.)
+    if (currentTypeFilter !== 'all') {
+        filtered = filtered.filter(t => t.type === currentTypeFilter);
+    }
+
+    // 2. SORTOWANIE (Chronologicznie)
     filtered.sort((a, b) => a.dueDate - b.dueDate);
 
-    // LIMIT 5 SZTUK
+    // 3. LOGIKA LIMITU 5 SZTUK
     const LIMIT = 5;
     const showAll = window.showAllTasks || false;
     const visibleTasks = showAll ? filtered : filtered.slice(0, LIMIT);
 
+    // 4. GENEROWANIE KART ZADANIA
     visibleTasks.forEach(t => {
         const animal = myHerd.find(a => a.id === t.animalId) || {};
         const div = document.createElement('div');
-        div.className = `task-item ${t.priority}`;
+        div.className = `task-item ${t.priority} ${t.isDone ? 'done' : ''}`;
         
         const dueStr = t.dueDate.toLocaleDateString('pl-PL');
         const lastInsemDate = animal.lastInsemination ? `💉 Krycie: <b>${animal.lastInsemination}</b>` : '';
@@ -603,25 +622,32 @@ function renderTasks(allTasks) {
                 <div class="task-animal-tag" onclick="openAnimalCard('${t.animalId}')">${t.tag}</div>
             </div>
             <div class="task-check-wrapper">
-                <input type="checkbox" onclick="initiateTaskCompletion('${t.id}', '${t.type}', '${t.animalId}', '${t.dueDate.toISOString()}')">
+                ${t.isDone 
+                    ? `<button class="btn" style="padding:5px 10px; font-size:12px; background:#ddd; width:auto; margin:0;" onclick="undoTask('${t.logId}')">Cofnij</button>`
+                    : `<input type="checkbox" style="transform:scale(1.5); cursor:pointer;" onclick="initiateTaskCompletion('${t.id}', '${t.type}', '${t.animalId}', '${t.dueDate.toISOString()}')">`
+                }
             </div>
         `;
         container.appendChild(div);
     });
 
-    // PRZYCISK ROZWIJANIA
-  // PRZYCISK ROZWIJANIA (wewnątrz funkcji renderTasks)
+    // 5. PRZYCISK POKAŻ WSZYSTKIE / ZWIŃ
     if (filtered.length > LIMIT) {
         const btnRow = document.createElement('div');
         btnRow.style.textAlign = 'center';
-        if (!window.showAllTasks) {
+        if (!showAll) {
             btnRow.innerHTML = `<button class="btn" style="background:#f0f4f8; color:var(--info); font-size:12px; padding:10px; width:100%; border:1px dashed var(--info); margin-top:10px;" 
-                onclick="window.showAllTasks=true; generateAndRenderTasks();">POKAŻ WSZYSTKIE (${filtered.length}) <i class="bi bi-chevron-down"></i></button>`;
+                onclick="window.showAllTasks=true; renderTasks(myAllTasksGlobal);">POKAŻ WSZYSTKIE (${filtered.length}) <i class="bi bi-chevron-down"></i></button>`;
         } else {
             btnRow.innerHTML = `<button class="btn" style="background:#fff; color:#999; font-size:12px; padding:10px; width:100%; border:1px solid #eee; margin-top:10px;" 
-                onclick="window.showAllTasks=false; generateAndRenderTasks();">ZWIŃ LISTĘ <i class="bi bi-chevron-up"></i></button>`;
+                onclick="window.showAllTasks=false; renderTasks(myAllTasksGlobal);">ZWIŃ LISTĘ <i class="bi bi-chevron-up"></i></button>`;
         }
         container.appendChild(btnRow);
+    }
+
+    // 6. OBSŁUGA PUSTEGO STANU
+    if (filtered.length === 0) {
+        container.innerHTML = '<div style="text-align:center; padding:20px; color:#999;">Brak zadań w tym widoku.</div>';
     }
 
     // Aktualizacja chipów (kategorii) na górze
@@ -1319,9 +1345,9 @@ function setDateInput(id, deltaDays) {
 
 function switchTaskFilter(mode) {
     currentTaskFilter = mode;
+    window.showAllTasks = false; // DODAJ TO: resetuje widok do 5 sztuk przy zmianie zakładki
     document.querySelectorAll('.sub-tab').forEach(b => {
         b.classList.remove('active');
-        // Dodatkowe sprawdzenie, by podświetlić właściwy guzik
         if(b.getAttribute('onclick')?.includes(mode)) b.classList.add('active');
     });
     generateAndRenderTasks();
