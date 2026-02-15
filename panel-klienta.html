@@ -40,6 +40,11 @@
         .sub-tab { flex: 1; padding: 8px; background: none; border: none; border-radius: 6px; font-size: 12px; cursor: pointer; color: #666; font-weight: 600; text-align: center; }
         .sub-tab.active { background: #fff; color: var(--primary); box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
         
+        .task-item { display: flex; align-items: center; justify-content: space-between; padding: 12px; border-bottom: 1px solid #f0f0f0; background: #fff; border-radius: 8px; margin-bottom: 8px; }
+        .task-item.urgent { border-left: 4px solid var(--danger); } 
+        .task-item.warning { border-left: 4px solid var(--warn); } 
+        .task-item.info { border-left: 4px solid var(--info); }
+
         .calendar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
         .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; text-align: center; }
         .cal-day { background: #fff; height: 45px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 12px; position: relative; border: 1px solid transparent; cursor: pointer; }
@@ -68,6 +73,10 @@
         .close-modal-fixed { position: absolute; top: 15px; right: 15px; font-size: 28px; background: none; border: none; color: #999; cursor: pointer; z-index: 100; }
         
         .origin-box { background: #f0f4f8; padding: 10px; border-radius: 10px; margin: 10px 0; font-size: 13px; border-left: 4px solid var(--info); }
+        
+        /* Styl checkboxa zadania na pulpicie */
+        .task-check-wrapper { display: flex; align-items: center; justify-content: center; padding-left: 10px; }
+        .task-check-wrapper input { width: 22px; height: 22px; cursor: pointer; }
     </style>
 </head>
 <body>
@@ -127,10 +136,9 @@
     </div>
 
     <div id="section-treatments" class="section">
-        <h2>💊 Karty Leczenia</h2>
+        <h2>💊 Karty leczenia</h2>
         <div class="card" style="background: #e3f2fd; border-color: #2980b9;">
             <div style="font-size:13px; color:#555; margin-bottom:10px;">Zakres dat wizyt:</div>
-            
             <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 15px;">
                 <div style="width: 50%;">
                     <label style="font-size: 11px; font-weight: bold;">Od:</label>
@@ -141,7 +149,6 @@
                     <input type="date" id="treatmentsDateTo" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:8px; font-size: 13px;">
                 </div>
             </div>
-            
             <button onclick="loadTreatments()" class="btn btn-primary" style="margin:0;">🔍 Pobierz Karty</button>
         </div>
         <div id="treatmentsList"></div>
@@ -159,7 +166,6 @@
                 <small style="color: #d35400; font-size: 11px; display: block; margin-top: 5px;">Wymagany do pobierania kart leczenia.</small>
             </div>
             <hr>
-
             <div id="configList"></div>
             <hr>
             <h3>Dodaj Własne Zadanie</h3>
@@ -182,7 +188,7 @@
         <button class="nav-item active" data-target="section-dashboard"><i class="bi bi-grid-fill"></i>Pulpit</button>
         <button class="nav-item" data-target="section-herd"><i class="bi bi-list-ul"></i>Stado</button>
         <button class="nav-item" data-target="section-calendar"><i class="bi bi-calendar-date"></i>Kalendarz</button>
-        <button class="nav-item" data-target="section-treatments"><i class="bi bi-bandaid-fill"></i>Leki</button>
+        <button class="nav-item" data-target="section-treatments"><i class="bi bi-bandaid-fill"></i>Karty leczenia</button>
         <button class="nav-item" data-target="section-config"><i class="bi bi-gear"></i>Opcje</button>
     </div>
 
@@ -190,7 +196,6 @@
         <div class="modal-content">
             <button class="close-modal-fixed" onclick="closeModal('animalCardModal')">✕</button>
             <h2 id="cardTag" style="color:var(--primary); margin-top:10px;">PL-XXX</h2>
-            
             <div id="viewMode">
                 <div style="background:#f9f9f9; padding:12px; border-radius:12px; margin-bottom:10px; font-size:14px;">
                     <strong>Typ:</strong> <span id="cardType">---</span><br>
@@ -217,7 +222,6 @@
                 <button class="btn" style="background:#eee; margin-top:20px;" onclick="toggleEditMode()">✏️ Edytuj Dane</button>
                 <button class="btn btn-danger" id="btnDeleteAnimal">🗑 Usuń ze stada</button>
             </div>
-
             <div id="editMode" class="hidden">
                 <div class="form-row"><label>Nr Kolczyka</label><input type="text" id="editTag"></div>
                 <div class="form-row"><label>Data Urodzenia</label><input type="date" id="editDob"></div>
