@@ -1197,7 +1197,7 @@ document.getElementById('animalForm').addEventListener('submit', (e) => {
             });
         }
 
-        // 4. ZAPIS DO FIREBASE (Wszystkie pola razem)
+// 4. ZAPIS DO FIREBASE (Wszystkie pola razem)
         db.collection('animals').add({
             ownerUid: currentUser.uid,
             tag: tag,
@@ -1208,18 +1208,27 @@ document.getElementById('animalForm').addEventListener('submit', (e) => {
             fatherSemen: fatherSemen,
             lastCalving: lastCalving,
             lastInsemination: lastInsem,
-            semen: semen,
+            semen: semen, // Tutaj zapisujemy nazwę buhaja
             historyInsemination: historyInsemination,
             isPregnantConfirmed: isPregnantConfirmed,
             usgStatus: usgStatus,
             historyCalving: [],
+            isDriedOff: false, // Wartość domyślna dla nowej sztuki
             createdAt: firebase.firestore.FieldValue.serverTimestamp()
         }).then(() => {
             alert("Dodano zwierzę do stada!");
             closeModal('animalModal');
-        }).catch(err => alert("Błąd: " + err.message));
-    });
-}
+            
+            // KLUCZOWE: Odświeżamy widok stada i zadań
+            if (typeof generateAndRenderTasks === "function") {
+                generateAndRenderTasks();
+            }
+        }).catch(err => {
+            console.error("Błąd zapisu:", err);
+            alert("Błąd: " + err.message);
+        });
+    }); // Koniec listenera submit
+} // Koniec funkcji setupModals
 
 // --- KONFIGURACJA ---
 
