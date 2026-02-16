@@ -1143,49 +1143,50 @@ function toggleEditMode() {
 function saveAnimalChanges() {
     if(!currentEditingAnimalId) return;
     
-    // Pobieranie podstawowych wartości
     const newTag = document.getElementById('editTag').value;
     const dob = document.getElementById('editDob').value;
     const lastCalving = document.getElementById('editLastCalving').value || null;
     const lastInsem = document.getElementById('editLastInsem').value || null;
     const newStatus = document.getElementById('editPregStatus').value;
     
-    // NOWE POLA: Lokalizacja, Matka, Ojciec
     const location = document.getElementById('editLocation').value || '';
     const motherTag = document.getElementById('editMother').value || '';
     const fatherSemen = document.getElementById('editFather').value || '';
     const lastSemen = document.getElementById('editSemen')?.value || '';
+
+    // --- DODAJ TO: Odczyt checkboxa ---
     const isDriedOffManual = document.getElementById('editIsDriedOff') ? document.getElementById('editIsDriedOff').checked : false;
-    // Logika statusu cielności (Twoja oryginalna)
+    // ----------------------------------
+
     let isPreg = false;
     let usg = 'pending';
-
-    if(newStatus === 'pregnant') { 
-        isPreg = true; usg = 'positive'; 
-    } else if(newStatus === 'negative') { 
-        isPreg = false; usg = 'negative'; 
-    } else if(newStatus === 'check') { 
-        isPreg = false; usg = 'pending'; 
-    }
+    if(newStatus === 'pregnant') { isPreg = true; usg = 'positive'; }
+    else if(newStatus === 'negative') { isPreg = false; usg = 'negative'; }
+    else if(newStatus === 'check') { isPreg = false; usg = 'pending'; }
     
-    // Aktualizacja w bazie Firebase
     db.collection('animals').doc(currentEditingAnimalId).update({
         tag: newTag,
         dob: dob, 
         lastCalving: lastCalving, 
         lastInsemination: lastInsem,
+        semen: lastSemen,
         isPregnantConfirmed: isPreg,
         usgStatus: usg,
-        // Zapisywanie nowych pól pochodzenia i miejsca
         location: location,
         motherTag: motherTag,
-        fatherSemen: fatherSemen
+        fatherSemen: fatherSemen,
+        
+        // --- DODAJ TO: Zapis do bazy ---
+        isDriedOff: isDriedOffManual
+        // -------------------------------
     }).then(() => {
         alert("Zapisano zmiany!");
         openAnimalCard(currentEditingAnimalId);
+        // Odświeżamy listę zadań, żeby np. zadanie zasuszenia wróciło jeśli odznaczyliśmy
+        generateAndRenderTasks(); 
     }).catch(err => {
         console.error("Błąd zapisu:", err);
-        alert("Błąd podczas zapisywania zmian.");
+        alert("Błąd: " + err.message);
     });
 }
 
