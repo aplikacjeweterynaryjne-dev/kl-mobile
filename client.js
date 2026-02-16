@@ -464,38 +464,33 @@ function getDetailedStatus(a) {
     const insDate = a.lastInsemination ? new Date(a.lastInsemination) : null;
     const diffCalv = calvDate ? Math.floor((today - calvDate) / (1000 * 60 * 60 * 24)) : null;
 
-    // 1. Cielna (Potwierdzona)
-    if (a.isPregnantConfirmed) return { text: '✅ Cielna', color: 'green', category: 'cielne' };
-    
-    // 2. Zasuszona
+    // 1. ZASUSZONA (Najwyższy priorytet wizualny)
+    // Jeśli krowa jest zasuszona, wyświetlamy to nawet jeśli jest cielna.
     if (a.isDriedOff) return { text: '❄️ Zasuszona', color: '#7f8c8d', category: 'zasuszone' };
 
+    // 2. Cielna (Potwierdzona)
+    if (a.isPregnantConfirmed) return { text: '✅ Cielna', color: 'green', category: 'cielne' };
+    
     // 3. Logika po inseminacji (ale jeszcze nie potwierdzona)
     if (insDate) {
         const diffInsem = Math.floor((today - insDate) / (1000 * 60 * 60 * 24));
         
-        // Jeśli już badana i wyszła negatywnie
         if (a.usgStatus === 'negative') return { text: '❌ Pusta (po USG)', color: '#c0392b', category: 'puste' };
 
-        // --- NOWA LOGIKA: ODLICZANIE DO USG ---
-        // Pobieramy dzień startu badania z ustawień (lub domyślnie 40, jeśli brak ustawień)
+        // ODLICZANIE DO USG
         const usgStart = (userSettings && userSettings.usg) ? Math.min(userSettings.usg.start, userSettings.usg.end) : 40;
 
-        // Jeśli minęło mniej dni niż wymaga termin badania:
         if (diffInsem < usgStart) {
             const daysLeft = usgStart - diffInsem;
-            // Kategoria 'inne' sprawia, że NIE wlicza się do licznika "Do USG" (czerwonego), 
-            // ale widać status na liście ogólnej.
             return { text: `⏳ Do USG za ${daysLeft} dni`, color: '#9b59b6', category: 'inne' };
         }
-        // --------------------------------------
 
-        // Jeśli termin minął -> krowa gotowa do badania
         return { text: '❓ Do badania USG', color: '#f39c12', category: 'usg' };
     }
 
     // 4. Logika po wycieleniu (bez inseminacji)
     if (calvDate) {
+        // Tu jest status "świeżej" krowy
         if (diffCalv <= 60) return { text: '🍼 Wycielona < 60 dni', color: '#2980b9', category: 'puste' };
         if (diffCalv > 365) return { text: '⚠️ Niecielna > 1 rok', color: '#e74c3c', category: 'puste' };
     }
@@ -505,7 +500,6 @@ function getDetailedStatus(a) {
 
     return { text: '⚪ Pusta', color: '#7f8c8d', category: 'puste' };
 }
-// --- SILNIK ZADAŃ I LOGIKA STADA ---
 
 // --- SILNIK ZADAŃ I LOGIKA STADA (WERSJA OSTATECZNA Z POPRAWKAMI) ---
 
@@ -1718,29 +1712,36 @@ function renderHerdList() {
     }
 
     // 4. SORTOWANIE DOMYŚLNE (Hierarchia ważności)
-    // 4. SORTOWANIE (Nowa logika wg Twojego życzenia)
+   // 4. SORTOWANIE (Puste -> Świeże -> Inne -> USG -> Cielne -> Zasuszone)
     filtered.sort((a, b) => {
         const getPriority = (x) => {
             const s = getDetailedStatus(x);
+            const today = new Date();
+            const lastCalv = x.lastCalving ? new Date(x.lastCalving) : null;
+            const diffCalv = lastCalv ? Math.floor((today - lastCalv) / (1000 * 60 * 60 * 24)) : 999;
             
-            // 1. Puste (Najwyższy priorytet - trzeba zacielić)
-            if (s.category === 'puste') return 1;
+            // Grupa: Puste (Kategoria 'puste' zawiera też te świeże < 60 dni, więc musimy je rozróżnić)
+            if (s.category === 'puste') {
+                // Jeśli jałówka LUB krowa wycielona dawniej niż 60 dni temu -> NAJWYŻSZY PRIORYTET
+                if (x.type === 'jalowka' || diffCalv > 60) return 1;
+                
+                // Jeśli krowa wycielona mniej niż 60 dni temu -> PRIORYTET DRUGI
+                return 2;
+            }
 
-            // 2. Zacielone, ale za wcześnie na USG (Kategoria 'inne' z datą krycia)
-            // To są te z licznikiem "Do USG za X dni"
-            if (s.category === 'inne' && x.lastInsemination) return 2;
+            // Grupa: Zacielone, ale za wcześnie na USG (licznik dni)
+            if (s.category === 'inne' && x.lastInsemination) return 3;
 
-            // 3. Kwalifikujące się do badania (Do USG - pomarańczowe)
-            if (s.category === 'usg') return 3;
+            // Grupa: Do badania USG
+            if (s.category === 'usg') return 4;
 
-            // 4. Cielne potwierdzone (ale jeszcze nie zasuszone - w laktacji)
-            if (x.isPregnantConfirmed && !x.isDriedOff) return 4;
+            // Grupa: Cielne (laktacja)
+            if (s.category === 'cielne') return 5;
 
-            // 5. Zasuszone (Na samym końcu - krowy "odpoczywające")
-            if (x.isDriedOff || s.category === 'zasuszone') return 5;
+            // Grupa: Zasuszone (Najniższy priorytet)
+            if (s.category === 'zasuszone') return 6;
 
-            // 6. Reszta (np. Byki, nieokreślone)
-            return 6;
+            return 7;
         };
         return getPriority(a) - getPriority(b);
     });
