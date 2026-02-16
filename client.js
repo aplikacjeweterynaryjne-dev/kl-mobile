@@ -496,63 +496,88 @@ function generateAndRenderTasks() {
     const today = new Date();
     today.setHours(0,0,0,0);
     let generatedTasks = [];
+    function generateAndRenderTasks() {
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    let generatedTasks = [];
 
     myHerd.forEach(animal => {
-        // --- AUTOMAT ZASUSZENIA ---
-        let daysToCalvAuto = 999;
-        if (animal.lastInsemination && animal.isPregnantConfirmed) {
-            const estCalv = addDays(new Date(animal.lastInsemination), userSettings.gestation || 280);
-            daysToCalvAuto = Math.floor((estCalv - today) / (1000 * 60 * 60 * 24));
+        // 1. OBLICZENIA POMOCNICZE
+        const insDate = animal.lastInsemination ? new Date(animal.lastInsemination) : null;
+        const calvingDate = insDate ? addDays(insDate, userSettings.gestation || 280) : null;
+        
+        const daysSinceInsem = insDate ? Math.floor((today - insDate) / (1000 * 60 * 60 * 24)) : 0;
+        const daysToCalving = calvingDate ? Math.floor((calvingDate - today) / (1000 * 60 * 60 * 24)) : 999;
+
+        // 2. AUTOMATYKA STATUSÓW (Zmieniają bazę danych, jeśli termin minął)
+        
+        // Automat USG -> Cielna (jeśli minął koniec okienka USG)
+        if (animal.usgStatus === 'pending' && daysSinceInsem > (userSettings.usg.end || 60)) {
+            db.collection('animals').doc(animal.id).update({ isPregnantConfirmed: true, usgStatus: 'positive' });
         }
 
-        if (animal.type === 'krowa' && animal.isPregnantConfirmed && daysToCalvAuto <= 40 && !animal.isDriedOff) {
+        // Automat Zasuszenie (jeśli minął koniec okienka zasuszenia, np. 40 dni do porodu)
+        if (animal.isPregnantConfirmed && !animal.isDriedOff && daysToCalving < (userSettings.dry.end || 40)) {
             db.collection('animals').doc(animal.id).update({ isDriedOff: true });
         }
 
+        // Automat Wycielenie (7 dni po terminie)
+        if (animal.isPregnantConfirmed && daysToCalving < -7) {
+            const taskId = `${animal.id}_calving_${calvingDate.toISOString().split('T')[0]}`;
+            const alreadyDone = completedTasks.some(t => t.taskId === taskId);
+            if (!alreadyDone) {
+                confirmTaskCalving({ animalId: animal.id, taskId: taskId }, calvingDate, true);
+            }
+        }
+
+        // 3. GENEROWANIE ZADAŃ WIZUALNYCH (To co widzimy w zakładkach)
+
         // --- SYNCHRONIZACJA ---
         if (animal.type === 'krowa' && animal.lastCalving) {
-            const calvDate = new Date(animal.lastCalving);
-            const dim = Math.floor((today - calvDate) / (1000 * 60 * 60 * 24));
-            if (dim > 60 && dim < 365) {
-                if (!animal.isPregnantConfirmed && animal.usgStatus !== 'pending') {
-                    const history = animal.historyInsemination || [];
-                    const insemsSinceCalving = history.filter(h => new Date(h.date) > calvDate).length;
-                    if (insemsSinceCalving <= 6) addTask(generatedTasks, animal, 'Wykonaj synchronizację', today, today, 'warning', 'sync', null, calvDate);
+            const lastCalv = new Date(animal.lastCalving);
+            const dim = Math.floor((today - lastCalv) / (1000 * 60 * 60 * 24));
+            if (dim > 60 && dim < 365 && !animal.isPregnantConfirmed && animal.usgStatus !== 'pending') {
+                const history = animal.historyInsemination || [];
+                const insemsSinceCalving = history.filter(h => new Date(h.date) > lastCalv).length;
+                if (insemsSinceCalving <= 6) {
+                    addTask(generatedTasks, animal, 'Wykonaj synchronizację', today, today, 'warning', 'sync', null, lastCalv);
                 }
             }
         }
+
+        // Przerwij jeśli nie krowa/jałówka lub brak krycia (dla dalszych zadań)
+        if ((animal.type !== 'krowa' && animal.type !== 'jalowka') || !insDate) return;
         
-        if (animal.type !== 'krowa' && animal.type !== 'jalowka') return;
-        if (!animal.lastInsemination) return;
-        // Naprawiony warunek: nie blokuje cielnych krów do zasuszenia
-        if (animal.usgStatus === 'negative' && !animal.isPregnantConfirmed) return; 
+        // Blokada dla pustych (chyba że to cielna)
+        if (animal.usgStatus === 'negative' && !animal.isPregnantConfirmed) return;
 
-        const insDate = new Date(animal.lastInsemination);
-        const calvingDate = addDays(insDate, userSettings.gestation || 280);
-        const daysSinceInsem = Math.floor((today - insDate) / (1000 * 60 * 60 * 24));
-
+        // --- USG I RUJA (Tylko dla niepotwierdzonych) ---
         if (!animal.isPregnantConfirmed) {
             checkRuleAndAddTask(generatedTasks, animal, userSettings.usg, daysSinceInsem, insDate, 'usg', calvingDate);
             checkRuleAndAddTask(generatedTasks, animal, userSettings.heat, daysSinceInsem, insDate, 'heat', calvingDate);
         }
-        
-        const daysToCalving = Math.floor((calvingDate - today) / (1000 * 60 * 60 * 24));
-        if (animal.type === 'krowa') checkRuleAndAddTask(generatedTasks, animal, userSettings.dry, daysToCalving, calvingDate, 'dry', calvingDate, true);
+
+        // --- ZASUSZENIE, ROVAC, KEXXTONE (Oparte na dacie porodu) ---
+        if (animal.type === 'krowa') {
+            checkRuleAndAddTask(generatedTasks, animal, userSettings.dry, daysToCalving, calvingDate, 'dry', calvingDate, true);
+        }
         checkRuleAndAddTask(generatedTasks, animal, userSettings.rovac, daysToCalving, calvingDate, 'rovac', calvingDate, true);
         checkRuleAndAddTask(generatedTasks, animal, userSettings.kexxtone, daysToCalving, calvingDate, 'kexxtone', calvingDate, true);
-        
+
+        // --- ZADANIA WŁASNE ---
         userSettings.customRules.forEach((rule, idx) => {
-            if(rule.base === 'insem') checkRuleAndAddTask(generatedTasks, animal, rule, daysSinceInsem, insDate, `custom_${idx}`, calvingDate);
+            if (rule.base === 'insem') checkRuleAndAddTask(generatedTasks, animal, rule, daysSinceInsem, insDate, `custom_${idx}`, calvingDate);
             else checkRuleAndAddTask(generatedTasks, animal, rule, daysToCalving, calvingDate, `custom_${idx}`, calvingDate, true);
         });
-        
-        if (daysToCalving <= 10 && daysToCalving >= -15) { 
-            const isDone = checkIfTaskDone(animal.id, 'calving', calvingDate);
-            if (!isDone && daysToCalving <= -13) {
-                confirmTaskCalving({ animalId: animal.id, dueDate: calvingDate }, calvingDate, true);
-            } else if (!isDone) {
+
+        // --- SPODZIEWANE WYCIELENIE (Wizualne na liście) ---
+        if (daysToCalving <= 14 && daysToCalving >= -7) {
+            const calvTaskId = `${animal.id}_calving_${calvingDate.toISOString().split('T')[0]}`;
+            const isDone = completedTasks.some(t => t.taskId === calvTaskId);
+            
+            if (!isDone) {
                 let priority = (daysToCalving <= 5 && daysToCalving >= -5) ? 'urgent' : 'warning';
-                let isOverdueCalving = (daysToCalving < -5); 
+                let isOverdueCalving = (daysToCalving < 0);
                 addTask(generatedTasks, animal, 'Spodziewane Wycielenie', calvingDate, calvingDate, priority, 'calving', insDate, calvingDate, isOverdueCalving);
             }
         }
@@ -568,25 +593,43 @@ function renderTasks(allTasks) {
     container.innerHTML = '';
     const today = new Date(); today.setHours(0,0,0,0);
     const limitDate = addDays(today, -14); 
+let filtered = allTasks.filter(t => {
+        const today = new Date();
+        today.setHours(0,0,0,0);
+        
+        // Obliczamy ile dni minęło od terminu (dueDate)
+        const diffMs = today - t.dueDate;
+        const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
- let filtered = allTasks.filter(t => {
-        if (t.dueDate < limitDate && t.isDone) return false;
+        // --- PUNKT 9: Automatyczne usuwanie ---
+        // Jeśli zadanie jest przeterminowane (niezrobione i isReallyOverdue) 
+        // i minęło więcej niż 14 dni od terminu -> usuwamy z widoku
+        if (!t.isDone && t.isReallyOverdue && diffDays > 14) return false;
 
+        // --- FILTROWANIE ZAKŁADEK ---
+        
+        // 1. ZROBIONE
         if (currentTaskFilter === 'done') return t.isDone;
         
-        // "DO ZROBIENIA" - teraz pokazuje wszystko, co jest do zrobienia (żółte), 
-        // nawet jeśli termin techniczny (koniec okienka) jest za kilka dni.
-        if (currentTaskFilter === 'todo') return !t.isDone && !t.isReallyOverdue;
-        
-        // "PRZETERMINOWANE" - tylko to, co już "uciekło" (czerwone)
-        if (currentTaskFilter === 'overdue') return !t.isDone && t.isReallyOverdue;
-        
-        // "TEN MIESIĄC" - pokazuje wszystko, co wypada w tym miesiącu (i punktowe USG, i zakresowe Zasuszenie)
-        if (currentTaskFilter === 'month') {
-            const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-            const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-            return !t.isDone && t.dueDate >= startOfMonth && t.dueDate <= endOfMonth;
+        // 2. DO ZROBIENIA (tylko te w oknie czasowym, jeszcze nie "czerwone")
+        if (currentTaskFilter === 'todo') {
+            return !t.isDone && !t.isReallyOverdue;
         }
+        
+        // 3. PRZETERMINOWANE (tylko te, które już "uciekły" poza przedział)
+        if (currentTaskFilter === 'overdue') {
+            return !t.isDone && t.isReallyOverdue;
+        }
+        
+        // 4. TEN MIESIĄC (wszystkie niezrobione, których termin przypada na obecny miesiąc)
+        if (currentTaskFilter === 'month') {
+            const currentMonth = today.getMonth();
+            const currentYear = today.getFullYear();
+            const taskMonth = t.dueDate.getMonth();
+            const taskYear = t.dueDate.getFullYear();
+            return !t.isDone && taskMonth === currentMonth && taskYear === currentYear;
+        }
+
         return true;
     });
 
@@ -645,46 +688,56 @@ function renderTasks(allTasks) {
 
 function checkRuleAndAddTask(list, animal, rule, daysCounter, refDate, type, calvDate, isReverse = false) {
     if (!rule || !rule.enabled) return;
-    let isActive = false; 
-    let isOverdue = false; 
+    
+    let isActive = false;     // Wpadnie do "Do zrobienia" (żółte)
+    let isOverdue = false;    // Wpadnie do "Przeterminowane" (czerwone)
     let dueDate = null;
     
-    // Ustalamy dzisiejszą datę do porównań
     const today = new Date();
     today.setHours(0,0,0,0);
-    
+
     if (isReverse) {
         // --- ZASUSZENIE / ROVAC / KEXXTONE (liczymy wstecz od wycielenia) ---
+        // Termin ostateczny to koniec okienka (np. 40 dni przed porodem)
         dueDate = addDays(calvDate, -rule.end); 
         
-        // Aktywne (żółte), gdy jesteśmy w oknie (np. między 60 a 40 dniem do porodu)
+        // Aktywne (żółte): jesteśmy wewnątrz przedziału (np. między 60 a 40 dniem do porodu)
         if (daysCounter <= rule.start && daysCounter >= rule.end) isActive = true;
-        // Przeterminowane (czerwone), gdy zostało mniej dni niż koniec okna (np. < 40 dni)
+        
+        // Przeterminowane (czerwone): czas na wykonanie minął (zostało mniej niż 40 dni do porodu)
         if (daysCounter < rule.end) isOverdue = true;
 
-        // FIX DATY KRYCIA: Pobieramy faktyczną datę ostatniego krycia zwierzęcia, 
-        // zamiast używać refDate (którym w tym przypadku jest błędnie calvDate)
-        const actualInsemDate = animal.lastInsemination ? new Date(animal.lastInsemination) : null;
-
-        if (isReverse && animal.isDriedOff && ['dry', 'rovac', 'kexxtone'].includes(type)) return;
-
-        if (isActive) {
-            addTask(list, animal, rule.label, dueDate, today, 'warning', type, actualInsemDate, calvDate, false);
-        } else if (isOverdue) {
-            addTask(list, animal, rule.label, dueDate, today, 'urgent', type, actualInsemDate, calvDate, true);
-        }
-
     } else {
-        // --- USG / RUJA (liczymy w przód od krycia) ---
+        // --- USG / RUJA / SYNC / CUSTOM (liczymy w przód od krycia/wycielenia) ---
+        // Termin ostateczny to koniec okienka (np. 60 dni po kryciu dla USG)
         dueDate = addDays(refDate, rule.end); 
         
+        // Aktywne (żółte): jesteśmy wewnątrz przedziału (np. 30-60 dni po kryciu)
         if (daysCounter >= rule.start && daysCounter <= rule.end) isActive = true;
+        
+        // Przeterminowane (czerwone): przekroczyliśmy koniec okienka (powyżej 60 dni)
         if (daysCounter > rule.end) isOverdue = true;
+    }
 
-        if (isActive) {
-            addTask(list, animal, rule.label, dueDate, today, 'warning', type, refDate, calvDate, false);
-        } else if (isOverdue) {
-            addTask(list, animal, rule.label, dueDate, today, 'urgent', type, refDate, calvDate, true);
+    // --- FILTRACJA I DODAWANIE DO LISTY ---
+    
+    // Pobieramy datę krycia dla widoku zadania
+    const actualInsemDate = animal.lastInsemination ? new Date(animal.lastInsemination) : null;
+
+    // Blokada dla krów już zasuszonych (nie wyświetlamy im zadań okołoporodowych, które już wykonano)
+    if (isReverse && animal.isDriedOff && ['dry', 'rovac', 'kexxtone'].includes(type)) return;
+
+    if (isActive) {
+        // Dodaj jako "Do zrobienia" (warning/żółte)
+        addTask(list, animal, rule.label, dueDate, today, 'warning', type, actualInsemDate, calvDate, false);
+    } else if (isOverdue) {
+        // Sprawdzamy punkt 9: Czy zadanie nie jest starsze niż 14 dni?
+        const diffMs = today - dueDate;
+        const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+        
+        if (diffDays <= 14) {
+            // Dodaj jako "Przeterminowane" (urgent/czerwone)
+            addTask(list, animal, rule.label, dueDate, today, 'urgent', type, actualInsemDate, calvDate, true);
         }
     }
 }
