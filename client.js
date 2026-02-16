@@ -1014,6 +1014,14 @@ function openAnimalCard(id) {
 
     document.getElementById('cardTag').textContent = animal.tag;
     document.getElementById('cardDob').textContent = animal.dob;
+    // --- NAPRAWA: Wyświetlanie daty ost. wycielenia i zacielenia ---
+if(document.getElementById('cardLastCalving')) {
+    document.getElementById('cardLastCalving').textContent = animal.lastCalving || '---';
+}
+if(document.getElementById('cardLastInsem')) {
+    document.getElementById('cardLastInsem').textContent = animal.lastInsemination || '---';
+}
+// -------------------------------------------------------------
     // --- MODUŁ 3: Sekcja Cielność ---
     const pregDiv = document.getElementById('cardPregnancyDetails');
     // UWAGA: Musisz dodać <div id="cardPregnancyDetails"></div> w swoim HTML w modalu karty!
