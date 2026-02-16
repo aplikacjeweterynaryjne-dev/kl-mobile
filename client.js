@@ -514,8 +514,11 @@ function getDetailedStatus(a) {
             db.collection('animals').doc(animal.id).update({ isPregnantConfirmed: true, usgStatus: 'positive' });
         }
 
-        // Automat Zasuszenie (jeśli minął termin końcowy z ustawień)
-        if (animal.isPregnantConfirmed && !animal.isDriedOff && daysToCalving < (userSettings.dry.end || 40)) {
+      // Automat Zasuszenie (POPRAWIONY: Wykonuje się dopiero, gdy minie 40 dni do porodu)
+        // Dzięki temu zadanie będzie widoczne w okresie 60-40 dni.
+        const dryDeadline = Math.min(userSettings.dry.start, userSettings.dry.end); // Wybiera mniejszą liczbę (40)
+
+        if (animal.isPregnantConfirmed && !animal.isDriedOff && daysToCalving < dryDeadline) {
             db.collection('animals').doc(animal.id).update({ isDriedOff: true });
         }
 
