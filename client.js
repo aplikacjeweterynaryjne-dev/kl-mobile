@@ -22,6 +22,7 @@ let currentTypeFilter = 'all';
 let currentCalDate = new Date(); 
 let currentEditingAnimalId = null;
 let activeHerdFilters = [];
+let selectedTaskIds = []; // Przechowuje zaznaczone zadania
 window.showAllTasks = false;
 // Ustawienia Domyślne
 const DEFAULT_SETTINGS = {
@@ -656,8 +657,31 @@ let filtered = allTasks.filter(t => {
         const estCalvStr = t.calvDate ? (new Date(t.calvDate).toLocaleDateString('pl-PL')) : '-';
         const dateColor = t.isReallyOverdue ? 'red' : (t.priority === 'urgent' ? '#e67e22' : '#333'); 
 
+        // Checkbox do masowego wyboru (po lewej)
+        const selectBox = `<input type="checkbox" class="mass-select-cb" 
+            style="margin-right: 10px; transform: scale(1.3);" 
+            value="${t.id}" 
+            onchange="toggleTaskSelection('${t.id}')"
+            ${selectedTaskIds.includes(t.id) ? 'checked' : ''}>`;
+
         div.innerHTML = `
-            <div style="flex: 1;">
+            <div style="display:flex; align-items:center;">
+                ${!t.isDone ? selectBox : ''} <div style="flex: 1;">
+                    <div style="font-size:15px; font-weight:bold; color:#333;">${t.title}</div>
+                    <div style="font-size: 11px; color: #777; margin: 4px 0; line-height: 1.4;">
+                        Termin: <b style="color:${dateColor}">${dueStr}</b><br>
+                        💉 Krycie: <b>${insemStr}</b> | 🍼 Przew. poród: <b>${estCalvStr}</b>
+                    </div>
+                    <div class="task-animal-tag" onclick="openAnimalCard('${t.animalId}')">${t.tag}</div>
+                </div>
+            </div>
+            <div class="task-check-wrapper">
+                ${t.isDone 
+                    ? `<button class="btn" style="padding:5px 10px; font-size:11px; background:#ddd;" onclick="undoTask('${t.logId}')">Cofnij</button>`
+                    : `<input type="checkbox" style="transform:scale(1.5); border: 2px solid #2980b9;" onclick="initiateTaskCompletion('${t.id}', '${t.type}', '${t.animalId}', '${t.dueDate.toISOString()}')">`
+                }
+            </div>
+        `;
                 <div style="font-size:15px; font-weight:bold; color:#333;">${t.title}</div>
                 <div style="font-size: 11px; color: #777; margin: 4px 0; line-height: 1.4;">
                     Termin: <b style="color:${dateColor}">${dueStr}</b><br>
@@ -693,40 +717,39 @@ let filtered = allTasks.filter(t => {
 function checkRuleAndAddTask(list, animal, rule, daysCounter, refDate, type, calvDate, isReverse = false) {
     if (!rule || !rule.enabled) return;
     
-    let isActive = false; 
-    let isOverdue = false;
+    // 1. Najpierw wyliczamy datę, żeby sprawdzić ID zadania
+    const minVal = Math.min(rule.start, rule.end);
+    const maxVal = Math.max(rule.start, rule.end);
     let dueDate = null;
-    
+    let isActive = false;
+    let isOverdue = false;
     const today = new Date();
     today.setHours(0,0,0,0);
 
-    // Używamy min/max, aby kolejność wpisania dni w ustawieniach (np. 40-60) nie miała znaczenia
-    const minVal = Math.min(rule.start, rule.end);
-    const maxVal = Math.max(rule.start, rule.end);
-
     if (isReverse) {
-        // --- LOGIKA WSTECZNA (Zasuszenie, Rovac itp.) ---
-        // Termin ostateczny to mniejsza liczba dni przed porodem (np. 40)
         dueDate = addDays(calvDate, -minVal); 
-        
-        // Aktywne gdy np. do porodu zostało 50 dni (mieści się między 40 a 60)
         if (daysCounter <= maxVal && daysCounter >= minVal) isActive = true;
         if (daysCounter < minVal) isOverdue = true;
-
     } else {
-        // --- LOGIKA W PRZÓD (USG, Ruja) ---
         dueDate = addDays(refDate, maxVal); 
-        
         if (daysCounter >= minVal && daysCounter <= maxVal) isActive = true;
         if (daysCounter > maxVal) isOverdue = true;
     }
 
+    // 2. Sprawdzamy czy zadanie zostało już wykonane (szukamy w logach)
+    const dateStr = dueDate.toISOString().split('T')[0];
+    const taskId = `${animal.id}_${type}_${dateStr}`;
+    const isAlreadyDone = completedTasks.some(t => t.taskId === taskId);
+
+    // 3. POPRAWKA LOGIKI:
+    // Blokujemy wyświetlanie "do zrobienia" jeśli krowa ma już status (np. isDriedOff), 
+    // ALE pozwalamy wyświetlić zadanie jeśli jest ono w "completedTasks" (żeby było w zakładce Wykonane).
+    if (isReverse && animal.isDriedOff && type === 'dry' && !isAlreadyDone) return;
+
+    // Reszta bez zmian
     const actualInsemDate = animal.lastInsemination ? new Date(animal.lastInsemination) : null;
 
-    // Blokada wyświetlania wykonanego zasuszenia
-    if (isReverse && animal.isDriedOff && type === 'dry') return;
-
-    if (isActive) {
+    if (isActive || isAlreadyDone) { // Dodano || isAlreadyDone, żeby wpadło do listy wykonanych
         addTask(list, animal, rule.label, dueDate, today, 'warning', type, actualInsemDate, calvDate, false);
     } else if (isOverdue) {
         const diffMs = today - dueDate;
@@ -951,6 +974,43 @@ function openAnimalCard(id) {
 
     document.getElementById('cardTag').textContent = animal.tag;
     document.getElementById('cardDob').textContent = animal.dob;
+    // --- MODUŁ 3: Sekcja Cielność ---
+    const pregDiv = document.getElementById('cardPregnancyDetails');
+    // UWAGA: Musisz dodać <div id="cardPregnancyDetails"></div> w swoim HTML w modalu karty!
+    // Jeśli nie masz dostępu do HTML, wstrzykniemy go dynamicznie poniżej:
+    
+    let targetContainer = document.getElementById('cardPregnancySectionJS');
+    if(!targetContainer) {
+        // Tworzymy kontener jeśli go nie ma (wstawiamy po dacie urodzenia)
+        targetContainer = document.createElement('div');
+        targetContainer.id = 'cardPregnancySectionJS';
+        targetContainer.style.cssText = "background: #e8f5e9; padding: 10px; border-radius: 5px; margin: 10px 0; border: 1px solid #c8e6c9;";
+        const dobEl = document.getElementById('cardDob').parentNode; // Zakładam że data ur jest w jakimś divie
+        dobEl.parentNode.insertBefore(targetContainer, dobEl.nextSibling);
+    }
+
+    if(animal.isPregnantConfirmed && animal.lastInsemination) {
+        const insemDate = new Date(animal.lastInsemination);
+        const gestDays = userSettings.gestation || 280;
+        const progCalving = addDays(insemDate, gestDays);
+        const daysToCalv = Math.floor((progCalving - new Date()) / (1000 * 60 * 60 * 24));
+
+        targetContainer.innerHTML = `
+            <h4 style="margin: 0 0 5px 0; color: #2e7d32;">🤰 Status: Cielna</h4>
+            <div style="font-size: 14px; display: grid; grid-template-columns: 1fr 1fr; gap: 5px;">
+                <div>📅 Krycie: <b>${animal.lastInsemination}</b></div>
+                <div>🧬 Buhaj: <b>${animal.semen || 'Nieznany'}</b></div>
+                <div style="grid-column: span 2; border-top: 1px dashed #aaa; padding-top: 5px; margin-top: 2px;">
+                    🍼 Termin wycielenia: <b>${progCalving.toLocaleDateString('pl-PL')}</b><br>
+                    <span style="font-size:12px; color: ${daysToCalv < 14 ? 'red' : '#555'}">(za ok. ${daysToCalv} dni)</span>
+                </div>
+            </div>
+        `;
+        targetContainer.style.display = 'block';
+    } else {
+        targetContainer.style.display = 'none'; // Ukryj jeśli nie jest cielna
+    }
+    // ---------------------------------
     // --- NOWA SEKCJA: RODZINA I POCHODZENIE ---
     
     // 1. Wyświetlanie Matki i Ojca (Pobieranie z bazy)
@@ -1567,17 +1627,20 @@ function renderHerdList() {
     const searchInput = document.getElementById('herdSearch');
     const search = searchInput ? searchInput.value.toLowerCase() : '';
 
-    // 2. OBLICZANIE LICZNIKÓW DLA PRZYCISKÓW (FILTRÓW)
-    const counts = { puste: 0, usg: 0, cielne: 0, jalowka: 0, krowa: 0, byk: 0 };
+   // 2. OBLICZANIE LICZNIKÓW DLA PRZYCISKÓW (FILTRÓW)
+    // DODANO: 'zasuszone' do obiektu counts
+    const counts = { puste: 0, usg: 0, cielne: 0, jalowka: 0, krowa: 0, byk: 0, zasuszone: 0 };
     
     myHerd.forEach(a => {
-        const s = getDetailedStatus(a); // Ta funkcja musi być dodana nad renderHerdList
+        const s = getDetailedStatus(a); 
         if (s.category === 'puste') counts.puste++;
         if (s.category === 'usg') counts.usg++;
         if (a.isPregnantConfirmed) counts.cielne++;
         if (a.type === 'jalowka') counts.jalowka++;
         if (a.type === 'krowa') counts.krowa++;
         if (a.type === 'byk') counts.byk++;
+        // DODANO: Zliczanie zasuszonych
+        if (a.isDriedOff) counts.zasuszone++;
     });
 
     // Wpisanie liczb do HTML (nawiasy w przyciskach)
@@ -1593,6 +1656,8 @@ function renderHerdList() {
             // Sprawdzamy kategorie statusów
             if (activeHerdFilters.includes('cielne') && a.isPregnantConfirmed) return true;
             if (activeHerdFilters.includes('puste') && s.category === 'puste') return true;
+            // DODANO: Obsługa filtra zasuszone
+            if (activeHerdFilters.includes('zasuszone') && a.isDriedOff) return true;
             if (activeHerdFilters.includes('usg') && s.category === 'usg') return true;
             // Sprawdzamy typy zwierząt
             if (activeHerdFilters.includes(a.type)) return true;
@@ -1667,7 +1732,68 @@ function renderHerdList() {
         list.appendChild(div);
     });
 }
+// --- MASOWE AKCJE ---
 
+function toggleTaskSelection(taskId) {
+    if (selectedTaskIds.includes(taskId)) {
+        selectedTaskIds = selectedTaskIds.filter(id => id !== taskId);
+    } else {
+        selectedTaskIds.push(taskId);
+    }
+    renderMassActionBar();
+}
+
+function renderMassActionBar() {
+    let bar = document.getElementById('massActionBar');
+    if (!bar) {
+        bar = document.createElement('div');
+        bar.id = 'massActionBar';
+        bar.style.cssText = "position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:#333; color:white; padding:15px 20px; border-radius:30px; display:none; align-items:center; gap:15px; z-index:9999; box-shadow: 0 5px 15px rgba(0,0,0,0.3);";
+        bar.innerHTML = `
+            <span id="massCount" style="font-weight:bold;">0 zaznaczonych</span>
+            <button onclick="executeMassTasks()" style="background:#4CAF50; border:none; color:white; padding:8px 15px; border-radius:20px; font-weight:bold; cursor:pointer;">✅ Zatwierdź wszystkie</button>
+            <button onclick="selectedTaskIds=[]; renderTasks(window.myAllTasksGlobal); renderMassActionBar();" style="background:#f44336; border:none; color:white; padding:8px 15px; border-radius:20px; cursor:pointer;">❌</button>
+        `;
+        document.body.appendChild(bar);
+    }
+
+    if (selectedTaskIds.length > 0) {
+        bar.style.display = 'flex';
+        document.getElementById('massCount').textContent = `${selectedTaskIds.length} zazn.`;
+    } else {
+        bar.style.display = 'none';
+    }
+}
+
+async function executeMassTasks() {
+    if (!confirm(`Czy na pewno chcesz potwierdzić wykonanie ${selectedTaskIds.length} zadań?`)) return;
+
+    // Pobieramy pełne obiekty zadań
+    const tasksToProcess = window.myAllTasksGlobal.filter(t => selectedTaskIds.includes(t.id));
+    
+    // Proste przetwarzanie sekwencyjne
+    for (const task of tasksToProcess) {
+        if (task.type === 'usg') {
+            // Dla USG masowo zakładamy, że są CIELNE (typowe działanie). 
+            // Jeśli pusta - użytkownik powinien odznaczyć ręcznie.
+            await db.collection('animals').doc(task.animalId).update({ isPregnantConfirmed: true, usgStatus: 'positive' });
+            saveTaskLog({ taskId: task.id, type: task.type, animalId: task.animalId }, "Pozytywny (Masowo)");
+        } 
+        else if (task.type === 'dry') {
+            await db.collection('animals').doc(task.animalId).update({ isDriedOff: true });
+            saveTaskLog({ taskId: task.id, type: task.type, animalId: task.animalId }, "Wykonano (Masowo)");
+        }
+        else {
+            // Inne (Rovac, Kexxtone itp.)
+            saveTaskLog({ taskId: task.id, type: task.type, animalId: task.animalId }, "Wykonano (Masowo)");
+        }
+    }
+
+    alert("Zadania wykonane!");
+    selectedTaskIds = [];
+    renderMassActionBar();
+    // Odświeżenie nastąpi automatycznie przez saveTaskLog -> generateAndRenderTasks
+}
 function renderLactationChart() {
     const canvas = document.getElementById('lactationChart');
     if (!canvas) return;
