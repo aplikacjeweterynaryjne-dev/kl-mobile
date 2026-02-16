@@ -618,12 +618,16 @@ let filtered = allTasks.filter(t => {
         }
         
         // 4. TEN MIESIĄC (wszystkie niezrobione, których termin przypada na obecny miesiąc)
+      // 4. TEN MIESIĄC
         if (currentTaskFilter === 'month') {
             const currentMonth = today.getMonth();
             const currentYear = today.getFullYear();
             const taskMonth = t.dueDate.getMonth();
             const taskYear = t.dueDate.getFullYear();
-            return !t.isDone && taskMonth === currentMonth && taskYear === currentYear;
+            
+            // Pokaż jeśli termin jest w tym miesiącu LUB jeśli zadanie jest już aktywne do zrobienia dzisiaj
+            const isThisMonth = (taskMonth === currentMonth && taskYear === currentYear);
+            return !t.isDone && (isThisMonth || !t.isReallyOverdue);
         }
 
         return true;
@@ -692,16 +696,16 @@ function checkRuleAndAddTask(list, animal, rule, daysCounter, refDate, type, cal
     const today = new Date();
     today.setHours(0,0,0,0);
 
-    if (isReverse) {
-        // --- ZASUSZENIE / ROVAC / KEXXTONE (liczymy wstecz od wycielenia) ---
-        // Termin ostateczny to koniec okienka (np. 40 dni przed porodem)
-        dueDate = addDays(calvDate, -rule.end); 
+  if (isReverse) {
+        // Poprawka: start to np. 60 dni przed, end to 40 dni przed. 
+        // isActive jest gdy daysCounter mieści się MIĘDZY nimi.
+        const minVal = Math.min(rule.start, rule.end);
+        const maxVal = Math.max(rule.start, rule.end);
         
-        // Aktywne (żółte): jesteśmy wewnątrz przedziału (np. między 60 a 40 dniem do porodu)
-        if (daysCounter <= rule.start && daysCounter >= rule.end) isActive = true;
+        dueDate = addDays(calvDate, -minVal); // Termin ostateczny to mniejsza liczba dni do porodu
         
-        // Przeterminowane (czerwone): czas na wykonanie minął (zostało mniej niż 40 dni do porodu)
-        if (daysCounter < rule.end) isOverdue = true;
+        if (daysCounter <= maxVal && daysCounter >= minVal) isActive = true;
+        if (daysCounter < minVal) isOverdue = true;
 
     } else {
         // --- USG / RUJA / SYNC / CUSTOM (liczymy w przód od krycia/wycielenia) ---
