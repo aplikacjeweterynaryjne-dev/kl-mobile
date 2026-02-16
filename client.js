@@ -1079,6 +1079,9 @@ function openAnimalCard(id) {
     document.getElementById('editLastCalving').value = animal.lastCalving || '';
     document.getElementById('editLastInsem').value = animal.lastInsemination || '';
     if(document.getElementById('editSemen')) document.getElementById('editSemen').value = animal.semen || '';
+    if(document.getElementById('editIsDriedOff')) {
+    document.getElementById('editIsDriedOff').checked = animal.isDriedOff || false;
+}
     let statusVal = 'unknown';
     if (animal.isPregnantConfirmed) statusVal = 'pregnant';
     else if (animal.usgStatus === 'negative') statusVal = 'negative';
@@ -1152,6 +1155,7 @@ function saveAnimalChanges() {
     const motherTag = document.getElementById('editMother').value || '';
     const fatherSemen = document.getElementById('editFather').value || '';
     const lastSemen = document.getElementById('editSemen')?.value || '';
+    const isDriedOffManual = document.getElementById('editIsDriedOff') ? document.getElementById('editIsDriedOff').checked : false;
     // Logika statusu cielności (Twoja oryginalna)
     let isPreg = false;
     let usg = 'pending';
