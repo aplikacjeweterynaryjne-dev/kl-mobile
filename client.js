@@ -1115,14 +1115,29 @@ function openAnimalCard(id) {
     }
     document.getElementById('cardDimStat').innerHTML = `DIM: <b>${cowDim}</b> (Śr. stada: ${avgDim})`;
 
-    document.getElementById('editTag').value = animal.tag;
+ document.getElementById('editTag').value = animal.tag;
     document.getElementById('editDob').value = animal.dob;
+
+    // --- POPRAWKA: Lokalizacja (czyści pole, żeby nie było starej wartości) ---
+    document.getElementById('editLocation').value = animal.location || '';
+    // ------------------------------------------------------------------------
+
+    // Warto też dodać resetowanie pól rodziców (dla pewności):
+    document.getElementById('editMother').value = animal.motherTag || '';
+    document.getElementById('editFather').value = animal.fatherSemen || '';
+
     document.getElementById('editLastCalving').value = animal.lastCalving || '';
     document.getElementById('editLastInsem').value = animal.lastInsemination || '';
-    if(document.getElementById('editSemen')) document.getElementById('editSemen').value = animal.semen || '';
+
+    // Obsługa pola nasienia
+    if(document.getElementById('editSemen')) {
+        document.getElementById('editSemen').value = animal.semen || '';
+    }
+
+    // Obsługa checkboxa zasuszenia
     if(document.getElementById('editIsDriedOff')) {
-    document.getElementById('editIsDriedOff').checked = animal.isDriedOff || false;
-}
+        document.getElementById('editIsDriedOff').checked = animal.isDriedOff || false;
+    }
     let statusVal = 'unknown';
     if (animal.isPregnantConfirmed) statusVal = 'pregnant';
     else if (animal.usgStatus === 'negative') statusVal = 'negative';
