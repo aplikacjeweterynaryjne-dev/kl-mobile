@@ -498,35 +498,38 @@ function getDetailedStatus(a) {
     let generatedTasks = [];
 
     myHerd.forEach(animal => {
-        // 1. USTALANIE DATY WYCIELENIA (Baza dla zasuszenia)
+        // 1. USTALANIE DATY WYCIELENIA (Baza dla zasuszenia i profilaktyki)
         const insDate = animal.lastInsemination ? new Date(animal.lastInsemination) : null;
         
-        // Przewidywane wycielenie: najpierw patrzymy na inseminację, 
-        // a jeśli jej nie ma, szukamy innej logiki daty (np. ręcznej)
+        // Wyliczamy przewidywany poród na podstawie ostatniego krycia
         let calvingDate = insDate ? addDays(insDate, userSettings.gestation || 280) : null;
 
         const daysSinceInsem = insDate ? Math.floor((today - insDate) / (1000 * 60 * 60 * 24)) : 0;
         const daysToCalving = calvingDate ? Math.floor((calvingDate - today) / (1000 * 60 * 60 * 24)) : 999;
 
-        // 2. AUTOMATYKA STATUSÓW
+        // 2. AUTOMATYKA STATUSÓW (Zmieniają bazę danych)
+        
+        // Automat USG -> Cielna
         if (animal.usgStatus === 'pending' && daysSinceInsem > (userSettings.usg.end || 60)) {
             db.collection('animals').doc(animal.id).update({ isPregnantConfirmed: true, usgStatus: 'positive' });
         }
 
+        // Automat Zasuszenie (jeśli minął termin końcowy z ustawień)
         if (animal.isPregnantConfirmed && !animal.isDriedOff && daysToCalving < (userSettings.dry.end || 40)) {
             db.collection('animals').doc(animal.id).update({ isDriedOff: true });
         }
 
-        if (animal.isPregnantConfirmed && daysToCalving < -7) {
+        // Automat Wycielenie (7 dni po terminie)
+        if (animal.isPregnantConfirmed && calvingDate && daysToCalving < -7) {
             const taskId = `${animal.id}_calving_${calvingDate.toISOString().split('T')[0]}`;
             if (!completedTasks.some(t => t.taskId === taskId)) {
                 confirmTaskCalving({ animalId: animal.id, taskId: taskId }, calvingDate, true);
             }
         }
 
-        // 3. GENEROWANIE ZADAŃ
+        // 3. GENEROWANIE ZADAŃ WIZUALNYCH
 
-        // --- SYNCHRONIZACJA (dla krów pustych) ---
+        // --- SYNCHRONIZACJA (Tylko dla krów pustych) ---
         if (animal.type === 'krowa' && animal.lastCalving) {
             const lastCalv = new Date(animal.lastCalving);
             const dim = Math.floor((today - lastCalv) / (1000 * 60 * 60 * 24));
@@ -535,38 +538,39 @@ function getDetailedStatus(a) {
             }
         }
 
-        // KLUCZOWE: Dla zasuszenia musimy "przepuścić" cielne krowy, nawet jeśli nie mają insDate (jeśli mają calvingDate)
-        // ZAMIEŃ NA TO:
-if (!calvingDate && !insDate) return; 
-// Blokada: Tylko jeśli krowa jest naprawdę PUSTA (status negative i brak potwierdzenia), 
-// to nie pokazuj zadań zasuszenia. 
-if (animal.usgStatus === 'negative' && !animal.isPregnantConfirmed) return;
-// Dodatkowa blokada bezpieczeństwa: jeśli krowa nie ma potwierdzonej cielności 
-// I nie jest w fazie "Do badania USG", a minęło dużo czasu, to nie zasuszaj "w ciemno".
-if (!animal.isPregnantConfirmed && daysSinceInsem > 150 && animal.usgStatus !== 'positive') return;
+        // --- FILTR PRZEJŚCIA ---
+        // Przerywamy tylko jeśli krowa jest POTWIERDZONA jako pusta po USG
+        if (animal.usgStatus === 'negative' && !animal.isPregnantConfirmed) return;
+        // Przerywamy jeśli brak jakiejkolwiek daty do wyliczeń
+        if (!calvingDate && !insDate) return;
 
-        // USG I RUJA
+        // --- USG I RUJA (Tylko dla krów NIEPOTWIERDZONYCH) ---
         if (!animal.isPregnantConfirmed && insDate) {
             checkRuleAndAddTask(generatedTasks, animal, userSettings.usg, daysSinceInsem, insDate, 'usg', calvingDate);
             checkRuleAndAddTask(generatedTasks, animal, userSettings.heat, daysSinceInsem, insDate, 'heat', calvingDate);
         }
 
-        // ZASUSZENIE / ROVAC / KEXXTONE
+        // --- ZASUSZENIE / ROVAC / KEXXTONE (Dla WSZYSTKICH z datą wycielenia) ---
         if (calvingDate) {
+            // Zasuszenie tylko dla krów
             if (animal.type === 'krowa') {
                 checkRuleAndAddTask(generatedTasks, animal, userSettings.dry, daysToCalving, calvingDate, 'dry', calvingDate, true);
             }
+            // Profilaktyka dla krów i jałówek
             checkRuleAndAddTask(generatedTasks, animal, userSettings.rovac, daysToCalving, calvingDate, 'rovac', calvingDate, true);
             checkRuleAndAddTask(generatedTasks, animal, userSettings.kexxtone, daysToCalving, calvingDate, 'kexxtone', calvingDate, true);
         }
 
-        // ZADANIA WŁASNE
+        // --- ZADANIA WŁASNE ---
         userSettings.customRules.forEach((rule, idx) => {
-            if (rule.base === 'insem' && insDate) checkRuleAndAddTask(generatedTasks, animal, rule, daysSinceInsem, insDate, `custom_${idx}`, calvingDate);
-            else if (calvingDate) checkRuleAndAddTask(generatedTasks, animal, rule, daysToCalving, calvingDate, `custom_${idx}`, calvingDate, true);
+            if (rule.base === 'insem' && insDate) {
+                checkRuleAndAddTask(generatedTasks, animal, rule, daysSinceInsem, insDate, `custom_${idx}`, calvingDate);
+            } else if (calvingDate) {
+                checkRuleAndAddTask(generatedTasks, animal, rule, daysToCalving, calvingDate, `custom_${idx}`, calvingDate, true);
+            }
         });
 
-        // WIZUALNE WYCIELENIE
+        // --- WIZUALNE SPODZIEWANE WYCIELENIE ---
         if (calvingDate && daysToCalving <= 14 && daysToCalving >= -7) {
             const calvTaskId = `${animal.id}_calving_${calvingDate.toISOString().split('T')[0]}`;
             if (!completedTasks.some(t => t.taskId === calvTaskId)) {
