@@ -536,8 +536,14 @@ function getDetailedStatus(a) {
         }
 
         // KLUCZOWE: Dla zasuszenia musimy "przepuścić" cielne krowy, nawet jeśli nie mają insDate (jeśli mają calvingDate)
-        if (!calvingDate && !insDate) return; 
-        if (animal.usgStatus === 'negative' && !animal.isPregnantConfirmed) return;
+        // ZAMIEŃ NA TO:
+if (!calvingDate && !insDate) return; 
+// Blokada: Tylko jeśli krowa jest naprawdę PUSTA (status negative i brak potwierdzenia), 
+// to nie pokazuj zadań zasuszenia. 
+if (animal.usgStatus === 'negative' && !animal.isPregnantConfirmed) return;
+// Dodatkowa blokada bezpieczeństwa: jeśli krowa nie ma potwierdzonej cielności 
+// I nie jest w fazie "Do badania USG", a minęło dużo czasu, to nie zasuszaj "w ciemno".
+if (!animal.isPregnantConfirmed && daysSinceInsem > 150 && animal.usgStatus !== 'positive') return;
 
         // USG I RUJA
         if (!animal.isPregnantConfirmed && insDate) {
