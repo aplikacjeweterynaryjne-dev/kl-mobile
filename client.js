@@ -492,10 +492,6 @@ function getDetailedStatus(a) {
 
 // --- SILNIK ZADAŃ I LOGIKA STADA (WERSJA OSTATECZNA Z POPRAWKAMI) ---
 
-function generateAndRenderTasks() {
-    const today = new Date();
-    today.setHours(0,0,0,0);
-    let generatedTasks = [];
     function generateAndRenderTasks() {
     const today = new Date();
     today.setHours(0,0,0,0);
