@@ -1718,14 +1718,29 @@ function renderHerdList() {
     }
 
     // 4. SORTOWANIE DOMYŚLNE (Hierarchia ważności)
+    // 4. SORTOWANIE (Nowa logika wg Twojego życzenia)
     filtered.sort((a, b) => {
         const getPriority = (x) => {
             const s = getDetailedStatus(x);
-            if (s.category === 'usg') return 1;           // Najpierw te do badania
-            if (s.category === 'puste') return 2;         // Potem puste (w tym alarmowe)
-            if (x.isPregnantConfirmed) return 3;         // Potem cielne
-            if (x.type === 'jalowka' && !x.lastInsemination) return 4;
-            return 5;                                    // Reszta (byki itp.)
+            
+            // 1. Puste (Najwyższy priorytet - trzeba zacielić)
+            if (s.category === 'puste') return 1;
+
+            // 2. Zacielone, ale za wcześnie na USG (Kategoria 'inne' z datą krycia)
+            // To są te z licznikiem "Do USG za X dni"
+            if (s.category === 'inne' && x.lastInsemination) return 2;
+
+            // 3. Kwalifikujące się do badania (Do USG - pomarańczowe)
+            if (s.category === 'usg') return 3;
+
+            // 4. Cielne potwierdzone (ale jeszcze nie zasuszone - w laktacji)
+            if (x.isPregnantConfirmed && !x.isDriedOff) return 4;
+
+            // 5. Zasuszone (Na samym końcu - krowy "odpoczywające")
+            if (x.isDriedOff || s.category === 'zasuszone') return 5;
+
+            // 6. Reszta (np. Byki, nieokreślone)
+            return 6;
         };
         return getPriority(a) - getPriority(b);
     });
