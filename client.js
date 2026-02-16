@@ -593,8 +593,9 @@ function renderTasks(allTasks) {
     if (!container) return;
     container.innerHTML = '';
     const today = new Date(); today.setHours(0,0,0,0);
-    const limitDate = addDays(today, -14); 
-let filtered = allTasks.filter(t => {
+    
+    // Filtrowanie zadań
+    let filtered = allTasks.filter(t => {
         const today = new Date();
         today.setHours(0,0,0,0);
         
@@ -602,35 +603,25 @@ let filtered = allTasks.filter(t => {
         const diffMs = today - t.dueDate;
         const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
-        // --- PUNKT 9: Automatyczne usuwanie ---
-        // Jeśli zadanie jest przeterminowane (niezrobione i isReallyOverdue) 
-        // i minęło więcej niż 14 dni od terminu -> usuwamy z widoku
+        // Automatyczne usuwanie starych zadań (powyżej 14 dni po terminie)
         if (!t.isDone && t.isReallyOverdue && diffDays > 14) return false;
 
         // --- FILTROWANIE ZAKŁADEK ---
-        
-        // 1. ZROBIONE
         if (currentTaskFilter === 'done') return t.isDone;
         
-        // 2. DO ZROBIENIA (tylko te w oknie czasowym, jeszcze nie "czerwone")
         if (currentTaskFilter === 'todo') {
             return !t.isDone && !t.isReallyOverdue;
         }
         
-        // 3. PRZETERMINOWANE (tylko te, które już "uciekły" poza przedział)
         if (currentTaskFilter === 'overdue') {
             return !t.isDone && t.isReallyOverdue;
         }
         
-        // 4. TEN MIESIĄC (wszystkie niezrobione, których termin przypada na obecny miesiąc)
-      // 4. TEN MIESIĄC
         if (currentTaskFilter === 'month') {
             const currentMonth = today.getMonth();
             const currentYear = today.getFullYear();
             const taskMonth = t.dueDate.getMonth();
             const taskYear = t.dueDate.getFullYear();
-            
-            // Pokaż jeśli termin jest w tym miesiącu LUB jeśli zadanie jest już aktywne do zrobienia dzisiaj
             const isThisMonth = (taskMonth === currentMonth && taskYear === currentYear);
             return !t.isDone && (isThisMonth || !t.isReallyOverdue);
         }
@@ -638,16 +629,20 @@ let filtered = allTasks.filter(t => {
         return true;
     });
 
+    // Filtrowanie po typie (chipy na górze)
     if (currentTypeFilter !== 'all') {
         filtered = filtered.filter(t => t.type === currentTypeFilter);
     }
 
     filtered.sort((a, b) => a.dueDate - b.dueDate);
 
+    // Obsługa limitu 5 zadań dla widoku "Do zrobienia"
     const LIMIT = 5;
     const showAll = window.showAllTasks || false;
-    const visibleTasks = showAll ? filtered : filtered.slice(0, LIMIT);
+    // Limitujemy tylko w zakładce 'todo' jeśli nie kliknięto "Pokaż wszystkie"
+    const visibleTasks = (currentTaskFilter === 'todo' && !showAll) ? filtered.slice(0, LIMIT) : filtered;
 
+    // Renderowanie kafelków
     visibleTasks.forEach(t => {
         const div = document.createElement('div');
         div.className = `task-item ${t.priority} ${t.isDone ? 'done' : ''}`;
@@ -666,7 +661,8 @@ let filtered = allTasks.filter(t => {
 
         div.innerHTML = `
             <div style="display:flex; align-items:center;">
-                ${!t.isDone ? selectBox : ''} <div style="flex: 1;">
+                ${!t.isDone ? selectBox : ''} 
+                <div style="flex: 1;">
                     <div style="font-size:15px; font-weight:bold; color:#333;">${t.title}</div>
                     <div style="font-size: 11px; color: #777; margin: 4px 0; line-height: 1.4;">
                         Termin: <b style="color:${dateColor}">${dueStr}</b><br>
@@ -682,24 +678,11 @@ let filtered = allTasks.filter(t => {
                 }
             </div>
         `;
-                <div style="font-size:15px; font-weight:bold; color:#333;">${t.title}</div>
-                <div style="font-size: 11px; color: #777; margin: 4px 0; line-height: 1.4;">
-                    Termin: <b style="color:${dateColor}">${dueStr}</b><br>
-                    💉 Krycie: <b>${insemStr}</b> | 🍼 Przew. poród: <b>${estCalvStr}</b>
-                </div>
-                <div class="task-animal-tag" onclick="openAnimalCard('${t.animalId}')">${t.tag}</div>
-            </div>
-            <div class="task-check-wrapper">
-                ${t.isDone 
-                    ? `<button class="btn" style="padding:5px 10px; font-size:11px; background:#ddd;" onclick="undoTask('${t.logId}')">Cofnij</button>`
-                    : `<input type="checkbox" style="transform:scale(1.5);" onclick="initiateTaskCompletion('${t.id}', '${t.type}', '${t.animalId}', '${t.dueDate.toISOString()}')">`
-                }
-            </div>
-        `;
         container.appendChild(div);
     });
 
-    if (filtered.length > LIMIT) {
+    // Przycisk "Pokaż wszystkie" tylko dla zakładki 'todo'
+    if (currentTaskFilter === 'todo' && filtered.length > LIMIT) {
         const btnRow = document.createElement('div');
         btnRow.style.textAlign = 'center';
         const btnLabel = showAll ? "ZWIŃ LISTĘ" : `POKAŻ WSZYSTKIE (${filtered.length})`;
