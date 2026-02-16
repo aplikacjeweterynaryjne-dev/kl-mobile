@@ -468,13 +468,29 @@ function getDetailedStatus(a) {
     if (a.isPregnantConfirmed) return { text: '✅ Cielna', color: 'green', category: 'cielne' };
     
     // 2. Zasuszona
-    if (a.isDriedOff) return { text: '❄️ Zasuszona', color: '#7f8c8d', category: 'inne' };
+    if (a.isDriedOff) return { text: '❄️ Zasuszona', color: '#7f8c8d', category: 'zasuszone' };
 
     // 3. Logika po inseminacji (ale jeszcze nie potwierdzona)
     if (insDate) {
         const diffInsem = Math.floor((today - insDate) / (1000 * 60 * 60 * 24));
+        
+        // Jeśli już badana i wyszła negatywnie
         if (a.usgStatus === 'negative') return { text: '❌ Pusta (po USG)', color: '#c0392b', category: 'puste' };
-        if (diffInsem < 30) return { text: '⏳ Za wcześnie na USG', color: '#9b59b6', category: 'inne' };
+
+        // --- NOWA LOGIKA: ODLICZANIE DO USG ---
+        // Pobieramy dzień startu badania z ustawień (lub domyślnie 40, jeśli brak ustawień)
+        const usgStart = (userSettings && userSettings.usg) ? Math.min(userSettings.usg.start, userSettings.usg.end) : 40;
+
+        // Jeśli minęło mniej dni niż wymaga termin badania:
+        if (diffInsem < usgStart) {
+            const daysLeft = usgStart - diffInsem;
+            // Kategoria 'inne' sprawia, że NIE wlicza się do licznika "Do USG" (czerwonego), 
+            // ale widać status na liście ogólnej.
+            return { text: `⏳ Do USG za ${daysLeft} dni`, color: '#9b59b6', category: 'inne' };
+        }
+        // --------------------------------------
+
+        // Jeśli termin minął -> krowa gotowa do badania
         return { text: '❓ Do badania USG', color: '#f39c12', category: 'usg' };
     }
 
