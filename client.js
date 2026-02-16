@@ -689,54 +689,45 @@ let filtered = allTasks.filter(t => {
 function checkRuleAndAddTask(list, animal, rule, daysCounter, refDate, type, calvDate, isReverse = false) {
     if (!rule || !rule.enabled) return;
     
-    let isActive = false;     // Wpadnie do "Do zrobienia" (żółte)
-    let isOverdue = false;    // Wpadnie do "Przeterminowane" (czerwone)
+    let isActive = false; 
+    let isOverdue = false;
     let dueDate = null;
     
     const today = new Date();
     today.setHours(0,0,0,0);
 
-  if (isReverse) {
-        // Poprawka: start to np. 60 dni przed, end to 40 dni przed. 
-        // isActive jest gdy daysCounter mieści się MIĘDZY nimi.
-        const minVal = Math.min(rule.start, rule.end);
-        const maxVal = Math.max(rule.start, rule.end);
+    // Używamy min/max, aby kolejność wpisania dni w ustawieniach (np. 40-60) nie miała znaczenia
+    const minVal = Math.min(rule.start, rule.end);
+    const maxVal = Math.max(rule.start, rule.end);
+
+    if (isReverse) {
+        // --- LOGIKA WSTECZNA (Zasuszenie, Rovac itp.) ---
+        // Termin ostateczny to mniejsza liczba dni przed porodem (np. 40)
+        dueDate = addDays(calvDate, -minVal); 
         
-        dueDate = addDays(calvDate, -minVal); // Termin ostateczny to mniejsza liczba dni do porodu
-        
+        // Aktywne gdy np. do porodu zostało 50 dni (mieści się między 40 a 60)
         if (daysCounter <= maxVal && daysCounter >= minVal) isActive = true;
         if (daysCounter < minVal) isOverdue = true;
 
     } else {
-        // --- USG / RUJA / SYNC / CUSTOM (liczymy w przód od krycia/wycielenia) ---
-        // Termin ostateczny to koniec okienka (np. 60 dni po kryciu dla USG)
-        dueDate = addDays(refDate, rule.end); 
+        // --- LOGIKA W PRZÓD (USG, Ruja) ---
+        dueDate = addDays(refDate, maxVal); 
         
-        // Aktywne (żółte): jesteśmy wewnątrz przedziału (np. 30-60 dni po kryciu)
-        if (daysCounter >= rule.start && daysCounter <= rule.end) isActive = true;
-        
-        // Przeterminowane (czerwone): przekroczyliśmy koniec okienka (powyżej 60 dni)
-        if (daysCounter > rule.end) isOverdue = true;
+        if (daysCounter >= minVal && daysCounter <= maxVal) isActive = true;
+        if (daysCounter > maxVal) isOverdue = true;
     }
 
-    // --- FILTRACJA I DODAWANIE DO LISTY ---
-    
-    // Pobieramy datę krycia dla widoku zadania
     const actualInsemDate = animal.lastInsemination ? new Date(animal.lastInsemination) : null;
 
-    // Blokada dla krów już zasuszonych (nie wyświetlamy im zadań okołoporodowych, które już wykonano)
-    if (isReverse && animal.isDriedOff && ['dry', 'rovac', 'kexxtone'].includes(type)) return;
+    // Blokada wyświetlania wykonanego zasuszenia
+    if (isReverse && animal.isDriedOff && type === 'dry') return;
 
     if (isActive) {
-        // Dodaj jako "Do zrobienia" (warning/żółte)
         addTask(list, animal, rule.label, dueDate, today, 'warning', type, actualInsemDate, calvDate, false);
     } else if (isOverdue) {
-        // Sprawdzamy punkt 9: Czy zadanie nie jest starsze niż 14 dni?
         const diffMs = today - dueDate;
         const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-        
         if (diffDays <= 14) {
-            // Dodaj jako "Przeterminowane" (urgent/czerwone)
             addTask(list, animal, rule.label, dueDate, today, 'urgent', type, actualInsemDate, calvDate, true);
         }
     }
