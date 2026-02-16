@@ -895,12 +895,16 @@ function confirmTaskCalving(taskData, calvingDate, isAuto) {
 
     db.collection('animals').doc(taskData.animalId).update({
         lastCalving: dateStr,
-        historyCalving: historyCalving, // ZAPISUJEMY HISTORIĘ
+        historyCalving: historyCalving, 
         lastInsemination: null,
         semen: null,
         isPregnantConfirmed: false,
         usgStatus: 'pending',
-        type: 'krowa'
+        type: 'krowa',
+        
+        // --- TO JEST NOWA LINIA, KTÓRA RESETUJE ZASUSZENIE ---
+        isDriedOff: false 
+        // -----------------------------------------------------
     });
 }
 
