@@ -918,10 +918,37 @@ function saveTaskLog(taskData, result) {
 }
 
 function undoTask(logId) {
-    if(confirm("Cofnąć?")) {
-        completedTasks = completedTasks.filter(t => t.logId !== logId);
-        generateAndRenderTasks();
-        if (!logId.startsWith('temp_')) db.collection('task_logs').doc(logId).delete();
+    if(!confirm("Cofnąć wykonanie zadania?")) return;
+    
+    // 1. Znajdujemy log w pamięci lokalnej, ZANIM go usuniemy
+    // Musimy wiedzieć, jakiego zwierzęcia dotyczyło to zadanie
+    const taskLog = completedTasks.find(t => t.logId === logId);
+    
+    // 2. Usuwamy z lokalnej tablicy (żeby zniknęło z ekranu)
+    completedTasks = completedTasks.filter(t => t.logId !== logId);
+    generateAndRenderTasks(); // Odświeżamy widok
+
+    // 3. Usuwamy trwale z bazy danych (kolekcja logów)
+    if (!logId.startsWith('temp_')) {
+        db.collection('task_logs').doc(logId).delete();
+    }
+
+    // 4. NAPRAWIAMY STATUS ZWIERZĘCIA (To jest kluczowa nowość)
+    if (taskLog && taskLog.animalId) {
+        
+        // Jeśli cofamy ZASUSZENIE -> odznaczamy 'isDriedOff' w bazie
+        if (taskLog.taskType === 'dry') {
+            db.collection('animals').doc(taskLog.animalId).update({ isDriedOff: false })
+              .then(() => console.log("Cofnięto status zasuszenia w bazie."));
+        }
+
+        // Jeśli cofamy USG (które było pozytywne) -> odznaczamy cielność
+        if (taskLog.taskType === 'usg' && taskLog.result === 'Pozytywny') {
+             db.collection('animals').doc(taskLog.animalId).update({ 
+                 isPregnantConfirmed: false, 
+                 usgStatus: 'pending' // Ustawiamy na 'oczekujący', żeby znów wpadła do badania
+             }).then(() => console.log("Cofnięto potwierdzenie cielności."));
+        }
     }
 }
 
