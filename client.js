@@ -766,15 +766,14 @@ function renderTaskTypeChips(allTasks) {
     const container = document.getElementById('taskTypeChips');
     if (!container) return;
     container.innerHTML = '';
-    const counts = {}; const types = new Set(['all']);
+    const counts = {}; 
+    const types = new Set(['all']);
     const today = new Date(); today.setHours(0,0,0,0);
     const limitDate = addDays(today, -14);
 
     allTasks.forEach(t => {
-        if (t.dueDate < limitDate && (t.isDone || t.isReallyOverdue) && t.type !== 'calving') return;
-
-      let visibleInTab = false;
-        // Licznik musi idealnie pokrywać się z tym, co filtruje renderTasks:
+        // Logika widoczności taka sama jak w renderTasks
+        let visibleInTab = false;
         if (currentTaskFilter === 'todo' && !t.isDone && !t.isReallyOverdue) visibleInTab = true;
         else if (currentTaskFilter === 'overdue' && !t.isDone && t.isReallyOverdue) visibleInTab = true;
         else if (currentTaskFilter === 'done' && t.isDone) visibleInTab = true;
@@ -787,10 +786,24 @@ function renderTaskTypeChips(allTasks) {
     });
 
     const labels = { 'all': 'Wszystkie', 'usg': 'USG', 'heat': 'Ruja', 'dry': 'Zasuszenie', 'rovac': 'Rovac', 'kexxtone': 'Kexxtone', 'calving': 'Wycielenia', 'sync': 'Synchronizacja' };
+    
     Array.from(types).forEach(type => {
-        let label = labels[type] || type;
+        let label = labels[type];
+        
+        // --- POPRAWKA: Pobieranie nazwy dla zadań własnych ---
+        if (!label && type.startsWith('custom_')) {
+            const idx = parseInt(type.split('_')[1]);
+            if (userSettings.customRules && userSettings.customRules[idx]) {
+                label = userSettings.customRules[idx].label;
+            }
+        }
+        // Fallback, gdyby coś poszło nie tak
+        if (!label) label = type; 
+        // -----------------------------------------------------
+
         const count = counts[type] || 0;
         const finalLabel = (type === 'all') ? label : `${label} (${count})`;
+        
         const btn = document.createElement('button');
         btn.className = `filter-chip ${currentTypeFilter === type ? 'active' : ''}`;
         btn.textContent = finalLabel;
