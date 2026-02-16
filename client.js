@@ -627,13 +627,16 @@ function renderTasks(allTasks) {
             return !t.isDone && t.isReallyOverdue;
         }
         
+     // 4. TEN MIESIĄC (Wersja Poprawiona - Sztywna)
         if (currentTaskFilter === 'month') {
             const currentMonth = today.getMonth();
             const currentYear = today.getFullYear();
             const taskMonth = t.dueDate.getMonth();
             const taskYear = t.dueDate.getFullYear();
+            
+            // Pokaż TYLKO jeśli termin (dueDate) wypada w bieżącym miesiącu kalendarzowym
             const isThisMonth = (taskMonth === currentMonth && taskYear === currentYear);
-            return !t.isDone && (isThisMonth || !t.isReallyOverdue);
+            return !t.isDone && isThisMonth;
         }
 
         return true;
