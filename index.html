@@ -2427,45 +2427,36 @@ tr.filled-row td {
 }
 /* --- POPRAWIONE STYLE DLA ZNACZNIKÓW ROZLICZENIA --- */
 
-/* Dzień rozliczony */
+/* Styl dla dnia, który jest ROZLICZONY (Zielone tło) */
 .day-cell.is-settled {
-    background-color: #d4edda !important; 
-    border: 1px solid #155724 !important;
+    background-color: #d4edda !important; /* Jasna zieleń */
+    border: 1px solid #155724 !important; /* Ciemniejsza ramka */
+    position: relative;
 }
 
-/* Przycisk "Ptaszek" - ZWIĘKSZONY OBSZAR KLIKNIĘCIA */
-.settlement-toggle-btn {
+/* Dodajemy mały znaczek "✔" w tle, żeby było wiadomo dlaczego jest zielone */
+.day-cell.is-settled::after {
+    content: '✔';
     position: absolute;
-    top: 0;
-    right: 0;
-    width: 35px; /* Szeroki obszar kliknięcia w rogu */
-    height: 35px; /* Wysoki obszar kliknięcia */
-    display: flex;
-    justify-content: flex-end; /* Wyrównaj ikonę do prawej */
-    align-items: flex-start;   /* Wyrównaj ikonę do góry */
-    padding: 4px; /* Odstęp wizualny ikony od krawędzi */
-    
-    cursor: pointer;
-    font-size: 18px; /* Większa ikona */
+    top: 2px;
+    right: 4px;
+    font-size: 14px;
+    color: #155724;
     font-weight: bold;
-    color: #aaa; /* Domyślny szary */
-    z-index: 20; /* ⚠️ Musi być wyższy niż cokolwiek innego w komórce */
-    
-    /* Zapobieganie zaznaczaniu tekstu przy szybkim klikaniu */
-    user-select: none; 
-    -webkit-user-select: none;
+    opacity: 0.6;
 }
 
-/* Efekt po najechaniu na sam przycisk (nie na cały dzień) */
-.settlement-toggle-btn:hover {
-    color: #6A994E; /* Podświetlenie na zielono przed kliknięciem */
-    transform: scale(1.2);
+/* Zapobiegamy zaznaczaniu tekstu podczas przytrzymywania */
+.day-cell {
+    user-select: none;
+    -webkit-user-select: none; /* Safari/Mobile */
+    transition: background-color 0.2s;
 }
 
-/* Wygląd aktywnego ptaszka */
-.day-cell.is-settled .settlement-toggle-btn {
-    color: #155724; /* Ciemna zieleń */
-    opacity: 1;
+/* Efekt wizualny podczas trzymania (opcjonalny, daje feedback) */
+.day-cell:active {
+    background-color: #f0f0f0;
+    transform: scale(0.98);
 }
 </style>
     <div id="calcProductSearchModal" class="product-search-modal" style="display: none; z-index: 10003;">
@@ -13076,7 +13067,7 @@ try {
                       const traceData = {
                           ...originalDataObj, 
                           // ⬇️ TU JEST ZMIANA: \n oznacza przejście do nowej linii
-                          status: `Dług \n, data spłaty: ${dateStringPL}`, 
+                          status: `Dług \ndata spłaty: ${dateStringPL}`, 
                           // Nadpisujemy timestamp utworzenia, żeby baza wiedziała kiedy powstał ten ślad
                           createdAt: firebase.firestore.FieldValue.serverTimestamp() 
                       };
@@ -15650,8 +15641,8 @@ function renderTodayView(visits, dateToShow) {
         todayVisitList.appendChild(visitDiv);
     });
 }
-    // Renderuje widok Miesiąca
    // Renderuje widok Miesiąca (ZMODYFIKOWANA O ZNACZNIKI ROZLICZEŃ)
+// Renderuje widok Miesiąca (ZMODYFIKOWANA O LONG PRESS)
     async function renderMonthView(visits, date) {
         monthGridBody.innerHTML = ''; // Wyczyść
         const year = date.getFullYear();
@@ -15659,24 +15650,18 @@ function renderTodayView(visits, dateToShow) {
         monthViewTitle.textContent = date.toLocaleDateString('pl-PL', { month: 'long', year: 'numeric' });
 
         // --- 1. PRZYGOTOWANIE DANYCH ROZLICZEŃ ---
-        // Sprawdź kogo wyświetlamy
         const targetUid = calendarUserSelect.value;
         let settledDaysSet = new Set();
 
         // Jeśli wybrano konkretnego użytkownika (nie "ALL"), pobierz jego znaczniki
         if (targetUid && targetUid !== "ALL") {
             try {
-                // Budujemy ID miesiąca np. "2025-11"
                 const monthStr = `${year}-${String(month + 1).padStart(2, '0')}`;
-                
-                // Pobieramy kolekcję znaczników
                 const q = db.collection("kalendarz_rozliczenia")
                             .where("uid", "==", targetUid)
                             .where("miesiac", "==", monthStr);
-                
                 const snap = await q.get();
                 snap.forEach(doc => {
-                    // Dokument zawiera pole 'dzien' (np. "2025-11-15")
                     settledDaysSet.add(doc.data().data); 
                 });
             } catch (e) {
@@ -15717,18 +15702,13 @@ function renderTodayView(visits, dateToShow) {
             const todayISO = new Date().toISOString().split('T')[0];
             if (dayString === todayISO) cell.classList.add('is-today');
 
-            // --- ✅ SPRAWDŹ CZY DZIEŃ JEST ROZLICZONY ---
+            // --- CZY ROZLICZONY (ZIELONY) ---
             if (settledDaysSet.has(dayString)) {
                 cell.classList.add('is-settled');
             }
 
-            // Numer dnia
+            // Zawartość komórki
             let cellContent = `<span class="day-number">${day}</span>`;
-
-            // --- ✅ DODAJ PRZYCISK "PTASZEK" (Jeśli wybrano konkretnego usera) ---
-            if (targetUid && targetUid !== "ALL") {
-                cellContent += `<span class="settlement-toggle-btn" title="Oznacz jako rozliczony" onclick="toggleSettlementStatus(event, '${dayString}', '${targetUid}')">✔</span>`;
-            }
 
             // Statystyki wizyt
             const visitsForThisDay = visitsByDate.get(dayString) || [];
@@ -15737,7 +15717,7 @@ function renderTodayView(visits, dateToShow) {
                 cellContent += `<div class="day-summary">${visitsToDo}</div>`;
             }
 
-            // Kropki
+            // Kropki (wskaźniki wizyt)
             const pory = new Set(visitsForThisDay.map(v => v.poraDnia));
             let dotsHtml = '<div class="day-dots">';
             if (pory.has('Pilne')) dotsHtml += '<div class="day-dot dot-pilne"></div>';
@@ -15749,12 +15729,114 @@ function renderTodayView(visits, dateToShow) {
             
             cell.innerHTML = cellContent + dotsHtml;
 
-            // Kliknięcie w tło -> widok dnia
-            cell.addEventListener('click', () => {
-                switchToDayView(dayString);
+            // ============================================================
+            // ✅ LOGIKA LONG PRESS (PRZYTRZYMANIE) vs KLIKNIĘCIE
+            // ============================================================
+            let pressTimer;
+            let longPressTriggered = false; // Flaga: czy przytrzymanie zadziałało?
+
+            const startPress = (e) => {
+                // Ignoruj prawy przycisk myszy
+                if (e.type === 'mousedown' && e.button !== 0) return;
+
+                longPressTriggered = false;
+                
+                // Ustaw timer na 800ms
+                pressTimer = setTimeout(() => {
+                    longPressTriggered = true; // Zaznacz, że to było przytrzymanie
+                    
+                    // Wywołaj logikę rozliczenia (potwierdzenie)
+                    handleLongPressSettlement(dayString, targetUid, cell);
+                    
+                    // Wibracja na telefonie dla potwierdzenia
+                    if (navigator.vibrate) navigator.vibrate(50); 
+                }, 800);
+            };
+
+            const cancelPress = () => {
+                clearTimeout(pressTimer);
+            };
+
+            // Zdarzenia Myszki
+            cell.addEventListener('mousedown', startPress);
+            cell.addEventListener('mouseup', cancelPress);
+            cell.addEventListener('mouseleave', cancelPress);
+
+            // Zdarzenia Dotyku (Mobile)
+            cell.addEventListener('touchstart', startPress, {passive: true});
+            cell.addEventListener('touchend', cancelPress);
+            cell.addEventListener('touchmove', cancelPress); // Anuluj jak przesunie palec (scrollowanie)
+
+            // Blokada menu kontekstowego (prawy kliki na mobile)
+            cell.addEventListener('contextmenu', (e) => {
+                 e.preventDefault();
+                 return false;
+            });
+
+            // GŁÓWNY CLICK (Przejście do dnia)
+            cell.addEventListener('click', (e) => {
+                // Przejdź do dnia TYLKO jeśli NIE było to długie przytrzymanie
+                if (!longPressTriggered) {
+                    switchToDayView(dayString);
+                }
+                // Jeśli longPressTriggered == true, to nic nie rób (obsłużono w timeout)
             });
 
             monthGridBody.appendChild(cell);
+        }
+    }
+    /**
+     * ✅ FUNKCJA OBSŁUGI DŁUGIEGO PRZYTRZYMANIA
+     * Wyświetla potwierdzenie i zmienia kolor dnia.
+     */
+    async function handleLongPressSettlement(dateString, uid, cellElement) {
+        if (!currentUserProfile) return;
+        
+        // Sprawdź czy wybrano konkretnego usera
+        if (!uid || uid === "ALL") {
+            alert("Aby rozliczać dni, wybierz konkretnego pracownika z listy filtrów.");
+            return;
+        }
+
+        // Sprawdź uprawnienia
+        const canEdit = (currentUserProfile.Rola === 'administrator' || currentUserProfile.Rola === 'właściciel' || currentUserProfile.uid === uid);
+        if (!canEdit) {
+            alert("Nie masz uprawnień do oznaczania rozliczeń tego pracownika.");
+            return;
+        }
+
+        const isCurrentlySettled = cellElement.classList.contains('is-settled');
+        const actionText = isCurrentlySettled ? "COFNĄĆ rozliczenie" : "ZATWIERDZIĆ rozliczenie";
+        
+        // ✅ WYŚWIETL ZAPYTANIE (CONFIRM)
+        if (confirm(`Czy na pewno chcesz ${actionText} dla dnia ${dateString}?`)) {
+            
+            // --- LOGIKA ZAPISU DO BAZY (Taka sama jak wcześniej) ---
+            const monthStr = dateString.substring(0, 7); 
+            const docId = `${uid}_${dateString}`; 
+
+            try {
+                if (isCurrentlySettled) {
+                    // Usuwanie
+                    await db.collection("kalendarz_rozliczenia").doc(docId).delete();
+                    cellElement.classList.remove('is-settled');
+                    showToast(`Cofnięto rozliczenie: ${dateString}`, 'info');
+                } else {
+                    // Dodawanie
+                    await db.collection("kalendarz_rozliczenia").doc(docId).set({
+                        uid: uid,
+                        data: dateString,
+                        miesiac: monthStr,
+                        timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                        oznaczyl_kto: `${currentUserProfile.Imie} ${currentUserProfile.Nazwisko}`
+                    });
+                    cellElement.classList.add('is-settled');
+                    showToast(`Rozliczono dzień: ${dateString}`, 'success');
+                }
+            } catch (error) {
+                console.error("Błąd bazy:", error);
+                alert("Wystąpił błąd połączenia.");
+            }
         }
     }
     /**
