@@ -13000,41 +13000,74 @@ else if (target.classList.contains('btn-pay-debt')) {
               
               const today = new Date().toISOString().split('T')[0];
               
-              try {
+ try {
                   const docRef = db.collection("archiwumParagony").doc(receiptId);
                   const doc = await docRef.get();
                   
                   let existingNote = '';
                   let previousOwner = 'Nieznany';
                   let originalDate = 'Brak daty';
+                  let originalDataObj = null; // Zmienna na kopię danych
 
                   if (doc.exists) {
                       const d = doc.data();
+                      originalDataObj = d; // Kopiujemy cały obiekt danych do pamięci
                       existingNote = d.notatka || '';
+                      
                       // Pobieramy dane pierwotne
                       if (d.lekarz_nazwisko) previousOwner = d.lekarz_nazwisko;
                       if (d.data) originalDate = d.data;
                   }
+
+                  // ============================================================
+                  // ✅ NOWOŚĆ: TWORZENIE ŚLADU HISTORYCZNEGO (KOPIA DŁUGU)
+                  // ============================================================
+                  if (originalDataObj) {
+                      const todayDateObj = new Date();
+                      const dd = String(todayDateObj.getDate()).padStart(2, '0');
+                      const mm = String(todayDateObj.getMonth() + 1).padStart(2, '0');
+                      const yyyy = todayDateObj.getFullYear();
+                      const dateStringPL = `${dd}.${mm}.${yyyy}`; // Data w formacie polskim
+
+                      // Tworzymy kopię danych ze starego paragonu
+                      // Kopia ma starą datę (tę z oryginału), starego lekarza, ale nowy status informacyjny
+                      const traceData = {
+                          ...originalDataObj, // Kopiuj wszystko (produkty, klienta, starego lekarza, starą datę)
+                          status: `Dług spłacony data spłaty: ${dateStringPL}`, // Nowy status (nie wlicza się do sum długu)
+                          // Nadpisujemy timestamp utworzenia, żeby baza wiedziała kiedy powstał ten ślad
+                          createdAt: firebase.firestore.FieldValue.serverTimestamp() 
+                      };
+                      
+                      // Usuwamy ID dokumentu z danych (jeśli tam jest), bo Firestore nada nowe ID
+                      delete traceData.id; 
+
+                      // Zapisujemy kopię jako CAŁKOWICIE NOWY dokument w archiwum
+                      await db.collection("archiwumParagony").add(traceData);
+                      console.log("Utworzono historyczny ślad spłaconego długu.");
+                  }
+                  // ============================================================
+                  // KONIEC NOWOŚCI - DALEJ STANDARDOWA AKTUALIZACJA ORYGINAŁU
+                  // ============================================================
                   
-                  // ✅ NOWA TREŚĆ NOTATKI WG TWOJEGO WZORU
+                  const today = new Date().toISOString().split('T')[0];
+
+                  // Treść notatki dla potwierdzenia wpłaty
                   const notePrefix = `Spłata długu z dnia: ${originalDate} / wizytę zrealizował: ${previousOwner}`;
-                  
-                  // Jeśli była jakaś stara notatka, dopisujemy ją po separatorze " | "
                   const newNote = notePrefix + (existingNote ? ` | ${existingNote}` : '');
                   
-                  // Dane do aktualizacji
+                  // Dane do aktualizacji ORYGINAŁU (Staje się potwierdzeniem wpłaty na DZIŚ)
                   const updateData = {
                       status: "Zapłacone",
                       data: today, 
                       notatka: newNote,
-                      lekarz_uid: currentUserProfile.uid, // Przypisz do aktualnie zalogowanego (spłacającego)
+                      lekarz_uid: currentUserProfile.uid, // Przypisz do Ciebie (osoby przyjmującej pieniądze)
                       lekarz_nazwisko: `${currentUserProfile.Imie} ${currentUserProfile.Nazwisko}`
                   };
                   
-                  // Wyślij do bazy
+                  // Wyślij aktualizację do bazy
                   await docRef.update(updateData);
                   
-                  // Aktualizuj tabelę w widoku (bez przeładowania)
+                  // --- Aktualizacja Wyglądu Tabeli (bez odświeżania strony) ---
                   const tr = target.closest('tr');
                   if (tr) {
                       // 1. Aktualizuj Datę (indeks 0)
@@ -13046,31 +13079,31 @@ else if (target.classList.contains('btn-pay-debt')) {
                       tr.cells[4].style.color = "green";
                       tr.dataset.status = "Zapłacone";
                       
-                      // 3. Aktualizuj Lekarza "Wystawił" (indeks 6) - teraz to Ty jesteś właścicielem wpłaty
+                      // 3. Aktualizuj Lekarza "Wystawił" (indeks 6)
                       if (tr.cells[6]) {
                           tr.cells[6].textContent = updateData.lekarz_nazwisko;
                           tr.dataset.lekarz = updateData.lekarz_nazwisko;
                       }
 
-                    // 4. Aktualizuj Notatkę (indeks 7)
+                      // 4. Aktualizuj Notatkę (indeks 7)
                       if (tr.cells[7]) { 
-                          tr.cells[7].textContent = newNote; // Pełny tekst
-                          tr.cells[7].style.whiteSpace = "normal"; // Wymuś zawijanie
+                          tr.cells[7].textContent = newNote;
+                          tr.cells[7].style.whiteSpace = "normal";
                           tr.cells[7].style.wordBreak = "break-word";
                           tr.dataset.notatka = newNote;
                       }
 
-                      // 5. Przenieś wiersz na górę tabeli (bo data dzisiejsza)
+                      // 5. Przenieś wiersz na samą górę tabeli (bo to teraz najnowsza wpłata)
                       const tbody = tr.parentElement;
                       tbody.insertBefore(tr, tbody.firstChild);
 
-                      // Podświetlenie sukcesu
+                      // Efekt podświetlenia sukcesu
                       tr.style.backgroundColor = "#e8f5e9"; 
                       setTimeout(() => { tr.style.backgroundColor = ""; }, 2000);
                   }
                   
-                  target.style.display = 'none'; // Ukryj przycisk po spłacie
-                  alert('Dług spłacony. Paragon został zaktualizowany.');
+                  target.style.display = 'none'; // Ukryj przycisk "Spłata długu" w tym wierszu
+                  alert('Dług spłacony. Paragon zaktualizowany na "Zapłacone", a kopia historyczna została zapisana w archiwum.');
 
               } catch (error) {
                   console.error("Błąd podczas spłaty długu:", error);
