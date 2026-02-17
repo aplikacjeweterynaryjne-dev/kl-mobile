@@ -2425,38 +2425,47 @@ tr.filled-row td {
 #reportWizytyTable .col-zuzycia li {
     margin-bottom: 2px !important; /* Mały odstęp między lekami */
 }
-/* --- STYLE DLA ZNACZNIKÓW ROZLICZENIA W KALENDARZU --- */
+/* --- POPRAWIONE STYLE DLA ZNACZNIKÓW ROZLICZENIA --- */
 
-/* Styl dla dnia, który jest ROZLICZONY (Zielone tło) */
+/* Dzień rozliczony */
 .day-cell.is-settled {
-    background-color: #d4edda !important; /* Jasna zieleń */
-    border: 1px solid #155724 !important; /* Ciemniejsza ramka */
+    background-color: #d4edda !important; 
+    border: 1px solid #155724 !important;
 }
 
-/* Przycisk "Ptaszek" wewnątrz dnia */
+/* Przycisk "Ptaszek" - ZWIĘKSZONY OBSZAR KLIKNIĘCIA */
 .settlement-toggle-btn {
     position: absolute;
-    top: 2px;
-    right: 2px;
+    top: 0;
+    right: 0;
+    width: 35px; /* Szeroki obszar kliknięcia w rogu */
+    height: 35px; /* Wysoki obszar kliknięcia */
+    display: flex;
+    justify-content: flex-end; /* Wyrównaj ikonę do prawej */
+    align-items: flex-start;   /* Wyrównaj ikonę do góry */
+    padding: 4px; /* Odstęp wizualny ikony od krawędzi */
+    
     cursor: pointer;
-    font-size: 16px;
-    line-height: 1;
-    opacity: 0.2; /* Domyślnie słabo widoczny */
-    transition: opacity 0.2s, transform 0.2s;
-    z-index: 10; /* Musi być nad tłem, żeby dało się kliknąć */
-    padding: 2px;
+    font-size: 18px; /* Większa ikona */
+    font-weight: bold;
+    color: #aaa; /* Domyślny szary */
+    z-index: 20; /* ⚠️ Musi być wyższy niż cokolwiek innego w komórce */
+    
+    /* Zapobieganie zaznaczaniu tekstu przy szybkim klikaniu */
+    user-select: none; 
+    -webkit-user-select: none;
 }
 
-/* Ptaszek po najechaniu lub gdy dzień jest rozliczony */
-.day-cell:hover .settlement-toggle-btn,
-.day-cell.is-settled .settlement-toggle-btn {
-    opacity: 1;
-    transform: scale(1.1);
+/* Efekt po najechaniu na sam przycisk (nie na cały dzień) */
+.settlement-toggle-btn:hover {
+    color: #6A994E; /* Podświetlenie na zielono przed kliknięciem */
+    transform: scale(1.2);
 }
 
-/* Kolor ptaszka gdy aktywny */
+/* Wygląd aktywnego ptaszka */
 .day-cell.is-settled .settlement-toggle-btn {
     color: #155724; /* Ciemna zieleń */
+    opacity: 1;
 }
 </style>
     <div id="calcProductSearchModal" class="product-search-modal" style="display: none; z-index: 10003;">
@@ -13790,8 +13799,11 @@ async function fetchReceiptsForReport(dateStart, dateEnd, userId) {
 /**
  * Generuje Raporty Wizyt (Typ 1, 2, 3) - WERSJA Z OBSŁUGĄ PRZELEWÓW
  */
+/**
+ * Generuje Raporty Wizyt (Typ 1, 2, 3) - WERSJA POPRAWIONA (Długi historyczne)
+ */
 function generateWizytyReport(allReceipts, filters) {
-    console.log("Generowanie raportu wizyt (v8 - Sortowanie)...");
+    console.log("Generowanie raportu wizyt (Fix: Długi historyczne)...");
 
     // --- 1. Filtrowanie wstępne (Klient) ---
     let filteredReceipts = [...allReceipts];
@@ -13805,10 +13817,16 @@ function generateWizytyReport(allReceipts, filters) {
     let sumLabelText = "Suma przychodu:"; 
 
     if (filters.type === "gotowka") {
-        filteredReceipts = filteredReceipts.filter(r => ["Zapłacone", "Przelew", "Dług"].includes(r.status));
+        // ✅ POPRAWKA: Używamy .startsWith, aby złapać też "Dług spłacony..."
+        filteredReceipts = filteredReceipts.filter(r => 
+            r.status === "Zapłacone" || 
+            r.status === "Przelew" || 
+            r.status.startsWith("Dług")
+        );
         reportTitle = "Raport Kasowy (Przyjęta Gotówka)";
         sumLabelText = "Suma przyjętej GOTÓWKI (bez przelewów):";
     } else if (filters.type === "dluznicy") {
+        // Tu chcemy tylko AKTYWNE długi, więc szukamy dokładnie słowa "Dług"
         filteredReceipts = filteredReceipts.filter(r => r.status === "Dług");
         reportTitle = "Raport Dłużników";
         sumLabelText = "Suma zadłużenia:";
@@ -13817,29 +13835,29 @@ function generateWizytyReport(allReceipts, filters) {
         sumLabelText = "Raport sumaryczny (Gotówka + Przelewy):";
     }
 
-    // --- 3. SORTOWANIE (Poprawione) ---
-    // Kolejność: 1. Zapłacone, 2. Przelew, 3. Dług. Wewnątrz grup: od najnowszej daty.
-    const statusOrder = { "Zapłacone": 1, "Przelew": 2, "Dług": 3 };
-
+    // --- 3. SORTOWANIE ---
+    // Kolejność: 1. Zapłacone, 2. Przelew, 3. Dług (aktywny), 4. Dług spłacony (historyczny)
     filteredReceipts.sort((a, b) => {
-        // A. Sortowanie po grupie statusu
-        const orderA = statusOrder[a.status] || 99; // Inne na koniec
-        const orderB = statusOrder[b.status] || 99;
+        // Helper do ustalania wagi statusu
+        const getStatusWeight = (s) => {
+            if (s === "Zapłacone") return 1;
+            if (s === "Przelew") return 2;
+            if (s === "Dług") return 3;
+            if (s.startsWith("Dług")) return 4; // Historyczne na końcu grupy
+            return 99;
+        };
 
-        if (orderA !== orderB) {
-            return orderA - orderB; // Rosnąco: 1 -> 2 -> 3
-        }
+        const orderA = getStatusWeight(a.status);
+        const orderB = getStatusWeight(b.status);
 
-        // B. Sortowanie po dacie MALEJĄCO (od najnowszej)
-        if (a.data !== b.data) {
-            return b.data.localeCompare(a.data);
-        }
+        if (orderA !== orderB) return orderA - orderB;
 
-        // C. (Opcjonalnie) Po nr dokumentu malejąco
+        // Sortowanie po dacie MALEJĄCO
+        if (a.data !== b.data) return b.data.localeCompare(a.data);
         return (b.nrDokumentu || '').localeCompare(a.nrDokumentu || '');
     });
 
-    // --- 4. OBLICZANIE SUM (Matematyka) ---
+    // --- 4. OBLICZANIE SUM ---
     let totalRevenue = 0; 
     let totalExpenses = 0; 
     let debtsOnlySum = 0; 
@@ -13849,6 +13867,8 @@ function generateWizytyReport(allReceipts, filters) {
         const status = r.status;
 
         if (filters.type === "gotowka") {
+            // Do sumy gotówki wliczamy TYLKO "Zapłacone"
+            // "Dług spłacony..." jest tu tylko dla informacji na liście, nie dodajemy go do sumy dnia
             if (status === 'Zapłacone') {
                 if (val < 0) totalExpenses += Math.abs(val);
                 else totalRevenue += val;
@@ -13858,7 +13878,10 @@ function generateWizytyReport(allReceipts, filters) {
             if (status === 'Zapłacone' || status === 'Przelew') {
                 if (val < 0) totalExpenses += Math.abs(val);
                 else totalRevenue += val;
-            } else if (status === 'Dług') {
+            } 
+            // Aktywny dług wliczamy do obrotu ogólnego (wykonana usługa)
+            // Historyczny ślad ("Dług spłacony") NIE wliczamy, bo to duplikat
+            else if (status === 'Dług') {
                 if (val > 0) totalRevenue += val;
             }
         }
@@ -13867,7 +13890,7 @@ function generateWizytyReport(allReceipts, filters) {
         }
     });
 
-    // --- 5. Generowanie HTML (Twój oryginalny układ) ---
+    // --- 5. Generowanie HTML ---
     let tableHtml = '';
 
     for (const receipt of filteredReceipts) {
@@ -13886,6 +13909,11 @@ function generateWizytyReport(allReceipts, filters) {
             rowStyle = "background-color: #fffde7; border-left: 4px solid #f39c12;";
             statusColor = "#c0392b";
             sumaColor = "#7f8c8d";
+        } else if (receipt.status.startsWith('Dług')) {
+            // ✅ Styl dla spłaconego długu (historyczny ślad)
+            rowStyle = "background-color: #f9f9f9; color: #777;"; // Wyszarzony
+            statusColor = "#7f8c8d"; // Szary status
+            sumaColor = "#aaa"; // Szara kwota (żeby nie rzucała się w oczy jako przychód)
         } else if (receipt.status === 'Przelew') {
             rowStyle = "background-color: #e3f2fd;"; 
             statusColor = "#2980b9"; 
@@ -13893,16 +13921,14 @@ function generateWizytyReport(allReceipts, filters) {
             statusColor = "green"; 
         }
 
-    // Zużycia (produkty)
+        // Zużycia (produkty)
         let zuzyciaHtml = '';
         if (receipt.pozycje && receipt.pozycje.length > 0) {
             const produkty = receipt.pozycje.filter(p => p.name.toLowerCase() !== 'wyrównanie');
             if (produkty.length > 0) {
-                 // ✅ ZMIANA TUTAJ: Zmieniono font-size z 12px na 15px
-                 zuzyciaHtml = '<ul style="margin: 0; padding-left: 18px; font-size: 15px; color: #333;">';
+                zuzyciaHtml = '<ul style="margin: 0; padding-left: 18px; font-size: 13px; color: #333;">'; // Większa czcionka 13px
                 for (const item of produkty) {
-                    // Dodatkowo pogrubiamy nazwę i zwiększamy odstęp (line-height)
-                    zuzyciaHtml += `<li style="margin-bottom: 4px; line-height: 1.4;"><b>${item.name}</b> - ${item.quantity}</li>`;
+                    zuzyciaHtml += `<li style="margin-bottom: 2px;"><b>${item.name}</b> - ${item.quantity}</li>`;
                 }
                 zuzyciaHtml += '</ul>';
             }
@@ -13910,6 +13936,7 @@ function generateWizytyReport(allReceipts, filters) {
         
         const sumaDisplay = formatPrice(suma); 
 
+        // ✅ POPRAWKA: status z 'white-space: pre-wrap' obsługuje \n (nową linię)
         tableHtml += `
             <tr style="${rowStyle}" data-klient="${receipt.klient}" data-data="${receipt.data}">
                 <td>${receipt.klient}</td>
@@ -13917,7 +13944,7 @@ function generateWizytyReport(allReceipts, filters) {
                 <td>${receipt.czynnosci || ''}</td>
                 <td class="col-zuzycia">${zuzyciaHtml}</td>
                 <td style="text-align: right; color: ${sumaColor}; font-weight: bold;">${sumaDisplay}</td>
-                <td style="color: ${statusColor}; font-weight: bold;">${receipt.status || 'Brak'}</td>
+                <td style="color: ${statusColor}; font-weight: bold; white-space: pre-wrap;">${receipt.status || 'Brak'}</td>
                 <td style="white-space: normal; word-break: break-word; min-width: 150px;">${receipt.notatka || ''}</td>
             </tr>
         `;
@@ -13934,9 +13961,7 @@ function generateWizytyReport(allReceipts, filters) {
     reportUserDisplay.textContent = `Pracownik: ${filters.userName}`;
     reportSumTitle.textContent = sumLabelText;
 
-    // USUNIĘTO: if(printReportBtn) printReportBtn.style.display = 'inline-block';
-
-    // ✅ LOGIKA PRZYCISKU ROZLICZENIA
+    // Logika przycisku rozliczenia
     if (filters.type === "gotowka") {
         if(settleReportBtn) {
             settleReportBtn.style.display = 'inline-block';
