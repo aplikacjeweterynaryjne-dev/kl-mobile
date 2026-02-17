@@ -2425,6 +2425,39 @@ tr.filled-row td {
 #reportWizytyTable .col-zuzycia li {
     margin-bottom: 2px !important; /* Mały odstęp między lekami */
 }
+/* --- STYLE DLA ZNACZNIKÓW ROZLICZENIA W KALENDARZU --- */
+
+/* Styl dla dnia, który jest ROZLICZONY (Zielone tło) */
+.day-cell.is-settled {
+    background-color: #d4edda !important; /* Jasna zieleń */
+    border: 1px solid #155724 !important; /* Ciemniejsza ramka */
+}
+
+/* Przycisk "Ptaszek" wewnątrz dnia */
+.settlement-toggle-btn {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    cursor: pointer;
+    font-size: 16px;
+    line-height: 1;
+    opacity: 0.2; /* Domyślnie słabo widoczny */
+    transition: opacity 0.2s, transform 0.2s;
+    z-index: 10; /* Musi być nad tłem, żeby dało się kliknąć */
+    padding: 2px;
+}
+
+/* Ptaszek po najechaniu lub gdy dzień jest rozliczony */
+.day-cell:hover .settlement-toggle-btn,
+.day-cell.is-settled .settlement-toggle-btn {
+    opacity: 1;
+    transform: scale(1.1);
+}
+
+/* Kolor ptaszka gdy aktywny */
+.day-cell.is-settled .settlement-toggle-btn {
+    color: #155724; /* Ciemna zieleń */
+}
 </style>
     <div id="calcProductSearchModal" class="product-search-modal" style="display: none; z-index: 10003;">
     <div class="product-search-card">
@@ -15593,37 +15626,62 @@ function renderTodayView(visits, dateToShow) {
     });
 }
     // Renderuje widok Miesiąca
-    function renderMonthView(visits, date) {
+   // Renderuje widok Miesiąca (ZMODYFIKOWANA O ZNACZNIKI ROZLICZEŃ)
+    async function renderMonthView(visits, date) {
         monthGridBody.innerHTML = ''; // Wyczyść
         const year = date.getFullYear();
         const month = date.getMonth(); // 0-11
         monthViewTitle.textContent = date.toLocaleDateString('pl-PL', { month: 'long', year: 'numeric' });
 
-        // Grupuj wizyty po dacie
+        // --- 1. PRZYGOTOWANIE DANYCH ROZLICZEŃ ---
+        // Sprawdź kogo wyświetlamy
+        const targetUid = calendarUserSelect.value;
+        let settledDaysSet = new Set();
+
+        // Jeśli wybrano konkretnego użytkownika (nie "ALL"), pobierz jego znaczniki
+        if (targetUid && targetUid !== "ALL") {
+            try {
+                // Budujemy ID miesiąca np. "2025-11"
+                const monthStr = `${year}-${String(month + 1).padStart(2, '0')}`;
+                
+                // Pobieramy kolekcję znaczników
+                const q = db.collection("kalendarz_rozliczenia")
+                            .where("uid", "==", targetUid)
+                            .where("miesiac", "==", monthStr);
+                
+                const snap = await q.get();
+                snap.forEach(doc => {
+                    // Dokument zawiera pole 'dzien' (np. "2025-11-15")
+                    settledDaysSet.add(doc.data().data); 
+                });
+            } catch (e) {
+                console.error("Błąd pobierania znaczników rozliczeń:", e);
+            }
+        }
+
+        // --- 2. GRUPOWANIE WIZYT ---
         const visitsByDate = new Map();
         visits.forEach(v => {
-            const dateKey = v.dataWizyty; // np. "2025-11-10"
+            const dateKey = v.dataWizyty; 
             if (!visitsByDate.has(dateKey)) {
                 visitsByDate.set(dateKey, []);
             }
             visitsByDate.get(dateKey).push(v);
         });
 
-        // Logika budowania siatki kalendarza
-        const firstDayOfMonth = new Date(year, month, 1).getDay(); // 0=Niedz, 1=Pon
+        // --- 3. BUDOWANIE SIATKI ---
+        const firstDayOfMonth = new Date(year, month, 1).getDay(); 
         const daysInMonth = new Date(year, month + 1, 0).getDate();
-
-        // Korekta na polski tydzień (Poniedziałek = 0, Niedziela = 6)
         const startOffset = (firstDayOfMonth === 0) ? 6 : firstDayOfMonth - 1; 
 
-        // Dodaj puste komórki na początku
+        // Puste komórki
         for (let i = 0; i < startOffset; i++) {
             const cell = document.createElement('div');
             cell.className = 'day-cell other-month';
             monthGridBody.appendChild(cell);
         }
 
-        // Dodaj komórki dni
+        // Dni miesiąca
         for (let day = 1; day <= daysInMonth; day++) {
             const cell = document.createElement('div');
             cell.className = 'day-cell';
@@ -15632,22 +15690,29 @@ function renderTodayView(visits, dateToShow) {
 
             // Sprawdź czy dzisiaj
             const todayISO = new Date().toISOString().split('T')[0];
-            if (dayString === todayISO) {
-                cell.classList.add('is-today');
+            if (dayString === todayISO) cell.classList.add('is-today');
+
+            // --- ✅ SPRAWDŹ CZY DZIEŃ JEST ROZLICZONY ---
+            if (settledDaysSet.has(dayString)) {
+                cell.classList.add('is-settled');
             }
 
             // Numer dnia
-            cell.innerHTML = `<span class="day-number">${day}</span>`;
+            let cellContent = `<span class="day-number">${day}</span>`;
 
-            const visitsForThisDay = visitsByDate.get(dayString) || [];
-
-            // Suma wizyt do realizacji (Req. 4)
-            const visitsToDo = visitsForThisDay.filter(v => v.status === 'Nowa').length;
-            if (visitsToDo > 0) {
-                cell.innerHTML += `<div class="day-summary">${visitsToDo}</div>`;
+            // --- ✅ DODAJ PRZYCISK "PTASZEK" (Jeśli wybrano konkretnego usera) ---
+            if (targetUid && targetUid !== "ALL") {
+                cellContent += `<span class="settlement-toggle-btn" title="Oznacz jako rozliczony" onclick="toggleSettlementStatus(event, '${dayString}', '${targetUid}')">✔</span>`;
             }
 
-            // Kropki kolorów (Req. 11)
+            // Statystyki wizyt
+            const visitsForThisDay = visitsByDate.get(dayString) || [];
+            const visitsToDo = visitsForThisDay.filter(v => v.status === 'Nowa').length;
+            if (visitsToDo > 0) {
+                cellContent += `<div class="day-summary">${visitsToDo}</div>`;
+            }
+
+            // Kropki
             const pory = new Set(visitsForThisDay.map(v => v.poraDnia));
             let dotsHtml = '<div class="day-dots">';
             if (pory.has('Pilne')) dotsHtml += '<div class="day-dot dot-pilne"></div>';
@@ -15656,15 +15721,69 @@ function renderTodayView(visits, dateToShow) {
                 dotsHtml += '<div class="day-dot dot-standard"></div>';
             }
             dotsHtml += '</div>';
-            cell.innerHTML += dotsHtml;
+            
+            cell.innerHTML = cellContent + dotsHtml;
 
-      // Kliknięcie na dzień przełącza na widok DNIA (Moduł 2.5)
-            cell.addEventListener('click', () => {
-                // Przekaż datę tej komórki (np. "2025-11-20") do nowej funkcji
-                switchToDayView(dayString);
-            });
+            // Kliknięcie w tło -> widok dnia
+            cell.addEventListener('click', () => {
+                switchToDayView(dayString);
+            });
 
             monthGridBody.appendChild(cell);
+        }
+    }
+    /**
+     * ✅ NOWA FUNKCJA: Przełącza status rozliczenia dnia (zielony ptaszek).
+     */
+    async function toggleSettlementStatus(event, dateString, uid) {
+        // 1. ZATRZYMAJ PROPAGACJĘ - najważniejsze!
+        // Dzięki temu kliknięcie w ptaszka NIE otworzy widoku dnia.
+        event.stopPropagation();
+
+        if (!currentUserProfile) return;
+        
+        // Zabezpieczenie: Tylko admin, właściciel lub sam użytkownik mogą zmieniać status
+        const canEdit = (currentUserProfile.Rola === 'administrator' || currentUserProfile.Rola === 'właściciel' || currentUserProfile.uid === uid);
+        
+        if (!canEdit) {
+            alert("Nie masz uprawnień do oznaczania rozliczeń innego pracownika.");
+            return;
+        }
+
+        const cell = event.target.closest('.day-cell');
+        const isSettled = cell.classList.contains('is-settled');
+        
+        // Wyciągnij rok i miesiąc z daty (np. "2025-11")
+        const monthStr = dateString.substring(0, 7); 
+        // Unikalne ID dokumentu: UID_DATA (np. "user123_2025-11-15")
+        const docId = `${uid}_${dateString}`; 
+
+        try {
+            if (isSettled) {
+                // --- USUWANIE (ODZNACZENIE) ---
+                await db.collection("kalendarz_rozliczenia").doc(docId).delete();
+                
+                // Aktualizuj widok natychmiast (Optimistic UI)
+                cell.classList.remove('is-settled');
+                showToast(`Usunięto rozliczenie dnia ${dateString}`, 'info', 1000);
+            } else {
+                // --- DODAWANIE (ZAZNACZENIE) ---
+                await db.collection("kalendarz_rozliczenia").doc(docId).set({
+                    uid: uid,
+                    data: dateString,
+                    miesiac: monthStr,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                    oznaczyl_uid: currentUserProfile.uid,
+                    oznaczyl_kto: `${currentUserProfile.Imie} ${currentUserProfile.Nazwisko}`
+                });
+
+                // Aktualizuj widok natychmiast
+                cell.classList.add('is-settled');
+                showToast(`Dzień ${dateString} oznaczony jako rozliczony!`, 'success', 1000);
+            }
+        } catch (error) {
+            console.error("Błąd przełączania rozliczenia:", error);
+            alert("Wystąpił błąd połączenia z bazą.");
         }
     }
 /* ⬇️ ⬇️ ⬇️ WKLEJ TĘ NOWĄ FUNKCJĘ (ok. linii 2139) ⬇️ ⬇️ ⬇️ */
