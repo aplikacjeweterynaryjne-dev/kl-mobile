@@ -13000,7 +13000,7 @@ else if (target.classList.contains('btn-pay-debt')) {
               
               const today = new Date().toISOString().split('T')[0];
               
- try {
+try {
                   const docRef = db.collection("archiwumParagony").doc(receiptId);
                   const doc = await docRef.get();
                   
@@ -13030,10 +13030,11 @@ else if (target.classList.contains('btn-pay-debt')) {
                       const dateStringPL = `${dd}.${mm}.${yyyy}`; // Data w formacie polskim
 
                       // Tworzymy kopię danych ze starego paragonu
-                      // Kopia ma starą datę (tę z oryginału), starego lekarza, ale nowy status informacyjny
+                      // Kopia ma starą datę, starego lekarza, ale status jest dwuwierszowy
                       const traceData = {
-                          ...originalDataObj, // Kopiuj wszystko (produkty, klienta, starego lekarza, starą datę)
-                          status: `Dług spłacony data spłaty: ${dateStringPL}`, // Nowy status (nie wlicza się do sum długu)
+                          ...originalDataObj, 
+                          // ⬇️ TU JEST ZMIANA: \n oznacza przejście do nowej linii
+                          status: `Dług \nDług spłacony, data spłaty: ${dateStringPL}`, 
                           // Nadpisujemy timestamp utworzenia, żeby baza wiedziała kiedy powstał ten ślad
                           createdAt: firebase.firestore.FieldValue.serverTimestamp() 
                       };
@@ -13051,7 +13052,7 @@ else if (target.classList.contains('btn-pay-debt')) {
                   
                   const today = new Date().toISOString().split('T')[0];
 
-                  // Treść notatki dla potwierdzenia wpłaty
+                  // Treść notatki dla potwierdzenia wpłaty (oryginał, który staje się wpłatą)
                   const notePrefix = `Spłata długu z dnia: ${originalDate} / wizytę zrealizował: ${previousOwner}`;
                   const newNote = notePrefix + (existingNote ? ` | ${existingNote}` : '');
                   
@@ -13103,7 +13104,7 @@ else if (target.classList.contains('btn-pay-debt')) {
                   }
                   
                   target.style.display = 'none'; // Ukryj przycisk "Spłata długu" w tym wierszu
-                  alert('Dług spłacony. Paragon zaktualizowany na "Zapłacone", a kopia historyczna została zapisana w archiwum.');
+                  alert('Dług spłacony. Paragon zaktualizowany na "Zapłacone", a kopia historyczna została zachowana.');
 
               } catch (error) {
                   console.error("Błąd podczas spłaty długu:", error);
