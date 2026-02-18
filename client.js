@@ -1244,7 +1244,7 @@ function renderSubListsForCow(animal) {
         }
     }
     document.getElementById('animalCardModal').style.display = 'flex';
-}
+
 
 function toggleEditMode() {
     const view = document.getElementById('viewMode');
