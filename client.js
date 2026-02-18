@@ -11,7 +11,29 @@ const firebaseConfig = {
 if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 const auth = firebase.auth();
+// ⬇️⬇️⬇️ WKLEJ TEN KOD TUTAJ ⬇️⬇️⬇️
 
+// --- OBSŁUGA OFFLINE (PWA) ---
+db.enablePersistence()
+    .catch((err) => {
+        if (err.code == 'failed-precondition') {
+            console.warn('Tryb offline ograniczony (wiele kart).');
+        } else if (err.code == 'unimplemented') {
+            console.warn('Przeglądarka nie obsługuje trybu offline.');
+        }
+    });
+
+// Rejestracja Service Workera
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        // Używamy tego samego SW co główna aplikacja, aby cache'ować pliki
+        navigator.serviceWorker.register('./sw.js')
+            .then(reg => console.log('✅ Service Worker (Klient) OK'))
+            .catch(err => console.error('❌ Błąd SW:', err));
+    });
+}
+
+// ⬆️⬆️⬆️ KONIEC WKLEJANIA ⬆️⬆️⬆️
 // --- STAN APLIKACJI (ZMIENNE GLOBALNE) ---
 let currentUser = null;
 let myHerd = [];
@@ -38,17 +60,78 @@ const DEFAULT_SETTINGS = {
 
 let userSettings = JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
 
-// --- AUTH ---
-auth.onAuthStateChanged(user => {
+// --- AUTH & SYMULACJA (Zaktualizowane dla Pracownika) ---
+auth.onAuthStateChanged(async (user) => {
     if (user) {
-        db.collection('konfiguracja').where('uid', '==', user.uid).get().then(snap => {
-            if(!snap.empty && snap.docs[0].data().Rola === 'klient') {
-                currentUser = { id: snap.docs[0].id, ...snap.docs[0].data(), uid: user.uid };
+        try {
+            // 1. Sprawdź, kim jest zalogowany użytkownik (Ty)
+            const myProfileSnap = await db.collection('konfiguracja').where('uid', '==', user.uid).limit(1).get();
+            
+            if (myProfileSnap.empty) {
+                window.location.href = 'index.html'; // Brak profilu
+                return;
+            }
+
+            const myProfile = myProfileSnap.docs[0].data();
+            const myRole = myProfile.Rola;
+
+            // 2. Sprawdź, czy w URL jest prośba o symulację (przekazane UID klienta)
+            const urlParams = new URLSearchParams(window.location.search);
+            const simulatedUid = urlParams.get('simulatedUid');
+
+            // ✅ SCENARIUSZ A: Admin / Właściciel / PRACOWNIK chce podglądać Klienta
+            if (simulatedUid && (myRole === 'administrator' || myRole === 'właściciel' || myRole === 'pracownik')) {
+                console.log("Tryb Symulacji: Personel przegląda konto klienta:", simulatedUid);
+                
+                // Pobierz dane symulowanego klienta
+                const clientSnap = await db.collection('konfiguracja').where('uid', '==', simulatedUid).limit(1).get();
+                
+                if (!clientSnap.empty) {
+                    // Ustawiamy currentUser na dane KLIENTA, ale uid bierzemy symulowane
+                    currentUser = { id: clientSnap.docs[0].id, ...clientSnap.docs[0].data(), uid: simulatedUid };
+                    
+                    // Dodajemy wizualny pasek, że to tryb podglądu
+                    showSimulationBanner(myProfile.Imie, currentUser.Imie + ' ' + currentUser.Nazwisko);
+                    
+                    initApp(); // Uruchom aplikację dla danych klienta
+                    return;
+                } else {
+                    alert("Nie znaleziono danych tego klienta.");
+                }
+            }
+
+            // SCENARIUSZ B: Zwykłe logowanie (Prawdziwy Klient wchodzi na swoje konto)
+            if (myRole === 'klient') {
+                currentUser = { id: myProfileSnap.docs[0].id, ...myProfile, uid: user.uid };
                 initApp();
-            } else { window.location.href = 'index.html'; }
-        });
-    } else { window.location.href = 'index.html'; }
+            } else {
+                // Jeśli personel wszedł tu bez parametru ?simulatedUid, odeślij go do panelu głównego
+                window.location.href = 'index.html';
+            }
+
+        } catch (error) {
+            console.error("Błąd autoryzacji:", error);
+            alert("Wystąpił błąd podczas logowania.");
+        }
+    } else {
+        // Niezalogowany
+        window.location.href = 'index.html';
+    }
 });
+
+// Pomocnicza funkcja: Pasek informacyjny o trybie podglądu
+function showSimulationBanner(adminName, clientName) {
+    const banner = document.createElement('div');
+    banner.style.cssText = `
+        position: fixed; top: 0; left: 0; width: 100%; 
+        background: #8e44ad; color: white; text-align: center; 
+        padding: 5px; font-size: 12px; z-index: 10000; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    `;
+    banner.innerHTML = `👁️ TRYB PODGLĄDU: Jesteś zalogowany jako ${adminName}, oglądasz panel klienta: ${clientName}`;
+    document.body.prepend(banner);
+    // Przesuń nieco body, żeby pasek nie zasłaniał treści
+    document.body.style.marginTop = "30px"; 
+}
 
 function initApp() {
     const dateEl = document.getElementById('welcomeDate');
