@@ -1288,7 +1288,24 @@ function saveAnimalChanges() {
         alert("Błąd: " + err.message);
     });
 }
+function deleteCurrentAnimal() {
+    if (!currentEditingAnimalId) return;
 
+    if (confirm("Czy na pewno chcesz TRWALE usunąć to zwierzę ze stada? \nTej operacji nie można cofnąć!")) {
+        
+        db.collection('animals').doc(currentEditingAnimalId).delete()
+            .then(() => {
+                alert("Zwierzę zostało usunięte.");
+                closeModal('animalCardModal'); // Zamknij kartę
+                currentEditingAnimalId = null; 
+                // Lista stada odświeży się sama dzięki onSnapshot
+            })
+            .catch(error => {
+                console.error("Błąd usuwania:", error);
+                alert("Wystąpił błąd podczas usuwania: " + error.message);
+            });
+    }
+}
 function deleteInsemination(animalId, index) {
     if(!confirm("Usunąć ten wpis?")) return;
     const animal = myHerd.find(a => a.id === animalId);
