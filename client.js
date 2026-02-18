@@ -1149,7 +1149,8 @@ function openAnimalCard(id) {
         // (Tutaj wstawiamy Twój kod generowania potomstwa i historii inseminacji - ten sam co był)
         renderSubListsForCow(animal); // Wyniosłem to do małej funkcji pomocniczej niżej, żeby kod był czytelny
     }
-    
+    document.getElementById('editTag').value = animal.tag;
+    document.getElementById('editDob').value = animal.dob;
     // NAPRAWA LOKALIZACJI
     document.getElementById('editLocation').value = animal.location || '';
     
