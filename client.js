@@ -609,6 +609,41 @@ function getDetailedStatus(a) {
                 addTask(generatedTasks, animal, 'Spodziewane Wycielenie', calvingDate, calvingDate, priority, 'calving', insDate, calvingDate, (daysToCalving < 0));
             }
         }
+        // --- ZADANIA DLA BYKÓW (Sprzedaż wg wieku) ---
+        if (animal.type === 'byk' && animal.dob) {
+            const dob = new Date(animal.dob);
+            // Obliczamy wiek w miesiącach (przybliżenie: 1 msc = 30.44 dnia)
+            const ageMonths = (today - dob) / (1000 * 60 * 60 * 24 * 30.44);
+
+            // Okno 1: 20-24 miesiące
+            if (ageMonths >= 20 && ageMonths < 24) {
+                const taskId20 = `${animal.id}_sell_20_24`;
+                // Sprawdzamy czy nie wykonano
+                if (!completedTasks.some(t => t.taskId === taskId20)) {
+                    generatedTasks.push({
+                        id: taskId20, animalId: animal.id, tag: animal.tag, 
+                        title: 'Sprzedaż byka (20-24 msc)',
+                        dueDate: today, // Termin "na dzisiaj" (ciągły)
+                        sortDate: today, priority: 'warning', type: 'sell_20_24',
+                        isDone: false, logId: null, insemDate: null, calvDate: null, isReallyOverdue: false
+                    });
+                }
+            }
+
+            // Okno 2: 24-30 miesięcy (Priorytet wysoki)
+            else if (ageMonths >= 24 && ageMonths < 30) {
+                const taskId24 = `${animal.id}_sell_24_30`;
+                if (!completedTasks.some(t => t.taskId === taskId24)) {
+                    generatedTasks.push({
+                        id: taskId24, animalId: animal.id, tag: animal.tag, 
+                        title: 'Sprzedaż byka (24-30 msc)',
+                        dueDate: today,
+                        sortDate: today, priority: 'urgent', type: 'sell_24_30',
+                        isDone: false, logId: null, insemDate: null, calvDate: null, isReallyOverdue: true
+                    });
+                }
+            }
+        }
     });
 
     window.myAllTasksGlobal = generatedTasks;
@@ -815,7 +850,14 @@ function renderTaskTypeChips(allTasks) {
         }
     });
 
-    const labels = { 'all': 'Wszystkie', 'usg': 'USG', 'heat': 'Ruja', 'dry': 'Zasuszenie', 'rovac': 'Rovac', 'kexxtone': 'Kexxtone', 'calving': 'Wycielenia', 'sync': 'Synchronizacja' };
+   const labels = { 
+        'all': 'Wszystkie', 'usg': 'USG', 'heat': 'Ruja', 
+        'dry': 'Zasuszenie', 'rovac': 'Rovac', 'kexxtone': 'Kexxtone', 
+        'calving': 'Wycielenia', 'sync': 'Synchronizacja',
+        // NOWE WPISY:
+        'sell_20_24': 'Sprzedaż (20-24m)',
+        'sell_24_30': 'Sprzedaż (24-30m)'
+    };
     
     Array.from(types).forEach(type => {
         let label = labels[type];
@@ -871,12 +913,34 @@ function initiateTaskCompletion(taskId, type, animalId, dueDateStr) {
 function confirmTaskStandard() {
     if(!pendingTask) return;
     
-    // Jeśli to zadanie zasuszenia, zaktualizuj status krowy
+    // 1. Obsługa Zasuszenia (istniejąca logika)
     if (pendingTask.type === 'dry') {
         db.collection('animals').doc(pendingTask.animalId).update({ isDriedOff: true });
         alert("Krowa została oznaczona jako zasuszona.");
     }
 
+    // 2. NOWOŚĆ: Obsługa Sprzedaży Byka
+    if (pendingTask.type === 'sell_20_24' || pendingTask.type === 'sell_24_30') {
+        // Najpierw zapisujemy log, że zadanie wykonano
+        saveTaskLog(pendingTask, "Wykonano (Sprzedaż)");
+        
+        // Pytanie o usunięcie z opóźnieniem (żeby modal potwierdzenia zdążył zniknąć)
+        setTimeout(() => {
+            if (confirm("Czy sprzedałeś tego byka? Kliknij OK, aby USUNĄĆ go trwale ze stada.")) {
+                db.collection('animals').doc(pendingTask.animalId).delete()
+                  .then(() => {
+                      alert("Byk został usunięty ze stada.");
+                      // Lista odświeży się sama dzięki onSnapshot
+                  })
+                  .catch(err => alert("Błąd usuwania: " + err.message));
+            }
+        }, 100); 
+        
+        closeModal('taskConfirmModal');
+        return; // Kończymy, bo saveTaskLog wywołaliśmy ręcznie wyżej
+    }
+
+    // Standardowe zadania (np. Rovac, Kexxtone)
     saveTaskLog(pendingTask, "Wykonano");
     closeModal('taskConfirmModal');
 }
@@ -1758,6 +1822,7 @@ function renderHerdList(forceType = null) {
     }
 
     // 3. Logika Filtrowania (ŚCISŁA)
+    // 3. Logika Filtrowania (ŚCISŁA)
     // Byki i Jałówki widoczne TYLKO w swoich zakładkach
     if (activeHerdFilters.length > 0) {
         filtered = filtered.filter(a => {
@@ -1778,6 +1843,7 @@ function renderHerdList(forceType = null) {
             return false;
         });
     } else if (!search) {
+        // --- TO JEST TA ZMIANA: ---
         // Jeśli nie ma filtrów i nie szukamy -> pokazujemy TYLKO KROWY (domyślny widok)
         filtered = filtered.filter(a => a.type === 'krowa');
     }
