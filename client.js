@@ -1095,71 +1095,105 @@ function openAnimalCard(id) {
     document.getElementById('viewMode').classList.remove('hidden');
     document.getElementById('editMode').classList.add('hidden');
 
-    // Podstawowe dane
+    // --- 1. Podstawowe dane ---
     document.getElementById('cardTag').textContent = animal.tag;
     document.getElementById('cardDob').textContent = animal.dob;
-    document.getElementById('cardType').textContent = animal.type;
+    document.getElementById('cardType').textContent = animal.type.toUpperCase();
     
-    // Pochodzenie i Lokalizacja
+    // Obsługa braku elementów w DOM (dla bezpieczeństwa)
     if(document.getElementById('cardMother')) document.getElementById('cardMother').textContent = animal.motherTag || 'Brak danych';
     if(document.getElementById('cardFather')) document.getElementById('cardFather').textContent = animal.fatherSemen || 'Brak danych';
     if(document.getElementById('cardLocation')) document.getElementById('cardLocation').textContent = animal.location || 'Brak danych';
 
-    // --- LOGIKA WIDOKU DLA RÓŻNYCH TYPÓW (Pkt 2) ---
+    // --- 2. LOGIKA UKRYWANIA SEKCJI (Byk vs Krowa) ---
     const isBull = (animal.type === 'byk');
-    const cowSpecificElements = [
-        'cardPregnancySectionJS', 'cardPregStatus', 'cardLastCalving', 
-        'cardLastInsem', 'cardOffspring', 'cardHistory', 
-        'cardCalvingHistory', 'cardDimStat'
+
+    // Lista ID elementów do ukrycia u byka (Nagłówki + Listy + Panel)
+    const elementsToToggle = [
+        'cowStatsPanel',    // Zielony panel z datami
+        'headerOffspring',  // Nagłówek Potomstwo
+        'cardOffspring',    // Lista Potomstwa
+        'headerInsem',      // Nagłówek Inseminacji
+        'cardHistory',      // Lista Inseminacji
+        'headerCalving',    // Nagłówek Wycielen
+        'cardCalvingHistory'// Lista Wycielen
     ];
 
-    // Ukrywamy/Pokazujemy elementy typowe dla krów
-    cowSpecificElements.forEach(elId => {
+    elementsToToggle.forEach(elId => {
         const el = document.getElementById(elId);
         if(el) el.style.display = isBull ? 'none' : 'block';
     });
 
-    // Sekcja specjalna dla Byka (Cele wiekowe) - wstrzykujemy dynamicznie
-    let bullSection = document.getElementById('bullAgeSection');
+    // --- 3. SEKCJA DLA BYKA (Cele Sprzedażowe) ---
+    // Usuwamy starą sekcję dynamiczną (jeśli istnieje), żeby się nie dublowała przy kolejnych kliknięciach
+    const oldBullSection = document.getElementById('bullAgeSection');
+    if (oldBullSection) oldBullSection.remove();
+
     if (isBull) {
-        if (!bullSection) {
-            bullSection = document.createElement('div');
-            bullSection.id = 'bullAgeSection';
-            bullSection.style.cssText = "background:#fff3e0; padding:10px; border-radius:10px; margin:10px 0; border:1px solid #ffe0b2;";
-            // Wstawiamy po dacie urodzenia
-            document.getElementById('cardDob').parentNode.appendChild(bullSection);
-        }
-        bullSection.style.display = 'block';
+        const bullSection = document.createElement('div');
+        bullSection.id = 'bullAgeSection';
+        bullSection.style.cssText = "background:#fff3e0; padding:10px; border-radius:10px; margin:10px 0; border:1px solid #ffe0b2; font-size:14px;";
         
+        // Wstawiamy pod szarym boksem z danymi podstawowymi
+        const basicInfoBox = document.getElementById('cardType').closest('div'); 
+        if(basicInfoBox) basicInfoBox.after(bullSection);
+
         const dob = new Date(animal.dob);
         const d24 = new Date(dob); d24.setMonth(d24.getMonth() + 24);
         const d30 = new Date(dob); d30.setMonth(d30.getMonth() + 30);
         
         bullSection.innerHTML = `
             <strong>🎯 Cele hodowlane:</strong><br>
-            24 mies: <b>${d24.toLocaleDateString()}</b><br>
-            30 mies: <b>${d30.toLocaleDateString()}</b>
+            24 mies: <b>${d24.toLocaleDateString('pl-PL')}</b><br>
+            30 mies: <b>${d30.toLocaleDateString('pl-PL')}</b>
         `;
-    } else {
-        if(bullSection) bullSection.style.display = 'none';
+    } 
+    // --- 4. SEKCJA DLA KROWY (Laktacja i Dane) ---
+    else {
+        document.getElementById('cardLastCalving').textContent = animal.lastCalving || '---';
+        document.getElementById('cardLastInsem').textContent = animal.lastInsemination || '---';
         
-        // Dla Krów/Jałówek wypełniamy standardowe dane (jeśli nie byk)
-        if(document.getElementById('cardLastCalving')) document.getElementById('cardLastCalving').textContent = animal.lastCalving || '---';
-        if(document.getElementById('cardLastInsem')) document.getElementById('cardLastInsem').textContent = animal.lastInsemination || '---';
-        
-        // Logika potomstwa i historii (bez zmian)...
-        // (Tutaj wstawiamy Twój kod generowania potomstwa i historii inseminacji - ten sam co był)
-        renderSubListsForCow(animal); // Wyniosłem to do małej funkcji pomocniczej niżej, żeby kod był czytelny
+        // --- OBLICZANIE DNI LAKTACJI (DIM) ---
+        const dimEl = document.getElementById('cardDimStat');
+        if (dimEl) {
+            if (animal.lastCalving) {
+                const today = new Date(); today.setHours(0,0,0,0);
+                const lastCalv = new Date(animal.lastCalving);
+                const diffTime = today - lastCalv;
+                const days = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+                
+                if (days >= 0) {
+                    dimEl.innerHTML = `📊 Dni laktacji: <b>${days}</b>`;
+                    dimEl.style.color = '#2e7d32'; // Zielony kolor
+                } else {
+                    dimEl.textContent = 'Błąd daty';
+                }
+            } else {
+                dimEl.textContent = 'Brak trwającej laktacji';
+                dimEl.style.color = '#7f8c8d'; // Szary kolor
+            }
+        }
+
+        // Status Cielności
+        const statusDiv = document.getElementById('cardPregStatus');
+        if(statusDiv) {
+            const statusInfo = getDetailedStatus(animal); 
+            statusDiv.textContent = statusInfo.text;
+            statusDiv.style.color = statusInfo.color;
+        }
+
+        // Renderowanie list (Potomstwo, Historia)
+        renderSubListsForCow(animal);
     }
+
+    // --- 5. WYPEŁNIANIE FORMULARZA EDYCJI ---
     document.getElementById('editTag').value = animal.tag;
     document.getElementById('editDob').value = animal.dob;
-    // NAPRAWA LOKALIZACJI
     document.getElementById('editLocation').value = animal.location || '';
     
-    // Ustawienie typu w Select
     if(document.getElementById('editType')) {
         document.getElementById('editType').value = animal.type;
-        toggleEditFields(); // Ukryj/Pokaż pola w zależności od typu
+        toggleEditFields(); 
     }
 
     document.getElementById('editMother').value = animal.motherTag || '';
@@ -1178,6 +1212,7 @@ function openAnimalCard(id) {
         document.getElementById('editPregStatus').value = statusVal;
     }
 
+    // Wyświetlenie modala
     document.getElementById('animalCardModal').style.display = 'flex';
 }
 
