@@ -1160,23 +1160,7 @@ function renderSubListsForCow(animal) {
         });
     }
 }
-    const today = new Date();
-    let totalDim = 0;
-    let countDim = 0;
-    myHerd.forEach(h => {
-        if(h.type === 'krowa' && h.lastCalving) {
-            const d = Math.floor((today - new Date(h.lastCalving)) / (1000 * 60 * 60 * 24));
-            if(d > 0) { totalDim += d; countDim++; }
-        }
-    });
-    const avgDim = countDim > 0 ? Math.floor(totalDim / countDim) : 0;
-
-    let cowDim = '-';
-    if(animal.lastCalving) {
-        cowDim = Math.floor((today - new Date(animal.lastCalving)) / (1000 * 60 * 60 * 24));
-    }
-    document.getElementById('cardDimStat').innerHTML = `DIM: <b>${cowDim}</b> (Śr. stada: ${avgDim})`;
-
+ 
  document.getElementById('editTag').value = animal.tag;
     document.getElementById('editDob').value = animal.dob;
 
