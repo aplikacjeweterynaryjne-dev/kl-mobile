@@ -10298,153 +10298,152 @@ if (saveProductBtn) {
 * Obsługa kliknięć w tabeli konfiguracji (Edycja)
 */
 if (konfiguracjaTableBody) {
-  konfiguracjaTableBody.addEventListener('click', async (e) => {
-    const target = e.target;
+    konfiguracjaTableBody.addEventListener('click', async (e) => {
+        // ✅ KLUCZOWA POPRAWKA: szukamy najbliższego przycisku
+        const target = e.target.closest('button');
+        if (!target) return;
 
-    // --- EDYCJA WPISU KONFIGURACJI ---
-    if (target.classList.contains('btn-edit-konfiguracja')) {
-      const docId = target.dataset.id;
-      console.log(`Próba edycji wpisu konfiguracji o ID: ${docId}`);
-      try {
-        let data = null;
-        if (cachedKonfiguracja) {
-          data = cachedKonfiguracja.find(item => item.id === docId);
-        }
-        if (!data) {
-          console.log("Nie znaleziono w cache, pobieranie z Firestore...");
-          const doc = await db.collection("konfiguracja").doc(docId).get();
-          if (doc.exists) {
-            data = { id: doc.id, ...doc.data() };
-          }
-        }
+        // --- 1. EDYCJA WPISU KONFIGURACJI ---
+        if (target.classList.contains('btn-edit-konfiguracja')) {
+            const docId = target.dataset.id;
+            console.log(`Próba edycji wpisu konfiguracji o ID: ${docId}`);
+            try {
+                // Pobieranie danych
+                let data = null;
+                if (cachedKonfiguracja) {
+                    data = cachedKonfiguracja.find(item => item.id === docId);
+                }
+                if (!data) {
+                    console.log("Nie znaleziono w cache, pobieranie z Firestore...");
+                    const doc = await db.collection("konfiguracja").doc(docId).get();
+                    if (doc.exists) {
+                        data = { id: doc.id, ...doc.data() };
+                    }
+                }
 
-        if (!data) {
-          alert('Błąd: Nie znaleziono danych konfiguracyjnych do edycji.');
-          console.error(`Nie znaleziono wpisu o ID: ${docId}`);
-          return;
-        }
-        console.log("Pobrano dane konfiguracji do edycji:", data);
+                if (!data) {
+                    alert('Błąd: Nie znaleziono danych konfiguracyjnych do edycji.');
+                    return;
+                }
+                console.log("Pobrano dane konfiguracji do edycji:", data);
 
-konfiguracjaFormTitle.textContent = 'Edytuj dane konfiguracyjne';
-        konfiguracjaFormDocId.value = docId;
-        konfiguracjaFormImie.value = data.Imie || '';
-        konfiguracjaFormNazwisko.value = data.Nazwisko || '';
-        konfiguracjaFormEmail.value = data['Adres email'] || '';
-        konfiguracjaFormTelefon.value = data['Nr telefonu'] || '';
-   
-        konfiguracjaFormIdLecznicy.value = data['ID lecznicy'] || '';
-        konfiguracjaFormNazwaLecznicy.value = data['Nazwa lecznicy'] || '';
-/* ✅ POPRAWIONY KOD (wczytuje dane) */
-// --- Wczytywanie podpisu i inicjałów ---
-konfiguracjaFormInicjaly.value = data.Inicjaly || ''; // Wczytaj inicjały
-konfigFormPodpisLinia.value = data.PodpisLinia || ''; // Wczytaj linię podpisu
+                // Wypełnianie formularza
+                konfiguracjaFormTitle.textContent = 'Edytuj dane konfiguracyjne';
+                konfiguracjaFormDocId.value = docId;
+                konfiguracjaFormImie.value = data.Imie || '';
+                konfiguracjaFormNazwisko.value = data.Nazwisko || '';
+                konfiguracjaFormEmail.value = data['Adres email'] || '';
+                konfiguracjaFormTelefon.value = data['Nr telefonu'] || '';
+                konfiguracjaFormIdLecznicy.value = data['ID lecznicy'] || '';
+                konfiguracjaFormNazwaLecznicy.value = data['Nazwa lecznicy'] || '';
+                konfiguracjaFormInicjaly.value = data.Inicjaly || ''; 
+                konfigFormPodpisLinia.value = data.PodpisLinia || ''; 
 
-const zapisanyPodpisBase64 = data.Podpis || '';
-konfiguracjaFormPodpis.value = zapisanyPodpisBase64; // Zapisz Base64 w ukrytym polu
+                // Obsługa podpisu
+                const zapisanyPodpisBase64 = data.Podpis || '';
+                konfiguracjaFormPodpis.value = zapisanyPodpisBase64; 
+                const ctxSmall = konfigFormCanvas.getContext('2d');
+                ctxSmall.clearRect(0, 0, konfigFormCanvas.width, konfigFormCanvas.height); 
 
-const ctxSmall = konfigFormCanvas.getContext('2d');
-ctxSmall.clearRect(0, 0, konfigFormCanvas.width, konfigFormCanvas.height); // Wyczyść płótno
+                if (zapisanyPodpisBase64) {
+                    konfigPreviewImg.src = zapisanyPodpisBase64;
+                    konfigPreviewImg.style.display = 'block';
+                    const img = new Image();
+                    img.onload = function() {
+                        ctxSmall.drawImage(img, 0, 0, konfigFormCanvas.width, konfigFormCanvas.height);
+                    };
+                    img.src = zapisanyPodpisBase64;
+                } else {
+                    konfigPreviewImg.src = '';
+                    konfigPreviewImg.style.display = 'none';
+                }
 
-if (zapisanyPodpisBase64) {
-    // Jeśli jest zapisany podpis, wczytaj go do podglądu I na płótno
-    konfigPreviewImg.src = zapisanyPodpisBase64;
-    konfigPreviewImg.style.display = 'block';
+                // Ustawienia Roli
+                populateRolaSelect();
+                konfiguracjaFormRola.value = data.Rola || 'pracownik';
 
-    // Narysuj zapisany podpis na małym płótnie
-    const img = new Image();
-    img.onload = function() {
-        ctxSmall.drawImage(img, 0, 0, canvasSmall.width, canvasSmall.height);
-    };
-    img.src = zapisanyPodpisBase64;
+                // Checkboxy Magazynu
+                if(document.getElementById('konfigFormUzywaMagazynu')) 
+                    document.getElementById('konfigFormUzywaMagazynu').checked = data.uzywaStanowMagazynowych || false;
+                if(document.getElementById('konfigFormMozeDoladowac'))
+                    document.getElementById('konfigFormMozeDoladowac').checked = data.mozeDoladowacWlasnyMagazyn || false;
 
-} else {
-    // Jeśli nie ma podpisu, ukryj podgląd
-    konfigPreviewImg.src = '';
-    konfigPreviewImg.style.display = 'none';
-}
-// --- Koniec wczytywania podpisu ---
+                // Logika Wiadomości Admina
+                if (currentUserProfile && currentUserProfile.Rola === 'administrator') {
+                    if (adminMessageFields) {
+                        adminMessageFields.style.display = 'block';
+                        confMsgContent.value = data.adminMessage || '';
+                        confMsgStart.value = data.adminMessageStart || '';
+                        confMsgEnd.value = data.adminMessageEnd || '';
+                    }
+                } else {
+                    if (adminMessageFields) adminMessageFields.style.display = 'none';
+                }
 
-            // ✅ MODYFIKACJA: Dynamicznie wypełnij role PRZED ustawieniem wartości
-            populateRolaSelect();
-           konfiguracjaFormRola.value = data.Rola || 'pracownik';
+                // Blokada pól
+                konfiguracjaFormIdLecznicy.readOnly = true;
+                konfiguracjaFormIdLecznicy.style.backgroundColor = '#eee';
 
-        // ✅ LOGIKA WIADOMOŚCI ADMINA (Wklejony Krok 4)
-        // Pokazujemy sekcję tylko jeśli zalogowany jest Administrator
-        if (currentUserProfile && currentUserProfile.Rola === 'administrator') {
-            if (adminMessageFields) {
-                adminMessageFields.style.display = 'block';
-                // Wczytaj istniejącą wiadomość lub puste
-                confMsgContent.value = data.adminMessage || '';
-                confMsgStart.value = data.adminMessageStart || '';
-                confMsgEnd.value = data.adminMessageEnd || '';
+                if (adminRoles.includes(currentUserProfile.Rola)) {
+                    konfiguracjaFormNazwaLecznicy.readOnly = false;
+                    konfiguracjaFormNazwaLecznicy.style.backgroundColor = '#fff';
+                } else {
+                    konfiguracjaFormNazwaLecznicy.readOnly = true;
+                    konfiguracjaFormNazwaLecznicy.style.backgroundColor = '#eee';
+                }
+
+                konfiguracjaFormModal.style.display = 'flex';
+
+            } catch (error) {
+                console.error('Błąd edycji:', error);
+                alert('Wystąpił błąd podczas pobierania danych.');
             }
-        } else {
-            if (adminMessageFields) adminMessageFields.style.display = 'none';
         }
-        // ✅ POCZĄTEK MODUŁU 2: Wczytywanie stanu checkboxów
-        document.getElementById('konfigFormUzywaMagazynu').checked = data.uzywaStanowMagazynowych || false;
-        document.getElementById('konfigFormMozeDoladowac').checked = data.mozeDoladowacWlasnyMagazyn || false;
-        // ✅ KONIEC MODUŁU 2
-        // ✅ POCZĄTEK NOWEJ LOGIKI BLOKOWANIA PÓL
-        // Pole ID Lecznicy jest ZAWSZE zablokowane
-        konfiguracjaFormIdLecznicy.readOnly = true;
-        konfiguracjaFormIdLecznicy.style.backgroundColor = '#eee';
 
-        // Sprawdź, czy zalogowany użytkownik jest adminem lub właścicielem
-        if (adminRoles.includes(currentUserProfile.Rola)) {
-          // JEST ADMINEM/WŁAŚCICIELEM: Może edytować nazwę lecznicy
-          konfiguracjaFormNazwaLecznicy.readOnly = false;
-          konfiguracjaFormNazwaLecznicy.style.backgroundColor = '#fff';
-        } else {
-          // JEST PRACOWNIKIEM: Nie może edytować nazwy lecznicy
-          konfiguracjaFormNazwaLecznicy.readOnly = true;
-          konfiguracjaFormNazwaLecznicy.style.backgroundColor = '#eee';
+        // --- 2. USUWANIE WPISU KONFIGURACJI ---
+        else if (target.classList.contains('btn-delete-konfiguracja')) {
+            const docId = target.dataset.id;
+            const row = target.closest('tr');
+            const wpisName = row.cells[0].textContent + ' ' + row.cells[1].textContent;
+
+            if (confirm(`Czy na pewno chcesz usunąć wpis dla: "${wpisName}"? \n\nTej operacji nie można cofnąć.`)) {
+                try {
+                    await db.collection("konfiguracja").doc(docId).delete();
+                    alert('Wpis usunięty pomyślnie.');
+                    
+                    if (cachedKonfiguracja) {
+                        cachedKonfiguracja = cachedKonfiguracja.filter(item => item.id !== docId);
+                        renderKonfiguracjaTable(cachedKonfiguracja);
+                    } else {
+                        loadAndCacheKonfiguracja();
+                    }
+                } catch (error) {
+                    console.error('Błąd usuwania:', error);
+                    alert('Nie udało się usunąć wpisu.');
+                }
+            }
         }
-        // ✅ KONIEC NOWEJ LOGIKI BLOKOWANIA PÓL
 
-        // ✅ POKAŻ MODAL TERAZ (PO SKONFIGUROWANIU PÓL)
-        konfiguracjaFormModal.style.display = 'flex';
+        // ✅ --- 3. OTWIERANIE PANELU KLIENTA (TRYB SYMULACJI) ---
+        else if (target.classList.contains('btn-open-client-panel')) {
+            const targetUid = target.dataset.uid;
+            console.log("Próba otwarcia panelu klienta dla UID:", targetUid);
 
-      } catch (error) {
-        // ✅ UZUPEŁNIŁEM TWÓJ PUSTY BLOK 'CATCH'
-        console.error('Błąd pobierania wpisu konfiguracji do edycji: ', error);
-        alert('Wystąpił błąd podczas pobierania danych.');
-      }
-      
-    } // ✅ <--- TO BYŁA BRAKUJĄCA KLAMRA, KTÓRA POWODOWAŁA BŁĄD
-
-    // ✅ POCZĄTEK: NOWY BLOK DLA PRZYCISKU "Usuń"
-    else if (target.classList.contains('btn-delete-konfiguracja')) {
-      const docId = target.dataset.id;
-      const row = target.closest('tr');
-      // Pobierz nazwę dla potwierdzenia (np. z pierwszej komórki)
-      const wpisName = row.cells[0].textContent + ' ' + row.cells[1].textContent;
-
-      if (confirm(`Czy na pewno chcesz usunąć wpis dla: "${wpisName}"? \n\nTej operacji nie można cofnąć.`)) {
-        console.log(`Próba usunięcia wpisu o ID: ${docId}`);
-        try {
-          // 1. Usuń z Firebase
-          await db.collection("konfiguracja").doc(docId).delete();
-          alert('Wpis usunięty pomyślnie.');
-          console.log(`Wpis ${docId} usunięty.`);
-
-          // 2. Usuń z cache
-          if (cachedKonfiguracja) {
-            cachedKonfiguracja = cachedKonfiguracja.filter(item => item.id !== docId);
-            // 3. Odśwież tabelę
-            renderKonfiguracjaTable(cachedKonfiguracja);
-          } else {
-            loadAndCacheKonfiguracja(); // Jeśli cache był pusty, załaduj na nowo
-          }
-
-        } catch (error) {
-          console.error('Błąd usuwania wpisu konfiguracji: ', error);
-          alert('Wystąpił błąd podczas usuwania wpisu.');
+            if (targetUid && targetUid !== "undefined" && targetUid !== "") {
+                // Budujemy adres URL z parametrem symulacji
+                const url = `panel-klienta.html?simulatedUid=${targetUid}`;
+                
+                // Otwieramy w nowym oknie
+                const newWindow = window.open(url, '_blank');
+                
+                if (!newWindow) {
+                    alert("Zablokowano wyskakujące okno! Proszę zezwolić na wyskakujące okna w ustawieniach przeglądarki.");
+                }
+            } else {
+                alert("Błąd: Ten użytkownik nie ma przypisanego numeru UID. Poproś klienta o rejestrację lub przypisz UID ręcznie.");
+            }
         }
-      }
-    }
-    // ✅ KONIEC: NOWY BLOK DLA PRZYCISKU "Usuń"
-  });
+    });
 }
 /**
 * Przycisk "Anuluj" w modalu konfiguracji
