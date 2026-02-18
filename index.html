@@ -10960,15 +10960,31 @@ function renderKonfiguracjaTable(konfiguracjaData) {
         // 9. Rola
         tr.appendChild(createCell(wpis.Rola, 'Rola'));
         
-        // 10. Akcje (tylko ta komórka musi używać innerHTML dla przycisków)
+// 10. Akcje (tylko ta komórka musi używać innerHTML dla przycisków)
         const akcjeCell = document.createElement('td');
         akcjeCell.className = 'col-akcje';
-        akcjeCell.style.width = '130px';
-        akcjeCell.dataset.label = 'Akcje'; // Dodajemy data-label dla spójności
-        akcjeCell.innerHTML = `
+        akcjeCell.style.width = '175px'; // ✅ ZWIĘKSZONO SZEROKOŚĆ (dla 3 przycisków)
+        akcjeCell.dataset.label = 'Akcje';
+        
+        // Budujemy HTML przycisków
+        let buttonsHtml = `
             <button class="btn btn-edit-konfiguracja" data-id="${wpis.id}" title="Edytuj wpis">Edytuj</button>
             <button class="btn warn btn-delete-konfiguracja" data-id="${wpis.id}" title="Usuń wpis">Usuń</button>
         `;
+
+        // ✅ NOWOŚĆ: Jeśli to KLIENT i ma przypisane UID, dodaj przycisk "Panel Klienta"
+        if (wpis.Rola === 'klient' && wpis.uid) {
+            buttonsHtml += `
+                <button class="btn primary btn-open-client-panel" 
+                        style="background-color: #8e44ad; border-color: #732d91; margin-left: 4px; padding: 6px 10px;" 
+                        data-uid="${wpis.uid}" 
+                        title="Otwórz Panel Klienta w nowym oknie">
+                    📱
+                </button>
+            `;
+        }
+
+        akcjeCell.innerHTML = buttonsHtml;
         tr.appendChild(akcjeCell);
 
         // Dodaj gotowy wiersz do tabeli
@@ -10989,13 +11005,9 @@ async function loadAndCacheKonfiguracja() {
     if(loadKonfiguracjaBtn) loadKonfiguracjaBtn.disabled = true;
 
     // 1. ZABEZPIECZENIE: Przycisk "Dodaj nowego"
-    // Pracownik nie może dodawać nowych osób. Właściciel i Admin mogą.
+    // ✅ ZMIANA: Teraz przycisk jest widoczny dla WSZYSTKICH zalogowanych (również pracowników)
     if (addNewKonfiguracjaBtn) {
-        if (currentUserProfile && currentUserProfile.Rola === 'pracownik') {
-            addNewKonfiguracjaBtn.style.display = 'none';
-        } else {
-            addNewKonfiguracjaBtn.style.display = 'inline-block';
-        }
+        addNewKonfiguracjaBtn.style.display = 'inline-block';
     }
 
     let query;
@@ -11037,15 +11049,15 @@ async function loadAndCacheKonfiguracja() {
             // 3. ✅ FILTRACJA WIDOKU (LOGIKA BIZNESOWA)
             
             if (currentUserProfile.Rola === 'pracownik') {
-                // Pracownik widzi TYLKO siebie
-                results = results.filter(u => u.uid === currentUserProfile.uid);
+                // ✅ ZMIANA: Pracownik widzi siebie ORAZ wszystkie konta typu 'klient'
+                // Dzięki temu może wejść w ich panele
+                results = results.filter(u => u.uid === currentUserProfile.uid || u.Rola === 'klient');
             
             } else if (currentUserProfile.Rola === 'właściciel') {
                 // Właściciel widzi wszystkich w lecznicy OPRÓCZ Administratora
-                // (Zakładamy, że Admin może mieć konto techniczne w tej samej lecznicy)
                 results = results.filter(u => u.Rola !== 'administrator');
             }
-            // Administrator widzi wszystko (brak filtra w JS, pobrał wszystko z bazy)
+            // Administrator widzi wszystko (bez filtra)
 
             cachedKonfiguracja = results;
             console.log(`Załadowano i przefiltrowano: ${cachedKonfiguracja.length} wpisów.`);
@@ -11073,9 +11085,11 @@ async function loadAndCacheKonfiguracja() {
     }
 }
 /**
- * ✅ NOWA FUNKCJA POMOCNICZA
- * Wypełnia listę rozwijaną ról w formularzu konfiguracji
- * w zależności od uprawnień zalogowanego użytkownika.
+ * ✅ ZMODYFIKOWANA FUNKCJA
+ * Wypełnia listę rozwijaną ról w formularzu konfiguracji.
+ * - Administrator: Wszystkie role
+ * - Właściciel: Pracownik, Właściciel, Klient
+ * - Pracownik: TYLKO Klient
  */
 function populateRolaSelect() {
     if (!konfiguracjaFormRola || !currentUserProfile) {
@@ -11085,28 +11099,30 @@ function populateRolaSelect() {
 
     konfiguracjaFormRola.innerHTML = ''; // Wyczyść stare opcje
 
-    // Opcje dostępne dla Właściciela (i Administratora, bo dziedziczy)
-    const opcjeWlasciciela = [
-        { value: 'pracownik', text: 'Pracownik' },
-        { value: 'właściciel', text: 'Właściciel' },
-        { value: 'klient', text: 'Klient (Hodowca)' } // ✅ NOWOŚĆ: Dodano rolę Klienta
-    ];
-
-    // Opcje dostępne TYLKO dla Administratora (rozszerza listę właściciela)
-    const opcjeAdministratora = [
-        ...opcjeWlasciciela,
-        { value: 'administrator', text: 'Administrator' }
-    ];
-
     let opcjeDoDodania = [];
 
     if (currentUserProfile.Rola === 'administrator') {
-        console.log("Wypełnianie ról: Tryb Administratora (Wszystkie role)");
-        opcjeDoDodania = opcjeAdministratora;
-    } else { 
-        // Domyślnie dla właściciela
-        console.log("Wypełnianie ról: Tryb Właściciela (Pracownik, Właściciel, Klient)");
-        opcjeDoDodania = opcjeWlasciciela;
+        // Administrator widzi wszystko
+        opcjeDoDodania = [
+            { value: 'pracownik', text: 'Pracownik' },
+            { value: 'właściciel', text: 'Właściciel' },
+            { value: 'klient', text: 'Klient (Hodowca)' },
+            { value: 'administrator', text: 'Administrator' }
+        ];
+    } 
+    else if (currentUserProfile.Rola === 'właściciel') {
+        // Właściciel nie może tworzyć Administratorów
+        opcjeDoDodania = [
+            { value: 'pracownik', text: 'Pracownik' },
+            { value: 'właściciel', text: 'Właściciel' },
+            { value: 'klient', text: 'Klient (Hodowca)' }
+        ];
+    } 
+    else if (currentUserProfile.Rola === 'pracownik') {
+        // ✅ ZMIANA: Pracownik może dodać TYLKO klienta
+        opcjeDoDodania = [
+            { value: 'klient', text: 'Klient (Hodowca)' }
+        ];
     }
 
     // Dodaj opcje do selecta
