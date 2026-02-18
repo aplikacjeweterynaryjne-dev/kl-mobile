@@ -13528,6 +13528,23 @@ let reportClientsLoaded = false;
  * Wywoływana przy każdym wejściu do sekcji Raporty.
  * Ładuje listy lekarzy i klientów do filtrów.
  */
+/**
+ * Funkcja pomocnicza: Generuje tablicę dat (YYYY-MM-DD) z zakresu.
+ */
+function getDatesInRange(startDate, endDate) {
+    const dates = [];
+    const currentDate = new Date(startDate);
+    const end = new Date(endDate);
+
+    while (currentDate <= end) {
+        const y = currentDate.getFullYear();
+        const m = String(currentDate.getMonth() + 1).padStart(2, '0');
+        const d = String(currentDate.getDate()).padStart(2, '0');
+        dates.push(`${y}-${m}-${d}`);
+        currentDate.setDate(currentDate.getDate() + 1);
+    }
+    return dates;
+}
 function onShowRaporty() {
     console.log("Wejście do sekcji Raporty. Ładowanie filtrów...");
     if (!reportUsersLoaded) {
@@ -13541,8 +13558,13 @@ function onShowRaporty() {
     if (!reportDateStart.value) reportDateStart.value = today;
     if (!reportDateEnd.value) reportDateEnd.value = today;
 
-    // ✅ DODAJ TO: Odśwież informację o ostatnim rozliczeniu
-    checkLastSettlement();
+    // ⬇️⬇️⬇️ ZASTĄP STARE WYWOŁANIE TYM KODEM ⬇️⬇️⬇️
+    
+    // ✅ FIX: Odśwież info dla aktualnie wybranego usera w filtrze
+    const currentSelectedUser = reportUserSelect ? reportUserSelect.value : null;
+    checkLastSettlement(currentSelectedUser);
+
+    // ⬆️⬆️⬆️ KONIEC ZMIANY ⬆️⬆️⬆️
     
     // Ukryj przyciski akcji (reset widoku)
     if(settleReportBtn) settleReportBtn.style.display = 'none';
@@ -13617,9 +13639,7 @@ async function loadReportUsers() {
 /**
  * Wczytuje klientów do listy <select> w raportach.
  */
-/**
- * Wczytuje klientów do listy <datalist> w raportach.
- */
+
 async function loadReportClients() {
     // Znajdź datalist bezpośrednio
     const datalist = document.getElementById('reportClientDatalist');
@@ -13666,44 +13686,73 @@ async function loadReportClients() {
         // Nie psujemy datalist, zostawiamy puste
     }
 }
+// Listener zmiany użytkownika w filtrze raportów
+if (reportUserSelect) {
+    reportUserSelect.addEventListener('change', () => {
+        // Odśwież informację o ostatnim rozliczeniu dla wybranej osoby
+        checkLastSettlement(reportUserSelect.value);
+    });
+}
 /**
- * ✅ NOWA FUNKCJA: Pobiera ostatnie rozliczenie zalogowanego użytkownika
+ * ✅ ZMODYFIKOWANA FUNKCJA: Sprawdza ostatni rozliczony dzień w KALENDARZU
+ * dla WYBRANEGO użytkownika (pobiera dane z kolekcji 'kalendarz_rozliczenia').
  */
-async function checkLastSettlement() {
-    if (!currentUserProfile || !lastSettlementInfo) return;
+async function checkLastSettlement(targetUid) {
+    // 1. Ustal, kogo sprawdzamy.
+    // Jeśli nie podano argumentu, spróbuj pobrać z filtra raportów, a jak nie ma, to bieżący user.
+    if (!targetUid) {
+        const select = document.getElementById('reportUserSelect');
+        targetUid = select ? select.value : (currentUserProfile ? currentUserProfile.uid : null);
+    }
 
-    // Ukryj na start
-    lastSettlementInfo.style.display = 'none';
+    // 2. Walidacja: Jeśli brak ID lub wybrano "Wszyscy", ukryj pasek
+    if (!targetUid || targetUid === "ALL" || !lastSettlementInfo) {
+        if(lastSettlementInfo) lastSettlementInfo.style.display = 'none';
+        return;
+    }
 
     try {
-        // Szukamy w podkolekcji 'rozliczenia' użytkownika
-        const q = db.collection("konfiguracja")
-                    .doc(currentUserProfile.id)
-                    .collection("rozliczenia")
-                    .orderBy("dataDo", "desc") // Najnowsze wg daty końcowej raportu
+        // 3. Szukamy najnowszej daty w kolekcji ZNACZNIKÓW KALENDARZA
+        // Kolekcja: kalendarz_rozliczenia, sortowanie po dacie malejąco
+        const q = db.collection("kalendarz_rozliczenia")
+                    .where("uid", "==", targetUid)
+                    .orderBy("data", "desc") // Najnowsze na górze
                     .limit(1);
 
         const snapshot = await q.get();
 
         if (!snapshot.empty) {
+            // Znaleziono wpis
             const data = snapshot.docs[0].data();
-            // Formatuj daty i kwotę
-            const kwota = parseFloat(data.kwota) || 0;
-            const kwotaStr = kwota.toFixed(2).replace('.', ',') + ' zł';
+            const lastDate = data.data; // Data w formacie YYYY-MM-DD
             
+            // Formatowanie daty na polski (DD.MM.RRRR)
+            const parts = lastDate.split('-');
+            const datePL = `${parts[2]}.${parts[1]}.${parts[0]}`;
+
+            // 4. Wyświetlanie wyniku
             lastSettlementText.innerHTML = `
-                <strong>ℹ️ Ostatnio rozliczony okres:</strong> <br>
-                ${data.dataOd} — ${data.dataDo} <br>
-                Kwota: <strong>${kwotaStr}</strong> <br>
-                <small style="color:#555;">(Zatwierdzono: ${data.timestamp ? new Date(data.timestamp.toDate()).toLocaleDateString() : '-'})</small>
+                <strong>ℹ️ Ostatni dzień oznaczony jako rozliczony:</strong> <br>
+                <span style="font-size: 18px; color: #27ae60; font-weight: bold;">${datePL}</span>
+                <br><small style="color:#555;">(Dane z kalendarza wizyt)</small>
             `;
+            lastSettlementInfo.style.display = 'block';
+        } else {
+            // Brak wpisów
+            lastSettlementText.innerHTML = `<strong>ℹ️ Brak odnotowanych rozliczeń w kalendarzu.</strong>`;
             lastSettlementInfo.style.display = 'block';
         }
     } catch (e) {
         console.error("Błąd pobierania ostatniego rozliczenia:", e);
+        // Jeśli brakuje indeksu, ukrywamy błąd, żeby nie śmiecić użytkownikowi
+        if (e.code === 'failed-precondition') {
+             console.warn("Wymagany indeks Firestore: kalendarz_rozliczenia [uid, data DESC]");
+        }
+        lastSettlementInfo.style.display = 'none';
     }
 }
-// --- 3. Logika generowania raportu ---
+
+// --- 3. Logika generowania raportu (POZOSTAJE BEZ ZMIAN) ---
 
 if (generateReportBtn) {
     generateReportBtn.addEventListener('click', async () => {
@@ -13728,7 +13777,7 @@ if (generateReportBtn) {
             if (filters.type === 'zuzycia') {
                 // Dla zużycia pobieramy KARTY LECZENIA
                 cachedReportData = await fetchCardsForReport(filters.dateStart, filters.dateEnd, filters.userId);
-                generateZuzyciaReportFromCards(cachedReportData, filters); // Nowa funkcja generująca
+                generateZuzyciaReportFromCards(cachedReportData, filters); 
             } else {
                 // Dla finansów pobieramy PARAGONY (bez zmian)
                 cachedReportData = await fetchReceiptsForReport(filters.dateStart, filters.dateEnd, filters.userId);
@@ -13736,7 +13785,7 @@ if (generateReportBtn) {
             }
 
             reportResultArea.style.display = 'block';
-            openReportPrintWindow();
+            // openReportPrintWindow(); // <-- To otwierało okno druku od razu, można zostawić lub usunąć
 
         } catch (error) {
             console.error("Błąd generowania raportu:", error);
@@ -14186,62 +14235,73 @@ if (reportTypeSelect) {
         }
     });
 }
-// ✅ Listener dla przycisku "Zatwierdź Rozliczenie"
+// ✅ ZMODYFIKOWANY LISTENER: Zatwierdź Rozliczenie (Integracja z Kalendarzem)
 if (settleReportBtn) {
     settleReportBtn.addEventListener('click', async () => {
-        // 1. Pobierz dane z dataset (ustawione przy generowaniu)
+        // 1. Pobierz dane z dataset (ustawione przy generowaniu raportu)
         const dateStart = settleReportBtn.dataset.start;
         const dateEnd = settleReportBtn.dataset.end;
         const amount = settleReportBtn.dataset.amount;
-        const userId = settleReportBtn.dataset.userId;
+        const targetUserId = settleReportBtn.dataset.userId;
 
-        // Walidacja: Czy rozliczamy siebie? (Tylko zalogowany może zatwierdzić swoje rozliczenie)
-        if (userId !== currentUserProfile.uid && userId !== 'ALL') {
-             // Admin może rozliczać innych, ale uprośćmy:
-             // Jeśli userId == ALL, to też blokujemy, bo rozlicza się konkretną osobę.
-             if(!confirm("Zatwierdzasz rozliczenie dla innego użytkownika. Kontynuować?")) return;
+        // Walidacja
+        if (!targetUserId || targetUserId === 'ALL') {
+             alert("Aby zatwierdzić rozliczenie, musisz wybrać konkretnego pracownika w filtrze.");
+             return;
         }
 
-        const msg = `Czy na pewno chcesz oznaczyć okres:\n${dateStart} do ${dateEnd}\njako ROZLICZONY (przekazana gotówka: ${amount} zł)?\n\nTo utworzy trwały wpis w historii.`;
+        // Sprawdź uprawnienia (czy to ja, czy admin rozlicza kogoś)
+        let confirmMsg = `Czy na pewno chcesz oznaczyć okres:\n${dateStart} do ${dateEnd}\njako ROZLICZONY (Suma z raportu: ${amount} zł)?\n\n`;
+        confirmMsg += `⚠️ To spowoduje automatyczne zaznaczenie wszystkich dni z tego zakresu na zielono w kalendarzu użytkownika.`;
 
-        if (confirm(msg)) {
+        if (confirm(confirmMsg)) {
             settleReportBtn.disabled = true;
-            settleReportBtn.textContent = "Zapisywanie...";
+            settleReportBtn.textContent = "Przetwarzanie... ⏳";
 
             try {
-                // Zapisujemy w podkolekcji 'rozliczenia' w dokumencie użytkownika
-                // Dzięki temu każdy lekarz ma swoją historię.
-                // Jeśli Admin rozlicza kogoś, musimy znaleźć ID dok. konfiguracji tego kogoś.
-                // Dla uproszczenia w v1: Zapisujemy w profilu TEGO KTO KLIKA (zalogowanego).
-                // Jeśli chcesz zapisywać w profilu wybranego lekarza, trzeba by pobrać jego docId.
-                // Zakładam scenariusz: Lekarz klika u siebie.
+                // 1. Generuj listę dni do oznaczenia
+                const daysToMark = getDatesInRange(dateStart, dateEnd);
                 
-                const settlementData = {
-                    dataOd: dateStart,
-                    dataDo: dateEnd,
-                    kwota: parseFloat(amount),
-                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-                    zatwierdzil_uid: currentUserProfile.uid,
-                    zatwierdzil_nazwisko: `${currentUserProfile.Imie} ${currentUserProfile.Nazwisko}`
-                };
+                // 2. Przygotuj Batch (zapis masowy)
+                const batch = db.batch();
+                let opsCount = 0;
 
-                await db.collection("konfiguracja")
-                        .doc(currentUserProfile.id)
-                        .collection("rozliczenia")
-                        .add(settlementData);
+                daysToMark.forEach(dayString => {
+                    // ID dokumentu: UID_DATA (np. user123_2026-02-12)
+                    const docId = `${targetUserId}_${dayString}`;
+                    const docRef = db.collection("kalendarz_rozliczenia").doc(docId);
+                    
+                    const monthStr = dayString.substring(0, 7); // YYYY-MM
 
-                showToast("Rozliczenie zapisane pomyślnie! ✅", "success");
+                    // Ustawiamy dane (nadpisujemy jeśli już jest, żeby odświeżyć timestamp)
+                    batch.set(docRef, {
+                        uid: targetUserId,
+                        data: dayString,
+                        miesiac: monthStr,
+                        timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                        oznaczyl_uid: currentUserProfile.uid,
+                        oznaczyl_kto: `${currentUserProfile.Imie} ${currentUserProfile.Nazwisko} (Raport)`,
+                        z_raportu: true, // Flaga, że to z automatu
+                        kwota_raportu: amount // Opcjonalnie, dla śladu
+                    });
+                    opsCount++;
+                });
+
+                // 3. Wyślij do bazy
+                await batch.commit();
+
+                showToast(`Pomyślnie oznaczono ${opsCount} dni w kalendarzu! ✅`, "success");
                 
                 // Aktualizuj przycisk
-                settleReportBtn.textContent = "Rozliczono ✔️";
+                settleReportBtn.textContent = "Rozliczono w Kalendarzu ✔️";
                 settleReportBtn.style.backgroundColor = "#27ae60";
                 
-                // Odśwież "przypominajkę" na górze
-                checkLastSettlement();
+                // Odśwież "przypominajkę" na górze (teraz pokaże ostatni dzień z tego zakresu)
+                checkLastSettlement(targetUserId);
 
             } catch (error) {
-                console.error("Błąd zapisu rozliczenia:", error);
-                alert("Wystąpił błąd podczas zapisu.");
+                console.error("Błąd zapisu rozliczenia do kalendarza:", error);
+                alert("Wystąpił błąd podczas zapisu dni w kalendarzu.");
                 settleReportBtn.disabled = false;
                 settleReportBtn.textContent = '💰 Zatwierdź Rozliczenie';
             }
