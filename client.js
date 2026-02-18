@@ -86,7 +86,24 @@ function initApp() {
 }
 
 // --- FUNKCJE POMOCNICZE (GLOBALNE) ---
-
+function toggleEditFields() {
+    const type = document.getElementById('editType').value;
+    const isBull = (type === 'byk');
+    
+    // Pola do ukrycia dla byka
+    const fieldsToHide = [
+        'editLastCalving', 'editLastInsem', 'editSemen', 
+        'editPregStatus', 'editIsDriedOff'
+    ];
+    
+    fieldsToHide.forEach(id => {
+        const el = document.getElementById(id);
+        if(el) {
+            // Ukrywamy cały rząd (form-row), czyli rodzica inputa
+            el.closest('.form-row').style.display = isBull ? 'none' : 'flex'; // lub 'block'
+        }
+    });
+}
 function addDays(date, days) { 
     const r = new Date(date); 
     r.setDate(r.getDate() + days); 
@@ -1012,103 +1029,137 @@ function openAnimalCard(id) {
     document.getElementById('viewMode').classList.remove('hidden');
     document.getElementById('editMode').classList.add('hidden');
 
+    // Podstawowe dane
     document.getElementById('cardTag').textContent = animal.tag;
     document.getElementById('cardDob').textContent = animal.dob;
-    // --- NAPRAWA: Wyświetlanie daty ost. wycielenia i zacielenia ---
-if(document.getElementById('cardLastCalving')) {
-    document.getElementById('cardLastCalving').textContent = animal.lastCalving || '---';
-}
-if(document.getElementById('cardLastInsem')) {
-    document.getElementById('cardLastInsem').textContent = animal.lastInsemination || '---';
-}
-// -------------------------------------------------------------
-    // --- MODUŁ 3: Sekcja Cielność ---
-    const pregDiv = document.getElementById('cardPregnancyDetails');
-    // UWAGA: Musisz dodać <div id="cardPregnancyDetails"></div> w swoim HTML w modalu karty!
-    // Jeśli nie masz dostępu do HTML, wstrzykniemy go dynamicznie poniżej:
+    document.getElementById('cardType').textContent = animal.type;
     
-    let targetContainer = document.getElementById('cardPregnancySectionJS');
-    if(!targetContainer) {
-        // Tworzymy kontener jeśli go nie ma (wstawiamy po dacie urodzenia)
-        targetContainer = document.createElement('div');
-        targetContainer.id = 'cardPregnancySectionJS';
-        targetContainer.style.cssText = "background: #e8f5e9; padding: 10px; border-radius: 5px; margin: 10px 0; border: 1px solid #c8e6c9;";
-        const dobEl = document.getElementById('cardDob').parentNode; // Zakładam że data ur jest w jakimś divie
-        dobEl.parentNode.insertBefore(targetContainer, dobEl.nextSibling);
-    }
+    // Pochodzenie i Lokalizacja
+    if(document.getElementById('cardMother')) document.getElementById('cardMother').textContent = animal.motherTag || 'Brak danych';
+    if(document.getElementById('cardFather')) document.getElementById('cardFather').textContent = animal.fatherSemen || 'Brak danych';
+    if(document.getElementById('cardLocation')) document.getElementById('cardLocation').textContent = animal.location || 'Brak danych';
 
-    if(animal.isPregnantConfirmed && animal.lastInsemination) {
-        const insemDate = new Date(animal.lastInsemination);
-        const gestDays = userSettings.gestation || 280;
-        const progCalving = addDays(insemDate, gestDays);
-        const daysToCalv = Math.floor((progCalving - new Date()) / (1000 * 60 * 60 * 24));
+    // --- LOGIKA WIDOKU DLA RÓŻNYCH TYPÓW (Pkt 2) ---
+    const isBull = (animal.type === 'byk');
+    const cowSpecificElements = [
+        'cardPregnancySectionJS', 'cardPregStatus', 'cardLastCalving', 
+        'cardLastInsem', 'cardOffspring', 'cardHistory', 
+        'cardCalvingHistory', 'cardDimStat'
+    ];
 
-        targetContainer.innerHTML = `
-            <h4 style="margin: 0 0 5px 0; color: #2e7d32;">🤰 Status: Cielna</h4>
-            <div style="font-size: 14px; display: grid; grid-template-columns: 1fr 1fr; gap: 5px;">
-                <div>📅 Krycie: <b>${animal.lastInsemination}</b></div>
-                <div>🧬 Buhaj: <b>${animal.semen || 'Nieznany'}</b></div>
-                <div style="grid-column: span 2; border-top: 1px dashed #aaa; padding-top: 5px; margin-top: 2px;">
-                    🍼 Termin wycielenia: <b>${progCalving.toLocaleDateString('pl-PL')}</b><br>
-                    <span style="font-size:12px; color: ${daysToCalv < 14 ? 'red' : '#555'}">(za ok. ${daysToCalv} dni)</span>
-                </div>
-            </div>
+    // Ukrywamy/Pokazujemy elementy typowe dla krów
+    cowSpecificElements.forEach(elId => {
+        const el = document.getElementById(elId);
+        if(el) el.style.display = isBull ? 'none' : 'block';
+    });
+
+    // Sekcja specjalna dla Byka (Cele wiekowe) - wstrzykujemy dynamicznie
+    let bullSection = document.getElementById('bullAgeSection');
+    if (isBull) {
+        if (!bullSection) {
+            bullSection = document.createElement('div');
+            bullSection.id = 'bullAgeSection';
+            bullSection.style.cssText = "background:#fff3e0; padding:10px; border-radius:10px; margin:10px 0; border:1px solid #ffe0b2;";
+            // Wstawiamy po dacie urodzenia
+            document.getElementById('cardDob').parentNode.appendChild(bullSection);
+        }
+        bullSection.style.display = 'block';
+        
+        const dob = new Date(animal.dob);
+        const d24 = new Date(dob); d24.setMonth(d24.getMonth() + 24);
+        const d30 = new Date(dob); d30.setMonth(d30.getMonth() + 30);
+        
+        bullSection.innerHTML = `
+            <strong>🎯 Cele hodowlane:</strong><br>
+            24 mies: <b>${d24.toLocaleDateString()}</b><br>
+            30 mies: <b>${d30.toLocaleDateString()}</b>
         `;
-        targetContainer.style.display = 'block';
     } else {
-        targetContainer.style.display = 'none'; // Ukryj jeśli nie jest cielna
+        if(bullSection) bullSection.style.display = 'none';
+        
+        // Dla Krów/Jałówek wypełniamy standardowe dane (jeśli nie byk)
+        if(document.getElementById('cardLastCalving')) document.getElementById('cardLastCalving').textContent = animal.lastCalving || '---';
+        if(document.getElementById('cardLastInsem')) document.getElementById('cardLastInsem').textContent = animal.lastInsemination || '---';
+        
+        // Logika potomstwa i historii (bez zmian)...
+        // (Tutaj wstawiamy Twój kod generowania potomstwa i historii inseminacji - ten sam co był)
+        renderSubListsForCow(animal); // Wyniosłem to do małej funkcji pomocniczej niżej, żeby kod był czytelny
     }
-    // ---------------------------------
-    // --- NOWA SEKCJA: RODZINA I POCHODZENIE ---
+
+    // --- PRZYGOTOWANIE TRYBU EDYCJI (Pkt 3 - Naprawa lokalizacji i typu) ---
+    document.getElementById('editTag').value = animal.tag;
+    document.getElementById('editDob').value = animal.dob;
     
-    // 1. Wyświetlanie Matki i Ojca (Pobieranie z bazy)
-    if(document.getElementById('cardMother')) {
-        document.getElementById('cardMother').textContent = animal.motherTag || 'Brak danych';
-    }
-    if(document.getElementById('cardFather')) {
-        document.getElementById('cardFather').textContent = animal.fatherSemen || 'Brak danych';
-    }
-
-    // 2. Wyświetlanie Lokalizacji (jeśli pominąłeś wcześniej)
-    if(document.getElementById('cardLocation')) {
-        document.getElementById('cardLocation').textContent = animal.location || 'Brak danych';
+    // NAPRAWA LOKALIZACJI
+    document.getElementById('editLocation').value = animal.location || '';
+    
+    // Ustawienie typu w Select
+    if(document.getElementById('editType')) {
+        document.getElementById('editType').value = animal.type;
+        toggleEditFields(); // Ukryj/Pokaż pola w zależności od typu
     }
 
-    // 3. Pobieranie i wyświetlanie potomstwa (Dzieci)
+    document.getElementById('editMother').value = animal.motherTag || '';
+    document.getElementById('editFather').value = animal.fatherSemen || '';
+    
+    if(!isBull) {
+        document.getElementById('editLastCalving').value = animal.lastCalving || '';
+        document.getElementById('editLastInsem').value = animal.lastInsemination || '';
+        if(document.getElementById('editSemen')) document.getElementById('editSemen').value = animal.semen || '';
+        if(document.getElementById('editIsDriedOff')) document.getElementById('editIsDriedOff').checked = animal.isDriedOff || false;
+        
+        let statusVal = 'unknown';
+        if (animal.isPregnantConfirmed) statusVal = 'pregnant';
+        else if (animal.usgStatus === 'negative') statusVal = 'negative';
+        else if (animal.usgStatus === 'pending') statusVal = 'check';
+        document.getElementById('editPregStatus').value = statusVal;
+    }
+
+    document.getElementById('animalCardModal').style.display = 'flex';
+}
+
+// Funkcja pomocnicza do renderowania list (żeby openAnimalCard nie było za długie)
+function renderSubListsForCow(animal) {
+    // Potomstwo
     const offspringDiv = document.getElementById('cardOffspring');
     if(offspringDiv) {
-        // Szukamy w stadzie zwierząt, które w polu motherTag mają kolczyk aktualnie otwartej krowy
         const offspring = myHerd.filter(a => a.motherTag === animal.tag);
         if(offspring.length > 0) {
             offspringDiv.innerHTML = offspring.map(child => 
                 `<div onclick="closeModal('animalCardModal'); openAnimalCard('${child.id}')" 
                       style="padding:8px; border-bottom:1px solid #eee; color:#1976d2; cursor:pointer; display:flex; align-items:center; gap:10px;">
                     <i class="bi bi-cow"></i> 
-                    <span><b>${child.tag}</b> (${child.type === 'jalowka' ? 'Jałówka' : child.type})</span>
+                    <span><b>${child.tag}</b> (${child.type})</span>
                 </div>`
             ).join('');
         } else {
-            offspringDiv.innerHTML = '<div style="color:#999; font-size:12px; padding:5px;">Brak zarejestrowanego potomstwa.</div>';
+            offspringDiv.innerHTML = '<div style="color:#999; font-size:12px; padding:5px;">Brak potomstwa.</div>';
         }
     }
-    // --- KONIEC SEKCJI RODZINNEJ ---
-    // Punkt 7: Wyświetlanie typu zwierzęcia
-    const cardTypeEl = document.getElementById('cardType');
-    if(cardTypeEl) cardTypeEl.textContent = animal.type;
-
-    // Punkt 11: Historia wycieleń
- const calvHistDiv = document.getElementById('cardCalvingHistory');
-    if(calvHistDiv) {
-        calvHistDiv.innerHTML = ''; // Czyścimy stare wpisy, nie dodajemy nagłówka
+    // Historia Insem
+    const histDiv = document.getElementById('cardHistory');
+    if(histDiv) {
+        histDiv.innerHTML = '';
+        const h = animal.historyInsemination || [];
+        h.map((val, idx) => ({val, idx})).reverse().forEach(item => {
+            const x = item.val;
+            const row = document.createElement('div');
+            row.style.cssText = 'border-bottom:1px solid #eee; padding:5px 0; display:flex; justify-content:space-between; align-items:center;';
+            row.innerHTML = `<span>💉 ${x.date} <small>(${x.bull})</small></span>
+                <button class="btn-danger" style="padding:2px 8px; font-size:10px;" onclick="deleteInsemination('${animal.id}', ${item.idx})">🗑</button>`;
+            histDiv.appendChild(row);
+        });
+    }
+    // Historia Wycielen
+    const calvDiv = document.getElementById('cardCalvingHistory');
+    if(calvDiv) {
+        calvDiv.innerHTML = '';
         const ch = animal.historyCalving || [];
-        if(ch.length === 0) {
-            calvHistDiv.innerHTML = '<small style="color:#999;">Brak danych</small>';
-        } else {
-            [...ch].reverse().forEach(c => {
-                calvHistDiv.innerHTML += `<div style="font-size:12px; border-bottom:1px solid #eee; padding:3px;">🍼 Data: <b>${c.date}</b></div>`;
-            });
-        }
+        [...ch].reverse().forEach(c => {
+            calvDiv.innerHTML += `<div style="font-size:12px; padding:5px 0; border-bottom:1px solid #eee;"><span>🍼 Data: <b>${c.date}</b></span></div>`;
+        });
     }
+}
     const today = new Date();
     let totalDim = 0;
     let countDim = 0;
@@ -1210,47 +1261,50 @@ function toggleEditMode() {
 function saveAnimalChanges() {
     if(!currentEditingAnimalId) return;
     
+    const newType = document.getElementById('editType').value; // NOWE
     const newTag = document.getElementById('editTag').value;
     const dob = document.getElementById('editDob').value;
-    const lastCalving = document.getElementById('editLastCalving').value || null;
-    const lastInsem = document.getElementById('editLastInsem').value || null;
-    const newStatus = document.getElementById('editPregStatus').value;
-    
     const location = document.getElementById('editLocation').value || '';
     const motherTag = document.getElementById('editMother').value || '';
     const fatherSemen = document.getElementById('editFather').value || '';
-    const lastSemen = document.getElementById('editSemen')?.value || '';
-
-    // --- DODAJ TO: Odczyt checkboxa ---
-    const isDriedOffManual = document.getElementById('editIsDriedOff') ? document.getElementById('editIsDriedOff').checked : false;
-    // ----------------------------------
-
-    let isPreg = false;
-    let usg = 'pending';
-    if(newStatus === 'pregnant') { isPreg = true; usg = 'positive'; }
-    else if(newStatus === 'negative') { isPreg = false; usg = 'negative'; }
-    else if(newStatus === 'check') { isPreg = false; usg = 'pending'; }
     
-    db.collection('animals').doc(currentEditingAnimalId).update({
+    // Obiekt do aktualizacji
+    let updateData = {
+        type: newType, // ZAPIS TYPU
         tag: newTag,
-        dob: dob, 
-        lastCalving: lastCalving, 
-        lastInsemination: lastInsem,
-        semen: lastSemen,
-        isPregnantConfirmed: isPreg,
-        usgStatus: usg,
+        dob: dob,
         location: location,
         motherTag: motherTag,
-        fatherSemen: fatherSemen,
-        
-        // --- DODAJ TO: Zapis do bazy ---
-        isDriedOff: isDriedOffManual
-        // -------------------------------
-    }).then(() => {
+        fatherSemen: fatherSemen
+    };
+
+    if (newType !== 'byk') {
+        const lastCalving = document.getElementById('editLastCalving').value || null;
+        const lastInsem = document.getElementById('editLastInsem').value || null;
+        const lastSemen = document.getElementById('editSemen')?.value || '';
+        const newStatus = document.getElementById('editPregStatus').value;
+        const isDriedOffManual = document.getElementById('editIsDriedOff') ? document.getElementById('editIsDriedOff').checked : false;
+
+        let isPreg = false;
+        let usg = 'pending';
+        if(newStatus === 'pregnant') { isPreg = true; usg = 'positive'; }
+        else if(newStatus === 'negative') { isPreg = false; usg = 'negative'; }
+        else if(newStatus === 'check') { isPreg = false; usg = 'pending'; }
+
+        updateData.lastCalving = lastCalving;
+        updateData.lastInsemination = lastInsem;
+        updateData.semen = lastSemen;
+        updateData.isPregnantConfirmed = isPreg;
+        updateData.usgStatus = usg;
+        updateData.isDriedOff = isDriedOffManual;
+    }
+
+    db.collection('animals').doc(currentEditingAnimalId).update(updateData).then(() => {
         alert("Zapisano zmiany!");
         openAnimalCard(currentEditingAnimalId);
-        // Odświeżamy listę zadań, żeby np. zadanie zasuszenia wróciło jeśli odznaczyliśmy
-        generateAndRenderTasks(); 
+        // Ważne: Odśwież listę, bo zmiana typu wpływa na filtry
+        renderHerdList(); 
+        updateDashboardStats();
     }).catch(err => {
         console.error("Błąd zapisu:", err);
         alert("Błąd: " + err.message);
@@ -1685,105 +1739,156 @@ function toggleHerdFilter(filter) {
 }
 // --- FUNKCJE RENDERUJĄCE (NAPRAWA BŁĘDÓW) ---
 
-function renderHerdList() {
+function renderHerdList(forceType = null) {
     const list = document.getElementById('herdList');
     if (!list) return;
     list.innerHTML = '';
 
-    // 1. Przygotowanie danych i filtrów
+    // 1. Przygotowanie danych
     let filtered = [...myHerd];
     const searchInput = document.getElementById('herdSearch');
     const search = searchInput ? searchInput.value.toLowerCase() : '';
 
-   // 2. OBLICZANIE LICZNIKÓW DLA PRZYCISKÓW (FILTRÓW)
-    // DODANO: 'zasuszone' do obiektu counts
+    // 2. Liczniki (Aktualizacja)
     const counts = { puste: 0, usg: 0, cielne: 0, jalowka: 0, krowa: 0, byk: 0, zasuszone: 0 };
-    
     myHerd.forEach(a => {
-        const s = getDetailedStatus(a); 
-        if (s.category === 'puste') counts.puste++;
-        if (s.category === 'usg') counts.usg++;
-        if (a.isPregnantConfirmed) counts.cielne++;
+        const s = getDetailedStatus(a);
+        
+        // Zliczanie typów
         if (a.type === 'jalowka') counts.jalowka++;
         if (a.type === 'krowa') counts.krowa++;
         if (a.type === 'byk') counts.byk++;
-        // DODANO: Zliczanie zasuszonych
-        if (a.isDriedOff) counts.zasuszone++;
+        
+        // Statusy logiczne (tylko dla samic)
+        if (a.type !== 'byk') {
+            if (s.category === 'puste') counts.puste++;
+            if (s.category === 'usg') counts.usg++;
+            if (a.isPregnantConfirmed) counts.cielne++;
+            if (a.isDriedOff) counts.zasuszone++;
+        }
     });
 
-    // Wpisanie liczb do HTML (nawiasy w przyciskach)
     for (let key in counts) {
         const el = document.getElementById(`count-${key}`);
         if (el) el.textContent = `(${counts[key]})`;
     }
 
-    // 3. FILTROWANIE (Obsługa wielu filtrów jednocześnie + wyszukiwarka)
+    // 3. Logika Filtrowania (ŚCISŁA)
+    // Byki i Jałówki widoczne TYLKO w swoich zakładkach
     if (activeHerdFilters.length > 0) {
         filtered = filtered.filter(a => {
-            const s = getDetailedStatus(a);
-            // Sprawdzamy kategorie statusów
-            if (activeHerdFilters.includes('cielne') && a.isPregnantConfirmed) return true;
-            if (activeHerdFilters.includes('puste') && s.category === 'puste') return true;
-            // DODANO: Obsługa filtra zasuszone
-            if (activeHerdFilters.includes('zasuszone') && a.isDriedOff) return true;
-            if (activeHerdFilters.includes('usg') && s.category === 'usg') return true;
-            // Sprawdzamy typy zwierząt
-            if (activeHerdFilters.includes(a.type)) return true;
+            // Jeśli wybrano filtr BYK - pokaż byki
+            if (activeHerdFilters.includes('byk') && a.type === 'byk') return true;
+            // Jeśli wybrano filtr JAŁÓWKA - pokaż jałówki
+            if (activeHerdFilters.includes('jalowka') && a.type === 'jalowka') return true;
+            
+            // Filtry statusowe (Puste, Cielne, USG) - dotyczą tylko KRÓW i JAŁÓWEK
+            if (a.type !== 'byk') {
+                const s = getDetailedStatus(a);
+                if (activeHerdFilters.includes('cielne') && a.isPregnantConfirmed) return true;
+                if (activeHerdFilters.includes('puste') && s.category === 'puste') return true;
+                if (activeHerdFilters.includes('usg') && s.category === 'usg') return true;
+                if (activeHerdFilters.includes('zasuszone') && a.isDriedOff) return true;
+                if (activeHerdFilters.includes('krowa') && a.type === 'krowa') return true;
+            }
             return false;
         });
+    } else if (!search) {
+        // Jeśli nie ma filtrów i nie szukamy -> pokazujemy TYLKO KROWY (domyślny widok)
+        filtered = filtered.filter(a => a.type === 'krowa');
     }
 
+    // Obsługa wyszukiwarki (szuka wszędzie)
     if (search) {
-        filtered = filtered.filter(a => a.tag.toLowerCase().includes(search));
+        filtered = [...myHerd].filter(a => a.tag.toLowerCase().includes(search));
     }
 
-    // 4. SORTOWANIE DOMYŚLNE (Hierarchia ważności)
-   // 4. SORTOWANIE (Puste -> Świeże -> Inne -> USG -> Cielne -> Zasuszone)
+    // 4. Sortowanie
     filtered.sort((a, b) => {
+        // Byki i Jałówki: Od najstarszej (data urodzenia rosnąco)
+        if (activeHerdFilters.includes('byk') || activeHerdFilters.includes('jalowka')) {
+            const dateA = a.dob ? new Date(a.dob) : new Date();
+            const dateB = b.dob ? new Date(b.dob) : new Date();
+            return dateA - dateB; 
+        }
+        // Krowy: Priorytety hodowlane
         const getPriority = (x) => {
             const s = getDetailedStatus(x);
-            const today = new Date();
-            const lastCalv = x.lastCalving ? new Date(x.lastCalving) : null;
-            const diffCalv = lastCalv ? Math.floor((today - lastCalv) / (1000 * 60 * 60 * 24)) : 999;
-            
-            // Grupa: Puste (Kategoria 'puste' zawiera też te świeże < 60 dni, więc musimy je rozróżnić)
-            if (s.category === 'puste') {
-                // Jeśli jałówka LUB krowa wycielona dawniej niż 60 dni temu -> NAJWYŻSZY PRIORYTET
-                if (x.type === 'jalowka' || diffCalv > 60) return 1;
-                
-                // Jeśli krowa wycielona mniej niż 60 dni temu -> PRIORYTET DRUGI
-                return 2;
-            }
-
-            // Grupa: Zacielone, ale za wcześnie na USG (licznik dni)
-            if (s.category === 'inne' && x.lastInsemination) return 3;
-
-            // Grupa: Do badania USG
-            if (s.category === 'usg') return 4;
-
-            // Grupa: Cielne (laktacja)
-            if (s.category === 'cielne') return 5;
-
-            // Grupa: Zasuszone (Najniższy priorytet)
-            if (s.category === 'zasuszone') return 6;
-
-            return 7;
+            if (s.category === 'usg') return 1;
+            if (s.category === 'puste') return 2;
+            if (x.isPregnantConfirmed) return 3;
+            return 4;
         };
         return getPriority(a) - getPriority(b);
     });
 
     if (filtered.length === 0) {
-        list.innerHTML = '<div style="text-align:center; padding:20px; color:#999;">Brak zwierząt pasujących do filtrów.</div>';
+        list.innerHTML = '<div style="text-align:center; padding:20px; color:#999;">Brak zwierząt w tym widoku.</div>';
         return;
     }
 
-    // 5. GENEROWANIE KART ZWIERZĄT
+    // 5. Renderowanie Kart
     const today = new Date();
     filtered.forEach(a => {
-        const statusInfo = getDetailedStatus(a); // Pobranie inteligentnego statusu
-        
+        const div = document.createElement('div');
+        div.className = 'card';
+        div.style.padding = '10px';
+        div.onclick = () => openAnimalCard(a.id);
+
         let detailsHtml = '';
-        if (a.type === 'krowa' || a.type === 'jalowka') {
+
+        // --- WIDOK DLA BYKA (Pkt 5) ---
+        if (a.type === 'byk') {
+            const dob = new Date(a.dob);
+            
+            // Obliczanie dat granicznych (24m i 30m)
+            const date24m = new Date(dob); date24m.setMonth(date24m.getMonth() + 24);
+            const date30m = new Date(dob); date30m.setMonth(date30m.getMonth() + 30);
+            
+            let targetDate = date24m;
+            let targetLabel = "do 24 mies.";
+            
+            // Jeśli przekroczył 24m, pokazujemy cel na 30m
+            if (today > date24m) {
+                targetDate = date30m;
+                targetLabel = "do 30 mies.";
+            }
+
+            // Licznik dni
+            const diffTime = targetDate - today;
+            const daysLeft = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            const daysLeftColor = daysLeft < 30 ? '#c0392b' : '#2e7d32';
+            const displayDays = daysLeft > 0 ? `Zostało: ${daysLeft} dni` : `PRZEKROCZONO o ${Math.abs(daysLeft)} dni`;
+
+            detailsHtml = `
+                <div style="font-size:12px; color:#555; margin-top:5px; line-height:1.6;">
+                    <div style="display:flex; justify-content:space-between;">
+                        <span>📅 Ur: <b>${a.dob}</b></span>
+                        <span>📍 Lok: <b>${a.location || '-'}</b></span>
+                    </div>
+                    <div style="margin-top:5px; padding-top:5px; border-top:1px dashed #ccc;">
+                        Cel ${targetLabel}: <b>${targetDate.toLocaleDateString('pl-PL')}</b><br>
+                        <span style="color:${daysLeftColor}; font-weight:bold;">${displayDays}</span>
+                    </div>
+                </div>`;
+        } 
+        // --- WIDOK DLA JAŁÓWKI (Pkt 6 + status cielności) ---
+        else if (a.type === 'jalowka') {
+            const statusInfo = getDetailedStatus(a);
+            const ins = a.lastInsemination ? a.lastInsemination : '-';
+            
+            detailsHtml = `
+                <div style="font-size:11px; color:#555; margin-top:5px; display:grid; grid-template-columns: 1fr 1fr; gap:5px;">
+                    <span style="grid-column: span 2;">📅 Ur: <b>${a.dob}</b> | 📍 Lok: <b>${a.location || '-'}</b></span>
+                    <span>💉 Ost. zac: <b>${ins}</b></span>
+                    <span style="font-weight:bold; color:${statusInfo.color}; text-align:right;">
+                        ${statusInfo.text}
+                    </span>
+                </div>`;
+        }
+        // --- WIDOK DLA KROWY ---
+        else {
+            const statusInfo = getDetailedStatus(a);
             const ins = a.lastInsemination ? a.lastInsemination : '-';
             let calvTermin = '-';
             let dimLabel = '-';
@@ -1808,17 +1913,13 @@ function renderHerdList() {
                 </div>`;
         }
 
-        const div = document.createElement('div');
-        div.className = 'card';
-        div.style.padding = '10px';
         div.innerHTML = `
             <div style="display:flex; justify-content:space-between; align-items:center;">
                 <strong style="color:#2e7d32; font-size:16px;">${a.tag}</strong>
-                <span class="badge" style="background:#eee; color:#333; padding:2px 8px; border-radius:10px; font-size:10px;">${a.type}</span>
+                <span class="badge" style="background:#eee; color:#333; padding:2px 8px; border-radius:10px; font-size:10px;">${a.type.toUpperCase()}</span>
             </div>
             ${detailsHtml}
         `;
-        div.onclick = () => openAnimalCard(a.id);
         list.appendChild(div);
     });
 }
