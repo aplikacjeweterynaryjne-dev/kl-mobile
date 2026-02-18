@@ -518,39 +518,77 @@ function getDetailedStatus(a) {
     return { text: '⚪ Pusta', color: '#7f8c8d', category: 'puste' };
 }
 
-// --- SILNIK ZADAŃ I LOGIKA STADA (WERSJA OSTATECZNA Z POPRAWKAMI) ---
-
-   function generateAndRenderTasks() {
+function generateAndRenderTasks() {
     const today = new Date();
     today.setHours(0,0,0,0);
     let generatedTasks = [];
 
     myHerd.forEach(animal => {
-        // 1. USTALANIE DATY WYCIELENIA (Baza dla zasuszenia i profilaktyki)
+        
+        // =================================================================
+        // 1. ŚCIEŻKA SZYBKA DLA BYKÓW (Przeniesione na samą górę!)
+        // =================================================================
+        if (animal.type === 'byk') {
+            if (!animal.dob) return; // Jeśli byk nie ma daty urodzenia, pomijamy
+
+            const dob = new Date(animal.dob);
+            // 1 miesiąc = średnio 30.44 dnia
+            const ageMonths = (today - dob) / (1000 * 60 * 60 * 24 * 30.44);
+
+            // WIDOK 1: Ostrzeżenie (20 - 23.5 miesiąca)
+            if (ageMonths >= 20 && ageMonths < 23.5) {
+                const taskId20 = `${animal.id}_sell_20_24`;
+                if (!completedTasks.some(t => t.taskId === taskId20)) {
+                    generatedTasks.push({
+                        id: taskId20, animalId: animal.id, tag: animal.tag, 
+                        title: 'Sprzedaż byka (20-23.5 msc)',
+                        dueDate: today, 
+                        sortDate: today, priority: 'warning', type: 'sell_20_24',
+                        isDone: false, logId: null, insemDate: null, calvDate: null, 
+                        isReallyOverdue: false
+                    });
+                }
+            }
+            // WIDOK 2: PILNE (Powyżej 23.5 miesiąca)
+            // Twój byk (23.8 msc) wpadnie TUTAJ
+            else if (ageMonths >= 23.5) { 
+                const taskId24 = `${animal.id}_sell_24_30`;
+                if (!completedTasks.some(t => t.taskId === taskId24)) {
+                    generatedTasks.push({
+                        id: taskId24, animalId: animal.id, tag: animal.tag, 
+                        title: 'PILNE: Sprzedaż byka (> 23.5 msc)',
+                        dueDate: today,
+                        sortDate: today, priority: 'urgent', type: 'sell_24_30',
+                        isDone: false, logId: null, insemDate: null, calvDate: null, 
+                        // WAŻNE: false, żeby nie ukryło się w "Zaległych"
+                        isReallyOverdue: false 
+                    });
+                }
+            }
+            
+            return; // <--- KLUCZOWE: Kończymy przetwarzanie tego zwierzęcia, bo to byk!
+        }
+        // =================================================================
+
+
+        // 2. USTALANIE DATY WYCIELENIA (Logika dla Krów/Jałówek)
         const insDate = animal.lastInsemination ? new Date(animal.lastInsemination) : null;
         
-        // Wyliczamy przewidywany poród na podstawie ostatniego krycia
         let calvingDate = insDate ? addDays(insDate, userSettings.gestation || 280) : null;
 
         const daysSinceInsem = insDate ? Math.floor((today - insDate) / (1000 * 60 * 60 * 24)) : 0;
         const daysToCalving = calvingDate ? Math.floor((calvingDate - today) / (1000 * 60 * 60 * 24)) : 999;
 
-        // 2. AUTOMATYKA STATUSÓW (Zmieniają bazę danych)
-        
-        // Automat USG -> Cielna
+        // --- AUTOMATYKA STATUSÓW ---
         if (animal.usgStatus === 'pending' && daysSinceInsem > (userSettings.usg.end || 60)) {
             db.collection('animals').doc(animal.id).update({ isPregnantConfirmed: true, usgStatus: 'positive' });
         }
-
-      // Automat Zasuszenie (POPRAWIONY: Wykonuje się dopiero, gdy minie 40 dni do porodu)
-        // Dzięki temu zadanie będzie widoczne w okresie 60-40 dni.
-        const dryDeadline = Math.min(userSettings.dry.start, userSettings.dry.end); // Wybiera mniejszą liczbę (40)
-
+        
+        const dryDeadline = Math.min(userSettings.dry.start, userSettings.dry.end);
         if (animal.isPregnantConfirmed && !animal.isDriedOff && daysToCalving < dryDeadline) {
             db.collection('animals').doc(animal.id).update({ isDriedOff: true });
         }
 
-        // Automat Wycielenie (7 dni po terminie)
         if (animal.isPregnantConfirmed && calvingDate && daysToCalving < -7) {
             const taskId = `${animal.id}_calving_${calvingDate.toISOString().split('T')[0]}`;
             if (!completedTasks.some(t => t.taskId === taskId)) {
@@ -558,9 +596,9 @@ function getDetailedStatus(a) {
             }
         }
 
-        // 3. GENEROWANIE ZADAŃ WIZUALNYCH
+        // --- GENEROWANIE ZADAŃ WIZUALNYCH (Dla krów) ---
 
-        // --- SYNCHRONIZACJA (Tylko dla krów pustych) ---
+        // Synchronizacja
         if (animal.type === 'krowa' && animal.lastCalving) {
             const lastCalv = new Date(animal.lastCalving);
             const dim = Math.floor((today - lastCalv) / (1000 * 60 * 60 * 24));
@@ -569,31 +607,26 @@ function getDetailedStatus(a) {
             }
         }
 
-      // --- FILTR PRZEJŚCIA ---
-        // Przerywamy tylko jeśli krowa jest POTWIERDZONA jako pusta po USG
+        // FILTR PRZEJŚCIA (Teraz bezpieczny, bo byki są obsługiwane wyżej)
         if (animal.usgStatus === 'negative' && !animal.isPregnantConfirmed) return;
-        
-        // --- POPRAWKA: Przepuszczamy byki, bo one nie mają dat wycieleń/krycia ---
-        if (!calvingDate && !insDate && animal.type !== 'byk') return;
+        if (!calvingDate && !insDate) return;
 
-        // --- USG I RUJA (Tylko dla krów NIEPOTWIERDZONYCH) ---
+        // USG i Ruja
         if (!animal.isPregnantConfirmed && insDate) {
             checkRuleAndAddTask(generatedTasks, animal, userSettings.usg, daysSinceInsem, insDate, 'usg', calvingDate);
             checkRuleAndAddTask(generatedTasks, animal, userSettings.heat, daysSinceInsem, insDate, 'heat', calvingDate);
         }
 
-        // --- ZASUSZENIE / ROVAC / KEXXTONE (Dla WSZYSTKICH z datą wycielenia) ---
+        // Zasuszenie / Profilaktyka
         if (calvingDate) {
-            // Zasuszenie tylko dla krów
             if (animal.type === 'krowa') {
                 checkRuleAndAddTask(generatedTasks, animal, userSettings.dry, daysToCalving, calvingDate, 'dry', calvingDate, true);
             }
-            // Profilaktyka dla krów i jałówek
             checkRuleAndAddTask(generatedTasks, animal, userSettings.rovac, daysToCalving, calvingDate, 'rovac', calvingDate, true);
             checkRuleAndAddTask(generatedTasks, animal, userSettings.kexxtone, daysToCalving, calvingDate, 'kexxtone', calvingDate, true);
         }
 
-        // --- ZADANIA WŁASNE ---
+        // Zadania własne
         userSettings.customRules.forEach((rule, idx) => {
             if (rule.base === 'insem' && insDate) {
                 checkRuleAndAddTask(generatedTasks, animal, rule, daysSinceInsem, insDate, `custom_${idx}`, calvingDate);
@@ -602,47 +635,12 @@ function getDetailedStatus(a) {
             }
         });
 
-        // --- WIZUALNE SPODZIEWANE WYCIELENIE ---
+        // Wycielenie (Wizualne)
         if (calvingDate && daysToCalving <= 14 && daysToCalving >= -7) {
             const calvTaskId = `${animal.id}_calving_${calvingDate.toISOString().split('T')[0]}`;
             if (!completedTasks.some(t => t.taskId === calvTaskId)) {
                 let priority = (daysToCalving <= 5 && daysToCalving >= -5) ? 'urgent' : 'warning';
                 addTask(generatedTasks, animal, 'Spodziewane Wycielenie', calvingDate, calvingDate, priority, 'calving', insDate, calvingDate, (daysToCalving < 0));
-            }
-        }
-        // --- ZADANIA DLA BYKÓW (Sprzedaż wg wieku) ---
-        if (animal.type === 'byk' && animal.dob) {
-            const dob = new Date(animal.dob);
-            // Obliczamy wiek w miesiącach (przybliżenie: 1 msc = 30.44 dnia)
-            const ageMonths = (today - dob) / (1000 * 60 * 60 * 24 * 30.44);
-
-            // Okno 1: 20-24 miesiące
-            if (ageMonths >= 20 && ageMonths < 24) {
-                const taskId20 = `${animal.id}_sell_20_24`;
-                // Sprawdzamy czy nie wykonano
-                if (!completedTasks.some(t => t.taskId === taskId20)) {
-                    generatedTasks.push({
-                        id: taskId20, animalId: animal.id, tag: animal.tag, 
-                        title: 'Sprzedaż byka (20-24 msc)',
-                        dueDate: today, // Termin "na dzisiaj" (ciągły)
-                        sortDate: today, priority: 'warning', type: 'sell_20_24',
-                        isDone: false, logId: null, insemDate: null, calvDate: null, isReallyOverdue: false
-                    });
-                }
-            }
-
-            // Okno 2: 24-30 miesięcy (Priorytet wysoki)
-            else if (ageMonths >= 24 && ageMonths < 30) {
-                const taskId24 = `${animal.id}_sell_24_30`;
-                if (!completedTasks.some(t => t.taskId === taskId24)) {
-                    generatedTasks.push({
-                        id: taskId24, animalId: animal.id, tag: animal.tag, 
-                        title: 'Sprzedaż byka (24-30 msc)',
-                        dueDate: today,
-                        sortDate: today, priority: 'urgent', type: 'sell_24_30',
-                        isDone: false, logId: null, insemDate: null, calvDate: null, isReallyOverdue: true
-                    });
-                }
             }
         }
     });
