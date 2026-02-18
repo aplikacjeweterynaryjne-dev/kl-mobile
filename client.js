@@ -525,23 +525,23 @@ function generateAndRenderTasks() {
 
     myHerd.forEach(animal => {
         
-        // =================================================================
-        // 1. ŚCIEŻKA SZYBKA DLA BYKÓW (Przeniesione na samą górę!)
+       // =================================================================
+        // 1. ŚCIEŻKA SZYBKA DLA BYKÓW (Poprawiona logika)
         // =================================================================
         if (animal.type === 'byk') {
-            if (!animal.dob) return; // Jeśli byk nie ma daty urodzenia, pomijamy
+            if (!animal.dob) return; 
 
             const dob = new Date(animal.dob);
             // 1 miesiąc = średnio 30.44 dnia
             const ageMonths = (today - dob) / (1000 * 60 * 60 * 24 * 30.44);
 
-            // WIDOK 1: Ostrzeżenie (20 - 23.5 miesiąca)
-            if (ageMonths >= 20 && ageMonths < 23.5) {
+            // WIDOK 1: Od 20 do 24 miesiąca (Normalne przypomnienie)
+            if (ageMonths >= 20 && ageMonths < 24) {
                 const taskId20 = `${animal.id}_sell_20_24`;
                 if (!completedTasks.some(t => t.taskId === taskId20)) {
                     generatedTasks.push({
                         id: taskId20, animalId: animal.id, tag: animal.tag, 
-                        title: 'Sprzedaż byka (20-23.5 msc)',
+                        title: 'Sprzedaż byka (20-24 msc)',
                         dueDate: today, 
                         sortDate: today, priority: 'warning', type: 'sell_20_24',
                         isDone: false, logId: null, insemDate: null, calvDate: null, 
@@ -549,24 +549,25 @@ function generateAndRenderTasks() {
                     });
                 }
             }
-            // WIDOK 2: PILNE (Powyżej 23.5 miesiąca)
-            // Twój byk (23.8 msc) wpadnie TUTAJ
-            else if (ageMonths >= 23.5) { 
+            // WIDOK 2: Powyżej 24 miesiąca (PILNE)
+            // Wyświetli się TYLKO jeśli byk nadal jest w stadzie (czyli nie został sprzedany wcześniej)
+            else if (ageMonths >= 24) { 
                 const taskId24 = `${animal.id}_sell_24_30`;
+                // Generujemy to zadanie, nawet jeśli poprzednie (20-24) było wykonane, 
+                // bo skoro byk tu dalej jest i ma >24msc, to znaczy że trzeba go sprzedać.
                 if (!completedTasks.some(t => t.taskId === taskId24)) {
                     generatedTasks.push({
                         id: taskId24, animalId: animal.id, tag: animal.tag, 
-                        title: 'PILNE: Sprzedaż byka (> 23.5 msc)',
+                        title: 'PILNE: Sprzedaż byka (> 24 msc)',
                         dueDate: today,
                         sortDate: today, priority: 'urgent', type: 'sell_24_30',
                         isDone: false, logId: null, insemDate: null, calvDate: null, 
-                        // WAŻNE: false, żeby nie ukryło się w "Zaległych"
                         isReallyOverdue: false 
                     });
                 }
             }
             
-            return; // <--- KLUCZOWE: Kończymy przetwarzanie tego zwierzęcia, bo to byk!
+            return; // Kończymy dla byka
         }
         // =================================================================
 
@@ -912,34 +913,36 @@ function initiateTaskCompletion(taskId, type, animalId, dueDateStr) {
 function confirmTaskStandard() {
     if(!pendingTask) return;
     
-    // 1. Obsługa Zasuszenia (istniejąca logika)
+    // 1. Obsługa Sprzedaży Byka (PRIORYTET)
+    if (pendingTask.type === 'sell_20_24' || pendingTask.type === 'sell_24_30') {
+        
+        // Najpierw pytamy użytkownika (zanim cokolwiek zamkniemy)
+        if (confirm("Czy sprzedałeś tego byka? \nKliknij OK, aby USUNĄĆ go trwale ze stada.\nKliknij Anuluj, aby tylko odhaczyć zadanie (byk zostanie).")) {
+            
+            // Użytkownik chce usunąć
+            db.collection('animals').doc(pendingTask.animalId).delete()
+              .then(() => {
+                  alert("Byk został usunięty ze stada.");
+                  // Zapisujemy log, że sprzedano
+                  saveTaskLog(pendingTask, "Sprzedano i usunięto");
+              })
+              .catch(err => alert("Błąd usuwania: " + err.message));
+        } else {
+            // Użytkownik chce tylko odhaczyć zadanie
+            saveTaskLog(pendingTask, "Wykonano (Pozostawiono w stadzie)");
+        }
+        
+        closeModal('taskConfirmModal');
+        return; 
+    }
+
+    // 2. Obsługa Zasuszenia
     if (pendingTask.type === 'dry') {
         db.collection('animals').doc(pendingTask.animalId).update({ isDriedOff: true });
         alert("Krowa została oznaczona jako zasuszona.");
     }
 
-    // 2. NOWOŚĆ: Obsługa Sprzedaży Byka
-    if (pendingTask.type === 'sell_20_24' || pendingTask.type === 'sell_24_30') {
-        // Najpierw zapisujemy log, że zadanie wykonano
-        saveTaskLog(pendingTask, "Wykonano (Sprzedaż)");
-        
-        // Pytanie o usunięcie z opóźnieniem (żeby modal potwierdzenia zdążył zniknąć)
-        setTimeout(() => {
-            if (confirm("Czy sprzedałeś tego byka? Kliknij OK, aby USUNĄĆ go trwale ze stada.")) {
-                db.collection('animals').doc(pendingTask.animalId).delete()
-                  .then(() => {
-                      alert("Byk został usunięty ze stada.");
-                      // Lista odświeży się sama dzięki onSnapshot
-                  })
-                  .catch(err => alert("Błąd usuwania: " + err.message));
-            }
-        }, 100); 
-        
-        closeModal('taskConfirmModal');
-        return; // Kończymy, bo saveTaskLog wywołaliśmy ręcznie wyżej
-    }
-
-    // Standardowe zadania (np. Rovac, Kexxtone)
+    // 3. Standardowe zadania (np. Rovac, Kexxtone)
     saveTaskLog(pendingTask, "Wykonano");
     closeModal('taskConfirmModal');
 }
