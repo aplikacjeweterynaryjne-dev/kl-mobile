@@ -569,11 +569,12 @@ function getDetailedStatus(a) {
             }
         }
 
-        // --- FILTR PRZEJŚCIA ---
+      // --- FILTR PRZEJŚCIA ---
         // Przerywamy tylko jeśli krowa jest POTWIERDZONA jako pusta po USG
         if (animal.usgStatus === 'negative' && !animal.isPregnantConfirmed) return;
-        // Przerywamy jeśli brak jakiejkolwiek daty do wyliczeń
-        if (!calvingDate && !insDate) return;
+        
+        // --- POPRAWKA: Przepuszczamy byki, bo one nie mają dat wycieleń/krycia ---
+        if (!calvingDate && !insDate && animal.type !== 'byk') return;
 
         // --- USG I RUJA (Tylko dla krów NIEPOTWIERDZONYCH) ---
         if (!animal.isPregnantConfirmed && insDate) {
