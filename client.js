@@ -2363,26 +2363,42 @@ function populateSyncAnimals() {
         return;
     }
 
-   // Generowanie listy (PIONOWO: Tekst po lewej, Checkbox po prawej)
+   // Generowanie listy (PIONOWO)
     eligible.forEach(a => {
         const div = document.createElement('div');
-        // Styl: Flexbox rozrzucający elementy (space-between)
-        div.style.cssText = "display:flex; justify-content: space-between; align-items:center; padding: 12px; border-bottom: 1px solid #eee; background: white;";
+        // Styl: Flexbox, szerokość 100% żeby wyrównać do krawędzi
+        div.style.cssText = "display:flex; align-items:center; padding: 10px 5px; border-bottom: 1px solid #eee; background: white; width: 100%; box-sizing: border-box;";
         
-        // Obliczanie wieku dla jałówek (dla info)
-        let infoText = a.type;
+        // --- BUDOWANIE OPISU SZCZEGÓŁOWEGO ---
+        let parts = [];
+        
+        // 1. Wiek (dla jałówek)
         if (a.type === 'jalowka' && a.dob) {
             const age = Math.floor((new Date() - new Date(a.dob)) / (1000 * 60 * 60 * 24 * 30.4));
-            infoText += ` (${age} mies.)`;
+            parts.push(`${a.type} (${age} mies.)`);
+        } else {
+            parts.push(a.type);
         }
 
-        // ✅ ZMIANA KOLEJNOŚCI: Najpierw tekst, potem input
+        // 2. Lokalizacja
+        if (a.location) {
+            parts.push(`📍 ${a.location}`);
+        }
+
+        // 3. Ostatnie wycielenie
+        if (a.lastCalving) {
+            parts.push(`🍼 ${a.lastCalving}`);
+        }
+
+        const infoText = parts.join(' | ');
+
+        // HTML: Tekst dostaje "flex: 1", żeby zająć całe miejsce i wypchnąć checkboxa w prawo
         div.innerHTML = `
-            <div style="text-align: left;">
+            <div style="text-align: left; flex: 1; padding-right: 10px;">
                 <span style="font-weight:bold; font-size:15px; color:#333; display:block;">${a.tag}</span>
-                <span style="font-size:11px; color:#777;">${infoText}</span>
+                <span style="font-size:11px; color:#777; display:block; margin-top:2px; line-height:1.3;">${infoText}</span>
             </div>
-            <input type="checkbox" class="sync-animal-cb" value="${a.id}" data-tag="${a.tag}" onchange="updateSyncCount()" style="transform: scale(1.5); cursor: pointer;">
+            <input type="checkbox" class="sync-animal-cb" value="${a.id}" data-tag="${a.tag}" onchange="updateSyncCount()" style="transform: scale(1.5); cursor: pointer; flex-shrink: 0;">
         `;
         list.appendChild(div);
     });
