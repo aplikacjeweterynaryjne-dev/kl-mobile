@@ -916,23 +916,27 @@ function renderTasks(allTasks) {
         let buttonHtml = '';
 
         if (t.isGroupTask) {
-            // --- WYGLĄD ZADANIA SYNCHRONIZACJI ---
+            // --- WYGLĄD ZADANIA SYNCHRONIZACJI (LISTA WIDOCZNA OD RAZU) ---
             
-            // 1. Treść zadania (kliknięcie w treść też otwiera listę)
+            // Generujemy listę kolczyków jako string, np: "PL-123, PL-456, PL-789"
+            const animalsListStr = t.animalTags.map(tag => `🐮 <b>${tag}</b>`).join(', ');
+
             infoHtml = `
-                <div style="cursor: pointer;" onclick="initiateSyncTaskCompletion('${t.id}')">
+                <div style="cursor: default;">
                     <div style="font-size:15px; font-weight:bold; color:#8e44ad;">${t.title}</div>
-                    <div style="font-size: 11px; color: #777; margin: 4px 0; line-height: 1.4;">
+                    
+                    <div style="font-size: 11px; color: #777; margin: 4px 0 8px 0; line-height: 1.4;">
                         Termin: <b style="color:${dateColor}">${dueStr}</b><br>
-                        Sztuk w programie: <b>${t.animalTags.length}</b>
+                        Liczba sztuk: <b>${t.animalTags.length}</b>
                     </div>
-                    <div class="task-animal-tag" style="background:#f3e5f5; color:#8e44ad; border-color:#ce93d8; text-align:center;">
-                        👁️ ZOBACZ LISTĘ ZWIERZĄT
+
+                    <div style="background:#f3e5f5; color:#4a148c; border:1px solid #ce93d8; padding:8px; border-radius:6px; font-size:11px; line-height:1.6;">
+                        ${animalsListStr}
                     </div>
                 </div>
             `;
             
-            // 2. Checkbox akcji (Fioletowy dla synchronizacji)
+            // Checkbox wywołuje potwierdzenie
             buttonHtml = t.isDone 
                 ? `<button class="btn" style="padding:5px 10px; font-size:11px; background:#ddd;" onclick="undoTask('${t.logId}')">Cofnij</button>`
                 : `<input type="checkbox" 
@@ -2063,23 +2067,46 @@ function renderHerdList(forceType = null) {
         filtered = [...myHerd].filter(a => a.tag.toLowerCase().includes(search));
     }
 
-    // 4. Sortowanie
+   // 4. Sortowanie (Zgodnie z życzeniem: Puste -> Świeże -> USG -> Cielne -> Zasuszone)
     filtered.sort((a, b) => {
-        // Byki i Jałówki: Od najstarszej (data urodzenia rosnąco)
+        // Byki i Jałówki: Od najstarszej
         if (activeHerdFilters.includes('byk') || activeHerdFilters.includes('jalowka')) {
             const dateA = a.dob ? new Date(a.dob) : new Date();
             const dateB = b.dob ? new Date(b.dob) : new Date();
             return dateA - dateB; 
         }
+
         // Krowy: Priorytety hodowlane
         const getPriority = (x) => {
             const s = getDetailedStatus(x);
-            if (s.category === 'usg') return 1;
-            if (s.category === 'puste') return 2;
-            if (x.isPregnantConfirmed) return 3;
-            return 4;
+            
+            // 5. ZASUSZONE (Na samym końcu)
+            if (x.isDriedOff) return 5;
+
+            // 4. CIELNE
+            if (x.isPregnantConfirmed) return 4;
+
+            // 3. DO USG
+            // Sprawdzamy czy kategory statusu to USG lub czy minęło >30 dni od zacielenia
+            if (s.category === 'usg' || (x.lastInsemination && !x.isPregnantConfirmed && s.category !== 'puste')) return 3;
+
+            // 2. NIEDAWNO WYCIELONE (Świeże < 60 dni)
+            // Funkcja getDetailedStatus zwraca tekst "Wycielona < 60 dni" dla tej grupy
+            if (s.text.includes('Wycielona')) return 2;
+
+            // 1. PUSTE (Najważniejsze - te co nie zaszły lub są długo po wycieleniu)
+            return 1; 
         };
-        return getPriority(a) - getPriority(b);
+
+        const pA = getPriority(a);
+        const pB = getPriority(b);
+
+        if (pA !== pB) return pA - pB; // Sortuj po grupach
+
+        // Jeśli ta sama grupa, sortuj po dacie ost. zabiegu (starsze na górę)
+        const dateA = a.lastInsemination || a.lastCalving || '9999-99-99';
+        const dateB = b.lastInsemination || b.lastCalving || '9999-99-99';
+        return dateA.localeCompare(dateB);
     });
 
     if (filtered.length === 0) {
