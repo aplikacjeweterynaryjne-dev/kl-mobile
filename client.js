@@ -923,13 +923,17 @@ function renderTasks(allTasks) {
                     Termin: <b style="color:${dateColor}">${dueStr}</b><br>
                     Sztuk w programie: <b>${t.animalTags.length}</b>
                 </div>
-                <div class="task-animal-tag" style="background:#f3e5f5; color:#8e44ad; border-color:#ce93d8;">
+                <div class="task-animal-tag" 
+                     style="background:#f3e5f5; color:#8e44ad; border-color:#ce93d8; cursor: pointer;"
+                     onclick="initiateSyncTaskCompletion('${t.id}')">
                     ZOBACZ LISTĘ ZWIERZĄT
                 </div>
             `;
+            
             buttonHtml = t.isDone 
                 ? `<button class="btn" style="padding:5px 10px; font-size:11px; background:#ddd;" onclick="undoTask('${t.logId}')">Cofnij</button>`
                 : `<button class="btn primary small" style="background:#8e44ad; color:white; border:none;" onclick="initiateSyncTaskCompletion('${t.id}')">Wykonaj</button>`;
+        }
         } else {
             // WYGLĄD STANDARDOWEGO ZADANIA (Twój stary kod wkomponowany tutaj)
             const insemStr = t.insemDate ? (new Date(t.insemDate).toLocaleDateString('pl-PL')) : '-';
