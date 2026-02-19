@@ -81,6 +81,11 @@
         /* NOWE STYLE DLA MASOWYCH AKCJI I FILTRA */
         .mass-select-cb { accent-color: var(--primary); }
         #f-zasuszone.active { background: #7f8c8d; border-color: #7f8c8d; color: #fff; }
+
+        /* ✅ STYLE DLA SYNCHRONIZACJI ROZRODU */
+        .sync-item-card { border: 1px solid #ccc; padding: 10px; border-radius: 8px; margin-bottom: 10px; background: #fff; display: flex; justify-content: space-between; align-items: center; }
+        .sync-item-card .details { font-size: 12px; color: #555; line-height: 1.4; }
+        .sync-checkbox-wrapper { display: flex; align-items: center; gap: 5px; font-size: 14px; }
     </style>
 </head>
 <body>
@@ -172,6 +177,11 @@
             <hr>
             <div id="configList"></div>
             <hr>
+
+            <button class="btn btn-primary" style="width:100%; margin-bottom: 20px; background-color: #8e44ad; border-color: #732d91;" onclick="openSyncManager()">
+                🔄 Otwórz Menadżer Synchronizacji Rozrodu
+            </button>
+
             <h3>Dodaj Własne Zadanie</h3>
             <form id="customTaskForm">
                 <div class="form-row"><label>Nazwa Zadania</label><input type="text" id="newCfgName" required></div>
@@ -322,6 +332,73 @@
 
     <div id="listModal" class="modal"><div class="modal-content"><button class="close-modal-fixed" onclick="closeModal('listModal')">✕</button><h3 id="listModalTitle">Lista</h3><div id="listModalContent"></div></div></div>
     <div id="taskConfirmModal" class="modal"><div class="modal-content"><h3>Potwierdź</h3><p id="taskConfirmText"></p><div id="usgResultOptions" class="hidden"><button class="btn btn-primary" onclick="confirmTaskUSG(true)">✅ CIELNA</button><button class="btn btn-danger" onclick="confirmTaskUSG(false)">❌ NIECIELNA</button></div><div id="calvingConfirmOptions" class="hidden"><input type="date" id="calvingRealDate" class="form-row"><button class="btn btn-primary" onclick="confirmTaskCalvingUI()">Potwierdź</button></div><div id="standardConfirmBtns"><button class="btn btn-primary" onclick="confirmTaskStandard()">Tak, wykonano</button></div><button class="btn" style="background:#eee;" onclick="closeModal('taskConfirmModal')">Anuluj</button></div></div>
+
+    <div id="syncManagerModal" class="modal hidden">
+        <div class="modal-content" style="max-width: 600px;">
+            <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h3 style="margin: 0; color: #8e44ad;">Zarządzanie Synchronizacją</h3>
+                <span class="close-btn" style="font-size: 28px; cursor: pointer; color: #999;" onclick="closeModal('syncManagerModal')">&times;</span>
+            </div>
+            
+            <div style="display:flex; gap:10px; margin-bottom:15px; border-bottom:2px solid #eee; padding-bottom:10px;">
+                <button class="btn btn-primary small" id="tabSyncNew" style="margin:0; padding:8px;" onclick="switchSyncTab('new')">Nowy Program</button>
+                <button class="btn small" id="tabSyncActive" style="margin:0; padding:8px; background:#eee; color:#333;" onclick="switchSyncTab('active')">Aktywne Programy</button>
+            </div>
+
+            <div id="syncNewSection">
+                <div class="form-row">
+                    <label>Wybierz metodę synchronizacji:</label>
+                    <select id="syncMethodSelect" onchange="renderSyncPreview()">
+                        <option value="g6g">G6G (Krowy)</option>
+                        <option value="ovsynch">Ovsynch (Krowy)</option>
+                        <option value="jalowki">Ovsynch (Jałówki)</option>
+                    </select>
+                </div>
+                
+                <div class="form-row">
+                    <label>Data pierwszej dawki (Dzień 0):</label>
+                    <input type="date" id="syncStartDate" onchange="renderSyncPreview()">
+                </div>
+
+                <div class="form-row">
+                    <label>Wybierz sztuki (>13 msc): <span id="syncAnimalCount" style="color: #8e44ad;">0 wybrano</span></label>
+                    <div id="syncAnimalList" style="max-height: 150px; overflow-y: auto; border: 1px solid #ccc; padding: 10px; border-radius: 6px; background: #fafafa; display: grid; grid-template-columns: 1fr 1fr; gap: 5px;">
+                        </div>
+                </div>
+
+                <div id="syncPreview" style="background:#f3e5f5; padding:10px; border-radius:6px; font-size:12px; margin-bottom:15px; color:#8e44ad;">
+                    </div>
+
+                <button class="btn btn-primary" style="width:100%; background-color: #8e44ad;" onclick="startSynchronization()">🚀 Rozpocznij Synchronizację</button>
+            </div>
+
+            <div id="syncActiveSection" class="hidden">
+                <div id="activeSyncList">
+                    </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="syncTaskConfirmModal" class="modal hidden">
+        <div class="modal-content">
+            <h3 id="syncTaskTitle" style="color: #8e44ad;">Szczegóły Podania</h3>
+            <p id="syncTaskSubtitle" style="font-size: 12px; color: #555; margin-bottom: 15px;"></p>
+            
+            <div style="background: #fff8e1; border-left: 4px solid #f39c12; padding: 10px; margin-bottom: 15px;">
+                <strong>Dawkowanie:</strong><br>
+                <span id="syncTaskDose" style="font-size: 15px; font-weight: bold; color: #c0392b;"></span>
+            </div>
+
+            <label>Zwierzęta do obsłużenia:</label>
+            <div id="syncTaskAnimals" style="background: #f9f9f9; border: 1px solid #ddd; padding: 10px; border-radius: 6px; margin-bottom: 15px; font-weight: bold; line-height: 1.6; max-height: 150px; overflow-y: auto;">
+            </div>
+
+            <div style="display: flex; gap: 10px;">
+                <button class="btn" style="flex:1; background:#eee;" onclick="closeModal('syncTaskConfirmModal')">Anuluj</button>
+                <button class="btn btn-primary" style="flex:1; background: #8e44ad;" onclick="confirmSyncTask()">✅ Zatwierdź</button>
+            </div>
+        </div>
+    </div>
 
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
