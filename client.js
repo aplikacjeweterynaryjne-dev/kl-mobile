@@ -2327,38 +2327,71 @@ function switchSyncTab(tab) {
 function populateSyncAnimals() {
     const list = document.getElementById('syncAnimalList');
     list.innerHTML = '';
-    const method = document.getElementById('syncMethodSelect').value;
     
-    // Filtr: Starsze niż 13 msc (dla krów i jałówek, bo byków nie synchronizujemy)
+    const method = document.getElementById('syncMethodSelect').value;
+    const searchTerm = document.getElementById('syncAnimalSearch').value.toLowerCase(); // Pobieramy tekst wyszukiwania
+
+    // Filtrowanie listy zwierząt
     const eligible = myHerd.filter(a => {
+        // 1. Odrzucamy byki
         if (a.type === 'byk') return false;
-        if (!a.dob) return false;
-        const ageMonths = (new Date() - new Date(a.dob)) / (1000 * 60 * 60 * 24 * 30.4);
-        
-        // Jeśli wybrano program dla jałówek, pokazujemy tylko jałówki, i na odwrót
+
+        // 2. Filtr metody (Krowy vs Jałówki)
         if (method === 'jalowki' && a.type !== 'jalowka') return false;
         if ((method === 'g6g' || method === 'ovsynch') && a.type === 'jalowka') return false;
 
-        return ageMonths >= 13;
+        // 3. Filtr wieku (TYLKO DLA JAŁÓWEK)
+        if (a.type === 'jalowka') {
+            if (!a.dob) return false;
+            const ageMonths = (new Date() - new Date(a.dob)) / (1000 * 60 * 60 * 24 * 30.4);
+            if (ageMonths < 13) return false;
+        }
+        // Krowy przechodzą bez sprawdzania wieku
+
+        // 4. Filtr wyszukiwarki (szukamy po kolczyku)
+        if (searchTerm && !a.tag.toLowerCase().includes(searchTerm)) return false;
+
+        return true;
     });
 
+    // Sortowanie alfabetyczne po kolczyku dla porządku
+    eligible.sort((a, b) => a.tag.localeCompare(b.tag));
+
     if (eligible.length === 0) {
-        list.innerHTML = '<span style="grid-column: span 2; color:#c0392b;">Brak odpowiednich sztuk (>13 msc).</span>';
+        list.innerHTML = '<div style="padding:15px; text-align:center; color:#999;">Brak pasujących zwierząt.</div>';
+        updateSyncCount(); // Aktualizuj licznik na 0
         return;
     }
 
+    // Generowanie listy (PIONOWO)
     eligible.forEach(a => {
         const div = document.createElement('div');
-        div.className = 'sync-checkbox-wrapper';
+        // Styl: Pasek na całą szerokość, ramka na dole
+        div.style.cssText = "display:flex; align-items:center; padding: 10px; border-bottom: 1px solid #eee; background: white;";
+        
+        // Obliczanie wieku dla jałówek (dla info)
+        let infoText = a.type;
+        if (a.type === 'jalowka' && a.dob) {
+            const age = Math.floor((new Date() - new Date(a.dob)) / (1000 * 60 * 60 * 24 * 30.4));
+            infoText += ` (${age} mies.)`;
+        }
+
         div.innerHTML = `
-            <input type="checkbox" class="sync-animal-cb" value="${a.id}" data-tag="${a.tag}" onchange="updateSyncCount()">
-            <label>${a.tag} <small>(${a.type})</small></label>
+            <input type="checkbox" class="sync-animal-cb" value="${a.id}" data-tag="${a.tag}" onchange="updateSyncCount()" style="transform: scale(1.3); margin-right: 15px;">
+            <div style="flex:1;">
+                <span style="font-weight:bold; font-size:15px; color:#333;">${a.tag}</span>
+                <div style="font-size:11px; color:#777;">${infoText}</div>
+            </div>
         `;
         list.appendChild(div);
     });
+    
+    // Nie wywołujemy tu updateSyncCount(), żeby nie resetować licznika "x wybrano" przy pisaniu w wyszukiwarce,
+    // ale musimy obsłużyć sytuację, gdy checkbox znika z widoku (wtedy jest technicznie ukryty, ale stan checked w DOM zostaje).
+    // Dla uproszczenia w tym widoku zliczymy tylko te widoczne LUB po prostu zostawimy obecny licznik.
+    // Wywołajmy update, żeby pokazać aktualny stan zaznaczonych (jeśli filtr ukrył zaznaczone, to one nie wejdą do programu - co jest bezpieczniejsze).
     updateSyncCount();
 }
-
 function updateSyncCount() {
     const checked = document.querySelectorAll('.sync-animal-cb:checked').length;
     document.getElementById('syncAnimalCount').textContent = `${checked} wybrano`;
