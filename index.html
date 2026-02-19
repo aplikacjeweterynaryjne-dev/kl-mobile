@@ -13788,19 +13788,20 @@ if (generateReportBtn) {
         reportResultArea.style.display = 'none';
 
         try {
-            // ✅ ZMIANA LOGIKI POBIERANIA DANYCH
+            // Pobieranie danych
             if (filters.type === 'zuzycia') {
-                // Dla zużycia pobieramy KARTY LECZENIA
                 cachedReportData = await fetchCardsForReport(filters.dateStart, filters.dateEnd, filters.userId);
                 generateZuzyciaReportFromCards(cachedReportData, filters); 
             } else {
-                // Dla finansów pobieramy PARAGONY (bez zmian)
                 cachedReportData = await fetchReceiptsForReport(filters.dateStart, filters.dateEnd, filters.userId);
                 generateWizytyReport(cachedReportData, filters);
             }
 
+            // Wyświetl raport na ekranie
             reportResultArea.style.display = 'block';
-            // openReportPrintWindow(); // <-- To otwierało okno druku od razu, można zostawić lub usunąć
+            
+            // ✅ POPRAWKA: Ta funkcja znowu automatycznie otwiera okno do druku!
+            openReportPrintWindow(); 
 
         } catch (error) {
             console.error("Błąd generowania raportu:", error);
