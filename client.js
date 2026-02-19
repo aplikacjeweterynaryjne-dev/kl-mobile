@@ -933,7 +933,7 @@ function renderTasks(allTasks) {
             buttonHtml = t.isDone 
                 ? `<button class="btn" style="padding:5px 10px; font-size:11px; background:#ddd;" onclick="undoTask('${t.logId}')">Cofnij</button>`
                 : `<button class="btn primary small" style="background:#8e44ad; color:white; border:none;" onclick="initiateSyncTaskCompletion('${t.id}')">Wykonaj</button>`;
-        }
+        
         } else {
             // WYGLĄD STANDARDOWEGO ZADANIA (Twój stary kod wkomponowany tutaj)
             const insemStr = t.insemDate ? (new Date(t.insemDate).toLocaleDateString('pl-PL')) : '-';
