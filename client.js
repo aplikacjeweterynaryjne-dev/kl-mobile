@@ -2363,11 +2363,11 @@ function populateSyncAnimals() {
         return;
     }
 
-    // Generowanie listy (PIONOWO)
+   // Generowanie listy (PIONOWO: Tekst po lewej, Checkbox po prawej)
     eligible.forEach(a => {
         const div = document.createElement('div');
-        // Styl: Pasek na całą szerokość, ramka na dole
-        div.style.cssText = "display:flex; align-items:center; padding: 10px; border-bottom: 1px solid #eee; background: white;";
+        // Styl: Flexbox rozrzucający elementy (space-between)
+        div.style.cssText = "display:flex; justify-content: space-between; align-items:center; padding: 12px; border-bottom: 1px solid #eee; background: white;";
         
         // Obliczanie wieku dla jałówek (dla info)
         let infoText = a.type;
@@ -2376,12 +2376,13 @@ function populateSyncAnimals() {
             infoText += ` (${age} mies.)`;
         }
 
+        // ✅ ZMIANA KOLEJNOŚCI: Najpierw tekst, potem input
         div.innerHTML = `
-            <input type="checkbox" class="sync-animal-cb" value="${a.id}" data-tag="${a.tag}" onchange="updateSyncCount()" style="transform: scale(1.3); margin-right: 15px;">
-            <div style="flex:1;">
-                <span style="font-weight:bold; font-size:15px; color:#333;">${a.tag}</span>
-                <div style="font-size:11px; color:#777;">${infoText}</div>
+            <div style="text-align: left;">
+                <span style="font-weight:bold; font-size:15px; color:#333; display:block;">${a.tag}</span>
+                <span style="font-size:11px; color:#777;">${infoText}</span>
             </div>
+            <input type="checkbox" class="sync-animal-cb" value="${a.id}" data-tag="${a.tag}" onchange="updateSyncCount()" style="transform: scale(1.5); cursor: pointer;">
         `;
         list.appendChild(div);
     });
