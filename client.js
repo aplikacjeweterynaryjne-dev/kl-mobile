@@ -2369,12 +2369,15 @@ function switchSyncTab(tab) {
 
 function populateSyncAnimals() {
     const list = document.getElementById('syncAnimalList');
+    if (!list) return;
     list.innerHTML = '';
     
     const method = document.getElementById('syncMethodSelect').value;
     const searchTerm = document.getElementById('syncAnimalSearch').value.toLowerCase(); 
+    const today = new Date();
+    today.setHours(0,0,0,0);
 
-    // 1. FILTROWANIE (Luźniejsze - pokazuje też cielne)
+    // 1. FILTROWANIE
     const eligible = myHerd.filter(a => {
         // Odrzucamy byki
         if (a.type === 'byk') return false;
@@ -2383,10 +2386,9 @@ function populateSyncAnimals() {
         if (method === 'jalowki' && a.type !== 'jalowka') return false;
         if ((method === 'g6g' || method === 'ovsynch') && a.type === 'jalowka') return false;
 
-        // Filtr wieku (TYLKO DLA JAŁÓWEK > 13 msc)
-        if (a.type === 'jalowka') {
-            if (!a.dob) return false;
-            const ageMonths = (new Date() - new Date(a.dob)) / (1000 * 60 * 60 * 24 * 30.4);
+        // Filtr wieku dla jałówek (> 13 msc)
+        if (a.type === 'jalowka' && a.dob) {
+            const ageMonths = (today - new Date(a.dob)) / (1000 * 60 * 60 * 24 * 30.4);
             if (ageMonths < 13) return false;
         }
 
@@ -2405,53 +2407,50 @@ function populateSyncAnimals() {
         return;
     }
 
-    // 2. GENEROWANIE LISTY ZE STATUSEM
+    // 2. GENEROWANIE LISTY
     eligible.forEach(a => {
-        const div = document.createElement('div');
-        div.style.cssText = "display:flex; justify-content: space-between; align-items: center; padding: 12px 8px; border-bottom: 1px solid #eee; background: white; width: 100%; box-sizing: border-box;";
-        
-        // Pobieramy status (Kolor i Tekst) z naszej istniejącej funkcji
+        // Pobieramy status (Kolor i Tekst) z Twojej głównej logiki
         const status = getDetailedStatus(a); 
 
-        // Budowanie opisu
-        let details = a.type;
+        // Obliczanie DIM (Dni laktacji) dla krów
+        let dimInfo = '';
+        if (a.type === 'krowa' && a.lastCalving) {
+            const diffDays = Math.floor((today - new Date(a.lastCalving)) / (1000 * 60 * 60 * 24));
+            dimInfo = ` | <span style="color:#2e7d32; font-weight:700;">DIM: ${diffDays}</span>`;
+        }
+
+        // Budowanie opisu (wiek dla jałówek, lokalizacja)
+        let subDetails = a.type.toUpperCase();
         if (a.type === 'jalowka' && a.dob) {
-            const age = Math.floor((new Date() - new Date(a.dob)) / (1000 * 60 * 60 * 24 * 30.4));
-            details += ` (${age} mies.)`;
+            const age = Math.floor((today - new Date(a.dob)) / (1000 * 60 * 60 * 24 * 30.4));
+            subDetails += ` (${age} msc)`;
         }
-        if (a.location) {
-            details += ` | Lok: ${a.location}`;
-        }
+        if (a.location) subDetails += ` | Lok: ${a.location}`;
 
-        let calvingHtml = '';
-        if (a.lastCalving) {
-            calvingHtml = `<div style="color: #d35400; font-weight: 600; margin-top: 2px;">Ost. wycielenie: ${a.lastCalving}</div>`;
-        } else if (a.type === 'krowa') {
-            calvingHtml = `<div style="color: #999; margin-top: 2px; font-style: italic;">Brak daty ost. wycielenia</div>`;
-        }
-
+        const div = document.createElement('div');
+        div.style.cssText = "display:flex; justify-content: space-between; align-items: center; padding: 12px 10px; border-bottom: 1px solid #eee; background: white; width: 100%; box-sizing: border-box;";
+        
         div.innerHTML = `
             <div style="text-align: left; flex-grow: 1; padding-right: 10px;">
-                <div style="display:flex; align-items:center; gap: 8px; margin-bottom: 2px;">
-                    <span style="font-weight:800; font-size:16px; color:#2c3e50;">${a.tag}</span>
-                    <span style="font-size:11px; font-weight:bold; color:${status.color}; background:#f4f4f4; padding:2px 6px; border-radius:4px;">
+                <div style="display:flex; align-items:center; gap: 8px; margin-bottom: 4px; flex-wrap: wrap;">
+                    <span style="font-weight:800; font-size:15px; color:#2c3e50;">${a.tag}</span>
+                    <span style="font-size:10px; font-weight:bold; color:${status.color}; background:${status.color}15; border: 1px solid ${status.color}33; padding:2px 6px; border-radius:4px; white-space: nowrap;">
                         ${status.text}
                     </span>
                 </div>
                 
                 <div style="font-size:11px; color:#7f8c8d; line-height: 1.4;">
-                    ${details}
+                    ${subDetails}${dimInfo}
                 </div>
-                <div style="font-size:11px;">
-                    ${calvingHtml}
-                </div>
+                
+                ${a.lastCalving ? `<div style="font-size:11px; color:#d35400; font-weight:600; margin-top:2px;">Ost. wycielenie: ${a.lastCalving}</div>` : ''}
             </div>
             
             <input type="checkbox" class="sync-animal-cb" 
                    value="${a.id}" 
                    data-tag="${a.tag}" 
                    onchange="updateSyncCount()" 
-                   style="width: 24px; height: 24px; cursor: pointer; flex-shrink: 0;">
+                   style="width: 24px; height: 24px; cursor: pointer; flex-shrink: 0; accent-color: #8e44ad;">
         `;
         list.appendChild(div);
     });
