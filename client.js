@@ -959,6 +959,7 @@ function renderTasks(allTasks) {
                 : `<input type="checkbox" 
                           style="transform:scale(1.5); border: 2px solid #2980b9;" 
                           onclick="initiateTaskCompletion('${t.id}', '${t.type}', '${t.animalId}', '${t.dueDate.toISOString()}')">`;
+        }
         
         } else {
             // WYGLĄD STANDARDOWEGO ZADANIA (Twój stary kod wkomponowany tutaj)
