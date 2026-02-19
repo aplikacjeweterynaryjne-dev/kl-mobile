@@ -932,8 +932,7 @@ function renderTasks(allTasks) {
                 </div>
             `;
             
-            // 2. Przycisk akcji (Teraz CHECKBOX zamiast przycisku "Wykonaj")
-            // Kliknięcie w checkbox również wywołuje funkcję otwierającą listę/potwierdzenie
+            // 2. Checkbox akcji (Fioletowy dla synchronizacji)
             buttonHtml = t.isDone 
                 ? `<button class="btn" style="padding:5px 10px; font-size:11px; background:#ddd;" onclick="undoTask('${t.logId}')">Cofnij</button>`
                 : `<input type="checkbox" 
@@ -959,23 +958,6 @@ function renderTasks(allTasks) {
                 : `<input type="checkbox" 
                           style="transform:scale(1.5); border: 2px solid #2980b9;" 
                           onclick="initiateTaskCompletion('${t.id}', '${t.type}', '${t.animalId}', '${t.dueDate.toISOString()}')">`;
-        }
-        
-        } else {
-            // WYGLĄD STANDARDOWEGO ZADANIA (Twój stary kod wkomponowany tutaj)
-            const insemStr = t.insemDate ? (new Date(t.insemDate).toLocaleDateString('pl-PL')) : '-';
-            const estCalvStr = t.calvDate ? (new Date(t.calvDate).toLocaleDateString('pl-PL')) : '-';
-            infoHtml = `
-                <div style="font-size:15px; font-weight:bold; color:#333;">${t.title}</div>
-                <div style="font-size: 11px; color: #777; margin: 4px 0; line-height: 1.4;">
-                    Termin: <b style="color:${dateColor}">${dueStr}</b><br>
-                    💉 Krycie: <b>${insemStr}</b> | 🍼 Przew. poród: <b>${estCalvStr}</b>
-                </div>
-                <div class="task-animal-tag" onclick="openAnimalCard('${t.animalId}')">${t.tag}</div>
-            `;
-            buttonHtml = t.isDone 
-                ? `<button class="btn" style="padding:5px 10px; font-size:11px; background:#ddd;" onclick="undoTask('${t.logId}')">Cofnij</button>`
-                : `<input type="checkbox" style="transform:scale(1.5); border: 2px solid #2980b9;" onclick="initiateTaskCompletion('${t.id}', '${t.type}', '${t.animalId}', '${t.dueDate.toISOString()}')">`;
         }
 
         div.innerHTML = `
