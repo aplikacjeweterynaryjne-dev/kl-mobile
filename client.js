@@ -2332,52 +2332,48 @@ function populateSyncAnimals() {
     list.innerHTML = '';
     
     const method = document.getElementById('syncMethodSelect').value;
-    const searchTerm = document.getElementById('syncAnimalSearch').value.toLowerCase(); // Pobieramy tekst wyszukiwania
+    const searchTerm = document.getElementById('syncAnimalSearch').value.toLowerCase(); 
 
-   // Filtrowanie listy zwierząt
+    // 1. FILTROWANIE (Luźniejsze - pokazuje też cielne)
     const eligible = myHerd.filter(a => {
-        // 1. Odrzucamy byki
+        // Odrzucamy byki
         if (a.type === 'byk') return false;
 
-        // ✅ 2. ODRZUCAMY SZTUKI CIELNE (Synchronizacja tylko dla pustych)
-        if (a.isPregnantConfirmed) return false;
-
-        // 3. Filtr metody (Krowy vs Jałówki)
+        // Filtr metody (Krowy vs Jałówki)
         if (method === 'jalowki' && a.type !== 'jalowka') return false;
         if ((method === 'g6g' || method === 'ovsynch') && a.type === 'jalowka') return false;
 
-        // 4. Filtr wieku (TYLKO DLA JAŁÓWEK)
+        // Filtr wieku (TYLKO DLA JAŁÓWEK > 13 msc)
         if (a.type === 'jalowka') {
             if (!a.dob) return false;
             const ageMonths = (new Date() - new Date(a.dob)) / (1000 * 60 * 60 * 24 * 30.4);
             if (ageMonths < 13) return false;
         }
 
-        // 5. Filtr wyszukiwarki (szukamy po kolczyku)
+        // Filtr wyszukiwarki
         if (searchTerm && !a.tag.toLowerCase().includes(searchTerm)) return false;
 
         return true;
     });
 
-    // Sortowanie alfabetyczne po kolczyku dla porządku
+    // Sortowanie alfabetyczne
     eligible.sort((a, b) => a.tag.localeCompare(b.tag));
 
     if (eligible.length === 0) {
         list.innerHTML = '<div style="padding:15px; text-align:center; color:#999;">Brak pasujących zwierząt.</div>';
-        updateSyncCount(); // Aktualizuj licznik na 0
+        updateSyncCount(); 
         return;
     }
 
-   // Generowanie listy (PIONOWO - Checkbox przyklejony do prawej)
+    // 2. GENEROWANIE LISTY ZE STATUSEM
     eligible.forEach(a => {
         const div = document.createElement('div');
-        
-        // STYL: 
-        // width: 100% -> Wiersz zajmuje całą szerokość listy
-        // justify-content: space-between -> Rozrzuca elementy (Tekst <--> Checkbox)
         div.style.cssText = "display:flex; justify-content: space-between; align-items: center; padding: 12px 8px; border-bottom: 1px solid #eee; background: white; width: 100%; box-sizing: border-box;";
         
-        // --- 1. Linia: Typ + Wiek + Lokalizacja ---
+        // Pobieramy status (Kolor i Tekst) z naszej istniejącej funkcji
+        const status = getDetailedStatus(a); 
+
+        // Budowanie opisu
         let details = a.type;
         if (a.type === 'jalowka' && a.dob) {
             const age = Math.floor((new Date() - new Date(a.dob)) / (1000 * 60 * 60 * 24 * 30.4));
@@ -2387,22 +2383,22 @@ function populateSyncAnimals() {
             details += ` | Lok: ${a.location}`;
         }
 
-        // --- 2. Linia: Ostatnie wycielenie (tekst zamiast ikony) ---
         let calvingHtml = '';
         if (a.lastCalving) {
-            // Wyświetlamy tylko jeśli data istnieje
-            calvingHtml = `<div style="color: #d35400; font-weight: 600; margin-top: 2px;">Ostatnie wycielenie: ${a.lastCalving}</div>`;
-        } else {
-            // Opcjonalnie: informacja o braku wycielenia (dla jałówek to normalne)
-            if (a.type === 'krowa') calvingHtml = `<div style="color: #999; margin-top: 2px; font-style: italic;">Brak daty ost. wycielenia</div>`;
+            calvingHtml = `<div style="color: #d35400; font-weight: 600; margin-top: 2px;">Ost. wycielenie: ${a.lastCalving}</div>`;
+        } else if (a.type === 'krowa') {
+            calvingHtml = `<div style="color: #999; margin-top: 2px; font-style: italic;">Brak daty ost. wycielenia</div>`;
         }
 
-        // HTML STRUKTURA
-        // Lewy div ma "flex-grow: 1", co sprawia, że zajmuje całe dostępne miejsce,
-        // dopychając checkboxa do prawej krawędzi.
         div.innerHTML = `
             <div style="text-align: left; flex-grow: 1; padding-right: 10px;">
-                <span style="font-weight:800; font-size:16px; color:#2c3e50; display:block; margin-bottom: 2px;">${a.tag}</span>
+                <div style="display:flex; align-items:center; gap: 8px; margin-bottom: 2px;">
+                    <span style="font-weight:800; font-size:16px; color:#2c3e50;">${a.tag}</span>
+                    <span style="font-size:11px; font-weight:bold; color:${status.color}; background:#f4f4f4; padding:2px 6px; border-radius:4px;">
+                        ${status.text}
+                    </span>
+                </div>
+                
                 <div style="font-size:11px; color:#7f8c8d; line-height: 1.4;">
                     ${details}
                 </div>
@@ -2420,10 +2416,6 @@ function populateSyncAnimals() {
         list.appendChild(div);
     });
     
-    // Nie wywołujemy tu updateSyncCount(), żeby nie resetować licznika "x wybrano" przy pisaniu w wyszukiwarce,
-    // ale musimy obsłużyć sytuację, gdy checkbox znika z widoku (wtedy jest technicznie ukryty, ale stan checked w DOM zostaje).
-    // Dla uproszczenia w tym widoku zliczymy tylko te widoczne LUB po prostu zostawimy obecny licznik.
-    // Wywołajmy update, żeby pokazać aktualny stan zaznaczonych (jeśli filtr ukrył zaznaczone, to one nie wejdą do programu - co jest bezpieczniejsze).
     updateSyncCount();
 }
 function updateSyncCount() {
