@@ -936,12 +936,12 @@ function renderTasks(allTasks) {
                 </div>
             `;
             
-            // Checkbox wywołuje potwierdzenie
+// Checkbox z blokadą propagacji (żeby nie klikał się cały kafelek pod spodem)
             buttonHtml = t.isDone 
                 ? `<button class="btn" style="padding:5px 10px; font-size:11px; background:#ddd;" onclick="undoTask('${t.logId}')">Cofnij</button>`
                 : `<input type="checkbox" 
                           style="transform:scale(1.5); border: 2px solid #8e44ad; accent-color: #8e44ad; cursor: pointer;" 
-                          onclick="initiateSyncTaskCompletion('${t.id}')">`;
+                          onclick="event.stopPropagation(); initiateSyncTaskCompletion('${t.id}')">`;
 
         } else {
             // --- WYGLĄD STANDARDOWEGO ZADANIA ---
