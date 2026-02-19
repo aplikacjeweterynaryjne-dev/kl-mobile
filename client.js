@@ -2133,7 +2133,7 @@ function renderHerdList(forceType = null) {
                     </span>
                 </div>`;
         }
-        // --- WIDOK DLA KROWY ---
+   // --- WIDOK DLA KROWY (Z LOKALIZACJĄ) ---
         else {
             const statusInfo = getDetailedStatus(a);
             const ins = a.lastInsemination ? a.lastInsemination : '-';
@@ -2151,15 +2151,18 @@ function renderHerdList(forceType = null) {
 
             detailsHtml = `
                 <div style="font-size:11px; color:#555; margin-top:5px; display:grid; grid-template-columns: 1fr 1fr; gap:5px;">
+                    <span style="grid-column: span 2; color:#2980b9; border-bottom:1px dashed #eee; padding-bottom:3px; margin-bottom:3px;">
+                        📍 Lok: <b>${a.location || '-'}</b>
+                    </span>
+                    
                     <span>💉 Ost. zac: <b>${ins}</b></span>
-                    <span>👶 Termin: <b>${calvTermin}</b></span>
+                    <span>🐮 Termin: <b>${calvTermin}</b></span>
                     <span>📊 Laktacja: <b>${dimLabel}</b></span>
                     <span style="font-weight:bold; color:${statusInfo.color}; grid-column: span 2; font-size: 12px; margin-top: 2px;">
                         ${statusInfo.text}
                     </span>
                 </div>`;
         }
-
         div.innerHTML = `
             <div style="display:flex; justify-content:space-between; align-items:center;">
                 <strong style="color:#2e7d32; font-size:16px;">${a.tag}</strong>
@@ -2331,24 +2334,26 @@ function populateSyncAnimals() {
     const method = document.getElementById('syncMethodSelect').value;
     const searchTerm = document.getElementById('syncAnimalSearch').value.toLowerCase(); // Pobieramy tekst wyszukiwania
 
-    // Filtrowanie listy zwierząt
+   // Filtrowanie listy zwierząt
     const eligible = myHerd.filter(a => {
         // 1. Odrzucamy byki
         if (a.type === 'byk') return false;
 
-        // 2. Filtr metody (Krowy vs Jałówki)
+        // ✅ 2. ODRZUCAMY SZTUKI CIELNE (Synchronizacja tylko dla pustych)
+        if (a.isPregnantConfirmed) return false;
+
+        // 3. Filtr metody (Krowy vs Jałówki)
         if (method === 'jalowki' && a.type !== 'jalowka') return false;
         if ((method === 'g6g' || method === 'ovsynch') && a.type === 'jalowka') return false;
 
-        // 3. Filtr wieku (TYLKO DLA JAŁÓWEK)
+        // 4. Filtr wieku (TYLKO DLA JAŁÓWEK)
         if (a.type === 'jalowka') {
             if (!a.dob) return false;
             const ageMonths = (new Date() - new Date(a.dob)) / (1000 * 60 * 60 * 24 * 30.4);
             if (ageMonths < 13) return false;
         }
-        // Krowy przechodzą bez sprawdzania wieku
 
-        // 4. Filtr wyszukiwarki (szukamy po kolczyku)
+        // 5. Filtr wyszukiwarki (szukamy po kolczyku)
         if (searchTerm && !a.tag.toLowerCase().includes(searchTerm)) return false;
 
         return true;
