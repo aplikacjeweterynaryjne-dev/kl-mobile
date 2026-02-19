@@ -35,6 +35,41 @@ if ('serviceWorker' in navigator) {
 
 // ⬆️⬆️⬆️ KONIEC WKLEJANIA ⬆️⬆️⬆️
 // --- STAN APLIKACJI (ZMIENNE GLOBALNE) ---
+let activeSynchronizations = [];
+let pendingSyncTaskToConfirm = null; // Do zapisu id zadania zgrupowanego
+
+// Słownik programów synchronizacji
+const SYNC_PROTOCOLS = {
+    'g6g': {
+        name: 'Synchronizacja G6G',
+        steps: [
+            { dayOffset: 0, time: '', product: 'Luteosyl', dose: '2 ml im./szt' },
+            { dayOffset: 2, time: '(Rano)', product: 'Ovarelin', dose: '2 ml im./szt' },
+            { dayOffset: 8, time: '(Rano)', product: 'Ovarelin', dose: '2 ml im./szt' },
+            { dayOffset: 15, time: '(Rano)', product: 'Luteosyl', dose: '2 ml im./szt' },
+            { dayOffset: 16, time: '(Rano)', product: 'Luteosyl', dose: '2 ml im./szt' },
+            { dayOffset: 16, time: '(Wieczorem)', product: 'Ovarelin', dose: '2 ml im./szt' }
+        ]
+    },
+    'ovsynch': {
+        name: 'Synchronizacja Ovsynch (Krowy)',
+        steps: [
+            { dayOffset: 0, time: '', product: 'Ovarelin', dose: '2 ml im./szt' },
+            { dayOffset: 6, time: '(Rano)', product: 'Luteosyl', dose: '2 ml im./szt' },
+            { dayOffset: 7, time: '(Rano)', product: 'Luteosyl', dose: '2 ml im./szt' },
+            { dayOffset: 8, time: '(Wieczorem)', product: 'Ovarelin', dose: '2 ml im./szt' }
+        ]
+    },
+    'jalowki': {
+        name: 'Synchronizacja (Jałówki)',
+        steps: [
+            { dayOffset: 0, time: '', product: 'Ovarelin', dose: '2 ml im./szt' },
+            { dayOffset: 4, time: '(Rano)', product: 'Luteosyl', dose: '2 ml im./szt' },
+            { dayOffset: 5, time: '(Rano)', product: 'Luteosyl', dose: '2 ml im./szt' },
+            { dayOffset: 7, time: '(Wieczorem)', product: 'Ovarelin', dose: '2 ml im./szt' }
+        ]
+    }
+};
 let currentUser = null;
 let myHerd = [];
 let completedTasks = [];
@@ -157,6 +192,7 @@ function initApp() {
     loadSettings().then(() => {
         loadHerd(); 
         loadCompletedTasks();
+        loadSynchronizations();
         renderConfig();
     });
     
@@ -167,7 +203,32 @@ function initApp() {
     const insemDateEl = document.getElementById('insemDate');
     if(insemDateEl) insemDateEl.valueAsDate = new Date();
 }
-
+// ✅ WKLEJ TĘ FUNKCJĘ POD initApp()
+function loadSynchronizations() {
+    db.collection('synchronizacje').where('ownerUid', '==', currentUser.uid)
+      .onSnapshot(snap => {
+          activeSynchronizations = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          
+          // Auto-czyszczenie (usuń jeśli ostatnia data minęła > 3 dni temu)
+          const today = new Date();
+          today.setHours(0,0,0,0);
+          
+          activeSynchronizations.forEach(sync => {
+              const protocol = SYNC_PROTOCOLS[sync.method];
+              if (protocol) {
+                  const maxDay = Math.max(...protocol.steps.map(s => s.dayOffset));
+                  const lastDate = addDays(new Date(sync.startDate), maxDay);
+                  const diff = (today - lastDate) / (1000 * 60 * 60 * 24);
+                  if (diff > 3) {
+                      // Usuń zakończony program z bazy
+                      db.collection('synchronizacje').doc(sync.id).delete();
+                  }
+              }
+          });
+          
+          generateAndRenderTasks(); // Odśwież widok zadań
+      });
+}
 // --- FUNKCJE POMOCNICZE (GLOBALNE) ---
 function toggleEditFields() {
     const type = document.getElementById('editType').value;
@@ -728,7 +789,50 @@ function generateAndRenderTasks() {
             }
         }
     });
+// =================================================================
+    // ✅ NOWOŚĆ: GENEROWANIE ZADAŃ Z SYNCHRONIZACJI (Grupowe)
+    // =================================================================
+    activeSynchronizations.forEach(sync => {
+        const protocol = SYNC_PROTOCOLS[sync.method];
+        if (!protocol) return;
 
+        const startDate = new Date(sync.startDate);
+
+        protocol.steps.forEach((step, stepIndex) => {
+            const stepDate = addDays(startDate, step.dayOffset);
+            // ID zadania: sync_IDdokumentu_krokNumer
+            const taskId = `sync_${sync.id}_step_${stepIndex}`;
+            
+            // Sprawdź czy zrobione w logach
+            const doneLog = completedTasks.find(t => t.taskId === taskId);
+            const isDone = !!doneLog;
+
+            const diffMs = today - stepDate;
+            const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+            // Pokazujemy zadanie jeśli jest Niezrobione i nie minęło 14 dni, ALBO jeśli jest zrobione (żeby wpadło do zakładki Wykonane)
+            if (isDone || diffDays <= 14) {
+                let priority = diffDays > 0 ? 'urgent' : (diffDays === 0 ? 'warning' : 'info');
+                
+                generatedTasks.push({
+                    id: taskId,
+                    isGroupTask: true, // Flaga grupowa
+                    syncDocId: sync.id,
+                    animalTags: sync.animalTags, // Tablica kolczyków
+                    title: `${protocol.name} - ${step.product} ${step.time}`,
+                    doseDetails: step.dose,
+                    dueDate: stepDate,
+                    sortDate: stepDate,
+                    priority: priority,
+                    type: 'sync',
+                    isDone: isDone,
+                    logId: isDone ? doneLog.logId : null,
+                    insemDate: null, calvDate: null,
+                    isReallyOverdue: diffDays > 0
+                });
+            }
+        });
+    });
     window.myAllTasksGlobal = generatedTasks;
     renderTasks(generatedTasks);
 }
@@ -795,39 +899,67 @@ function renderTasks(allTasks) {
         const div = document.createElement('div');
         div.className = `task-item ${t.priority} ${t.isDone ? 'done' : ''}`;
         
-        const dueStr = t.dueDate.toLocaleDateString('pl-PL');
-        const insemStr = t.insemDate ? (new Date(t.insemDate).toLocaleDateString('pl-PL')) : '-';
-        const estCalvStr = t.calvDate ? (new Date(t.calvDate).toLocaleDateString('pl-PL')) : '-';
+       const dueStr = t.dueDate.toLocaleDateString('pl-PL');
         const dateColor = t.isReallyOverdue ? 'red' : (t.priority === 'urgent' ? '#e67e22' : '#333'); 
+        
+        let selectBox = '';
+        if (!t.isDone && !t.isGroupTask) {
+             selectBox = `<input type="checkbox" class="mass-select-cb" 
+                style="margin-right: 10px; transform: scale(1.3);" 
+                value="${t.id}" 
+                onchange="toggleTaskSelection('${t.id}')"
+                ${selectedTaskIds.includes(t.id) ? 'checked' : ''}>`;
+        }
 
-        // Checkbox do masowego wyboru (po lewej)
-        const selectBox = `<input type="checkbox" class="mass-select-cb" 
-            style="margin-right: 10px; transform: scale(1.3);" 
-            value="${t.id}" 
-            onchange="toggleTaskSelection('${t.id}')"
-            ${selectedTaskIds.includes(t.id) ? 'checked' : ''}>`;
+        // ✅ LOGIKA GRUPOWA (SYNCHRONIZACJA) vs POJEDYNCZA (ZWYKŁA)
+        let infoHtml = '';
+        let buttonHtml = '';
+
+        if (t.isGroupTask) {
+            // WYGLĄD ZADANIA SYNCHRONIZACJI
+            infoHtml = `
+                <div style="font-size:15px; font-weight:bold; color:#8e44ad;">${t.title}</div>
+                <div style="font-size: 11px; color: #777; margin: 4px 0; line-height: 1.4;">
+                    Termin: <b style="color:${dateColor}">${dueStr}</b><br>
+                    Sztuk w programie: <b>${t.animalTags.length}</b>
+                </div>
+                <div class="task-animal-tag" style="background:#f3e5f5; color:#8e44ad; border-color:#ce93d8;">
+                    ZOBACZ LISTĘ ZWIERZĄT
+                </div>
+            `;
+            buttonHtml = t.isDone 
+                ? `<button class="btn" style="padding:5px 10px; font-size:11px; background:#ddd;" onclick="undoTask('${t.logId}')">Cofnij</button>`
+                : `<button class="btn primary small" style="background:#8e44ad; color:white; border:none;" onclick="initiateSyncTaskCompletion('${t.id}')">Wykonaj</button>`;
+        } else {
+            // WYGLĄD STANDARDOWEGO ZADANIA (Twój stary kod wkomponowany tutaj)
+            const insemStr = t.insemDate ? (new Date(t.insemDate).toLocaleDateString('pl-PL')) : '-';
+            const estCalvStr = t.calvDate ? (new Date(t.calvDate).toLocaleDateString('pl-PL')) : '-';
+            infoHtml = `
+                <div style="font-size:15px; font-weight:bold; color:#333;">${t.title}</div>
+                <div style="font-size: 11px; color: #777; margin: 4px 0; line-height: 1.4;">
+                    Termin: <b style="color:${dateColor}">${dueStr}</b><br>
+                    💉 Krycie: <b>${insemStr}</b> | 🍼 Przew. poród: <b>${estCalvStr}</b>
+                </div>
+                <div class="task-animal-tag" onclick="openAnimalCard('${t.animalId}')">${t.tag}</div>
+            `;
+            buttonHtml = t.isDone 
+                ? `<button class="btn" style="padding:5px 10px; font-size:11px; background:#ddd;" onclick="undoTask('${t.logId}')">Cofnij</button>`
+                : `<input type="checkbox" style="transform:scale(1.5); border: 2px solid #2980b9;" onclick="initiateTaskCompletion('${t.id}', '${t.type}', '${t.animalId}', '${t.dueDate.toISOString()}')">`;
+        }
 
         div.innerHTML = `
             <div style="display:flex; align-items:center;">
-                ${!t.isDone ? selectBox : ''} 
-                <div style="flex: 1;">
-                    <div style="font-size:15px; font-weight:bold; color:#333;">${t.title}</div>
-                    <div style="font-size: 11px; color: #777; margin: 4px 0; line-height: 1.4;">
-                        Termin: <b style="color:${dateColor}">${dueStr}</b><br>
-                        💉 Krycie: <b>${insemStr}</b> | 🍼 Przew. poród: <b>${estCalvStr}</b>
-                    </div>
-                    <div class="task-animal-tag" onclick="openAnimalCard('${t.animalId}')">${t.tag}</div>
+                ${selectBox} 
+                <div style="flex: 1;" ${t.isGroupTask && !t.isDone ? `onclick="initiateSyncTaskCompletion('${t.id}')"` : ''}>
+                    ${infoHtml}
                 </div>
             </div>
             <div class="task-check-wrapper">
-                ${t.isDone 
-                    ? `<button class="btn" style="padding:5px 10px; font-size:11px; background:#ddd;" onclick="undoTask('${t.logId}')">Cofnij</button>`
-                    : `<input type="checkbox" style="transform:scale(1.5); border: 2px solid #2980b9;" onclick="initiateTaskCompletion('${t.id}', '${t.type}', '${t.animalId}', '${t.dueDate.toISOString()}')">`
-                }
+                ${buttonHtml}
             </div>
         `;
         container.appendChild(div);
-    });
+    }); // <-- Zamykamy pętlę forEach
 
     // Przycisk "Pokaż wszystkie" tylko dla zakładki 'todo'
     if (currentTaskFilter === 'todo' && filtered.length > LIMIT) {
@@ -2160,4 +2292,211 @@ function renderLactationChart() {
             }
         }
     });
+}
+// =====================================================================
+// ✅ FUNKCJE OBSŁUGI MODALU SYNCHRONIZACJI
+// =====================================================================
+
+function openSyncManager() {
+    document.getElementById('syncManagerModal').style.display = 'flex';
+    document.getElementById('syncStartDate').valueAsDate = new Date();
+    switchSyncTab('new');
+    populateSyncAnimals();
+    renderSyncPreview();
+}
+
+function switchSyncTab(tab) {
+    if (tab === 'new') {
+        document.getElementById('syncNewSection').classList.remove('hidden');
+        document.getElementById('syncActiveSection').classList.add('hidden');
+        document.getElementById('tabSyncNew').classList.add('primary');
+        document.getElementById('tabSyncNew').classList.remove('ghost');
+        document.getElementById('tabSyncActive').classList.add('ghost');
+        document.getElementById('tabSyncActive').classList.remove('primary');
+    } else {
+        document.getElementById('syncNewSection').classList.add('hidden');
+        document.getElementById('syncActiveSection').classList.remove('hidden');
+        document.getElementById('tabSyncActive').classList.add('primary');
+        document.getElementById('tabSyncActive').classList.remove('ghost');
+        document.getElementById('tabSyncNew').classList.add('ghost');
+        document.getElementById('tabSyncNew').classList.remove('primary');
+        renderActiveSyncs();
+    }
+}
+
+function populateSyncAnimals() {
+    const list = document.getElementById('syncAnimalList');
+    list.innerHTML = '';
+    const method = document.getElementById('syncMethodSelect').value;
+    
+    // Filtr: Starsze niż 13 msc (dla krów i jałówek, bo byków nie synchronizujemy)
+    const eligible = myHerd.filter(a => {
+        if (a.type === 'byk') return false;
+        if (!a.dob) return false;
+        const ageMonths = (new Date() - new Date(a.dob)) / (1000 * 60 * 60 * 24 * 30.4);
+        
+        // Jeśli wybrano program dla jałówek, pokazujemy tylko jałówki, i na odwrót
+        if (method === 'jalowki' && a.type !== 'jalowka') return false;
+        if ((method === 'g6g' || method === 'ovsynch') && a.type === 'jalowka') return false;
+
+        return ageMonths >= 13;
+    });
+
+    if (eligible.length === 0) {
+        list.innerHTML = '<span style="grid-column: span 2; color:#c0392b;">Brak odpowiednich sztuk (>13 msc).</span>';
+        return;
+    }
+
+    eligible.forEach(a => {
+        const div = document.createElement('div');
+        div.className = 'sync-checkbox-wrapper';
+        div.innerHTML = `
+            <input type="checkbox" class="sync-animal-cb" value="${a.id}" data-tag="${a.tag}" onchange="updateSyncCount()">
+            <label>${a.tag} <small>(${a.type})</small></label>
+        `;
+        list.appendChild(div);
+    });
+    updateSyncCount();
+}
+
+function updateSyncCount() {
+    const checked = document.querySelectorAll('.sync-animal-cb:checked').length;
+    document.getElementById('syncAnimalCount').textContent = `${checked} wybrano`;
+}
+
+function renderSyncPreview() {
+    // Aktualizujemy listę krów jeśli zmieniono metodę (np. krowy -> jałówki)
+    populateSyncAnimals();
+
+    const preview = document.getElementById('syncPreview');
+    const method = document.getElementById('syncMethodSelect').value;
+    const startDate = document.getElementById('syncStartDate').valueAsDate;
+    
+    if (!startDate) return;
+    
+    const protocol = SYNC_PROTOCOLS[method];
+    let html = `<strong>Kroki dla: ${protocol.name}</strong><ul style="margin:5px 0 0 15px; padding:0;">`;
+    
+    protocol.steps.forEach(step => {
+        const d = addDays(startDate, step.dayOffset);
+        html += `<li>${d.toLocaleDateString('pl-PL')}: <b>${step.product}</b> ${step.time}</li>`;
+    });
+    html += '</ul>';
+    preview.innerHTML = html;
+}
+
+function startSynchronization() {
+    const method = document.getElementById('syncMethodSelect').value;
+    const startDate = document.getElementById('syncStartDate').value;
+    
+    const checkboxes = document.querySelectorAll('.sync-animal-cb:checked');
+    const animalIds = Array.from(checkboxes).map(cb => cb.value);
+    const animalTags = Array.from(checkboxes).map(cb => cb.dataset.tag);
+
+    if (animalIds.length === 0) {
+        alert("Wybierz przynajmniej jedno zwierzę!");
+        return;
+    }
+    if (!startDate) {
+        alert("Wybierz datę początkową!");
+        return;
+    }
+
+    db.collection('synchronizacje').add({
+        ownerUid: currentUser.uid,
+        method: method,
+        protocolName: SYNC_PROTOCOLS[method].name,
+        startDate: startDate,
+        animalIds: animalIds,
+        animalTags: animalTags,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    }).then(() => {
+        alert("Program synchronizacji został pomyślnie uruchomiony!");
+        closeModal('syncManagerModal');
+    }).catch(err => alert("Błąd: " + err.message));
+}
+
+function renderActiveSyncs() {
+    const list = document.getElementById('activeSyncList');
+    list.innerHTML = '';
+
+    if (activeSynchronizations.length === 0) {
+        list.innerHTML = '<p style="text-align:center; color:#999;">Brak aktywnych programów.</p>';
+        return;
+    }
+
+    activeSynchronizations.forEach(sync => {
+        const start = new Date(sync.startDate).toLocaleDateString('pl-PL');
+        const animals = (sync.animalTags || []).join(', ');
+        const div = document.createElement('div');
+        div.className = 'sync-item-card';
+        div.innerHTML = `
+            <div>
+                <strong>${sync.protocolName}</strong><br>
+                <div class="details">Start: ${start}<br>Zwierzęta: ${animals}</div>
+            </div>
+            <button class="btn warn small" onclick="deleteSynchronization('${sync.id}')">Usuń</button>
+        `;
+        list.appendChild(div);
+    });
+}
+
+function deleteSynchronization(syncId) {
+    if (confirm("Czy usunąć ten program? Spowoduje to skasowanie wszystkich ZAPLANOWANYCH kroków (już wykonane zostaną w historii).")) {
+        db.collection('synchronizacje').doc(syncId).delete()
+            .then(() => renderActiveSyncs())
+            .catch(err => alert("Błąd: " + err.message));
+    }
+}
+
+// -----------------------------------------------------
+// Obsługa potwierdzania konkretnego kroku w "Zadaniach"
+// -----------------------------------------------------
+
+function initiateSyncTaskCompletion(taskId) {
+    const task = window.myAllTasksGlobal.find(t => t.id === taskId);
+    if (!task) return;
+
+    pendingSyncTaskToConfirm = task; // Zapisz do potwierdzenia
+    
+    document.getElementById('syncTaskTitle').textContent = task.title;
+    document.getElementById('syncTaskSubtitle').textContent = `Termin podania: ${task.dueDate.toLocaleDateString('pl-PL')}`;
+    document.getElementById('syncTaskDose').textContent = task.doseDetails;
+    
+    const animalsList = document.getElementById('syncTaskAnimals');
+    animalsList.innerHTML = task.animalTags.map(tag => `<div>🐮 ${tag}</div>`).join('');
+
+    document.getElementById('syncTaskConfirmModal').style.display = 'flex';
+}
+
+function confirmSyncTask() {
+    if (!pendingSyncTaskToConfirm) return;
+    const t = pendingSyncTaskToConfirm;
+
+    // Ponieważ to jest zadanie "grupowe", zapisujemy to jako jeden wpis w task_logs
+    // (Z zaznaczeniem, że dotyczy wielu zwierząt)
+    const fakeLogId = 'temp_sync_' + Date.now();
+    completedTasks.push({
+        logId: fakeLogId, 
+        taskId: t.id, 
+        taskType: 'sync',
+        animalId: 'GROUP', // Specjalne ID
+        result: `Wykonano dla ${t.animalTags.length} szt.`, 
+        completedAt: { toDate: () => new Date() }
+    });
+    
+    generateAndRenderTasks(); // Odśwież UI
+
+    db.collection('task_logs').add({
+        ownerUid: currentUser.uid, 
+        taskId: t.id, 
+        taskType: 'sync',
+        animalId: 'GROUP', // Oznaczamy, że to grupowe
+        animalTags: t.animalTags, // Zapisujemy dla kogo to było
+        result: "Wykonano", 
+        completedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+
+    closeModal('syncTaskConfirmModal');
+    showToast("Zatwierdzono podanie leków w ramach synchronizacji!", "success");
 }
