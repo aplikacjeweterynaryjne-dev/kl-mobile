@@ -911,28 +911,54 @@ function renderTasks(allTasks) {
                 ${selectedTaskIds.includes(t.id) ? 'checked' : ''}>`;
         }
 
-        // ✅ LOGIKA GRUPOWA (SYNCHRONIZACJA) vs POJEDYNCZA (ZWYKŁA)
+// ✅ LOGIKA GRUPOWA (SYNCHRONIZACJA) vs POJEDYNCZA (ZWYKŁA)
         let infoHtml = '';
         let buttonHtml = '';
 
         if (t.isGroupTask) {
-            // WYGLĄD ZADANIA SYNCHRONIZACJI
+            // --- WYGLĄD ZADANIA SYNCHRONIZACJI ---
+            
+            // 1. Treść zadania (kliknięcie w treść też otwiera listę)
             infoHtml = `
-                <div style="font-size:15px; font-weight:bold; color:#8e44ad;">${t.title}</div>
+                <div style="cursor: pointer;" onclick="initiateSyncTaskCompletion('${t.id}')">
+                    <div style="font-size:15px; font-weight:bold; color:#8e44ad;">${t.title}</div>
+                    <div style="font-size: 11px; color: #777; margin: 4px 0; line-height: 1.4;">
+                        Termin: <b style="color:${dateColor}">${dueStr}</b><br>
+                        Sztuk w programie: <b>${t.animalTags.length}</b>
+                    </div>
+                    <div class="task-animal-tag" style="background:#f3e5f5; color:#8e44ad; border-color:#ce93d8; text-align:center;">
+                        👁️ ZOBACZ LISTĘ ZWIERZĄT
+                    </div>
+                </div>
+            `;
+            
+            // 2. Przycisk akcji (Teraz CHECKBOX zamiast przycisku "Wykonaj")
+            // Kliknięcie w checkbox również wywołuje funkcję otwierającą listę/potwierdzenie
+            buttonHtml = t.isDone 
+                ? `<button class="btn" style="padding:5px 10px; font-size:11px; background:#ddd;" onclick="undoTask('${t.logId}')">Cofnij</button>`
+                : `<input type="checkbox" 
+                          style="transform:scale(1.5); border: 2px solid #8e44ad; accent-color: #8e44ad; cursor: pointer;" 
+                          onclick="initiateSyncTaskCompletion('${t.id}')">`;
+
+        } else {
+            // --- WYGLĄD STANDARDOWEGO ZADANIA ---
+            const insemStr = t.insemDate ? (new Date(t.insemDate).toLocaleDateString('pl-PL')) : '-';
+            const estCalvStr = t.calvDate ? (new Date(t.calvDate).toLocaleDateString('pl-PL')) : '-';
+            
+            infoHtml = `
+                <div style="font-size:15px; font-weight:bold; color:#333;">${t.title}</div>
                 <div style="font-size: 11px; color: #777; margin: 4px 0; line-height: 1.4;">
                     Termin: <b style="color:${dateColor}">${dueStr}</b><br>
-                    Sztuk w programie: <b>${t.animalTags.length}</b>
+                    💉 Krycie: <b>${insemStr}</b> | 🍼 Przew. poród: <b>${estCalvStr}</b>
                 </div>
-                <div class="task-animal-tag" 
-                     style="background:#f3e5f5; color:#8e44ad; border-color:#ce93d8; cursor: pointer;"
-                     onclick="initiateSyncTaskCompletion('${t.id}')">
-                    ZOBACZ LISTĘ ZWIERZĄT
-                </div>
+                <div class="task-animal-tag" onclick="openAnimalCard('${t.animalId}')">${t.tag}</div>
             `;
             
             buttonHtml = t.isDone 
                 ? `<button class="btn" style="padding:5px 10px; font-size:11px; background:#ddd;" onclick="undoTask('${t.logId}')">Cofnij</button>`
-                : `<button class="btn primary small" style="background:#8e44ad; color:white; border:none;" onclick="initiateSyncTaskCompletion('${t.id}')">Wykonaj</button>`;
+                : `<input type="checkbox" 
+                          style="transform:scale(1.5); border: 2px solid #2980b9;" 
+                          onclick="initiateTaskCompletion('${t.id}', '${t.type}', '${t.animalId}', '${t.dueDate.toISOString()}')">`;
         
         } else {
             // WYGLĄD STANDARDOWEGO ZADANIA (Twój stary kod wkomponowany tutaj)
