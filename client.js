@@ -2363,42 +2363,54 @@ function populateSyncAnimals() {
         return;
     }
 
-   // Generowanie listy (PIONOWO)
+   // Generowanie listy (PIONOWO - Checkbox przyklejony do prawej)
     eligible.forEach(a => {
         const div = document.createElement('div');
-        // Styl: Flexbox, szerokość 100% żeby wyrównać do krawędzi
-        div.style.cssText = "display:flex; align-items:center; padding: 10px 5px; border-bottom: 1px solid #eee; background: white; width: 100%; box-sizing: border-box;";
         
-        // --- BUDOWANIE OPISU SZCZEGÓŁOWEGO ---
-        let parts = [];
+        // STYL: 
+        // width: 100% -> Wiersz zajmuje całą szerokość listy
+        // justify-content: space-between -> Rozrzuca elementy (Tekst <--> Checkbox)
+        div.style.cssText = "display:flex; justify-content: space-between; align-items: center; padding: 12px 8px; border-bottom: 1px solid #eee; background: white; width: 100%; box-sizing: border-box;";
         
-        // 1. Wiek (dla jałówek)
+        // --- 1. Linia: Typ + Wiek + Lokalizacja ---
+        let details = a.type;
         if (a.type === 'jalowka' && a.dob) {
             const age = Math.floor((new Date() - new Date(a.dob)) / (1000 * 60 * 60 * 24 * 30.4));
-            parts.push(`${a.type} (${age} mies.)`);
-        } else {
-            parts.push(a.type);
+            details += ` (${age} mies.)`;
         }
-
-        // 2. Lokalizacja
         if (a.location) {
-            parts.push(`📍 ${a.location}`);
+            details += ` | Lok: ${a.location}`;
         }
 
-        // 3. Ostatnie wycielenie
+        // --- 2. Linia: Ostatnie wycielenie (tekst zamiast ikony) ---
+        let calvingHtml = '';
         if (a.lastCalving) {
-            parts.push(`🍼 ${a.lastCalving}`);
+            // Wyświetlamy tylko jeśli data istnieje
+            calvingHtml = `<div style="color: #d35400; font-weight: 600; margin-top: 2px;">Ostatnie wycielenie: ${a.lastCalving}</div>`;
+        } else {
+            // Opcjonalnie: informacja o braku wycielenia (dla jałówek to normalne)
+            if (a.type === 'krowa') calvingHtml = `<div style="color: #999; margin-top: 2px; font-style: italic;">Brak daty ost. wycielenia</div>`;
         }
 
-        const infoText = parts.join(' | ');
-
-        // HTML: Tekst dostaje "flex: 1", żeby zająć całe miejsce i wypchnąć checkboxa w prawo
+        // HTML STRUKTURA
+        // Lewy div ma "flex-grow: 1", co sprawia, że zajmuje całe dostępne miejsce,
+        // dopychając checkboxa do prawej krawędzi.
         div.innerHTML = `
-            <div style="text-align: left; flex: 1; padding-right: 10px;">
-                <span style="font-weight:bold; font-size:15px; color:#333; display:block;">${a.tag}</span>
-                <span style="font-size:11px; color:#777; display:block; margin-top:2px; line-height:1.3;">${infoText}</span>
+            <div style="text-align: left; flex-grow: 1; padding-right: 10px;">
+                <span style="font-weight:800; font-size:16px; color:#2c3e50; display:block; margin-bottom: 2px;">${a.tag}</span>
+                <div style="font-size:11px; color:#7f8c8d; line-height: 1.4;">
+                    ${details}
+                </div>
+                <div style="font-size:11px;">
+                    ${calvingHtml}
+                </div>
             </div>
-            <input type="checkbox" class="sync-animal-cb" value="${a.id}" data-tag="${a.tag}" onchange="updateSyncCount()" style="transform: scale(1.5); cursor: pointer; flex-shrink: 0;">
+            
+            <input type="checkbox" class="sync-animal-cb" 
+                   value="${a.id}" 
+                   data-tag="${a.tag}" 
+                   onchange="updateSyncCount()" 
+                   style="width: 24px; height: 24px; cursor: pointer; flex-shrink: 0;">
         `;
         list.appendChild(div);
     });
