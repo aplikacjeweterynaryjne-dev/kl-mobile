@@ -3017,9 +3017,14 @@ background-color: #eef;
     </div> <div id="registerSection" style="display: none; flex-direction: column; justify-content: center; align-items: center; width: 100vw; height: 100vh; background-color: #F7F9F5;">
   <div class="form-card" style="width: 100%; max-width: 400px; height: auto; max-height: 95vh; overflow-y: auto;">
 
-    <h3 style="font-size: 25px; text-align: center; margin-top: 0;">Tworzenie konta</h3>
+<h3 style="font-size: 25px; text-align: center; margin-top: 0;">Tworzenie konta</h3>
 
-    <div class="form-row">
+    <div style="display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 1px solid #ccc; padding-bottom: 10px;">
+        <button id="regTabVet" class="btn primary" style="flex: 1;" onclick="toggleRegTab('vet')">Lecznica / Weterynarz</button>
+        <button id="regTabClient" class="btn" style="flex: 1; background: #eee; color: #333;" onclick="toggleRegTab('client')">Hodowca / Klient</button>
+    </div>
+    
+    <input type="hidden" id="registerRole" value="właściciel"> <div class="form-row">
       <label for="registerImie">Twoje Imię</label>
       <input type="text" id="registerImie" placeholder="Wpisz imię">
     </div>
@@ -3029,10 +3034,18 @@ background-color: #eef;
       <input type="text" id="registerNazwisko" placeholder="Wpisz nazwisko">
     </div>
 
-  <div class="form-row">
-  <label for="registerNazwaLecznicy">Nazwa lecznicy / Adres</label>
-  <input type="text" id="registerNazwaLecznicy" placeholder="Wypełnij, gdy jesteś właścicielem lecznicy">
-</div>
+    <div class="form-row" id="regRowClinicName">
+      <label for="registerNazwaLecznicy">Nazwa Nowej Lecznicy</label>
+      <input type="text" id="registerNazwaLecznicy" placeholder="Np. Gabinet Weterynaryjny...">
+    </div>
+
+    <div class="form-row" id="regRowClinicSelect" style="display: none;">
+      <label for="registerLecznicaSelect">Wybierz Lecznicę (Opcjonalne)</label>
+      <select id="registerLecznicaSelect" style="width: 100%; padding: 8px; font-size: 16px; border-radius: 8px; border: 1px solid #ddd;">
+          <option value="">-- Brak / Niepowiązane --</option>
+      </select>
+      <small style="color: #666; font-size: 11px;">Wybierz, aby powiązać konto z weterynarzem.</small>
+    </div>
 
     <div class="form-row">
       <label for="registerEmail">Adres e-mail (do logowania)</label>
@@ -11226,7 +11239,8 @@ function translateAuthError(errorCode) {
 // --- Listener dla przycisku "Zaloguj się" ---
 if (loginBtn) {
   loginBtn.addEventListener('click', () => {
-    const email = loginEmail.value.trim();
+    // ✅ POPRAWKA: Wymuszamy małe litery w e-mailu
+    const email = loginEmail.value.trim().toLowerCase();
     const password = loginPassword.value;
 
     // Wyczyść stare błędy
@@ -11289,145 +11303,149 @@ if (logoutBtn) {
 if (menuLogoutBtn) {
   menuLogoutBtn.addEventListener('click', handleLogout); // ✅ DODANY BLOK
 }
-// --- Listener dla przycisku "Zarejestruj się" (INTELIGENTNA REJESTRACJA) ---
+// --- LOGIKA REJESTRACJI (ZAKŁADKI) ---
+// Tę funkcję wklej OBOK (np. nad) listenerem registerBtn
+window.toggleRegTab = function(type) {
+    const tabVet = document.getElementById('regTabVet');
+    const tabClient = document.getElementById('regTabClient');
+    const rowClinicName = document.getElementById('regRowClinicName');
+    const rowClinicSelect = document.getElementById('regRowClinicSelect');
+    const roleInput = document.getElementById('registerRole');
+
+    if (type === 'vet') {
+        tabVet.className = 'btn primary';
+        tabClient.className = 'btn';
+        tabClient.style.background = '#eee';
+        tabClient.style.color = '#333';
+        
+        rowClinicName.style.display = 'block';
+        rowClinicSelect.style.display = 'none';
+        roleInput.value = 'właściciel';
+    } else {
+        tabClient.className = 'btn primary';
+        tabVet.className = 'btn';
+        tabVet.style.background = '#eee';
+        tabVet.style.color = '#333';
+        
+        rowClinicName.style.display = 'none';
+        rowClinicSelect.style.display = 'block';
+        roleInput.value = 'klient';
+        
+        // Załaduj listę lecznic
+        loadClinicsForRegistration();
+    }
+}
+
+async function loadClinicsForRegistration() {
+    const select = document.getElementById('registerLecznicaSelect');
+    if (select.options.length > 1) return; // Już załadowane
+    
+    try {
+        // Pobieramy tylko właścicieli (oni mają nazwy lecznic)
+        const q = await db.collection('konfiguracja').where('Rola', '==', 'właściciel').get();
+        
+        select.innerHTML = '<option value="">-- Wybierz swoją lecznicę --</option>';
+        q.forEach(doc => {
+            const data = doc.data();
+            if (data['Nazwa lecznicy'] && data['ID lecznicy']) {
+                const opt = document.createElement('option');
+                opt.value = data['ID lecznicy'];
+                opt.textContent = `${data['Nazwa lecznicy']} (${data.Nazwisko})`;
+                select.appendChild(opt);
+            }
+        });
+        // Opcja dla niepowiązanych
+        const optNone = document.createElement('option');
+        optNone.value = "";
+        optNone.textContent = "-- Brak / Niepowiązane --";
+        select.appendChild(optNone);
+
+    } catch (e) {
+        console.error("Błąd ładowania lecznic:", e);
+    }
+}
+
+// --- Listener dla przycisku "Zarejestruj się" ---
 if (registerBtn) {
   registerBtn.addEventListener('click', async () => {
-    // Wyczyść stare błędy
-    registerError.textContent = '';
     registerError.style.display = 'none';
+    registerError.textContent = '';
 
-    // Pobierz dane z formularza
-    const email = registerEmail.value.trim();
+    const email = registerEmail.value.trim().toLowerCase(); // ✅ Pkt 6: Małe litery
     const password = registerPassword.value;
     const passwordConfirm = registerPasswordConfirm.value;
     const imie = registerImie.value.trim();
     const nazwisko = registerNazwisko.value.trim();
-    const nazwaLecznicy = registerNazwaLecznicy.value.trim();
+    const role = document.getElementById('registerRole').value; // 'właściciel' lub 'klient'
+    
+    // Pola specyficzne
+    const nazwaLecznicy = document.getElementById('registerNazwaLecznicy').value.trim();
+    const wybranaLecznicaID = document.getElementById('registerLecznicaSelect').value;
 
-    // Walidacja (nieco lżejsza, bo Nazwa Lecznicy jest opcjonalna)
     if (!imie || !nazwisko || !email) {
-      registerError.textContent = 'Imię, Nazwisko i E-mail są wymagane.';
-      registerError.style.display = 'block';
-      return;
+      registerError.textContent = 'Wypełnij dane osobowe.';
+      registerError.style.display = 'block'; return;
     }
-    if (password.length < 6) {
-      registerError.textContent = 'Hasło musi mieć minimum 6 znaków.';
-      registerError.style.display = 'block';
-      return;
+    if (password.length < 6 || password !== passwordConfirm) {
+      registerError.textContent = 'Hasła muszą być zgodne i mieć min. 6 znaków.';
+      registerError.style.display = 'block'; return;
     }
-    if (password !== passwordConfirm) {
-      registerError.textContent = 'Hasła nie są zgodne.';
-      registerError.style.display = 'block';
-      return;
+    
+    // Walidacja dla Weterynarza
+    if (role === 'właściciel' && !nazwaLecznicy) {
+        registerError.textContent = 'Jako weterynarz musisz podać nazwę swojej lecznicy.';
+        registerError.style.display = 'block'; return;
     }
 
-    console.log(`Próba rejestracji dla: ${email}`);
     registerBtn.disabled = true;
     registerBtn.textContent = 'Rejestrowanie...';
 
-    let createdUserUid = null;
-
     try {
-      // KROK 1: Sprawdź, czy ten e-mail istnieje już w 'konfiguracja'
-      const querySnapshot = await db.collection("konfiguracja").where("Adres email", "==", email).limit(1).get();
-
-      if (!querySnapshot.empty) {
-        // SCENARIUSZ A: E-MAIL ZNALEZIONY (PRACOWNIK)
-        console.log("E-mail znaleziony. Próba aktywacji konta pracownika...");
-        const doc = querySnapshot.docs[0];
-        const profil = doc.data();
-
-        // Sprawdź, czy konto nie jest już aktywne (czy ma UID)
-        if (profil.uid) {
-          throw new Error("Konto dla tego adresu e-mail jest już aktywne.");
-        }
-
         // 1. Stwórz użytkownika w Auth
         const userCredential = await auth.createUserWithEmailAndPassword(email, password);
-        createdUserUid = userCredential.user.uid;
+        const uid = userCredential.user.uid;
 
-        // 2. Zaktualizuj profil o UID, Imię i Nazwisko
-        await doc.ref.update({
-          uid: createdUserUid,
-          Imie: imie,
-          Nazwisko: nazwisko
-        });
+        // 2. Przygotuj dane do bazy
+        let userProfileData = {
+            uid: uid,
+            Imie: imie,
+            Nazwisko: nazwisko,
+            'Adres email': email,
+            Rola: role,
+            'Nr telefonu': '',
+            uzywaStanowMagazynowych: false
+        };
 
-        console.log(`Pomyślnie aktywowano pracownika i połączono UID: ${createdUserUid}`);
-        alert('Rejestracja pomyślna! Zostałeś dodany do lecznicy. Możesz się teraz zalogować.');
-
-      } else {
-        // SCENARIUSZ B: E-MAIL NIEZNALEZIONY (NOWY WŁAŚCICIEL)
-        console.log("E-mail nieznaleziony. Próba rejestracji nowej lecznicy...");
-
-        // Właściciel MUSI podać nazwę lecznicy
-        if (!nazwaLecznicy) {
-          throw new Error("Jako nowy właściciel musisz podać Nazwę Lecznicy.");
+        if (role === 'właściciel') {
+            // Nowa lecznica
+            userProfileData['Nazwa lecznicy'] = nazwaLecznicy;
+            const docRef = await db.collection("konfiguracja").add(userProfileData);
+            await docRef.update({ 'ID lecznicy': docRef.id }); // ID dokumentu staje się ID lecznicy
+        } else {
+            // Klient (Hodowca)
+            if (wybranaLecznicaID) {
+                userProfileData['ID lecznicy'] = wybranaLecznicaID;
+            } else {
+                userProfileData['ID lecznicy'] = ''; // Konto niepowiązane
+            }
+            await db.collection("konfiguracja").add(userProfileData);
         }
 
-        // 1. Stwórz użytkownika w Auth
-        const userCredential = await auth.createUserWithEmailAndPassword(email, password);
-        createdUserUid = userCredential.user.uid;
-
-        // 2. Stwórz profil WŁAŚCICIELA (ta sama logika co wcześniej)
-     const userProfileData = {
-          uid: createdUserUid,
-          Imie: imie,
-          Nazwisko: nazwisko,
-          'Adres email': email,
-          Rola: 'właściciel',
-          'Nazwa lecznicy': nazwaLecznicy,
-          'ID lecznicy': '', // Puste na razie
-          Podpis: '', Inicjaly: '', 'Nr telefonu': '',
-          // ✅ POCZĄTEK MODUŁU 1
-          uzywaStanowMagazynowych: false,
-          mozeDoladowacWlasnyMagazyn: false
-          // ✅ KONIEC MODUŁU 1
-        };
-
-        const docRef = await db.collection("konfiguracja").add(userProfileData);
-
-        // 3. Ustaw ID lecznicy
-        await docRef.update({
-          'ID lecznicy': docRef.id
-        });
-
-        console.log(`Pomyślnie zarejestrowano nową lecznicę z ID: ${docRef.id}`);
-        alert('Rejestracja lecznicy pomyślna! Możesz się teraz zalogować.');
-      }
-
-      // KROK OSTATNI (dla obu scenariuszy): Wyloguj i przełącz
-      await auth.signOut();
-      registerSection.style.display = 'none';
-      loginSection.style.display = 'flex';
-
-      // Wyczyść formularz
-      registerImie.value = ''; registerNazwisko.value = '';
-      registerEmail.value = ''; registerPassword.value = '';
-      registerPasswordConfirm.value = ''; registerNazwaLecznicy.value = '';
+        alert('Rejestracja pomyślna! Możesz się teraz zalogować.');
+        await auth.signOut();
+        registerSection.style.display = 'none';
+        loginSection.style.display = 'flex';
+        // Reset formularza
+        registerImie.value = ''; registerNazwisko.value = ''; registerEmail.value = '';
+        registerPassword.value = ''; registerPasswordConfirm.value = '';
 
     } catch (error) {
-      // Błąd
-      console.error("Błąd rejestracji:", error.code, error.message);
-
-      // Tłumaczenie błędów
-      if (error.message === "Konto dla tego adresu e-mail jest już aktywne.") {
-        registerError.textContent = "To konto jest już aktywne. Spróbuj się zalogować.";
-      } else if (error.message.includes("Jako nowy właściciel")) {
-        registerError.textContent = "Aby zarejestrować nową lecznicę, musisz podać jej nazwę.";
-      } else if (error.code === 'auth/email-already-in-use') {
-        registerError.textContent = 'Ten adres e-mail jest już zajęty.';
-      } else if (error.code === 'auth/weak-password') {
-        registerError.textContent = 'Hasło jest zbyt słabe.';
-      } else {
-        registerError.textContent = 'Wystąpił błąd rejestracji.';
-      }
-      registerError.style.display = 'block';
-
+        console.error("Błąd rejestracji:", error);
+        registerError.textContent = "Błąd: " + (error.message || "Wystąpił błąd.");
+        registerError.style.display = 'block';
     } finally {
-      // Przywróć przycisk
-      registerBtn.disabled = false;
-      registerBtn.textContent = 'Zarejestruj się';
+        registerBtn.disabled = false;
+        registerBtn.textContent = 'Zarejestruj się';
     }
   });
 }
@@ -17018,8 +17036,9 @@ function applySchema(event) {
                 produktInput.value = p.produkt;
                 produktInput.dispatchEvent(new Event('input', { bubbles: true }));
 
-                // Seria
-                row.cells[5].textContent = p.seria || '';
+                // Seria (Pobieramy aktualną serię z bazy leków, a nie ze schematu)
+                const aktualnaSeria = typeof mapaSerii !== 'undefined' ? (mapaSerii[p.produkt] || '') : '';
+                row.cells[5].textContent = aktualnaSeria;
 
                 // Ilość (Przeliczanie RAZY MNOŻNIK)
                 const iloscInput = row.cells[6].querySelector('input[type="number"]');
