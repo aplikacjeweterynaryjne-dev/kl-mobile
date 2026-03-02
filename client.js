@@ -2631,24 +2631,20 @@ function confirmSyncTask() {
     showToast("Zatwierdzono podanie leków w ramach synchronizacji!", "success");
 }
 // ============================================================
-// ✅ NOWY MODUŁ IMPORTU (TABELA EXCEL + SMART STATUS + TYP)
+// ✅ NOWY MODUŁ IMPORTU (5 KOLUMN + SUPER SMART STATUS)
 // ============================================================
 
 // 1. Inicjalizacja tabeli po załadowaniu
 document.addEventListener('DOMContentLoaded', () => {
     const tbody = document.getElementById('importTableBody');
     if (tbody) {
-        addEmptyRows(20); // 20 pustych wierszy na start
-        
-        // Podpięcie inteligentnego wklejania
+        addEmptyRows(20); // Na start 20 wierszy
         tbody.addEventListener('paste', handleImportPaste);
-        
-        // Podpięcie "Smart Status" - nasłuchujemy zmian w polach daty
-        tbody.addEventListener('input', handleSmartDateInput);
+        tbody.addEventListener('input', handleSmartLogic); // Nasłuchujemy każdej zmiany
     }
 });
 
-// Funkcja dodająca puste wiersze (Teraz 4 kolumny)
+// Funkcja dodająca puste wiersze (5 kolumn)
 function addEmptyRows(count = 10) {
     const tbody = document.getElementById('importTableBody');
     if (!tbody) return;
@@ -2657,52 +2653,86 @@ function addEmptyRows(count = 10) {
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td><input type="text" class="imp-tag" placeholder="PL..."></td>
-            <td><input type="text" class="imp-type" placeholder="krowa"></td>
-            <td><input type="text" class="imp-date" placeholder="DD.MM.RRRR"></td>
-            <td><input type="text" class="imp-status" placeholder="-- automat --"></td>
+            <td><input type="text" class="imp-type" list="impTypeList" placeholder="krowa"></td>
+            <td><input type="text" class="imp-calv" placeholder="DD.MM.RRRR"></td>
+            <td><input type="text" class="imp-insem" placeholder="DD.MM.RRRR"></td>
+            <td><input type="text" class="imp-status" list="impStatusList" placeholder="-- automat --"></td>
         `;
         tbody.appendChild(tr);
     }
 }
 
-// 2. Automatyczne wyliczanie statusu na podstawie daty
-function handleSmartDateInput(e) {
-    if (e.target.classList.contains('imp-date')) {
-        const dateInput = e.target;
-        const row = dateInput.closest('tr');
-        const statusInput = row.querySelector('.imp-status');
-        
-        // Działamy tylko, jeśli status jest pusty (nie nadpisujemy ręcznych zmian użytkownika)
-        if (statusInput.value.trim() === "") {
-            const dateStr = dateInput.value.trim();
-            const parsedDate = parseDatePL(dateStr);
-            
-            if (parsedDate) {
-                const diffDays = Math.floor((new Date() - new Date(parsedDate)) / (1000 * 60 * 60 * 24));
-                
-                if (diffDays < 30) {
-                    statusInput.value = "Pusta"; // Za wcześnie na badanie
-                } else {
-                    statusInput.value = "Do USG"; // Czas na badanie
-                }
-                // Dodajemy lekki efekt wizualny, że system to wypełnił
-                statusInput.style.color = "#2980b9";
-            }
+// 2. LOGIKA "SUPER SMART" - Oblicza status na żywo
+function handleSmartLogic(e) {
+    const input = e.target;
+    const row = input.closest('tr');
+    
+    // Uruchom tylko przy zmianie dat (wycielenia lub zacielenia)
+    if (input.classList.contains('imp-insem') || input.classList.contains('imp-calv')) {
+        recalculateRowStatus(row);
+    }
+}
+
+function recalculateRowStatus(row) {
+    const insemInput = row.querySelector('.imp-insem');
+    const calvInput = row.querySelector('.imp-calv');
+    const statusInput = row.querySelector('.imp-status');
+
+    // Nie nadpisuj, jeśli użytkownik wpisał "Cielna" ręcznie
+    if (statusInput.value.includes("Cielna")) return; 
+
+    const insemDateStr = insemInput.value.trim();
+    const calvDateStr = calvInput.value.trim();
+    
+    const today = new Date();
+    const insemDate = parseDatePL(insemDateStr);
+    const calvDate = parseDatePL(calvDateStr);
+
+    let suggestedStatus = "";
+
+    // A. Analiza na podstawie ZACIELENIA
+    if (insemDate) {
+        const iDate = new Date(insemDate);
+        const diffDays = Math.floor((today - iDate) / (1000 * 60 * 60 * 24));
+
+        if (diffDays > 220) {
+            suggestedStatus = "Zasuszona"; // Zaawansowana ciąża
+        } else if (diffDays > 30) {
+            suggestedStatus = "Do USG";
+        } else {
+            suggestedStatus = "Pusta"; // Za wcześnie na badanie
         }
+    } 
+    // B. Analiza na podstawie WYCIELENIA (jeśli brak zacielenia)
+    else if (calvDate) {
+        const cDate = new Date(calvDate);
+        const diffDays = Math.floor((today - cDate) / (1000 * 60 * 60 * 24));
+        
+        if (diffDays < 60) {
+            suggestedStatus = "Wycielona < 60 dni";
+        } else {
+            suggestedStatus = "Pusta";
+        }
+    }
+
+    // Wstaw wynik
+    if (suggestedStatus) {
+        statusInput.value = suggestedStatus;
+        statusInput.style.color = (suggestedStatus === "Zasuszona") ? "#c0392b" : "#2980b9";
+        statusInput.style.fontWeight = "bold";
     }
 }
 
 // 3. Inteligentne wklejanie z Excela
 function handleImportPaste(e) {
-    e.preventDefault();
-    const clipboardData = e.clipboardData || window.clipboardData;
-    const pastedData = clipboardData.getData('Text');
-    
-    const rows = pastedData.split(/\r?\n/).filter(r => r.trim() !== '');
-    
     const targetInput = e.target;
     if (targetInput.tagName !== 'INPUT') return;
     
+    e.preventDefault();
+    const clipboardData = e.clipboardData || window.clipboardData;
+    const pastedData = clipboardData.getData('Text');
+    const rows = pastedData.split(/\r?\n/).filter(r => r.trim() !== '');
+
     const targetCell = targetInput.parentElement;
     const targetRow = targetCell.parentElement;
     const startRowIndex = Array.from(targetRow.parentElement.children).indexOf(targetRow);
@@ -2714,7 +2744,7 @@ function handleImportPaste(e) {
         if (rowIndex >= tableRows.length) addEmptyRows(1);
         
         const currentRow = tableRows[rowIndex];
-        const cols = rowText.split('\t');
+        const cols = rowText.split('\t'); // Excel tab
 
         cols.forEach((cellText, j) => {
             const colIndex = startColIndex + j;
@@ -2722,22 +2752,19 @@ function handleImportPaste(e) {
                 const input = currentRow.children[colIndex].querySelector('input');
                 if (input) {
                     input.value = cellText.trim();
-                    // Po wklejeniu daty, uruchom logikę Smart Status ręcznie
-                    if (input.classList.contains('imp-date')) {
-                         // Wywołujemy zdarzenie input, żeby Smart logic zadziałała
-                         input.dispatchEvent(new Event('input', { bubbles: true }));
-                    }
                 }
             }
         });
+        
+        // Po wklejeniu całego wiersza, przelicz status
+        recalculateRowStatus(currentRow);
     });
 }
 
-// 4. Konwerter daty (Europejska -> ISO)
+// 4. Konwerter daty (Bez zmian)
 function parseDatePL(dateStr) {
     if (!dateStr) return null;
     dateStr = dateStr.split(' ')[0].trim();
-    // Obsługa: . / -
     const match = dateStr.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{4})$/);
     if (match) {
         const d = match[1].padStart(2, '0');
@@ -2749,7 +2776,7 @@ function parseDatePL(dateStr) {
     return null;
 }
 
-// 5. Główna funkcja Importu (czyta 4 kolumny)
+// 5. Główny Import do Bazy (5 kolumn)
 async function processHerdImport() {
     const tbody = document.getElementById('importTableBody');
     const rows = tbody.querySelectorAll('tr');
@@ -2758,46 +2785,50 @@ async function processHerdImport() {
 
     for (const row of rows) {
         const inputs = row.querySelectorAll('input');
-        // Kolejność kolumn: 0=Tag, 1=Typ, 2=Data, 3=Status
+        // Indexy: 0=Tag, 1=Typ, 2=Calv, 3=Insem, 4=Status
         const tag = inputs[0].value.trim();
         const typeRaw = inputs[1].value.trim().toLowerCase();
-        const dateRaw = inputs[2].value.trim();
-        const statusRaw = inputs[3].value.trim().toLowerCase();
+        const calvRaw = inputs[2].value.trim();
+        const insemRaw = inputs[3].value.trim();
+        const statusRaw = inputs[4].value.trim().toLowerCase();
 
         if (tag.length > 2) {
             
-            // 1. Obsługa Typu
-            let animalType = 'krowa'; // Domyślnie
-            if (typeRaw.includes('jał') || typeRaw.includes('jal') || typeRaw.includes('heifer')) {
-                animalType = 'jalowka';
-            } else if (typeRaw.includes('byk') || typeRaw.includes('bull')) {
-                animalType = 'byk';
-            }
-
-            // 2. Obsługa Daty
-            const lastInsem = parseDatePL(dateRaw);
+            // Typ
+            let animalType = 'krowa';
+            if (typeRaw.includes('jał') || typeRaw.includes('jal')) animalType = 'jalowka';
+            else if (typeRaw.includes('byk')) animalType = 'byk';
             
-            // 3. Obsługa Statusu (Jeśli pusty -> Pusta/Niecielna)
+            // Daty
+            const lastCalving = parseDatePL(calvRaw);
+            const lastInsem = parseDatePL(insemRaw);
+            
+            // Statusy Bazy
             let pregStatus = 'negative';
             let isPregnant = false;
-            let usgStatus = 'negative'; // Domyślnie pusta
+            let usgStatus = 'negative';
+            let isDriedOff = false;
 
-            if (statusRaw.includes('cieln') || statusRaw.includes('ciąża') || statusRaw.includes('+') || statusRaw.includes('ok')) {
-                pregStatus = 'pregnant'; isPregnant = true; usgStatus = 'positive';
-            } else if (statusRaw.includes('usg') || statusRaw.includes('badan') || statusRaw.includes('?')) {
+            // Logika mapowania wpisanego statusu na flagi bazy
+            if (statusRaw.includes('zasusz')) {
+                isDriedOff = true; isPregnant = true; pregStatus = 'pregnant'; usgStatus = 'positive';
+            } else if (statusRaw.includes('cieln') || statusRaw.includes('ciąża')) {
+                isPregnant = true; pregStatus = 'pregnant'; usgStatus = 'positive';
+            } else if (statusRaw.includes('usg') || statusRaw.includes('badani')) {
                 pregStatus = 'check'; usgStatus = 'pending';
-            } 
-            // Jeśli użytkownik wpisał "pusta" lub pole jest puste -> zostaje 'negative'
+            }
+            // "Pusta" lub "Wycielona" -> zostaje default (negative)
 
             const animalRef = db.collection('animals').doc();
             batch.set(animalRef, {
                 ownerUid: currentUser.uid,
                 tag: tag,
-                type: animalType, 
-                lastInsemination: lastInsem,
+                type: animalType,
+                lastCalving: lastCalving,     // Zapisujemy wycielenie
+                lastInsemination: lastInsem,  // Zapisujemy zacielenie
                 isPregnantConfirmed: isPregnant,
                 usgStatus: usgStatus,
-                pregnancyStatus: pregStatus,
+                isDriedOff: isDriedOff,       // Zapisujemy zasuszenie
                 createdAt: firebase.firestore.FieldValue.serverTimestamp()
             });
             addedCount++;
@@ -2808,40 +2839,11 @@ async function processHerdImport() {
 
     if (addedCount > 0) {
         await batch.commit();
-        alert(`Pomyślnie zaimportowano ${addedCount} sztuk.`);
+        alert(`Sukces! Zaimportowano ${addedCount} sztuk.`);
         tbody.innerHTML = '';
         addEmptyRows(20);
         closeModal('importHerdModal');
     } else {
-        alert("Tabela wydaje się pusta lub brak numerów kolczyków.");
-    }
-}
-
-// ✅ FUNKCJA USUWANIA KONTA (BEZ ZMIAN - MUSI TU BYĆ)
-async function deleteMyAccount() {
-    const confirmation = prompt("⚠️ USUWANIE KONTA ⚠️\n\nAby trwale usunąć konto i wszystkie dane stada, wpisz wielkimi literami słowo: USUŃ");
-    if (confirmation !== "USUŃ") return alert("Anulowano. Kod niepoprawny.");
-    try {
-        const uid = currentUser.uid;
-        const animalsSnap = await db.collection('animals').where('ownerUid', '==', uid).get();
-        if (!animalsSnap.empty) {
-            const batch = db.batch();
-            animalsSnap.forEach(doc => batch.delete(doc.ref));
-            await batch.commit();
-        }
-        await db.collection('konfiguracja').doc(currentUser.id).delete();
-        const logsSnap = await db.collection('task_logs').where('ownerUid', '==', uid).get();
-        if (!logsSnap.empty) {
-            const batchLogs = db.batch();
-            logsSnap.forEach(doc => batchLogs.delete(doc.ref));
-            await batchLogs.commit();
-        }
-        const user = auth.currentUser;
-        try { await user.delete(); } catch (e) { console.warn("Relogin required for auth delete", e); }
-        alert("Konto usunięte.");
-        window.location.href = 'index.html';
-    } catch (e) {
-        console.error(e);
-        alert("Błąd: " + e.message);
+        alert("Brak danych do importu.");
     }
 }
