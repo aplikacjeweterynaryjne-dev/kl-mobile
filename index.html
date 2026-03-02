@@ -4088,14 +4088,23 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
     <div id="archiwumKartySection" style="display: none; padding: 0 20px;">
     <h2>🗄️ Archiwum Kart Leczenia</h2>
     
-    <div style="margin-bottom: 20px; border-bottom: 1px solid #eee; padding-bottom: 15px;">
+<div style="margin-bottom: 20px; border-bottom: 1px solid #eee; padding-bottom: 15px;">
         <div class="form-row">
             <label for="archiveUserSelect">Wybierz użytkownika:</label>
             <select id="archiveUserSelect" style="width:100%; padding:8px; font-size:16px;">
                 <option value="">Najpierw wczytaj użytkowników...</option>
             </select>
         </div>
-        <button id="loadArchiveUsersBtn" class="btn primary small" style="margin-top: 10px;">📥 Wczytaj Użytkowników</button>
+        
+        <div style="display:flex; gap:5px; margin-top:10px; flex-wrap:wrap;">
+             <button id="loadArchiveUsersBtn" class="btn primary small" style="flex:1;">👥 Załaduj Listę</button>
+        </div>
+        
+        <div id="archiveActionButtons" style="display:none; gap:5px; margin-top:10px; flex-wrap:wrap;">
+             <button class="btn small" style="background:#34495e; color:white; flex:1;" onclick="loadCardsForUser(archiveUserSelect.value, '30days')">📅 Ost. 30 dni</button>
+             <button class="btn small" style="background:#7f8c8d; color:white; flex:1;" onclick="loadCardsForUser(archiveUserSelect.value, 'filter')">🔍 Wg filtrów</button>
+             <button class="btn small" style="background:#c0392b; color:white; flex:1;" onclick="loadCardsForUser(archiveUserSelect.value, 'all')">📂 Wszystkie</button>
+        </div>
     </div>
 
     <div id="archiveCardFilterControls" class="archive-filter-controls" style="display: none;">
@@ -4131,14 +4140,23 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
 <div id="archiwumParagonySection" style="display: none; padding: 0 20px;">
     <h2>🧾 Archiwum Paragonów</h2>
     
-    <div style="margin-bottom: 20px; border-bottom: 1px solid #eee; padding-bottom: 15px;">
-        <div class="form-row">
+   <div style="margin-bottom: 20px; border-bottom: 1px solid #eee; padding-bottom: 15px;">
+         <div class="form-row">
             <label for="archiveReceiptUserSelect">Wybierz użytkownika:</label>
             <select id="archiveReceiptUserSelect" style="width:100%; padding:8px; font-size:16px;">
                 <option value="">Najpierw wczytaj użytkowników...</option>
             </select>
         </div>
-        <button id="loadArchiveReceiptUsersBtn" class="btn primary small" style="margin-top: 10px;">📥 Wczytaj Użytkowników</button>
+
+        <div style="display:flex; gap:5px; margin-top:10px; flex-wrap:wrap;">
+             <button id="loadArchiveReceiptUsersBtn" class="btn primary small" style="flex:1;">👥 Załaduj Listę</button>
+        </div>
+        
+        <div id="archiveReceiptActionButtons" style="display:none; gap:5px; margin-top:10px; flex-wrap:wrap;">
+             <button class="btn small" style="background:#34495e; color:white; flex:1;" onclick="loadReceiptsForUser(archiveReceiptUserSelect.value, '30days')">📅 Ost. 30 dni</button>
+             <button class="btn small" style="background:#7f8c8d; color:white; flex:1;" onclick="loadReceiptsForUser(archiveReceiptUserSelect.value, 'filter')">🔍 Wg filtrów</button>
+             <button class="btn small" style="background:#c0392b; color:white; flex:1;" onclick="loadReceiptsForUser(archiveReceiptUserSelect.value, 'all')">📂 Wszystkie</button>
+        </div>
     </div>
 
     <div id="archiveReceiptFilterControls" class="archive-filter-controls" style="display: none;"> <input type="date" id="arcReceiptDateStart" title="Data od">
@@ -12150,137 +12168,125 @@ if(loadArchiveUsersBtn) loadArchiveUsersBtn.addEventListener('click', loadArchiv
  */
 // ✅ ZASTĄP CAŁĄ FUNKCJĘ TYM KODEM
 /**
- * Pkt 6: Wczytuje karty dla wybranego UID lekarza (ZMODYFIKOWANA O CHECKBOXY I CACHE)
+ * Pkt 6: Wczytuje karty dla wybranego UID lekarza (Obsługa 3 trybów)
  */
-async function loadCardsForUser(lekarz_uid) {
+async function loadCardsForUser(lekarz_uid, mode = '30days') {
     const tableBody = document.getElementById('archiveCardTableBody');
     const filterControls = document.getElementById('archiveCardFilterControls');
-    const printSelectedBtn = document.getElementById('printSelectedCardsBtn'); // Nowy przycisk
-
+    
     // Reset cache i UI
     currentArchiveCardsCache = []; 
-    if(printSelectedBtn) printSelectedBtn.textContent = '🖨️ Drukuj Zaznaczone (0)';
     document.getElementById('archiveSelectAllCheckbox').checked = false;
 
-    if (!lekarz_uid) {
-        tableBody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 20px; color: #555;">Wybierz użytkownika, aby zobaczyć archiwum.</td></tr>';
-        filterControls.style.display = 'none';
-        return;
-    }
+    if (!lekarz_uid) return;
     
     tableBody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 20px; color: #555;">Wczytywanie kart... ⏳</td></tr>';
-    filterControls.style.display = 'none';
 
-    let q; 
+    let q = db.collection("archiwumKarty");
+
+    // 1. FILTR LEKARZA
     if (lekarz_uid === "ALL") {
-        console.log("Wczytywanie kart dla: WSZYSCY");
-        if (currentUserProfile.Rola === 'administrator') {
-            q = db.collection("archiwumKarty").orderBy("createdAt", "desc");
-        } else {
+        if (currentUserProfile.Rola !== 'administrator') {
             const userClinicId = currentUserProfile['ID lecznicy'];
-            if (!userClinicId) {
-                 tableBody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 20px; color: red;">Błąd: Twój profil nie ma przypisanego ID lecznicy.</td></tr>';
-                 return;
-            }
-            q = db.collection("archiwumKarty")
-                  .where("id_lecznicy", "==", userClinicId)
-                  .orderBy("createdAt", "desc");
+            q = q.where("id_lecznicy", "==", userClinicId);
         }
     } else {
-        console.log(`Wczytywanie kart dla UID: ${lekarz_uid}`);
-        q = db.collection("archiwumKarty")
-              .where("lekarz_uid", "==", lekarz_uid)
-              .orderBy("createdAt", "desc");
+        q = q.where("lekarz_uid", "==", lekarz_uid);
+    }
+
+    // 2. OBSŁUGA TRYBÓW
+    if (mode === '30days') {
+        console.log("Tryb: Ostatnie 30 dni");
+        // Ogranicz do daty
+        const d = new Date();
+        d.setDate(d.getDate() - 30);
+        // dataWykonania to string YYYY-MM-DD, więc porównanie leksykograficzne działa
+        const dateStr = d.toISOString().split('T')[0];
+        q = q.where("dataWykonania", ">=", dateStr);
+        q = q.orderBy("dataWykonania", "desc");
+        
+        // Pokaż filtry (żeby user widział co się dzieje), ale nie są one kluczowe do pobrania
+        filterControls.style.display = 'grid';
+
+    } else if (mode === 'filter') {
+        console.log("Tryb: Wg filtrów (Data)");
+        // Pobierz daty z inputów
+        const dStart = document.getElementById('arcCardDateStart').value;
+        const dEnd = document.getElementById('arcCardDateEnd').value;
+        
+        if (dStart) q = q.where("dataWykonania", ">=", dStart);
+        if (dEnd) q = q.where("dataWykonania", "<=", dEnd);
+        
+        q = q.orderBy("dataWykonania", "desc");
+        filterControls.style.display = 'grid';
+
+    } else if (mode === 'all') {
+        console.log("Tryb: Wszystkie (Limit 500)");
+        // Po prostu sortuj, ale dodaj limit bezpieczeństwa
+        q = q.orderBy("dataWykonania", "desc").limit(500);
+        filterControls.style.display = 'grid';
     }
 
     try {
         const snapshot = await q.get();
         
         if (snapshot.empty) {
-            tableBody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 20px; color: #999;">Brak zapisanych kart dla tego wyboru.</td></tr>';
-            filterControls.style.display = 'none'; 
+            tableBody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 20px; color: #999;">Brak kart dla wybranych kryteriów.</td></tr>';
             return;
         }
         
-        tableBody.innerHTML = ''; // Wyczyść tabelę
+        tableBody.innerHTML = '';
         
         snapshot.docs.forEach(doc => {
             const card = { id: doc.id, ...doc.data() };
-            
-            // ✅ DODAJ DO CACHE
-            currentArchiveCardsCache.push(card);
+            currentArchiveCardsCache.push(card); // Dodaj do cache
 
             const tr = document.createElement('tr');
-            
-            // Atrybuty do filtrowania
+            // Atrybuty dla filtra lokalnego JS
             tr.dataset.data = card.dataWykonania || '';
             tr.dataset.klient = card.klient_nazwa || 'Klient nieznany';
             tr.dataset.nrDok = card.nrDokumentu || 'Brak nr';
-            tr.dataset.lekarz = card.lekarz_nazwisko || 'Nieznany';
-            
-            // --- ✅ NOWA KOLUMNA: CHECKBOX ---
+
+            // Checkbox
             const tdCheck = document.createElement('td');
             tdCheck.style.textAlign = 'center';
             tdCheck.innerHTML = `<input type="checkbox" class="archive-card-checkbox" value="${card.id}" style="transform: scale(1.2); cursor: pointer;">`;
             tr.appendChild(tdCheck);
 
-            // Komórka 1: Data
-            const tdData = document.createElement('td');
-            tdData.textContent = card.dataWykonania || 'Brak daty';
-            tr.appendChild(tdData);
+            // Reszta kolumn (uproszczona dla czytelności kodu tutaj)
+            const addCell = (text) => { const td = document.createElement('td'); td.textContent = text; tr.appendChild(td); };
+            addCell(card.dataWykonania || 'Brak daty');
+            addCell(card.klient_nazwa || 'Klient nieznany');
+            addCell(card.nrDokumentu || 'Brak nr');
+            addCell(card.lekarz_nazwisko || 'Nieznany');
 
-            // Komórka 2: Klient
-            const tdKlient = document.createElement('td');
-            tdKlient.textContent = card.klient_nazwa || 'Klient nieznany';
-            tr.appendChild(tdKlient);
-
-            // Komórka 3: Nr Dokumentu
-            const tdNrDok = document.createElement('td');
-            tdNrDok.textContent = card.nrDokumentu || 'Brak nr';
-            tr.appendChild(tdNrDok);
-
-            // Komórka 4: Wystawił
-            const tdLekarz = document.createElement('td');
-            tdLekarz.textContent = card.lekarz_nazwisko || 'Nieznany';
-            tr.appendChild(tdLekarz);
-
-            // Komórka 5: Akcje
+            // Akcje
             const tdAkcje = document.createElement('td');
             tdAkcje.className = 'col-akcje';
             tdAkcje.innerHTML = `
                 <button class="btn primary small btn-view-archived-card" data-card-id="${card.id}" title="Podgląd">📄</button>
-                <button type="button" class="btn small btn-qr-card" 
-                        data-card-id="${card.id}" 
-                        data-card-nr="${card.nrDokumentu || '---'}" 
-                        data-card-date="${card.dataWykonania || '---'}"
-                        style="background-color: #34495e; color: white; margin: 0 4px;" 
-                        title="Naklejka QR">🏷️</button>
-                <button class="btn warn small btn-delete-archived-card" data-card-id="${card.id}" data-card-nr="${card.nrDokumentu || 'Brak nr'}" title="Usuń">🗑</button>
+                <button class="btn small btn-qr-card" data-card-id="${card.id}" data-card-nr="${card.nrDokumentu}" data-card-date="${card.dataWykonania}" style="background-color: #34495e; color: white; margin: 0 4px;" title="QR">🏷️</button>
+                <button class="btn warn small btn-delete-archived-card" data-card-id="${card.id}" data-card-nr="${card.nrDokumentu}" title="Usuń">🗑</button>
             `;
             tr.appendChild(tdAkcje);
-            
             tableBody.appendChild(tr);
         });
 
-        filterControls.style.display = 'grid';
-
-        // ✅ Podepnij listenery checkboxów po wyrenderowaniu
-        setupArchiveCheckboxListeners();
+        // Podepnij listenery checkboxów
+        if (typeof setupArchiveCheckboxListeners === 'function') setupArchiveCheckboxListeners();
 
     } catch (error) {
-        console.error(`Błąd wczytywania kart dla ${lekarz_uid}:`, error);
-        if (lekarz_uid === "ALL" && error.code === 'failed-precondition') {
-             alert("BŁĄD BAZY DANYCH: Wymagany indeks Firestore.");
-             tableBody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 20px; color: red;">Błąd konfiguracji bazy danych (brak indeksu).</td></tr>';
-        } else {
-            tableBody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 20px; color: red;">Wystąpił błąd podczas wczytywania kart.</td></tr>';
-        }
-        filterControls.style.display = 'none';
+        console.error("Błąd wczytywania kart:", error);
+        tableBody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: red;">Błąd wczytywania (Sprawdź konsolę/indeksy).</td></tr>';
     }
 }
 // Listener dla zmiany lekarza w Archiwum
 if(archiveUserSelect) archiveUserSelect.addEventListener('change', () => {
-    loadCardsForUser(archiveUserSelect.value);
+    // Pokaż guziki akcji
+    const btns = document.getElementById('archiveActionButtons');
+    if (btns) btns.style.display = 'flex';
+    // Domyślnie załaduj 30 dni (żeby nie było pusto)
+    if (archiveUserSelect.value) loadCardsForUser(archiveUserSelect.value, '30days');
 });
 
 
@@ -12823,71 +12829,63 @@ async function loadArchiveReceiptUsers() {
     }
 }
 if(loadArchiveReceiptUsersBtn) loadArchiveReceiptUsersBtn.addEventListener('click', loadArchiveReceiptUsers);
-
-// ✅ ZASTĄP CAŁĄ FUNKCJĘ TYM KODEM (Zadanie 2 i 3)
 /**
- * Wczytuje paragony dla użytkownika.
- * ✅ POPRAWKA: Sortowanie hybrydowe (Data Wizyty -> Czas Utworzenia).
- * Dzięki temu paragony z tego samego dnia są ułożone chronologicznie.
+ * Wczytuje paragony dla użytkownika (Obsługa 3 trybów)
  */
-async function loadReceiptsForUser(lekarz_uid) {
+async function loadReceiptsForUser(lekarz_uid, mode = '30days') {
     const tableBody = document.getElementById('archiveReceiptTableBody');
     const filterControls = document.getElementById('archiveReceiptFilterControls');
 
-    if (!lekarz_uid) {
-        tableBody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 20px; color: #555;">Wybierz użytkownika, aby zobaczyć archiwum.</td></tr>';
-        filterControls.style.display = 'none';
-        return;
-    }
+    if (!lekarz_uid) return;
     
     tableBody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 20px; color: #555;">Wczytywanie paragonów... ⏳</td></tr>';
-    filterControls.style.display = 'none';
 
-    let q; 
-    // Pobieranie danych (Sortujemy wstępnie po dacie wizyty, resztę zrobi JS)
+    let q = db.collection("archiwumParagony");
+
+    // 1. FILTR LEKARZA
     if (lekarz_uid === "ALL") {
-        console.log("Wczytywanie paragonów dla: WSZYSCY");
-        if (currentUserProfile.Rola === 'administrator') {
-            q = db.collection("archiwumParagony").orderBy("data", "desc");
-        } else {
+        if (currentUserProfile.Rola !== 'administrator') {
             const userClinicId = currentUserProfile['ID lecznicy'];
-            if (!userClinicId) {
-                  tableBody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 20px; color: red;">Błąd: Twój profil nie ma przypisanego ID lecznicy.</td></tr>';
-                  return;
-            }
-            q = db.collection("archiwumParagony")
-                    .where("id_lecznicy", "==", userClinicId)
-                    .orderBy("data", "desc");
+            q = q.where("id_lecznicy", "==", userClinicId);
         }
     } else {
-        console.log(`Wczytywanie paragonów dla UID: ${lekarz_uid}`);
-        q = db.collection("archiwumParagony")
-                  .where("lekarz_uid", "==", lekarz_uid)
-                  .orderBy("data", "desc");
+        q = q.where("lekarz_uid", "==", lekarz_uid);
+    }
+
+    // 2. OBSŁUGA TRYBÓW
+    if (mode === '30days') {
+        const d = new Date();
+        d.setDate(d.getDate() - 30);
+        const dateStr = d.toISOString().split('T')[0];
+        q = q.where("data", ">=", dateStr);
+        q = q.orderBy("data", "desc");
+        filterControls.style.display = 'grid';
+
+    } else if (mode === 'filter') {
+        const dStart = document.getElementById('arcReceiptDateStart').value;
+        const dEnd = document.getElementById('arcReceiptDateEnd').value;
+        if (dStart) q = q.where("data", ">=", dStart);
+        if (dEnd) q = q.where("data", "<=", dEnd);
+        q = q.orderBy("data", "desc");
+        filterControls.style.display = 'grid';
+
+    } else if (mode === 'all') {
+        q = q.orderBy("data", "desc").limit(500);
+        filterControls.style.display = 'grid';
     }
 
     try {
-        const snapshot = await q.get(); 
-        
+        const snapshot = await q.get();
         if (snapshot.empty) {
-            tableBody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 20px; color: #999;">Brak zapisanych paragonów dla tego wyboru.</td></tr>';
-            filterControls.style.display = 'none';
+            tableBody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 20px; color: #999;">Brak paragonów dla wybranych kryteriów.</td></tr>';
             return;
         }
         
-        // 1. Konwersja na tablicę obiektów
         let receiptsArray = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-        // 2. ✅ ZAAWANSOWANE SORTOWANIE (JS)
-        // Sortujemy najpierw po dacie wizyty, a przy remisie po czasie utworzenia (createdAt)
+        // Sortowanie JS (jak w oryginale, dla pewności czasu)
         receiptsArray.sort((a, b) => {
-            // A. Sortuj po dacie wizyty (Malejąco: najnowsze dni na górze)
-            if (b.data !== a.data) {
-                return b.data.localeCompare(a.data);
-            }
-            
-            // B. Jeśli ten sam dzień -> Sortuj po czasie utworzenia (Malejąco: 18:00 nad 08:00)
-            // Używamy bezpiecznego dostępu, bo stare rekordy mogą nie mieć 'createdAt'
+            if (b.data !== a.data) return b.data.localeCompare(a.data);
             const timeA = a.createdAt ? a.createdAt.toMillis() : 0;
             const timeB = b.createdAt ? b.createdAt.toMillis() : 0;
             return timeB - timeA; 
@@ -12895,107 +12893,45 @@ async function loadReceiptsForUser(lekarz_uid) {
 
         tableBody.innerHTML = ''; 
         
-        // 3. Renderowanie posortowanej listy
         receiptsArray.forEach(receipt => {
             const tr = document.createElement('tr');
-            
-            const statusColor = receipt.status === "Zapłacone" ? "green" : (receipt.status === "Dług" ? "red" : "#555");
-            const suma = parseFloat(receipt.suma) || 0;
-            const notatka = receipt.notatka || '';
-            
-            // Zapisujemy dane do atrybutów data-* (dla filtrów JS)
+            // Zapisz atrybuty dla filtra lokalnego JS (applyReceiptFilters)
             tr.dataset.data = receipt.data || '';
-            tr.dataset.klient = receipt.klient || 'Klient nieznany';
-            tr.dataset.czynnosci = receipt.czynnosci || '';
-            tr.dataset.nrDokumentu = receipt.nrDokumentu || '';
-            tr.dataset.status = receipt.status || 'Nie wybrano';
-            tr.dataset.suma = suma;
-            tr.dataset.lekarz = receipt.lekarz_nazwisko || 'Nieznany';
-            tr.dataset.notatka = notatka;
-            
-            // --- Budowanie wiersza metodą DOM ---
+            tr.dataset.klient = receipt.klient || '';
+            tr.dataset.status = receipt.status || '';
 
-            // Komórka 1: Data
-            const tdData = document.createElement('td');
-            tdData.textContent = receipt.data || 'Brak daty';
-            tr.appendChild(tdData);
+            const suma = parseFloat(receipt.suma) || 0;
+            const statusColor = receipt.status === "Zapłacone" ? "green" : (receipt.status === "Dług" ? "red" : "#555");
+            const sumaDisplay = (typeof formatPrice === 'function') ? formatPrice(suma) : suma + " zł";
 
-            // Komórka 2: Klient
-            const tdKlient = document.createElement('td');
-            tdKlient.textContent = receipt.klient || 'Klient nieznany';
-            tr.appendChild(tdKlient);
-
-            // Komórka 3: Czynności
-            const tdCzynnosci = document.createElement('td');
-            tdCzynnosci.textContent = receipt.czynnosci || '';
-            tr.appendChild(tdCzynnosci);
-
-            // Komórka 4: Nr Dokumentu
-            const tdNrDok = document.createElement('td');
-            tdNrDok.textContent = receipt.nrDokumentu || '';
-            tr.appendChild(tdNrDok);
-
-            // Komórka 5: Status
-            const tdStatus = document.createElement('td');
-            tdStatus.textContent = receipt.status || 'Nie wybrano';
-            tdStatus.style.color = statusColor;
-            tdStatus.style.fontWeight = 'bold';
-            tr.appendChild(tdStatus);
-
-            // Komórka 6: Suma
-            const tdSuma = document.createElement('td');
-            tdSuma.textContent = (typeof formatPrice === 'function') ? formatPrice(suma) : suma.toFixed(2) + " zł";
-            tdSuma.style.textAlign = 'right';
-            tr.appendChild(tdSuma);
-
-            // Komórka 7: Wystawił
-            const tdLekarz = document.createElement('td');
-            tdLekarz.textContent = receipt.lekarz_nazwisko || 'Nieznany';
-            tr.appendChild(tdLekarz);
-
-            // Komórka 8: Notatka
-            const tdNotatka = document.createElement('td');
-            tdNotatka.textContent = notatka;
-            tdNotatka.style.whiteSpace = "normal"; 
-            tdNotatka.style.wordBreak = "break-word";
-            tdNotatka.style.minWidth = "150px"; 
-            tr.appendChild(tdNotatka);
-
-            // Komórka 9: Akcje
-            const tdAkcje = document.createElement('td');
-            tdAkcje.className = 'col-akcje';
-            
-            let akcjeHTML = `
-                <button class="btn primary small btn-view-archived-receipt" data-receipt-id="${receipt.id}">Podgląd</button>
-                <button class="btn warn small btn-delete-archived-receipt" data-receipt-id="${receipt.id}" data-receipt-info="${receipt.data} / ${receipt.klient}">Usuń</button>
+            tr.innerHTML = `
+                <td>${receipt.data}</td>
+                <td>${receipt.klient}</td>
+                <td>${receipt.czynnosci || ''}</td>
+                <td>${receipt.nrDokumentu || ''}</td>
+                <td style="color:${statusColor}; font-weight:bold; white-space:pre-wrap;">${receipt.status}</td>
+                <td style="text-align:right;">${sumaDisplay}</td>
+                <td>${receipt.lekarz_nazwisko}</td>
+                <td style="white-space:normal; min-width:150px;">${receipt.notatka || ''}</td>
+                <td class="col-akcje">
+                    <button class="btn primary small btn-view-archived-receipt" data-receipt-id="${receipt.id}">Podgląd</button>
+                    <button class="btn warn small btn-delete-archived-receipt" data-receipt-id="${receipt.id}" data-receipt-info="${receipt.data}">Usuń</button>
+                    ${receipt.status === "Dług" ? `<button class="btn small btn-pay-debt" style="background-color: #27ae60; color: white;" data-receipt-id="${receipt.id}" data-receipt-klient="${receipt.klient}" data-receipt-suma="${suma}">Spłata</button>` : ''}
+                </td>
             `;
-            
-            if (receipt.status === "Dług") {
-                akcjeHTML += ` <button class="btn small btn-pay-debt" style="background-color: #27ae60; color: white;" data-receipt-id="${receipt.id}" data-receipt-klient="${receipt.klient || ''}" data-receipt-suma="${suma}">Spłata długu</button>`;
-            }
-            
-            tdAkcje.innerHTML = akcjeHTML;
-            tr.appendChild(tdAkcje);
-
             tableBody.appendChild(tr);
         });
 
-        filterControls.style.display = 'grid';
-
     } catch (error) {
-        console.error(`Błąd wczytywania paragonów dla ${lekarz_uid}:`, error);
-        
-        if (error.code === 'failed-precondition') {
-             alert("⚠️ BŁĄD INDEKSU FIREBASE!\n\nWymagany nowy indeks w bazie danych. Sprawdź konsolę (F12) i kliknij w link.");
-             tableBody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 20px; color: red;">Wymagany nowy indeks w bazie danych. Sprawdź konsolę (F12).</td></tr>';
-        } else {
-             tableBody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 20px; color: red;">Wystąpił błąd podczas wczytywania paragonów.</td></tr>';
-        }
-        filterControls.style.display = 'none';
+        console.error("Błąd wczytywania paragonów:", error);
+        tableBody.innerHTML = '<tr><td colspan="9" style="text-align: center; color: red;">Błąd wczytywania.</td></tr>';
     }
 }
+
 if(archiveReceiptUserSelect) archiveReceiptUserSelect.addEventListener('change', () => {
-    loadReceiptsForUser(archiveReceiptUserSelect.value);
+    const btns = document.getElementById('archiveReceiptActionButtons');
+    if (btns) btns.style.display = 'flex';
+    if (archiveReceiptUserSelect.value) loadReceiptsForUser(archiveReceiptUserSelect.value, '30days');
 });
 
 // Podgląd Paragonu (użyjemy zwykłego alert() dla prostoty)
