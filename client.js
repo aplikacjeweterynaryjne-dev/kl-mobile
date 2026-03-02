@@ -2631,103 +2631,131 @@ function confirmSyncTask() {
     showToast("Zatwierdzono podanie leków w ramach synchronizacji!", "success");
 }
 // ============================================================
-// ✅ NOWY MODUŁ IMPORTU (5 KOLUMN + SUPER SMART STATUS)
+// ✅ NOWY MODUŁ IMPORTU (6 KOLUMN + DOB + WSPÓLNA LOGIKA)
 // ============================================================
 
-// 1. Inicjalizacja tabeli po załadowaniu
+// 1. Inicjalizacja tabeli
 document.addEventListener('DOMContentLoaded', () => {
     const tbody = document.getElementById('importTableBody');
     if (tbody) {
-        addEmptyRows(20); // Na start 20 wierszy
+        addEmptyRows(20);
         tbody.addEventListener('paste', handleImportPaste);
-        tbody.addEventListener('input', handleSmartLogic); // Nasłuchujemy każdej zmiany
+        tbody.addEventListener('input', handleSmartLogic);
+    }
+    
+    // Podpięcie logiki dla pojedynczego dodawania (Moduł Pkt 3 twojego pytania)
+    const inpLastInsem = document.getElementById('inpLastInsem');
+    if (inpLastInsem) {
+        // Usuwamy stare listenery (klonowanie)
+        const newInp = inpLastInsem.cloneNode(true);
+        inpLastInsem.parentNode.replaceChild(newInp, inpLastInsem);
+        
+        newInp.addEventListener('change', (e) => {
+             const dateStr = e.target.value; // Format YYYY-MM-DD z input date
+             const statusSelect = document.getElementById('inpPregStatus');
+             if (dateStr && statusSelect) {
+                 const result = calculateDetailedStatusFromDate(dateStr);
+                 // Mapujemy wynik tekstu na wartości selecta w formularzu
+                 if (result.statusText.includes('Zasuszona') || result.statusText.includes('Cielna')) {
+                     statusSelect.value = 'pregnant';
+                 } else if (result.statusText.includes('Do USG')) {
+                     statusSelect.value = 'check';
+                 } else {
+                     statusSelect.value = 'negative';
+                 }
+                 // Alert opcjonalny, żeby użytkownik wiedział co się stało
+                 // alert(`Data wskazuje na status: ${result.statusText}`);
+             }
+        });
     }
 });
 
-// Funkcja dodająca puste wiersze (5 kolumn)
+// 2. WSPÓLNA FUNKCJA LOGIKI STATUSU (Używa ustawień usg z konfiguracji)
+function calculateDetailedStatusFromDate(dateIsoStr) {
+    if (!dateIsoStr) return { statusText: "Pusta", color: "#333", isPregnant: false, isDriedOff: false };
+
+    const today = new Date();
+    const eventDate = new Date(dateIsoStr);
+    const diffDays = Math.floor((today - eventDate) / (1000 * 60 * 60 * 24));
+
+    // Pobierz ustawienia USG z globalnych (jeśli są, w przeciwnym razie domyślne)
+    const usgEnd = (typeof userSettings !== 'undefined' && userSettings.usg) ? userSettings.usg.end : 180; 
+    const usgStart = (typeof userSettings !== 'undefined' && userSettings.usg) ? userSettings.usg.start : 30;
+
+    let statusText = "";
+    let color = "#333";
+    let isPregnant = false;
+    let isDriedOff = false;
+
+    if (diffDays > 220) {
+        statusText = "Zasuszona";
+        color = "#c0392b"; // Czerwony
+        isPregnant = true;
+        isDriedOff = true;
+    } else if (diffDays > usgEnd) {
+        // Przekroczyło termin badania -> Zakładamy Cielna
+        statusText = "Cielna";
+        color = "#27ae60"; // Zielony
+        isPregnant = true;
+    } else if (diffDays > usgStart) {
+        statusText = "Do USG";
+        color = "#f39c12"; // Pomarańczowy
+    } else {
+        statusText = "Pusta";
+        color = "#2980b9"; // Niebieski
+    }
+
+    return { statusText, color, isPregnant, isDriedOff };
+}
+
+
+// 3. Funkcja dodająca puste wiersze (6 kolumn: Tag | Typ | DOB | Calv | Insem | Status)
 function addEmptyRows(count = 10) {
     const tbody = document.getElementById('importTableBody');
     if (!tbody) return;
     
     for (let i = 0; i < count; i++) {
         const tr = document.createElement('tr');
+        // Dodano onclick="this.select()" do statusu - ułatwia edycję
         tr.innerHTML = `
             <td><input type="text" class="imp-tag" placeholder="PL..."></td>
             <td><input type="text" class="imp-type" list="impTypeList" placeholder="krowa"></td>
+            <td><input type="text" class="imp-dob" placeholder="DD.MM.RRRR"></td>
             <td><input type="text" class="imp-calv" placeholder="DD.MM.RRRR"></td>
             <td><input type="text" class="imp-insem" placeholder="DD.MM.RRRR"></td>
-            <td><input type="text" class="imp-status" list="impStatusList" placeholder="-- automat --"></td>
+            <td><input type="text" class="imp-status" list="impStatusList" placeholder="-- automat --" onclick="this.select()"></td>
         `;
         tbody.appendChild(tr);
     }
 }
 
-// 2. LOGIKA "SUPER SMART" - Oblicza status na żywo
+// 4. Obsługa zmian w tabeli (Smart Logic)
 function handleSmartLogic(e) {
     const input = e.target;
     const row = input.closest('tr');
     
-    // Uruchom tylko przy zmianie dat (wycielenia lub zacielenia)
-    if (input.classList.contains('imp-insem') || input.classList.contains('imp-calv')) {
-        recalculateRowStatus(row);
-    }
-}
+    if (input.classList.contains('imp-insem')) {
+        const insemStr = input.value.trim();
+        const statusInput = row.querySelector('.imp-status');
 
-function recalculateRowStatus(row) {
-    const insemInput = row.querySelector('.imp-insem');
-    const calvInput = row.querySelector('.imp-calv');
-    const statusInput = row.querySelector('.imp-status');
-
-    // Nie nadpisuj, jeśli użytkownik wpisał "Cielna" ręcznie
-    if (statusInput.value.includes("Cielna")) return; 
-
-    const insemDateStr = insemInput.value.trim();
-    const calvDateStr = calvInput.value.trim();
-    
-    const today = new Date();
-    const insemDate = parseDatePL(insemDateStr);
-    const calvDate = parseDatePL(calvDateStr);
-
-    let suggestedStatus = "";
-
-    // A. Analiza na podstawie ZACIELENIA
-    if (insemDate) {
-        const iDate = new Date(insemDate);
-        const diffDays = Math.floor((today - iDate) / (1000 * 60 * 60 * 24));
-
-        if (diffDays > 220) {
-            suggestedStatus = "Zasuszona"; // Zaawansowana ciąża
-        } else if (diffDays > 30) {
-            suggestedStatus = "Do USG";
-        } else {
-            suggestedStatus = "Pusta"; // Za wcześnie na badanie
-        }
-    } 
-    // B. Analiza na podstawie WYCIELENIA (jeśli brak zacielenia)
-    else if (calvDate) {
-        const cDate = new Date(calvDate);
-        const diffDays = Math.floor((today - cDate) / (1000 * 60 * 60 * 24));
+        // Przeliczamy tylko jeśli status nie został ręcznie ustawiony na "Cielna" (lub inny finalny) przez usera
+        // Ale zgodnie z życzeniem, chcemy być pomocni, więc jeśli pole jest puste lub ma stary automat -> nadpisz
+        const parsedDate = parseDatePL(insemStr);
         
-        if (diffDays < 60) {
-            suggestedStatus = "Wycielona < 60 dni";
-        } else {
-            suggestedStatus = "Pusta";
+        if (parsedDate) {
+            const result = calculateDetailedStatusFromDate(parsedDate);
+            statusInput.value = result.statusText;
+            statusInput.style.color = result.color;
+            statusInput.style.fontWeight = "bold";
         }
-    }
-
-    // Wstaw wynik
-    if (suggestedStatus) {
-        statusInput.value = suggestedStatus;
-        statusInput.style.color = (suggestedStatus === "Zasuszona") ? "#c0392b" : "#2980b9";
-        statusInput.style.fontWeight = "bold";
     }
 }
 
-// 3. Inteligentne wklejanie z Excela
+// 5. Inteligentne wklejanie (Obsługuje 6 kolumn)
 function handleImportPaste(e) {
     const targetInput = e.target;
     if (targetInput.tagName !== 'INPUT') return;
-    
+
     e.preventDefault();
     const clipboardData = e.clipboardData || window.clipboardData;
     const pastedData = clipboardData.getData('Text');
@@ -2744,7 +2772,7 @@ function handleImportPaste(e) {
         if (rowIndex >= tableRows.length) addEmptyRows(1);
         
         const currentRow = tableRows[rowIndex];
-        const cols = rowText.split('\t'); // Excel tab
+        const cols = rowText.split('\t');
 
         cols.forEach((cellText, j) => {
             const colIndex = startColIndex + j;
@@ -2752,31 +2780,29 @@ function handleImportPaste(e) {
                 const input = currentRow.children[colIndex].querySelector('input');
                 if (input) {
                     input.value = cellText.trim();
+                    // Wywołaj event dla daty zacielenia, żeby przeliczyć status
+                    if (input.classList.contains('imp-insem')) {
+                        input.dispatchEvent(new Event('input', { bubbles: true }));
+                    }
                 }
             }
         });
-        
-        // Po wklejeniu całego wiersza, przelicz status
-        recalculateRowStatus(currentRow);
     });
 }
 
-// 4. Konwerter daty (Bez zmian)
+// 6. Konwerter daty
 function parseDatePL(dateStr) {
     if (!dateStr) return null;
     dateStr = dateStr.split(' ')[0].trim();
     const match = dateStr.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{4})$/);
     if (match) {
-        const d = match[1].padStart(2, '0');
-        const m = match[2].padStart(2, '0');
-        const y = match[3];
-        return `${y}-${m}-${d}`;
+        return `${match[3]}-${match[2].padStart(2, '0')}-${match[1].padStart(2, '0')}`;
     }
     if (dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) return dateStr;
     return null;
 }
 
-// 5. Główny Import do Bazy (5 kolumn)
+// 7. Główny Import do Bazy
 async function processHerdImport() {
     const tbody = document.getElementById('importTableBody');
     const rows = tbody.querySelectorAll('tr');
@@ -2785,31 +2811,32 @@ async function processHerdImport() {
 
     for (const row of rows) {
         const inputs = row.querySelectorAll('input');
-        // Indexy: 0=Tag, 1=Typ, 2=Calv, 3=Insem, 4=Status
+        // Indexy: 0=Tag, 1=Typ, 2=DOB, 3=Calv, 4=Insem, 5=Status
         const tag = inputs[0].value.trim();
         const typeRaw = inputs[1].value.trim().toLowerCase();
-        const calvRaw = inputs[2].value.trim();
-        const insemRaw = inputs[3].value.trim();
-        const statusRaw = inputs[4].value.trim().toLowerCase();
+        const dobRaw = inputs[2].value.trim(); // NOWA KOLUMNA
+        const calvRaw = inputs[3].value.trim();
+        const insemRaw = inputs[4].value.trim();
+        const statusRaw = inputs[5].value.trim().toLowerCase();
 
         if (tag.length > 2) {
-            
             // Typ
             let animalType = 'krowa';
             if (typeRaw.includes('jał') || typeRaw.includes('jal')) animalType = 'jalowka';
             else if (typeRaw.includes('byk')) animalType = 'byk';
             
             // Daty
+            const dob = parseDatePL(dobRaw);
             const lastCalving = parseDatePL(calvRaw);
             const lastInsem = parseDatePL(insemRaw);
             
-            // Statusy Bazy
+            // Logika Statusu (Priorytety: Wpisany ręcznie > Obliczony z daty)
             let pregStatus = 'negative';
             let isPregnant = false;
             let usgStatus = 'negative';
             let isDriedOff = false;
 
-            // Logika mapowania wpisanego statusu na flagi bazy
+            // Jeśli wpisany status zawiera słowa kluczowe
             if (statusRaw.includes('zasusz')) {
                 isDriedOff = true; isPregnant = true; pregStatus = 'pregnant'; usgStatus = 'positive';
             } else if (statusRaw.includes('cieln') || statusRaw.includes('ciąża')) {
@@ -2817,18 +2844,32 @@ async function processHerdImport() {
             } else if (statusRaw.includes('usg') || statusRaw.includes('badani')) {
                 pregStatus = 'check'; usgStatus = 'pending';
             }
-            // "Pusta" lub "Wycielona" -> zostaje default (negative)
+            // Jeśli użytkownik zostawił puste, a data wskazuje na Pusta -> to Pusta
+            // System wyliczył status wizualnie w funkcji handleSmartLogic, 
+            // ale tutaj musimy upewnić się, co zapisać w bazie.
+            
+            // Jeśli jest data zacielenia, ale status nie wskazuje na ciążę/usg -> traktujemy jako pusta po kryciu (np. wynik negatywny usg)
+            // Chyba że funkcja smart wstawiła "Pusta" lub "Do USG", wtedy user to widzi.
+            
+            // Dodatkowe zabezpieczenie: Jeśli data zacielenia > 220 dni i status pusty (user nie zmienił), wymuś zasuszenie
+            if (lastInsem && !isPregnant && !isDriedOff) {
+                 const result = calculateDetailedStatusFromDate(lastInsem);
+                 if (result.isDriedOff) { isDriedOff = true; isPregnant = true; pregStatus = 'pregnant'; usgStatus = 'positive'; }
+                 else if (result.isPregnant) { isPregnant = true; pregStatus = 'pregnant'; usgStatus = 'positive'; }
+                 else if (result.statusText === 'Do USG') { pregStatus = 'check'; usgStatus = 'pending'; }
+            }
 
             const animalRef = db.collection('animals').doc();
             batch.set(animalRef, {
                 ownerUid: currentUser.uid,
                 tag: tag,
                 type: animalType,
-                lastCalving: lastCalving,     // Zapisujemy wycielenie
-                lastInsemination: lastInsem,  // Zapisujemy zacielenie
+                dob: dob,                     // Data urodzenia
+                lastCalving: lastCalving,
+                lastInsemination: lastInsem,
                 isPregnantConfirmed: isPregnant,
                 usgStatus: usgStatus,
-                isDriedOff: isDriedOff,       // Zapisujemy zasuszenie
+                isDriedOff: isDriedOff,
                 createdAt: firebase.firestore.FieldValue.serverTimestamp()
             });
             addedCount++;
@@ -2845,5 +2886,34 @@ async function processHerdImport() {
         closeModal('importHerdModal');
     } else {
         alert("Brak danych do importu.");
+    }
+}
+
+// ✅ FUNKCJA USUWANIA KONTA (BEZ ZMIAN)
+async function deleteMyAccount() {
+    const confirmation = prompt("⚠️ USUWANIE KONTA ⚠️\n\nAby trwale usunąć konto i wszystkie dane stada, wpisz wielkimi literami słowo: USUŃ");
+    if (confirmation !== "USUŃ") return alert("Anulowano. Kod niepoprawny.");
+    try {
+        const uid = currentUser.uid;
+        const animalsSnap = await db.collection('animals').where('ownerUid', '==', uid).get();
+        if (!animalsSnap.empty) {
+            const batch = db.batch();
+            animalsSnap.forEach(doc => batch.delete(doc.ref));
+            await batch.commit();
+        }
+        await db.collection('konfiguracja').doc(currentUser.id).delete();
+        const logsSnap = await db.collection('task_logs').where('ownerUid', '==', uid).get();
+        if (!logsSnap.empty) {
+            const batchLogs = db.batch();
+            logsSnap.forEach(doc => batchLogs.delete(doc.ref));
+            await batchLogs.commit();
+        }
+        const user = auth.currentUser;
+        try { await user.delete(); } catch (e) { console.warn("Relogin required", e); }
+        alert("Konto usunięte.");
+        window.location.href = 'index.html';
+    } catch (e) {
+        console.error(e);
+        alert("Błąd: " + e.message);
     }
 }
