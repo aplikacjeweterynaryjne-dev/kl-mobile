@@ -86,6 +86,17 @@
         .sync-item-card { border: 1px solid #ccc; padding: 10px; border-radius: 8px; margin-bottom: 10px; background: #fff; display: flex; justify-content: space-between; align-items: center; }
         .sync-item-card .details { font-size: 12px; color: #555; line-height: 1.4; }
         .sync-checkbox-wrapper { display: flex; align-items: center; gap: 5px; font-size: 14px; }
+        /* Nowe style dla tabeli importu */
+        .import-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12px; }
+        .import-table th { background: #eee; padding: 8px; border: 1px solid #ccc; text-align: left; }
+        .import-table td { border: 1px solid #ccc; padding: 0; min-height: 30px; }
+        /* Inputy w tabeli, żeby wyglądało jak Excel */
+        .import-table input { 
+            width: 100%; height: 100%; border: none; padding: 8px; 
+            box-sizing: border-box; font-family: inherit; font-size: inherit; 
+            outline: none; background: transparent;
+        }
+        .import-table input:focus { background: #e3f2fd; }
     </style>
 </head>
 <body>
@@ -413,18 +424,34 @@
     </div>
 
     <div id="importHerdModal" class="modal">
-        <div class="modal-content">
-            <span class="close-btn" style="float:right; font-size:24px; cursor:pointer;" onclick="closeModal('importHerdModal')">&times;</span>
-            <h3>📥 Import Stada</h3>
-            <p style="font-size:12px; color:#555;">
-                Skopiuj kolumny z Excela i wklej poniżej. <br>
-                Wymagana kolejność: <b>Kolczyk | Data Ost. Zacielenia | Status</b><br>
-                <i>(Statusy: cielna, pusta, usg, do badania)</i>
+        <div class="modal-content" style="max-width: 800px; width: 95%; height: 90vh; display: flex; flex-direction: column;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                <h3 style="margin:0;">📥 Import z Excela</h3>
+                <button style="background:none; border:none; font-size:24px; cursor:pointer;" onclick="closeModal('importHerdModal')">✕</button>
+            </div>
+            
+            <p style="font-size:12px; color:#555; margin-bottom:10px;">
+                Skopiuj dane z Excela (CTRL+C) i wklej w pierwsze pole (CTRL+V).<br>
+                Możesz wklejać kolumnami lub całą tabelę naraz. Daty: <b>DD.MM.RRRR</b> lub <b>DD-MM-RRRR</b>.
             </p>
-            <textarea id="importHerdInput" style="width:100%; height:200px; padding:10px; font-size:12px; border:1px solid #ccc; border-radius: 6px;" placeholder="PL005234567890   2024-01-01   cielna"></textarea>
-            <div style="margin-top:10px; display: flex; gap: 10px;">
-                 <button class="btn" style="background:#eee; color: #333;" onclick="closeModal('importHerdModal')">Anuluj</button>
-                 <button class="btn btn-primary" onclick="processHerdImport()">Importuj</button>
+
+            <div style="flex: 1; overflow: auto; border: 1px solid #ccc;">
+                <table class="import-table" id="importTable">
+                    <thead>
+                        <tr>
+                            <th style="width: 33%;">Nr Kolczyka</th>
+                            <th style="width: 33%;">Data Ost. Zacielenia</th>
+                            <th style="width: 33%;">Status (cielna/pusta/usg)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="importTableBody">
+                        </tbody>
+                </table>
+            </div>
+            
+            <div style="margin-top:15px; display: flex; gap: 10px; justify-content: flex-end;">
+                 <button class="btn" style="background:#eee; color: #333; width: auto;" onclick="addEmptyRows()">+ Dodaj wiersze</button>
+                 <button class="btn btn-primary" style="width: auto;" onclick="processHerdImport()">✅ Importuj do Bazy</button>
             </div>
         </div>
     </div>
