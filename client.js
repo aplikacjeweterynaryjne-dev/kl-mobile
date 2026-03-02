@@ -2630,52 +2630,145 @@ function confirmSyncTask() {
     closeModal('syncTaskConfirmModal');
     showToast("Zatwierdzono podanie leków w ramach synchronizacji!", "success");
 }
-// ✅ NOWA FUNKCJA: IMPORT STADA Z TEKSTU
-async function processHerdImport() {
-    const text = document.getElementById('importHerdInput').value.trim();
-    if (!text) return alert("Wklej dane do pola tekstowego!");
+// ============================================================
+// ✅ NOWY MODUŁ IMPORTU (TABELA EXCEL + OBSŁUGA DATY PL)
+// ============================================================
 
-    const rows = text.split('\n');
-    let addedCount = 0;
-    const batch = db.batch(); // Używamy batcha dla wydajności
-
-    // Limit batcha to 500 operacji, zróbmy prostą pętlę (dla małych importów wystarczy)
-    // Jeśli planujesz importować > 500 sztuk, trzeba by to podzielić, ale tu uprościmy
-    
-    for (let row of rows) {
-        // Dzielimy po tabulatorze (Excel domyślnie), średniku lub przecinku
-        let cols = row.split(/\t|,|;/).map(c => c.trim());
+// 1. Inicjalizacja tabeli po załadowaniu
+document.addEventListener('DOMContentLoaded', () => {
+    // Generuj puste wiersze na start
+    const tbody = document.getElementById('importTableBody');
+    if (tbody) {
+        addEmptyRows(20); // 20 pustych wierszy na start
         
-        // Oczekujemy co najmniej kolczyka (kolumna 0)
-        if (cols.length >= 1 && cols[0].length > 3) {
-            const tag = cols[0];
-            
-            // Opcjonalne dane
-            let lastInsem = null;
-            let statusRaw = '';
-            
-            if (cols[1] && cols[1].match(/^\d{4}-\d{2}-\d{2}$/)) {
-                lastInsem = cols[1]; // Data w formacie YYYY-MM-DD
-            }
-            
-            if (cols[2]) statusRaw = cols[2].toLowerCase();
+        // Podpięcie inteligentnego wklejania
+        tbody.addEventListener('paste', handleImportPaste);
+    }
+});
 
+// Funkcja dodająca puste wiersze
+function addEmptyRows(count = 10) {
+    const tbody = document.getElementById('importTableBody');
+    if (!tbody) return;
+    
+    for (let i = 0; i < count; i++) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td><input type="text" class="imp-tag" placeholder="PL..."></td>
+            <td><input type="text" class="imp-date" placeholder="DD.MM.RRRR"></td>
+            <td><input type="text" class="imp-status" placeholder="np. cielna"></td>
+        `;
+        tbody.appendChild(tr);
+    }
+}
+
+// 2. Inteligentne wklejanie z Excela (Obsługuje kolumny i bloki)
+function handleImportPaste(e) {
+    e.preventDefault();
+    const clipboardData = e.clipboardData || window.clipboardData;
+    const pastedData = clipboardData.getData('Text');
+    
+    // Podziel na wiersze
+    const rows = pastedData.split(/\r?\n/).filter(r => r.trim() !== '');
+    
+    // Znajdź, gdzie użytkownik ma kursor (w którym polu input)
+    const targetInput = e.target;
+    if (targetInput.tagName !== 'INPUT') return;
+    
+    const targetCell = targetInput.parentElement;
+    const targetRow = targetCell.parentElement;
+    const startRowIndex = Array.from(targetRow.parentElement.children).indexOf(targetRow);
+    const startColIndex = Array.from(targetRow.children).indexOf(targetCell);
+
+    const tableRows = document.getElementById('importTableBody').children;
+
+    // Pętla po wklejanych danych
+    rows.forEach((rowText, i) => {
+        const rowIndex = startRowIndex + i;
+        
+        // Jeśli brakuje wierszy w tabeli, dodaj je
+        if (rowIndex >= tableRows.length) {
+            addEmptyRows(1);
+        }
+        
+        const currentRow = tableRows[rowIndex];
+        const cols = rowText.split('\t'); // Excel rozdziela kolumny tabulatorem
+
+        cols.forEach((cellText, j) => {
+            const colIndex = startColIndex + j;
+            if (currentRow.children[colIndex]) {
+                const input = currentRow.children[colIndex].querySelector('input');
+                if (input) {
+                    input.value = cellText.trim();
+                }
+            }
+        });
+    });
+}
+
+// 3. Konwerter daty (Europejska -> ISO)
+// Obsługuje: 15.01.2024, 15/01/2024, 15-01-2024
+function parseDatePL(dateStr) {
+    if (!dateStr) return null;
+    
+    // Usuń ewentualne godziny
+    dateStr = dateStr.split(' ')[0].trim();
+    
+    // Regex dla formatu DD.MM.RRRR lub DD/MM/RRRR lub DD-MM-RRRR
+    // Grupy: 1=Dzień, 2=Miesiąc, 3=Rok
+    const match = dateStr.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{4})$/);
+    
+    if (match) {
+        const d = match[1].padStart(2, '0');
+        const m = match[2].padStart(2, '0');
+        const y = match[3];
+        return `${y}-${m}-${d}`; // Zwraca YYYY-MM-DD (format bazy)
+    }
+    
+    // Jeśli już jest w formacie YYYY-MM-DD (np. skopiowane z bazy SQL), zwróć bez zmian
+    if (dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
+        return dateStr;
+    }
+
+    return null; // Błędny format
+}
+
+// 4. Główna funkcja Importu (czyta z tabeli HTML)
+async function processHerdImport() {
+    const tbody = document.getElementById('importTableBody');
+    const rows = tbody.querySelectorAll('tr');
+    let addedCount = 0;
+    const batch = db.batch();
+
+    for (const row of rows) {
+        const inputs = row.querySelectorAll('input');
+        const tag = inputs[0].value.trim();
+        const dateRaw = inputs[1].value.trim();
+        const statusRaw = inputs[2].value.trim().toLowerCase();
+
+        // Wymagany min. numer kolczyka
+        if (tag.length > 2) {
+            
+            // Konwersja daty
+            const lastInsem = parseDatePL(dateRaw);
+            
             // Analiza statusu
             let pregStatus = 'negative';
             let isPregnant = false;
             let usgStatus = 'negative';
 
-            if (statusRaw.includes('cieln') || statusRaw.includes('ciąża')) {
+            if (statusRaw.includes('cieln') || statusRaw.includes('ciąża') || statusRaw.includes('+')) {
                 pregStatus = 'pregnant'; isPregnant = true; usgStatus = 'positive';
-            } else if (statusRaw.includes('usg') || statusRaw.includes('badan')) {
+            } else if (statusRaw.includes('usg') || statusRaw.includes('badani') || statusRaw.includes('?')) {
                 pregStatus = 'check'; usgStatus = 'pending';
             }
 
-            const animalRef = db.collection('animals').doc(); // Generuj ID
+            // Tworzenie dokumentu
+            const animalRef = db.collection('animals').doc();
             batch.set(animalRef, {
                 ownerUid: currentUser.uid,
                 tag: tag,
-                type: 'krowa', // Domyślnie krowa przy masowym imporcie
+                type: 'krowa', // Domyślny typ
                 lastInsemination: lastInsem,
                 isPregnantConfirmed: isPregnant,
                 usgStatus: usgStatus,
@@ -2683,69 +2776,23 @@ async function processHerdImport() {
                 createdAt: firebase.firestore.FieldValue.serverTimestamp()
             });
             addedCount++;
-            
-            // Zabezpieczenie batcha (co 400 sztuk)
-            if (addedCount % 400 === 0) {
+
+            // Zabezpieczenie batcha (maks 450 operacji)
+            if (addedCount % 450 === 0) {
                  await batch.commit();
-                 // Nowy batch
-                 // (W prostej wersji tutaj funkcja mogłaby się skomplikować, 
-                 // zakładamy że użytkownik importuje < 400 na raz dla bezpieczeństwa)
             }
         }
     }
 
     if (addedCount > 0) {
         await batch.commit();
-        alert(`Sukces! Zaimportowano ${addedCount} zwierząt.`);
-        document.getElementById('importHerdInput').value = '';
+        alert(`Pomyślnie zaimportowano ${addedCount} sztuk.`);
+        
+        // Wyczyść tabelę
+        tbody.innerHTML = '';
+        addEmptyRows(20);
         closeModal('importHerdModal');
-        // Lista stada odświeży się sama dzięki onSnapshot w loadHerd()
     } else {
-        alert("Nie rozpoznano danych. Upewnij się, że kopiujesz kolumny z Excela.");
-    }
-}
-
-// ✅ NOWA FUNKCJA: USUWANIE KONTA
-async function deleteMyAccount() {
-    const confirmation = prompt("⚠️ USUWANIE KONTA ⚠️\n\nAby trwale usunąć konto i wszystkie dane stada, wpisz wielkimi literami słowo: USUŃ");
-    if (confirmation !== "USUŃ") return alert("Anulowano. Kod niepoprawny.");
-
-    try {
-        const uid = currentUser.uid;
-        
-        // 1. Usuń zwierzęta (Pobierz i usuń w batchu)
-        const animalsSnap = await db.collection('animals').where('ownerUid', '==', uid).get();
-        
-        if (!animalsSnap.empty) {
-            const batch = db.batch();
-            animalsSnap.forEach(doc => batch.delete(doc.ref));
-            await batch.commit();
-        }
-
-        // 2. Usuń profil konfiguracji
-        await db.collection('konfiguracja').doc(currentUser.id).delete();
-        
-        // 3. Usuń logi zadań
-        const logsSnap = await db.collection('task_logs').where('ownerUid', '==', uid).get();
-        if (!logsSnap.empty) {
-            const batchLogs = db.batch();
-            logsSnap.forEach(doc => batchLogs.delete(doc.ref));
-            await batchLogs.commit();
-        }
-
-        // 4. Usuń użytkownika z Auth (Wymaga świeżego logowania, więc może rzucić błąd)
-        const user = auth.currentUser;
-        try {
-            await user.delete();
-        } catch (e) {
-            console.warn("Nie udało się usunąć z Auth (wymagane przelogowanie), ale dane usunięto.", e);
-        }
-
-        alert("Twoje konto i dane zostały usunięte.");
-        window.location.href = 'index.html';
-
-    } catch (e) {
-        console.error(e);
-        alert("Błąd podczas usuwania danych: " + e.message);
+        alert("Tabela wydaje się pusta lub dane są niepoprawne. Wypełnij kolumnę 'Nr Kolczyka'.");
     }
 }
