@@ -928,6 +928,10 @@ function renderTasks(allTasks) {
 
     // Renderowanie kafelków
     visibleTasks.forEach(t => {
+        // ✅ NOWOŚĆ: Pobieranie lokalizacji
+        const taskAnimal = myHerd.find(a => a.id === t.animalId);
+        const locationStr = (taskAnimal && taskAnimal.location) ? `📍 ${taskAnimal.location}` : '';
+
         const div = document.createElement('div');
         div.className = `task-item ${t.priority} ${t.isDone ? 'done' : ''}`;
         
@@ -980,13 +984,16 @@ function renderTasks(allTasks) {
             const insemStr = t.insemDate ? (new Date(t.insemDate).toLocaleDateString('pl-PL')) : '-';
             const estCalvStr = t.calvDate ? (new Date(t.calvDate).toLocaleDateString('pl-PL')) : '-';
             
-            infoHtml = `
+        infoHtml = `
                 <div style="font-size:15px; font-weight:bold; color:#333;">${t.title}</div>
                 <div style="font-size: 11px; color: #777; margin: 4px 0; line-height: 1.4;">
                     Termin: <b style="color:${dateColor}">${dueStr}</b><br>
                     💉 Krycie: <b>${insemStr}</b> | 🍼 Przew. poród: <b>${estCalvStr}</b>
                 </div>
-                <div class="task-animal-tag" onclick="openAnimalCard('${t.animalId}')">${t.tag}</div>
+                <div class="task-animal-tag" onclick="openAnimalCard('${t.animalId}')">
+                    ${t.tag} 
+                    <span style="font-size:11px; color:#2980b9; margin-left:10px; font-weight:normal;">${locationStr}</span>
+                </div>
             `;
             
             buttonHtml = t.isDone 
@@ -1438,12 +1445,48 @@ function openAnimalCard(id) {
             }
         }
 
-        // Status Cielności
+  // Status Cielności
         const statusDiv = document.getElementById('cardPregStatus');
         if(statusDiv) {
             const statusInfo = getDetailedStatus(animal); 
             statusDiv.textContent = statusInfo.text;
             statusDiv.style.color = statusInfo.color;
+        }
+
+        // ✅ NOWOŚĆ: Sekcja Zadań w Karcie
+        const cardTasksDiv = document.getElementById('cardTasksSection');
+        if (cardTasksDiv) cardTasksDiv.remove(); // Usuń starą sekcję jeśli istnieje (żeby nie dublować)
+
+        // Szukamy aktywnych zadań dla tego zwierzęcia
+        const animalTasks = window.myAllTasksGlobal.filter(t => t.animalId === id && !t.isDone);
+
+        if (animalTasks.length > 0) {
+            const tasksContainer = document.createElement('div');
+            tasksContainer.id = 'cardTasksSection';
+            tasksContainer.style.cssText = "background:#fff3e0; padding:10px; border-radius:10px; margin:10px 0; border:1px solid #ffe0b2;";
+            tasksContainer.innerHTML = '<h4 style="margin:0 0 10px 0; color:#e67e22; font-size:14px;">⚡ Aktywne Zadania:</h4>';
+
+            animalTasks.forEach(t => {
+                const btn = document.createElement('button');
+                btn.className = 'btn small';
+                btn.style.cssText = "margin-bottom:5px; background:white; border:1px solid #e67e22; color:#e67e22; text-align:left; width:100%; display:flex; justify-content:space-between; align-items:center;";
+                btn.innerHTML = `<span>${t.title}</span> <span style="font-weight:bold;">✔ Wykonaj</span>`;
+                
+                // Kliknięcie uruchamia standardową procedurę potwierdzania
+                btn.onclick = () => {
+                    closeModal('animalCardModal'); // Zamknij kartę, żeby widzieć modal potwierdzenia
+                    if (t.isGroupTask) {
+                        initiateSyncTaskCompletion(t.id);
+                    } else {
+                        initiateTaskCompletion(t.id, t.type, t.animalId, t.dueDate.toISOString());
+                    }
+                };
+                tasksContainer.appendChild(btn);
+            });
+
+            // Wstaw sekcję zadań pod statystykami (cowStatsPanel)
+            const statsPanel = document.getElementById('cowStatsPanel');
+            if (statsPanel) statsPanel.after(tasksContainer);
         }
 
         // Renderowanie list (Potomstwo, Historia)
