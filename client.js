@@ -2960,3 +2960,28 @@ async function deleteMyAccount() {
         alert("Błąd: " + e.message);
     }
 }
+// ✅ FUNKCJA: Otwórz inseminację z Karty Zwierzęcia
+function openInsemForCurrentAnimal() {
+    // 1. Sprawdź czy mamy otwarte zwierzę
+    if (!currentEditingAnimalId) return;
+    const animal = myHerd.find(a => a.id === currentEditingAnimalId);
+    if (!animal) return;
+
+    // 2. Zamknij kartę zwierzęcia (dla przejrzystości)
+    closeModal('animalCardModal');
+    
+    // 3. Otwórz formularz inseminacji
+    openInsemModal();
+    
+    // 4. Wypełnij dane
+    document.getElementById('insemTagInput').value = animal.tag; // Wpisz kolczyk
+    
+    // Ustaw datę na dziś (jeśli pole jest puste)
+    const dateInput = document.getElementById('insemDate');
+    if (!dateInput.value) {
+        dateInput.valueAsDate = new Date();
+    }
+    
+    // Opcjonalnie: wyczyść pole buhaja, żeby użytkownik musiał wybrać nowego
+    document.getElementById('insemBull').value = '';
+}
