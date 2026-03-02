@@ -11341,20 +11341,34 @@ async function loadClinicsForRegistration() {
     if (select.options.length > 1) return; // Już załadowane
     
     try {
-        // Pobieramy tylko właścicieli (oni mają nazwy lecznic)
+        // Pobieramy wszystkich właścicieli
         const q = await db.collection('konfiguracja').where('Rola', '==', 'właściciel').get();
         
-        select.innerHTML = '<option value="">-- Wybierz swoją lecznicę --</option>';
+        select.innerHTML = '<option value="">-- Wybierz Lecznicę --</option>';
+
+        // ✅ POPRAWKA: Zbiór (Set) do pilnowania unikalnych ID lecznic
+        const addedIds = new Set();
+
         q.forEach(doc => {
             const data = doc.data();
-            if (data['Nazwa lecznicy'] && data['ID lecznicy']) {
+            const clinicId = data['ID lecznicy'];
+            const clinicName = data['Nazwa lecznicy'];
+
+            // Dodajemy tylko jeśli mamy ID i Nazwę ORAZ tego ID nie ma jeszcze w zbiorze addedIds
+            if (clinicId && clinicName && !addedIds.has(clinicId)) {
+                
+                // Oznaczamy to ID jako już dodane
+                addedIds.add(clinicId);
+
                 const opt = document.createElement('option');
-                opt.value = data['ID lecznicy'];
-                opt.textContent = `${data['Nazwa lecznicy']} (${data.Nazwisko})`;
+                opt.value = clinicId;
+                // Wyświetlamy nazwę lecznicy (i nazwisko pierwszego znalezionego właściciela)
+                opt.textContent = `${clinicName} (${data.Nazwisko})`;
                 select.appendChild(opt);
             }
         });
-        // Opcja dla niepowiązanych
+
+        // Opcja dla niepowiązanych (na samym końcu)
         const optNone = document.createElement('option');
         optNone.value = "";
         optNone.textContent = "-- Brak / Niepowiązane --";
