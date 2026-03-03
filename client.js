@@ -810,7 +810,20 @@ function generateAndRenderTasks() {
             }
         }
 
-        // FILTR PRZEJŚCIA (Teraz bezpieczny, bo byki są obsługiwane wyżej)
+       // ✅ ZADANIA WŁASNE (Od daty urodzenia muszą działać dla każdego, nawet dla pustych/młodych)
+        userSettings.customRules.forEach((rule, idx) => {
+            if (rule.base === 'insem' && insDate) {
+                checkRuleAndAddTask(generatedTasks, animal, rule, daysSinceInsem, insDate, `custom_${idx}`, calvingDate);
+            } else if ((rule.base === 'calving' || rule.base === 'calving_minus') && calvingDate) {
+                checkRuleAndAddTask(generatedTasks, animal, rule, daysToCalving, calvingDate, `custom_${idx}`, calvingDate, rule.base === 'calving_minus');
+            } else if (rule.base === 'dob' && animal.dob) {
+                const dobDate = new Date(animal.dob);
+                const daysSinceDob = Math.floor((today - dobDate) / (1000 * 60 * 60 * 24));
+                checkRuleAndAddTask(generatedTasks, animal, rule, daysSinceDob, dobDate, `custom_${idx}`, calvingDate, false);
+            }
+        });
+
+        // FILTR PRZEJŚCIA (Odrzuca sztuki, które nie mają żadnych wpisów rozrodczych, by nie liczyć im USG)
         if (animal.usgStatus === 'negative' && !animal.isPregnantConfirmed) return;
         if (!calvingDate && !insDate) return;
 
@@ -828,30 +841,48 @@ function generateAndRenderTasks() {
             checkRuleAndAddTask(generatedTasks, animal, userSettings.rovac, daysToCalving, calvingDate, 'rovac', calvingDate, true);
             checkRuleAndAddTask(generatedTasks, animal, userSettings.kexxtone, daysToCalving, calvingDate, 'kexxtone', calvingDate, true);
         }
-
-    // Zadania własne (Rozszerzone)
-        userSettings.customRules.forEach((rule, idx) => {
-            if (rule.base === 'insem' && insDate) {
-                checkRuleAndAddTask(generatedTasks, animal, rule, daysSinceInsem, insDate, `custom_${idx}`, calvingDate);
-            } else if ((rule.base === 'calving' || rule.base === 'calving_minus') && calvingDate) {
-                checkRuleAndAddTask(generatedTasks, animal, rule, daysToCalving, calvingDate, `custom_${idx}`, calvingDate, rule.base === 'calving_minus');
-            } else if (rule.base === 'dob' && animal.dob) {
-                const dobDate = new Date(animal.dob);
-                const daysSinceDob = Math.floor((today - dobDate) / (1000 * 60 * 60 * 24));
-                checkRuleAndAddTask(generatedTasks, animal, rule, daysSinceDob, dobDate, `custom_${idx}`, calvingDate, false);
-            } else if (rule.base === 'fixed' && rule.fixedDate) {
-                const fixedD = new Date(rule.fixedDate);
-                const daysSinceFixed = Math.floor((today - fixedD) / (1000 * 60 * 60 * 24));
-                checkRuleAndAddTask(generatedTasks, animal, rule, daysSinceFixed, fixedD, `custom_${idx}`, calvingDate, false);
-            }
-        });
-
         // Wycielenie (Wizualne)
         if (calvingDate && daysToCalving <= 14 && daysToCalving >= -7) {
             const calvTaskId = `${animal.id}_calving_${calvingDate.toISOString().split('T')[0]}`;
             if (!completedTasks.some(t => t.taskId === calvTaskId)) {
                 let priority = (daysToCalving <= 5 && daysToCalving >= -5) ? 'urgent' : 'warning';
                 addTask(generatedTasks, animal, 'Spodziewane Wycielenie', calvingDate, calvingDate, priority, 'calving', insDate, calvingDate, (daysToCalving < 0));
+            }
+        }
+    });
+    // =================================================================
+    // ✅ ZADANIA WŁASNE: KONKRETNA DATA (Generowane jako Grupowe)
+    // =================================================================
+    userSettings.customRules.forEach((rule, idx) => {
+        if (rule.base === 'fixed' && rule.enabled) {
+            const dTo = new Date(rule.dateTo);
+            const taskId = `custom_fixed_${idx}_${rule.dateFrom}`;
+            
+            const doneLog = completedTasks.find(t => t.taskId === taskId);
+            const isDone = !!doneLog;
+
+            const diffMs = today - dTo;
+            const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24)); 
+
+            // Wyświetlamy jeśli jest niewykonane (do 14 dni po terminie), lub jeśli wykonane (do zakładki Wykonane)
+            if (isDone || diffDays <= 14) {
+                let priority = diffDays > 0 ? 'urgent' : 'warning';
+                
+                generatedTasks.push({
+                    id: taskId,
+                    isGroupTask: true, // Renderuje się jako piękny, jeden boks!
+                    animalTags: rule.allHerd ? ['🐄 CAŁE STADO'] : rule.tags,
+                    title: rule.label,
+                    doseDetails: `Okres: Od ${rule.dateFrom} do ${rule.dateTo}`, // Wykorzystujemy pole na datę
+                    dueDate: dTo,
+                    sortDate: dTo,
+                    priority: priority,
+                    type: `custom_${idx}`,
+                    isDone: isDone,
+                    logId: isDone ? doneLog.logId : null,
+                    insemDate: null, calvDate: null,
+                    isReallyOverdue: diffDays > 0
+                });
             }
         }
     });
@@ -1890,20 +1921,36 @@ function renderConfig() {
 userSettings.customRules.forEach((rule, idx) => {
         const div = document.createElement('div');
         div.className = 'config-item';
-        div.innerHTML = `
-            <div style="display:flex; flex-direction:column;">
-                <span>${rule.label}</span>
-                <small style="color:#999;">${getBaseText(rule.base)}</small>
-            </div>
-            <div class="config-inputs">
-                <input type="number" id="cfg_cust_start_${idx}" value="${rule.start}">
-                <input type="number" id="cfg_cust_end_${idx}" value="${rule.end}">
-                <input type="checkbox" id="cfg_cust_enable_${idx}" ${rule.enabled ? 'checked' : ''} style="width:20px; height:20px;">
-                <button class="btn-danger" style="width:34px; height:34px; display:flex; align-items:center; justify-content:center; border-radius:6px; padding:0;" onclick="removeCustomRule(${idx})">
-                    <i class="bi bi-trash"></i>
-                </button>
-            </div>
-        `;
+        
+        if (rule.base === 'fixed') {
+            div.innerHTML = `
+                <div style="display:flex; flex-direction:column; flex:1;">
+                    <span style="font-weight:bold;">${rule.label}</span>
+                    <small style="color:#2980b9;">(W konkretnym dniu)</small>
+                </div>
+                <div class="config-inputs" style="flex-wrap: wrap; gap:5px;">
+                    <input type="date" id="cfg_cust_dateFrom_${idx}" value="${rule.dateFrom}" style="width:110px;">
+                    <input type="date" id="cfg_cust_dateTo_${idx}" value="${rule.dateTo}" style="width:110px;">
+                    <input type="checkbox" id="cfg_cust_enable_${idx}" ${rule.enabled ? 'checked' : ''} style="width:20px; height:20px;">
+                    <button class="btn-danger" style="width:34px; height:34px; display:flex; align-items:center; justify-content:center; border-radius:6px; padding:0;" onclick="removeCustomRule(${idx})"><i class="bi bi-trash"></i></button>
+                </div>
+            `;
+        } else {
+            div.innerHTML = `
+                <div style="display:flex; flex-direction:column;">
+                    <span>${rule.label}</span>
+                    <small style="color:#999;">${getBaseText(rule.base)}</small>
+                </div>
+                <div class="config-inputs">
+                    <input type="number" id="cfg_cust_start_${idx}" value="${rule.start}">
+                    <input type="number" id="cfg_cust_end_${idx}" value="${rule.end}">
+                    <input type="checkbox" id="cfg_cust_enable_${idx}" ${rule.enabled ? 'checked' : ''} style="width:20px; height:20px;">
+                    <button class="btn-danger" style="width:34px; height:34px; display:flex; align-items:center; justify-content:center; border-radius:6px; padding:0;" onclick="removeCustomRule(${idx})">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </div>
+            `;
+        }
         list.appendChild(div);
     });
 }
@@ -1924,14 +1971,24 @@ function saveConfiguration(fromDOM = true) {
             if(en) userSettings[k].enabled = en.checked;
         });
 
-       userSettings.customRules.forEach((r, idx) => {
-            const s = document.getElementById(`cfg_cust_start_${idx}`);
-            const e = document.getElementById(`cfg_cust_end_${idx}`);
+      userSettings.customRules.forEach((r, idx) => {
             const en = document.getElementById(`cfg_cust_enable_${idx}`);
-            if(s && e) {
-                r.start = parseInt(s.value);
-                r.end = parseInt(e.value);
-                if(en) r.enabled = en.checked;
+            if(en) r.enabled = en.checked;
+
+            if (r.base === 'fixed') {
+                const df = document.getElementById(`cfg_cust_dateFrom_${idx}`);
+                const dt = document.getElementById(`cfg_cust_dateTo_${idx}`);
+                if (df && dt) {
+                    r.dateFrom = df.value;
+                    r.dateTo = dt.value;
+                }
+            } else {
+                const s = document.getElementById(`cfg_cust_start_${idx}`);
+                const e = document.getElementById(`cfg_cust_end_${idx}`);
+                if(s && e) {
+                    r.start = parseInt(s.value);
+                    r.end = parseInt(e.value);
+                }
             }
         });
     }
@@ -1939,26 +1996,54 @@ function saveConfiguration(fromDOM = true) {
     return db.collection('konfiguracja').doc(currentUser.id).collection('settings').doc('tasks').set(userSettings, {merge: true});
 }
 
+function toggleCustomTaskFields(val) {
+    if (val === 'fixed') {
+        document.getElementById('cfgRelativeFields').style.display = 'none';
+        document.getElementById('cfgFixedFields').style.display = 'block';
+    } else {
+        document.getElementById('cfgRelativeFields').style.display = 'block';
+        document.getElementById('cfgFixedFields').style.display = 'none';
+    }
+}
+
 document.getElementById('customTaskForm').addEventListener('submit', (e) => {
     e.preventDefault();
     const name = document.getElementById('newCfgName').value;
     const base = document.getElementById('newCfgBase').value;
-    const s = parseInt(document.getElementById('newCfgStart').value);
-    const end = parseInt(document.getElementById('newCfgEnd').value);
     
-    let fixedDate = null;
+    let ruleObj = { label: name, base: base, enabled: true };
+
     if (base === 'fixed') {
-        fixedDate = document.getElementById('newCfgFixedDate').value;
-        if (!fixedDate) return alert("Wybierz datę!");
+        const dFrom = document.getElementById('newCfgDateFrom').value;
+        const dTo = document.getElementById('newCfgDateTo').value;
+        if (!dFrom || !dTo) return alert("Wybierz obie daty wydarzenia!");
+        if (new Date(dFrom) > new Date(dTo)) return alert("Data początkowa nie może być późniejsza niż końcowa.");
+        
+        const allHerd = document.getElementById('newCfgAllHerd').checked;
+        const tagsRaw = document.getElementById('newCfgTags').value;
+        const tags = tagsRaw.split(',').map(t=>t.trim()).filter(t=>t);
+
+        if (!allHerd && tags.length === 0) return alert("Wpisz przynajmniej jeden numer kolczyka!");
+
+        ruleObj.dateFrom = dFrom;
+        ruleObj.dateTo = dTo;
+        ruleObj.allHerd = allHerd;
+        ruleObj.tags = tags;
+    } else {
+        const s = parseInt(document.getElementById('newCfgStart').value);
+        const end = parseInt(document.getElementById('newCfgEnd').value);
+        if (isNaN(s) || isNaN(end)) return alert("Podaj prawidłowy zakres dni!");
+        ruleObj.start = s;
+        ruleObj.end = end;
     }
 
-    userSettings.customRules.push({ label: name, base: base, start: s, end: end, enabled: true, fixedDate: fixedDate });
+    userSettings.customRules.push(ruleObj);
     
     saveConfiguration(false).then(() => {
-        alert(`Dodano: ${name}`);
+        alert(`Dodano zadanie: ${name}`);
         renderConfig();
         document.getElementById('customTaskForm').reset();
-        document.getElementById('newCfgFixedDateRow').style.display = 'none';
+        toggleCustomTaskFields('insem'); // Zresetuj UI
     }).catch(err => alert("Błąd zapisu: " + err.message));
 });
 
