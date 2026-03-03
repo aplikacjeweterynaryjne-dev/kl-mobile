@@ -949,8 +949,10 @@ function renderTasks(allTasks) {
     // Obsługa limitu 5 zadań dla widoku "Do zrobienia"
     const LIMIT = 5;
     const showAll = window.showAllTasks || false;
-    // Limitujemy tylko w zakładce 'todo' jeśli nie kliknięto "Pokaż wszystkie"
+   // Limitujemy tylko w zakładce 'todo' jeśli nie kliknięto "Pokaż wszystkie"
     const visibleTasks = (currentTaskFilter === 'todo' && !showAll) ? filtered.slice(0, LIMIT) : filtered;
+    
+    window.currentVisibleTasks = visibleTasks; // <--- DODAJ TĘ LINIJKĘ
 
     // Renderowanie kafelków
     visibleTasks.forEach(t => {
@@ -1644,16 +1646,17 @@ function saveAnimalChanges() {
         updateData.isDriedOff = isDriedOffManual;
     }
 
-    db.collection('animals').doc(currentEditingAnimalId).update(updateData).then(() => {
-        alert("Zapisano zmiany!");
-        openAnimalCard(currentEditingAnimalId);
-        // Ważne: Odśwież listę, bo zmiana typu wpływa na filtry
-        renderHerdList(); 
-        updateDashboardStats();
-    }).catch(err => {
-        console.error("Błąd zapisu:", err);
-        alert("Błąd: " + err.message);
+db.collection('animals').doc(currentEditingAnimalId).update(updateData).catch(err => {
+        console.error("Błąd zapisu (offline/online):", err);
     });
+
+    // TO WYKONA SIĘ OD RAZU (NIE ZALEŻY OD INTERNETU)
+    showToast(navigator.onLine ? "Zapisano zmiany!" : "Edycja zapisana offline. Dane zostaną wysłane w tle.", navigator.onLine ? "success" : "warning");
+    
+    openAnimalCard(currentEditingAnimalId);
+    // Ważne: Odśwież listę, bo zmiana typu wpływa na filtry
+    renderHerdList(); 
+    updateDashboardStats();
 }
 function deleteCurrentAnimal() {
     if (!currentEditingAnimalId) return;
@@ -1771,16 +1774,17 @@ function setupModals() {
         const history = animal.historyInsemination || [];
         history.push(newHistory);
 
-      db.collection('animals').doc(animal.id).update({
+     db.collection('animals').doc(animal.id).update({
             lastInsemination: date, semen: bull, historyInsemination: history,
             isPregnantConfirmed: false, usgStatus: 'pending',
-            lastActivityDate: new Date().toISOString().split('T')[0] // <--- DODANO
-        }).then(() => {
-            alert("Zapisano inseminację!");
-            document.getElementById('insemForm').reset();
-            document.getElementById('insemDate').valueAsDate = new Date();
-            closeModal('insemModal');
-        }).catch(err => alert("Błąd: " + err.message));
+            lastActivityDate: new Date().toISOString().split('T')[0] 
+        }).catch(err => console.error(err));
+
+        // TO WYKONA SIĘ OD RAZU
+        showToast(navigator.onLine ? "Zapisano inseminację!" : "Inseminacja zapisana offline.", navigator.onLine ? "success" : "warning");
+        document.getElementById('insemForm').reset();
+        document.getElementById('insemDate').valueAsDate = new Date();
+        closeModal('insemModal');
     });
 
 document.getElementById('animalForm').addEventListener('submit', (e) => {
@@ -1847,18 +1851,19 @@ document.getElementById('animalForm').addEventListener('submit', (e) => {
             isDriedOff: false, // Wartość domyślna dla nowej sztuki
             createdAt: firebase.firestore.FieldValue.serverTimestamp(),
             lastActivityDate: new Date().toISOString().split('T')[0] // <--- DODANO
-        }).then(() => {
-            alert("Dodano zwierzę do stada!");
-            closeModal('animalModal');
-            
-            // KLUCZOWE: Odświeżamy widok stada i zadań
-            if (typeof generateAndRenderTasks === "function") {
-                generateAndRenderTasks();
-            }
         }).catch(err => {
-            console.error("Błąd zapisu:", err);
-            alert("Błąd: " + err.message);
+            console.error("Błąd zapisu (offline/online):", err);
         });
+
+        // TO WYKONA SIĘ OD RAZU (NIE ZALEŻY OD INTERNETU)
+        showToast(navigator.onLine ? "Dodano zwierzę do stada!" : "Zapisano offline. Dane zostaną wysłane w tle.", navigator.onLine ? "success" : "warning");
+        closeModal('animalModal');
+        document.getElementById('animalForm').reset();
+            
+        // KLUCZOWE: Odświeżamy widok stada i zadań natychmiast
+        if (typeof generateAndRenderTasks === "function") {
+            generateAndRenderTasks();
+        }
     }); // Koniec listenera submit
 } // Koniec funkcji setupModals
 
@@ -3200,3 +3205,124 @@ window.addEventListener('load', () => {
         updateNetworkStatus();
     }
 });
+// ============================================================
+// ✅ MODUŁ: DRUKOWANIE ZADAŃ
+// ============================================================
+
+function printCurrentTaskList() {
+    if (!window.currentVisibleTasks || window.currentVisibleTasks.length === 0) {
+        alert("Brak zadań do wydruku w obecnym widoku.");
+        return;
+    }
+
+    // Szukamy aktywnego filtru (np. USG, Ruja), żeby ustawić ładny tytuł
+    let taskTitle = "Zadania: Wszystkie";
+    if (currentTypeFilter !== 'all') {
+        const activeChip = Array.from(document.querySelectorAll('.filter-chip')).find(c => c.classList.contains('active'));
+        if (activeChip) taskTitle = `Lista krów: ${activeChip.textContent.split('(')[0].trim()}`;
+    }
+
+    let rowsHTML = '';
+    const today = new Date();
+    today.setHours(0,0,0,0);
+
+    // Przechodzimy po wszystkich zadaniach aktualnie widocznych
+    window.currentVisibleTasks.forEach((t, index) => {
+        // Jeśli to zadanie grupowe (synchronizacja)
+        if (t.isGroupTask) {
+            rowsHTML += `
+                <tr>
+                    <td style="text-align:center;">${index + 1}</td>
+                    <td colspan="7" style="background:#f9f9f9;">
+                        <b>Zadanie Grupowe:</b> ${t.title} <br>
+                        <b>Sztuki:</b> ${t.animalTags.join(', ')}
+                    </td>
+                </tr>
+            `;
+            return; // Przechodzimy do następnego
+        }
+
+        // Standardowe zadanie na jednej krowie
+        const animal = myHerd.find(a => a.id === t.animalId);
+        if (!animal) return;
+
+        const typ = animal.type.toUpperCase();
+        const tag = animal.tag;
+        const loc = animal.location || '-';
+        const insDate = animal.lastInsemination || '-';
+        
+        // Prognozowane wycielenie
+        let calvTermin = '-';
+        if (animal.lastInsemination) {
+            const est = addDays(new Date(animal.lastInsemination), userSettings.gestation || 280);
+            calvTermin = est.toLocaleDateString('pl-PL');
+        }
+
+        // Dni Laktacji
+        let dimLabel = '-';
+        if (animal.type === 'krowa' && animal.lastCalving) {
+            const days = Math.floor((today - new Date(animal.lastCalving)) / (1000 * 60 * 60 * 24));
+            dimLabel = `${days}`;
+        }
+
+        rowsHTML += `
+            <tr>
+                <td style="text-align:center;">${index + 1}</td>
+                <td>${typ}</td>
+                <td style="font-weight:bold; color:#2e7d32;">${tag}</td>
+                <td>${loc}</td>
+                <td style="text-align:center;">${insDate}</td>
+                <td style="text-align:center;">${calvTermin}</td>
+                <td style="text-align:center; font-weight:bold;">${dimLabel}</td>
+                <td></td> </tr>
+        `;
+    });
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) { alert('Zablokowano okno pop-up. Zezwól na wyskakujące okienka.'); return; }
+
+    printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Wydruk Zadań - KL-Mobile</title>
+            <style>
+                body { font-family: Arial, sans-serif; padding: 20px; color: #333; }
+                h2 { text-align: center; margin-bottom: 5px; color: #2c3e50; }
+                .subtitle { text-align: center; font-size: 14px; color: #777; margin-top: 0; margin-bottom: 20px; }
+                table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 13px; }
+                th, td { border: 1px solid #000; padding: 8px; text-align: left; vertical-align: middle; }
+                th { background-color: #e8f5e9; text-align:center; font-weight:bold; }
+                .print-btn { display: block; margin: 0 auto 20px; padding: 12px 24px; font-size: 16px; cursor: pointer; background: #2e7d32; color: white; border: none; border-radius: 8px; }
+                @media print { 
+                    .print-btn { display: none; } 
+                    body { padding: 0; }
+                }
+            </style>
+        </head>
+        <body>
+            <button class="print-btn" onclick="window.print()">🖨️ Kliknij tutaj, aby wydrukować</button>
+            <h2>${taskTitle}</h2>
+            <p class="subtitle">Gospodarstwo: ${currentUser.numer_gospodarstwa || '-'} | Stan na dzień: ${new Date().toLocaleDateString('pl-PL')}</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width:4%;">Lp.</th>
+                        <th style="width:8%;">Typ</th>
+                        <th style="width:14%;">Nr Kolczyka</th>
+                        <th style="width:14%;">Lokalizacja</th>
+                        <th style="width:15%;">Ostatnie Zacielenie</th>
+                        <th style="width:15%;">Prog. Wycielenie</th>
+                        <th style="width:10%;">Dni Lakt. (DIM)</th>
+                        <th style="width:20%;">Uwagi / Wynik</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${rowsHTML}
+                </tbody>
+            </table>
+        </body>
+        </html>
+    `);
+    printWindow.document.close();
+}
