@@ -3148,3 +3148,55 @@ async function saveClinicChoice() {
         alert("Błąd podczas zapisu: " + e.message);
     }
 }
+// ============================================================
+// ✅ MODUŁ: OBSŁUGA TRYBU OFFLINE I POWIADOMIEŃ
+// ============================================================
+
+// 1. Funkcja Toast (Powiadomienia - brakowało jej w kodzie!)
+function showToast(message, type = 'info') {
+    const toast = document.createElement('div');
+    const bgColor = type === 'success' ? '#27ae60' : (type === 'warning' ? '#f39c12' : '#333');
+    
+    toast.style.cssText = `
+        position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
+        background: ${bgColor}; color: white; padding: 10px 20px;
+        border-radius: 20px; z-index: 10000; font-size: 13px; font-weight: bold;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+        transition: opacity 0.3s; opacity: 0; text-align: center; white-space: nowrap;
+    `;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    
+    // Animacja pojawiania się i znikania
+    setTimeout(() => toast.style.opacity = '1', 10);
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        setTimeout(() => toast.remove(), 300);
+    }, 3000);
+}
+
+// 2. Nasłuchiwanie statusu sieci (Online / Offline)
+window.addEventListener('load', () => {
+    const offlineBanner = document.getElementById('offlineBanner');
+    
+    function updateNetworkStatus() {
+        if (navigator.onLine) {
+            // Połączono z internetem
+            if (offlineBanner) offlineBanner.classList.add('hidden');
+            showToast("🌐 Połączenie przywrócone! Zsynchronizowano dane.", "success");
+        } else {
+            // Brak internetu
+            if (offlineBanner) offlineBanner.classList.remove('hidden');
+            showToast("⚠️ Jesteś offline. Zmiany zapiszą się lokalnie.", "warning");
+        }
+    }
+
+    // Podpinamy listenery pod system operacyjny/przeglądarkę
+    window.addEventListener('online', updateNetworkStatus);
+    window.addEventListener('offline', updateNetworkStatus);
+    
+    // Sprawdź status od razu przy uruchomieniu aplikacji
+    if (!navigator.onLine) {
+        updateNetworkStatus();
+    }
+});
