@@ -172,33 +172,31 @@ function initApp() {
     const dateEl = document.getElementById('welcomeDate');
     if(dateEl) dateEl.textContent = new Date().toLocaleDateString('pl-PL', { weekday: 'long', day: 'numeric', month: 'long' });
     
- // ✅ POPRAWKA: Obsługa konta bez lecznicy
+// ✅ POPRAWKA: Obsługa konta bez lecznicy i wczytywanie wyboru
     const farmInputContainer = document.getElementById('cfgFarmNumber')?.parentElement;
     const treatmentsSection = document.getElementById('section-treatments');
+
+    // Uruchom ładowanie opcji lecznic
+    loadClinicsForOptions();
 
     if (!currentUser['ID lecznicy']) {
         // --- KLIENT NIEPOWIĄZANY ---
         
-        // 1. Zablokuj konfigurację nr gospodarstwa i pokaż komunikat
         if (farmInputContainer) {
-            // Ukrywamy input i guzik, pokazujemy komunikat
             farmInputContainer.innerHTML = `
                 <div style="background:#fff3e0; color:#d35400; padding:15px; border-radius:8px; font-size:13px; text-align:center; border: 1px solid #ffe0b2;">
-                    ⚠️ <strong>Konto niepowiązane</strong><br><br>
-                    Twój profil nie jest połączony z żadną lecznicą. 
-                    Nie możesz pobierać kart leczenia ani importować danych od weterynarza.<br><br>
-                    Aby to zmienić, usuń konto i zarejestruj się ponownie wybierając lecznicę.
+                    ⚠️ <strong>Brak wybranej lecznicy</strong><br>
+                    Wybierz lecznicę w niebieskim polu powyżej i kliknij "Zmień", aby odblokować dostęp do pobierania kart leczenia.
                 </div>`;
         }
 
-        // 2. Zablokuj sekcję Kart Leczenia
         if (treatmentsSection) {
             treatmentsSection.innerHTML = `
                 <div style="padding:40px 20px; text-align:center; color:#777;">
                     <i class="bi bi-link-45deg" style="font-size:50px; color:#ccc;"></i>
                     <h3>Brak połączenia</h3>
                     <p>Twoje gospodarstwo nie jest powiązane z żadną lecznicą.</p>
-                    <p style="font-size:13px;">Import kart leczenia jest niemożliwy.</p>
+                    <p style="font-size:13px;">Przejdź do Opcji i wybierz lecznicę.</p>
                 </div>
             `;
         }
@@ -389,12 +387,15 @@ function loadTreatments() {
       .where('header.nrStada', 'in', farmNumbers)
       .where('header.dataWykonania', '>=', dateFrom)
       .where('header.dataWykonania', '<=', dateTo)
-      .limit(50)
       .get()
       .then(snap => {
           myTreatments = [];
           snap.forEach(doc => {
-              myTreatments.push({ id: doc.id, ...doc.data() });
+              const data = doc.data();
+              // ✅ Pobieramy TYLKO karty powiązane z aktualną lecznicą użytkownika
+              if (data.id_lecznicy === currentUser['ID lecznicy']) {
+                  myTreatments.push({ id: doc.id, ...data });
+              }
           });
           
           myTreatments.sort((a,b) => {
@@ -2984,4 +2985,82 @@ function openInsemForCurrentAnimal() {
     
     // Opcjonalnie: wyczyść pole buhaja, żeby użytkownik musiał wybrać nowego
     document.getElementById('insemBull').value = '';
+}
+// ============================================================
+// ✅ MODUŁ: ZMIANA LECZNICY (W OPCJACH)
+// ============================================================
+
+async function loadClinicsForOptions() {
+    const select = document.getElementById('cfgLecznicaSelect');
+    if (!select) return;
+
+    try {
+        const q = await db.collection('konfiguracja').where('Rola', '==', 'właściciel').get();
+        select.innerHTML = '<option value="">-- Wybierz Lecznicę --</option>';
+
+        const uniqueClinics = new Map();
+
+        q.forEach(doc => {
+            const data = doc.data();
+            let clinicId = data['ID lecznicy'];
+            const clinicName = data['Nazwa lecznicy'];
+
+            if (clinicId && clinicName) {
+                clinicId = clinicId.trim();
+                if (!uniqueClinics.has(clinicId)) {
+                    uniqueClinics.set(clinicId, {
+                        id: clinicId,
+                        name: clinicName,
+                        owner: data.Nazwisko
+                    });
+                }
+            }
+        });
+
+        // Generowanie opcji
+        uniqueClinics.forEach((val) => {
+            const opt = document.createElement('option');
+            opt.value = val.id;
+            opt.textContent = `${val.name} (${val.owner})`;
+            select.appendChild(opt);
+        });
+
+        const optNone = document.createElement('option');
+        optNone.value = "";
+        optNone.textContent = "-- Brak / Niepowiązane --";
+        select.appendChild(optNone);
+
+        // Ustaw domyślnie obecną lecznicę usera
+        if (currentUser && currentUser['ID lecznicy']) {
+            select.value = currentUser['ID lecznicy'];
+        }
+
+    } catch (e) {
+        console.error("Błąd ładowania lecznic w opcjach:", e);
+        select.innerHTML = '<option value="">Błąd ładowania</option>';
+    }
+}
+
+async function saveClinicChoice() {
+    const select = document.getElementById('cfgLecznicaSelect');
+    if (!select) return;
+
+    const newClinicId = select.value;
+    
+    if (!confirm("Czy na pewno chcesz zmienić przypisaną lecznicę? Spowoduje to odświeżenie aplikacji i wyczyszczenie starych kart z pamięci.")) {
+        return;
+    }
+
+    try {
+        await db.collection('konfiguracja').doc(currentUser.id).update({
+            'ID lecznicy': newClinicId
+        });
+        
+        alert("Lecznica została zaktualizowana!");
+        window.location.reload(); // Przeładowanie, żeby wszystko na nowo wczytać z nową lecznicą
+
+    } catch (e) {
+        console.error("Błąd zapisu lecznicy:", e);
+        alert("Błąd podczas zapisu: " + e.message);
+    }
 }
