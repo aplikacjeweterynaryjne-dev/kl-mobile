@@ -218,11 +218,12 @@
             </button>
 
             <h3>Dodaj Własne Zadanie</h3>
-          <form id="customTaskForm">
+   <form id="customTaskForm">
                 <div class="form-row"><label>Nazwa Zadania</label><input type="text" id="newCfgName" required></div>
+                
                 <div class="form-row">
                     <label>Baza daty</label>
-                    <select id="newCfgBase" onchange="document.getElementById('newCfgFixedDateRow').style.display = this.value === 'fixed' ? 'block' : 'none';">
+                    <select id="newCfgBase" onchange="toggleCustomTaskFields(this.value)">
                         <option value="insem">Zacielenie</option>
                         <option value="calving">Wycielenie (+)</option>
                         <option value="calving_minus">Wycielenie (-)</option>
@@ -230,11 +231,37 @@
                         <option value="fixed">Konkretna Data</option>
                     </select>
                 </div>
-                <div class="form-row hidden" id="newCfgFixedDateRow" style="display:none;">
-                    <label>Wybierz datę wydarzenia</label>
-                    <input type="date" id="newCfgFixedDate">
+                
+                <div id="cfgRelativeFields">
+                    <div class="form-row">
+                        <label>Zakres dni (Od - Do)</label>
+                        <div style="display:flex; gap:10px;">
+                            <input type="number" id="newCfgStart" value="0">
+                            <input type="number" id="newCfgEnd" value="0">
+                        </div>
+                    </div>
                 </div>
-                <div class="form-row"><label>Zakres dni (Od - Do)</label><div style="display:flex; gap:10px;"><input type="number" id="newCfgStart" required><input type="number" id="newCfgEnd" required></div></div>
+
+                <div id="cfgFixedFields" style="display:none; background:#e3f2fd; padding:10px; border-radius:8px; margin-bottom:12px;">
+                    <div class="form-row">
+                        <label>Zakres dat (Od kiedy - Do kiedy)</label>
+                        <div style="display:flex; gap:10px;">
+                            <input type="date" id="newCfgDateFrom">
+                            <input type="date" id="newCfgDateTo">
+                        </div>
+                    </div>
+                    <div class="form-row" style="margin-bottom: 5px;">
+                        <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+                            <input type="checkbox" id="newCfgAllHerd" checked onchange="document.getElementById('newCfgTagsRow').style.display = this.checked ? 'none' : 'block';" style="width:20px; height:20px;">
+                            Zadanie dotyczy całego stada
+                        </label>
+                    </div>
+                    <div class="form-row" id="newCfgTagsRow" style="display:none;">
+                        <label>Wpisz numery kolczyków (po przecinku)</label>
+                        <input type="text" id="newCfgTags" placeholder="np. PL1234, PL5678">
+                    </div>
+                </div>
+
                 <button type="submit" class="btn btn-primary">Dodaj Zadanie</button>
             </form>
             
@@ -525,6 +552,6 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
-    <script src="client.js?v=100"></script>
+    <script src="client.js?v=101"></script>
 </body>
 </html>
