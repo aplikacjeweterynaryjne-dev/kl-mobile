@@ -1,5 +1,5 @@
-// 🔒 Nazwa pamięci podręcznej (zmieniona na v94, aby wymusić aktualizację u użytkowników)
-const CACHE_NAME = 'karta-leczenia-cache-v96';
+// 🔒 Nazwa pamięci podręcznej 
+const CACHE_NAME = 'karta-leczenia-cache-v97';
 
 // 📦 Lista plików do zapamiętania offline (tzw. App Shell)
 const urlsToCache = [
@@ -7,13 +7,9 @@ const urlsToCache = [
   'index.html',
   'manifest.json',
   'logo.jpg', 
-
-  // --- Zasoby zewnętrzne (CDN) - style i skrypty ---
   'https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&display=swap',
   'https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css',
   'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js',
-
-  // --- Biblioteki Firebase ---
   'https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js',
   'https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js',
   'https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js'
@@ -21,9 +17,10 @@ const urlsToCache = [
 
 // ⚙️ Instalacja Service Workera
 self.addEventListener('install', event => {
-  console.log('[Service Worker] Instalacja (v94)...');
-  // Wymuś natychmiastowe zastąpienie starego Service Workera
-  self.skipWaiting();
+  console.log('[Service Worker] Instalacja (v96)...');
+  
+  // ❌ UWAGA: USUNIĘTO self.skipWaiting(); STĄD! 
+  // Zrobimy to dopiero, gdy użytkownik kliknie OK.
 
   event.waitUntil(
     caches.open(CACHE_NAME)
@@ -32,6 +29,14 @@ self.addEventListener('install', event => {
         return cache.addAll(urlsToCache);
       })
   );
+});
+
+// ✅ NOWOŚĆ: Nasłuchiwanie na kliknięcie "OK" w panelu klienta
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    console.log('[Service Worker] Otrzymano sygnał SKIP_WAITING. Aktywuję nową wersję...');
+    self.skipWaiting();
+  }
 });
 
 // ♻️ Aktywacja — czyszczenie starych cache
