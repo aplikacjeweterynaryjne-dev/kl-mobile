@@ -1,12 +1,16 @@
 // 🔒 Nazwa pamięci podręcznej 
-const CACHE_NAME = 'karta-leczenia-cache-v102';
+const CACHE_NAME = 'karta-leczenia-cache-v103';
+
+// 🔒 Nazwa pamięci podręcznej (PODBIJ WERSJĘ!)
+const CACHE_NAME = 'karta-leczenia-cache-v98';
 
 // 📦 Lista plików do zapamiętania offline (tzw. App Shell)
 const urlsToCache = [
   './',
   'index.html',
+  'panel-klienta.html', // <--- ✅ DODANE!
   'manifest.json',
-  'logo.jpg', 
+  'logo.jpg',
   'https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&display=swap',
   'https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css',
   'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js',
