@@ -131,13 +131,16 @@
     </div>
 
     <div id="section-herd" class="section">
-        <h2 id="herdTitle">Pełna Lista</h2>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+            <h2 id="herdTitle" style="margin:0;">Pełna Lista</h2>
+            <button class="btn small" style="width:auto; margin:0; padding:6px 12px; background:#34495e; color:white; font-size:12px; border-radius:8px;" onclick="printHerdList()">🖨️ Drukuj listę</button>
+        </div>
        <button onclick="document.getElementById('importHerdModal').style.display='flex'" class="btn" style="background:#e3f2fd; color:#1565c0; border:1px solid #90caf9; margin-bottom:15px; padding: 12px; font-weight: 700;">
             📥 Import z Excela / Dodaj wiele naraz
         </button>
         <div style="display:flex; gap:10px; margin-bottom:10px;">
             <input type="search" id="herdSearch" oninput="renderHerdList()" placeholder="🔍 Szukaj kolczyka..." style="flex:1; padding:12px; border:1px solid #ddd; border-radius:10px;">
-            <button onclick="renderHerdList('all')" style="background:#eee; border:none; padding:0 15px; border-radius:10px;">Reset</button>
+            <button onclick="resetHerdSearch()" style="background:#eee; border:none; padding:0 15px; border-radius:10px;">Reset</button>
         </div>
         <div class="task-filter-chips" style="margin-bottom: 15px;">
             <button class="filter-chip" id="f-puste" onclick="toggleHerdFilter('puste')">Puste <span id="count-puste"></span></button>
@@ -215,9 +218,22 @@
             </button>
 
             <h3>Dodaj Własne Zadanie</h3>
-            <form id="customTaskForm">
+          <form id="customTaskForm">
                 <div class="form-row"><label>Nazwa Zadania</label><input type="text" id="newCfgName" required></div>
-                <div class="form-row"><label>Baza daty</label><select id="newCfgBase"><option value="insem">Zacielenie</option><option value="calving">Wycielenie (+)</option><option value="calving_minus">Wycielenie (-)</option></select></div>
+                <div class="form-row">
+                    <label>Baza daty</label>
+                    <select id="newCfgBase" onchange="document.getElementById('newCfgFixedDateRow').style.display = this.value === 'fixed' ? 'block' : 'none';">
+                        <option value="insem">Zacielenie</option>
+                        <option value="calving">Wycielenie (+)</option>
+                        <option value="calving_minus">Wycielenie (-)</option>
+                        <option value="dob">Data Urodzenia (Wiek)</option>
+                        <option value="fixed">Konkretna Data</option>
+                    </select>
+                </div>
+                <div class="form-row hidden" id="newCfgFixedDateRow" style="display:none;">
+                    <label>Wybierz datę wydarzenia</label>
+                    <input type="date" id="newCfgFixedDate">
+                </div>
                 <div class="form-row"><label>Zakres dni (Od - Do)</label><div style="display:flex; gap:10px;"><input type="number" id="newCfgStart" required><input type="number" id="newCfgEnd" required></div></div>
                 <button type="submit" class="btn btn-primary">Dodaj Zadanie</button>
             </form>
@@ -360,15 +376,28 @@
     </div>
 
     <div id="insemModal" class="modal">
-        <div class="modal-content">
+        <div class="modal-content" style="max-width: 600px;">
             <button class="close-modal-fixed" onclick="closeModal('insemModal')">✕</button>
-            <h3>💉 Nowa Inseminacja</h3>
-            <form id="insemForm">
-                <div class="form-row"><label>Wybierz Sztukę</label><input type="text" id="insemTagInput" list="tagList" required><datalist id="tagList"></datalist></div>
-                <div class="form-row"><label>Data</label><input type="date" id="insemDate" required></div>
-                <div class="form-row"><label>Nasienie / Buhaj</label><input type="text" id="insemBull" list="semenList" required><datalist id="semenList"></datalist></div>
-                <button type="submit" class="btn btn-primary">Zapisz</button>
-            </form>
+            <h3 style="color:#2980b9;">💉 Masowe Zacielenie</h3>
+            
+            <div class="form-row" style="background:#e3f2fd; padding:10px; border-radius:8px;">
+                <label style="color:#1565c0;">Nasienie / Buhaj (Zastosuj do wszystkich)</label>
+                <div style="display:flex; gap:10px; align-items:center;">
+                    <input type="text" id="massInsemBull" list="semenList" placeholder="Wpisz i zatwierdź..." style="flex:1;">
+                    <button type="button" class="btn" style="width:auto; margin:0; padding:10px; background:#1565c0; color:white; font-size:12px;" onclick="applyMassSemen()">Zastosuj</button>
+                </div>
+            </div>
+
+            <div class="form-row"><label>Data Inseminacji *</label><input type="date" id="insemDate" required></div>
+            
+            <div class="form-row">
+                <label>Wybierz Sztuki i dostosuj nasienie:</label>
+                <input type="text" id="insemAnimalSearch" placeholder="🔍 Szukaj kolczyka..." oninput="populateMassInsemAnimals()" style="margin-bottom:8px; width:100%; padding:8px; border-radius:6px; border:1px solid #ccc;">
+                <div id="insemAnimalList" style="height: 250px; overflow-y: auto; border: 1px solid #ccc; padding: 5px; border-radius: 6px; background: #fafafa; display: flex; flex-direction: column; gap: 5px;">
+                </div>
+            </div>
+
+            <button type="button" class="btn btn-primary" style="width:100%;" onclick="submitMassInsem()">💾 Zapisz Zacielenia</button>
         </div>
     </div>
 
@@ -496,6 +525,6 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
-    <script src="client.js?v=99"></script>
+    <script src="client.js?v=100"></script>
 </body>
 </html>
