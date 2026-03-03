@@ -2019,11 +2019,13 @@ document.getElementById('customTaskForm').addEventListener('submit', (e) => {
         if (!dFrom || !dTo) return alert("Wybierz obie daty wydarzenia!");
         if (new Date(dFrom) > new Date(dTo)) return alert("Data początkowa nie może być późniejsza niż końcowa.");
         
-        const allHerd = document.getElementById('newCfgAllHerd').checked;
-        const tagsRaw = document.getElementById('newCfgTags').value;
-        const tags = tagsRaw.split(',').map(t=>t.trim()).filter(t=>t);
+       const allHerd = document.getElementById('newCfgAllHerd').checked;
+        
+        // Pobieramy zaznaczone checkboxy z nowej listy
+        const checkboxes = document.querySelectorAll('.custom-task-cb:checked');
+        const tags = Array.from(checkboxes).map(cb => cb.value);
 
-        if (!allHerd && tags.length === 0) return alert("Wpisz przynajmniej jeden numer kolczyka!");
+        if (!allHerd && tags.length === 0) return alert("Zaznacz z listy przynajmniej jedną sztukę!");
 
         ruleObj.dateFrom = dFrom;
         ruleObj.dateTo = dTo;
@@ -3597,4 +3599,92 @@ function submitMassInsem() {
 
     showToast(navigator.onLine ? `Zapisano zacielenie dla ${count} sztuk!` : "Zapisano offline.", navigator.onLine ? "success" : "warning");
     closeModal('insemModal');
+}
+// ============================================================
+// ✅ MODUŁ: LISTA ZWIERZĄT DLA ZADAŃ WŁASNYCH
+// ============================================================
+
+function populateCustomTaskAnimals() {
+    const list = document.getElementById('customTaskAnimalList');
+    if(!list) return;
+    list.innerHTML = '';
+    const searchTerm = document.getElementById('customTaskAnimalSearch').value.toLowerCase();
+    
+    const eligible = myHerd.filter(a => {
+        // Szukamy po kolczyku jeśli wpisano tekst
+        if (searchTerm && !a.tag.toLowerCase().includes(searchTerm)) return false;
+        return true;
+    });
+    
+    // Sortuj alfabetycznie
+    eligible.sort((a,b) => a.tag.localeCompare(b.tag));
+
+    if(eligible.length === 0) {
+        list.innerHTML = '<div style="padding:10px; color:#999; text-align:center;">Brak zwierząt.</div>';
+        return;
+    }
+
+    eligible.forEach(a => {
+        const status = getDetailedStatus(a);
+        const div = document.createElement('div');
+        div.style.cssText = "display:flex; justify-content:space-between; align-items:center; padding:8px; border-bottom:1px solid #eee; background:white; border-radius:4px;";
+        
+        // Zaznaczamy checkbox automatycznie, jeśli rolnik wpisał kolczyk z palca w szukajkę i znalazł
+        const isChecked = searchTerm && a.tag.toLowerCase().includes(searchTerm) ? 'checked' : '';
+
+        div.innerHTML = `
+            <div style="flex:1;">
+                <div style="font-weight:bold; color:#2c3e50; font-size:14px;">${a.tag}</div>
+                <div style="font-size:10px; font-weight:bold; color:${status.color};">${status.text}</div>
+            </div>
+            <input type="checkbox" class="custom-task-cb" value="${a.tag}" ${isChecked} style="width:24px; height:24px; accent-color:#2980b9; cursor:pointer;">
+        `;
+        list.appendChild(div);
+    });
+}
+
+
+// ============================================================
+// ✅ MODUŁ: INSTALACJA PWA (W PANELU KLIENTA)
+// ============================================================
+let deferredPromptKlient;
+const installBtnKlient = document.getElementById('installAppBtnKlient');
+
+// Przechwytujemy zdarzenie gotowości przeglądarki do instalacji
+window.addEventListener('beforeinstallprompt', (e) => {
+    // Zapobiega domyślnemu paskowi w niektórych przeglądarkach
+    e.preventDefault();
+    // Zapisujemy event, żeby móc wywołać instalację później
+    deferredPromptKlient = e;
+    
+    // Pokazujemy nasz piękny zielony przycisk w panelu konfiguracyjnym
+    if (installBtnKlient) {
+        installBtnKlient.classList.remove('hidden');
+    }
+});
+
+// Nasłuchujemy kliknięcia na przycisk w panelu klienta
+if (installBtnKlient) {
+    installBtnKlient.addEventListener('click', async () => {
+        if (deferredPromptKlient) {
+            // Pokazujemy systemowy dialog instalacji PWA
+            deferredPromptKlient.prompt();
+            // Czekamy na odpowiedź użytkownika
+            const { outcome } = await deferredPromptKlient.userChoice;
+            console.log(`Wynik instalacji: ${outcome}`);
+            
+            // Oczyszczamy event (można użyć tylko raz)
+            deferredPromptKlient = null;
+            installBtnKlient.classList.add('hidden');
+        }
+    });
+}
+
+// Jeśli aplikacja została właśnie zainstalowana lub odpalona od razu jako standalone - ukrywamy guzik
+window.addEventListener('appinstalled', () => {
+    if (installBtnKlient) installBtnKlient.classList.add('hidden');
+    console.log('Aplikacja została zainstalowana na ekranie głównym');
+});
+if (window.matchMedia('(display-mode: standalone)').matches) {
+    if (installBtnKlient) installBtnKlient.classList.add('hidden');
 }
