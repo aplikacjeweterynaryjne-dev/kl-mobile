@@ -23,16 +23,41 @@ db.enablePersistence()
         }
     });
 
-// Rejestracja Service Workera
+// ✅ INTELIGENTNA REJESTRACJA SERVICE WORKERA (Auto-Aktualizacja)
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-        // Używamy tego samego SW co główna aplikacja, aby cache'ować pliki
-        navigator.serviceWorker.register('./sw.js')
-            .then(reg => console.log('✅ Service Worker (Klient) OK'))
-            .catch(err => console.error('❌ Błąd SW:', err));
+        navigator.serviceWorker.register('./sw.js').then(reg => {
+            console.log('✅ Service Worker (Klient) OK');
+            
+            // Wymuś sprawdzenie aktualizacji przy każdym wejściu
+            reg.update();
+
+            // Nasłuchuj na instalację nowej wersji w tle
+            reg.addEventListener('updatefound', () => {
+                const newWorker = reg.installing;
+                newWorker.addEventListener('statechange', () => {
+                    // Jeśli nowa wersja się pobrała i jest gotowa
+                    if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                        // Zapytaj użytkownika lub zrób to w tle
+                        if (confirm("🚀 Dostępna jest nowa, ulepszona wersja aplikacji!\n\nKliknij OK, aby odświeżyć i wczytać nowości.")) {
+                            // Ten kod wymusi przejęcie kontroli przez nowego Workera
+                            newWorker.postMessage({ type: 'SKIP_WAITING' });
+                        }
+                    }
+                });
+            });
+        }).catch(err => console.error('❌ Błąd SW:', err));
+    });
+
+    // Przeładuj stronę, gdy nowy Worker przejmie kontrolę (po kliknięciu OK wyżej)
+    let refreshing = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (!refreshing) {
+            window.location.reload();
+            refreshing = true;
+        }
     });
 }
-
 // ⬆️⬆️⬆️ KONIEC WKLEJANIA ⬆️⬆️⬆️
 // --- STAN APLIKACJI (ZMIENNE GLOBALNE) ---
 let activeSynchronizations = [];
