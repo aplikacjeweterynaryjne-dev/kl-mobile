@@ -3057,7 +3057,8 @@ async function saveClinicChoice() {
         });
         
         alert("Lecznica została zaktualizowana!");
-        window.location.reload(); // Przeładowanie, żeby wszystko na nowo wczytać z nową lecznicą
+        // Omijamy pamięć podręczną (Cache) ładując stronę z unikalnym parametrem czasu
+        window.location.href = window.location.pathname + "?refresh=" + new Date().getTime();
 
     } catch (e) {
         console.error("Błąd zapisu lecznicy:", e);
