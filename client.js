@@ -829,12 +829,20 @@ function generateAndRenderTasks() {
             checkRuleAndAddTask(generatedTasks, animal, userSettings.kexxtone, daysToCalving, calvingDate, 'kexxtone', calvingDate, true);
         }
 
-        // Zadania własne
+    // Zadania własne (Rozszerzone)
         userSettings.customRules.forEach((rule, idx) => {
             if (rule.base === 'insem' && insDate) {
                 checkRuleAndAddTask(generatedTasks, animal, rule, daysSinceInsem, insDate, `custom_${idx}`, calvingDate);
-            } else if (calvingDate) {
-                checkRuleAndAddTask(generatedTasks, animal, rule, daysToCalving, calvingDate, `custom_${idx}`, calvingDate, true);
+            } else if ((rule.base === 'calving' || rule.base === 'calving_minus') && calvingDate) {
+                checkRuleAndAddTask(generatedTasks, animal, rule, daysToCalving, calvingDate, `custom_${idx}`, calvingDate, rule.base === 'calving_minus');
+            } else if (rule.base === 'dob' && animal.dob) {
+                const dobDate = new Date(animal.dob);
+                const daysSinceDob = Math.floor((today - dobDate) / (1000 * 60 * 60 * 24));
+                checkRuleAndAddTask(generatedTasks, animal, rule, daysSinceDob, dobDate, `custom_${idx}`, calvingDate, false);
+            } else if (rule.base === 'fixed' && rule.fixedDate) {
+                const fixedD = new Date(rule.fixedDate);
+                const daysSinceFixed = Math.floor((today - fixedD) / (1000 * 60 * 60 * 24));
+                checkRuleAndAddTask(generatedTasks, animal, rule, daysSinceFixed, fixedD, `custom_${idx}`, calvingDate, false);
             }
         });
 
@@ -1289,16 +1297,25 @@ function confirmTaskCalving(taskData, calvingDate, isAuto) {
     saveTaskLog(taskData, `Wycielenie: ${dateStr} ${isAuto ? '(Automat)' : ''}`);
 
 db.collection('animals').doc(taskData.animalId).update({
-        lastCalving: dateStr,
-        historyCalving: historyCalving, 
-        lastInsemination: null,
-        semen: null,
-        isPregnantConfirmed: false,
-        usgStatus: 'pending',
-        type: 'krowa',
-        isDriedOff: false,
-        lastActivityDate: new Date().toISOString().split('T')[0] // <--- DODANO
-    });
+        lastCalving: dateStr, historyCalving: historyCalving, lastInsemination: null, semen: null,
+        isPregnantConfirmed: false, usgStatus: 'pending', type: 'krowa', isDriedOff: false,
+        lastActivityDate: new Date().toISOString().split('T')[0] 
+    }).catch(err => console.error("Błąd", err));
+
+    // Pokaż powiadomienie o sukcesie wycielenia
+    showToast("Wycielenie zaktualizowane lokalnie.", "success");
+
+    // ✅ Pytanie o dodanie cielaka (uruchamiane z opóźnieniem)
+    setTimeout(() => {
+        if(confirm("Wycielenie zapisane! Czy chcesz teraz dodać nowo narodzone zwierzę (cielę) do stada?")) {
+            const motherAnimal = myHerd.find(a => a.id === taskData.animalId);
+            openAnimalModal();
+            if (motherAnimal) {
+                document.getElementById('inpMother').value = motherAnimal.tag;
+            }
+            document.getElementById('inpDob').value = dateStr; // Wpisz datę wycielenia jako urodziny
+        }
+    }, 500);
 }
 
 function saveTaskLog(taskData, result) {
@@ -1708,7 +1725,6 @@ function openAnimalModal() {
     document.getElementById('inpType').value = 'krowa';
 }
 
-function openInsemModal() { document.getElementById('insemModal').style.display = 'flex'; }
 function closeModal(id) { document.getElementById(id).style.display = 'none'; }
 
 function setupModals() {
@@ -1757,36 +1773,7 @@ function setupModals() {
             document.getElementById('inpLastInsem').value = '';
         }
     });
-    document.getElementById('insemForm').addEventListener('submit', (e) => {
-        e.preventDefault();
-        const tagVal = document.getElementById('insemTagInput').value; 
-        const date = document.getElementById('insemDate').value;
-        const bull = document.getElementById('insemBull').value;
-        const note = document.getElementById('insemNote').value;
-
-        const animal = myHerd.find(a => a.tag === tagVal);
-        if(!animal) {
-            alert("Nie znaleziono zwierzęcia! Sprawdź listę.");
-            return;
-        }
-
-        const newHistory = { date, bull, note, added: new Date().toISOString() };
-        const history = animal.historyInsemination || [];
-        history.push(newHistory);
-
-     db.collection('animals').doc(animal.id).update({
-            lastInsemination: date, semen: bull, historyInsemination: history,
-            isPregnantConfirmed: false, usgStatus: 'pending',
-            lastActivityDate: new Date().toISOString().split('T')[0] 
-        }).catch(err => console.error(err));
-
-        // TO WYKONA SIĘ OD RAZU
-        showToast(navigator.onLine ? "Zapisano inseminację!" : "Inseminacja zapisana offline.", navigator.onLine ? "success" : "warning");
-        document.getElementById('insemForm').reset();
-        document.getElementById('insemDate').valueAsDate = new Date();
-        closeModal('insemModal');
-    });
-
+    
 document.getElementById('animalForm').addEventListener('submit', (e) => {
         e.preventDefault();
         
@@ -1873,9 +1860,11 @@ function renderConfig() {
     const list = document.getElementById('configList');
     list.innerHTML = '';
 
-    const getBaseText = (base) => {
+   const getBaseText = (base) => {
         if(base === 'insem') return '(od daty zacielenia)';
         if(base === 'calving' || base === 'calving_minus') return '(od daty wycielenia)';
+        if(base === 'dob') return '(od daty urodzenia)';
+        if(base === 'fixed') return '(w konkretnym dniu)';
         return '';
     };
 
@@ -1956,13 +1945,20 @@ document.getElementById('customTaskForm').addEventListener('submit', (e) => {
     const base = document.getElementById('newCfgBase').value;
     const s = parseInt(document.getElementById('newCfgStart').value);
     const end = parseInt(document.getElementById('newCfgEnd').value);
+    
+    let fixedDate = null;
+    if (base === 'fixed') {
+        fixedDate = document.getElementById('newCfgFixedDate').value;
+        if (!fixedDate) return alert("Wybierz datę!");
+    }
 
-    userSettings.customRules.push({ label: name, base: base, start: s, end: end, enabled: true });
+    userSettings.customRules.push({ label: name, base: base, start: s, end: end, enabled: true, fixedDate: fixedDate });
     
     saveConfiguration(false).then(() => {
         alert(`Dodano: ${name}`);
         renderConfig();
         document.getElementById('customTaskForm').reset();
+        document.getElementById('newCfgFixedDateRow').style.display = 'none';
     }).catch(err => alert("Błąd zapisu: " + err.message));
 });
 
@@ -2269,9 +2265,12 @@ function renderHerdList(forceType = null) {
 
         // Jeśli ta sama grupa, sortuj po dacie ost. zabiegu (starsze na górę)
         const dateA = a.lastInsemination || a.lastCalving || '9999-99-99';
-        const dateB = b.lastInsemination || b.lastCalving || '9999-99-99';
+     const dateB = b.lastInsemination || b.lastCalving || '9999-99-99';
         return dateA.localeCompare(dateB);
     });
+    
+    // ✅ DODANE: Zapisujemy listę do zmiennej globalnej dla wydruku
+    window.currentVisibleHerd = filtered;
 
     if (filtered.length === 0) {
         list.innerHTML = '<div style="text-align:center; padding:20px; color:#999;">Brak zwierząt w tym widoku.</div>';
@@ -3285,6 +3284,8 @@ function printCurrentTaskList() {
         <!DOCTYPE html>
         <html>
         <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>Wydruk Zadań - KL-Mobile</title>
             <style>
                 body { font-family: Arial, sans-serif; padding: 20px; color: #333; }
@@ -3325,4 +3326,190 @@ function printCurrentTaskList() {
         </html>
     `);
     printWindow.document.close();
+}
+// ============================================================
+// ✅ NOWOŚCI: MASOWA INSEMINACJA, DRUKOWANIE STADA, RESET STADA
+// ============================================================
+
+// 1. Reset wyszukiwania stada
+function resetHerdSearch() {
+    const searchInput = document.getElementById('herdSearch');
+    if (searchInput) searchInput.value = '';
+    activeHerdFilters = [];
+    document.querySelectorAll('.filter-chip').forEach(b => b.classList.remove('active'));
+    renderHerdList();
+}
+
+// 2. Drukowanie z zakładki Stado (Z kolumną Data Urodzenia)
+function printHerdList() {
+    if (!window.currentVisibleHerd || window.currentVisibleHerd.length === 0) {
+        alert("Brak zwierząt do wydruku. Zmień filtry.");
+        return;
+    }
+
+    let rowsHTML = '';
+    window.currentVisibleHerd.forEach((a, index) => {
+        const typ = a.type.toUpperCase();
+        const tag = a.tag;
+        const dob = a.dob ? new Date(a.dob).toLocaleDateString('pl-PL') : '-';
+        const loc = a.location || '-';
+        const statusInfo = getDetailedStatus(a);
+        
+        rowsHTML += `
+            <tr>
+                <td style="text-align:center;">${index + 1}</td>
+                <td>${typ}</td>
+                <td style="font-weight:bold; color:#2e7d32;">${tag}</td>
+                <td style="text-align:center;">${dob}</td>
+                <td>${loc}</td>
+                <td style="font-weight:bold; color:${statusInfo.color};">${statusInfo.text}</td>
+            </tr>
+        `;
+    });
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) { alert('Zablokowano okienko. Zezwól na wyskakujące okienka.'); return; }
+
+    printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Wydruk Stada</title>
+            <style>
+                body { font-family: Arial, sans-serif; padding: 20px; color: #333; }
+                h2 { text-align: center; margin-bottom: 5px; }
+                table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 13px; }
+                th, td { border: 1px solid #000; padding: 8px; text-align: left; vertical-align:middle; }
+                th { background-color: #e8f5e9; text-align:center; }
+                .print-btn { display: block; margin: 0 auto 20px; padding: 12px 24px; font-size: 16px; cursor: pointer; background: #2e7d32; color: white; border: none; border-radius: 8px; }
+                @media print { .print-btn { display: none; } body { padding: 0; } }
+            </style>
+        </head>
+        <body>
+            <button class="print-btn" onclick="window.print()">🖨️ Kliknij tutaj, aby wydrukować</button>
+            <h2>Lista Zwierząt (Stado)</h2>
+            <p style="text-align:center; color:#777; margin-top:0;">Gospodarstwo: ${currentUser?.numer_gospodarstwa || '-'} | Stan na: ${new Date().toLocaleDateString('pl-PL')}</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width:5%;">Lp.</th>
+                        <th style="width:10%;">Typ</th>
+                        <th style="width:20%;">Nr Kolczyka</th>
+                        <th style="width:15%;">Data Urodzenia</th>
+                        <th style="width:20%;">Lokalizacja</th>
+                        <th style="width:30%;">Status</th>
+                    </tr>
+                </thead>
+                <tbody>${rowsHTML}</tbody>
+            </table>
+        </body>
+        </html>
+    `);
+    printWindow.document.close();
+}
+
+// 3. Moduł Masowej Inseminacji
+function openInsemModal() { 
+    document.getElementById('insemModal').style.display = 'flex'; 
+    document.getElementById('insemDate').valueAsDate = new Date();
+    document.getElementById('massInsemBull').value = '';
+    document.getElementById('insemAnimalSearch').value = '';
+    populateMassInsemAnimals();
+}
+
+function populateMassInsemAnimals() {
+    const list = document.getElementById('insemAnimalList');
+    list.innerHTML = '';
+    const searchTerm = document.getElementById('insemAnimalSearch').value.toLowerCase();
+    
+    // Szukamy krów i jałówek
+    const eligible = myHerd.filter(a => {
+        if (a.type === 'byk') return false;
+        if (searchTerm && !a.tag.toLowerCase().includes(searchTerm)) return false;
+        return true;
+    });
+
+    eligible.sort((a,b) => a.tag.localeCompare(b.tag));
+
+    if(eligible.length === 0) {
+        list.innerHTML = '<div style="padding:10px; color:#999; text-align:center;">Brak zwierząt.</div>';
+        return;
+    }
+
+    eligible.forEach(a => {
+        const status = getDetailedStatus(a);
+        const div = document.createElement('div');
+        div.style.cssText = "display:flex; justify-content:space-between; align-items:center; padding:10px; border-bottom:1px solid #eee; background:white; border-radius:4px;";
+        
+        // Zaznaczamy checkbox jeśli user jej szukał z palca
+        const isChecked = searchTerm && a.tag.toLowerCase().includes(searchTerm) ? 'checked' : '';
+
+        div.innerHTML = `
+            <div style="flex:1;">
+                <div style="font-weight:bold; color:#2c3e50;">${a.tag}</div>
+                <div style="font-size:10px; font-weight:bold; color:${status.color};">${status.text}</div>
+            </div>
+            <div style="display:flex; gap:10px; align-items:center;">
+                <input type="text" class="mass-insem-bull-input" data-id="${a.id}" list="semenList" placeholder="Nasienie" style="padding:8px; border:1px solid #ccc; border-radius:4px; width:120px; font-size:12px;">
+                <input type="checkbox" class="mass-insem-cb" value="${a.id}" ${isChecked} style="width:24px; height:24px; accent-color:#2980b9; cursor:pointer;">
+            </div>
+        `;
+        list.appendChild(div);
+    });
+}
+
+function applyMassSemen() {
+    const globalSemen = document.getElementById('massInsemBull').value;
+    if (!globalSemen) return alert("Wpisz najpierw nazwę nasienia w górnym polu!");
+    
+    const checkboxes = document.querySelectorAll('.mass-insem-cb');
+    let appliedCount = 0;
+    checkboxes.forEach(cb => {
+        if (cb.checked) {
+            const input = document.querySelector(`.mass-insem-bull-input[data-id="${cb.value}"]`);
+            if (input) {
+                input.value = globalSemen;
+                appliedCount++;
+            }
+        }
+    });
+    
+    if (appliedCount === 0) alert("Zaznacz ptaszkiem z prawej strony przynajmniej jedną sztukę, aby zastosować to nasienie.");
+}
+
+function submitMassInsem() {
+    const date = document.getElementById('insemDate').value;
+    if (!date) return alert("Wybierz datę inseminacji!");
+
+    const checkboxes = document.querySelectorAll('.mass-insem-cb:checked');
+    if (checkboxes.length === 0) return alert("Zaznacz ptaszkiem przynajmniej jedną sztukę do zacielenia!");
+
+    let count = 0;
+
+    checkboxes.forEach(cb => {
+        const animalId = cb.value;
+        const bullInput = document.querySelector(`.mass-insem-bull-input[data-id="${animalId}"]`);
+        const bull = bullInput ? bullInput.value.trim() : '';
+        
+        const animal = myHerd.find(a => a.id === animalId);
+        if (!animal) return;
+
+        const newHistory = { date, bull, note: 'Zacielenie', added: new Date().toISOString() };
+        const history = animal.historyInsemination || [];
+        history.push(newHistory);
+
+        // Wysyłamy w tło (nie blokujemy UI)
+        db.collection('animals').doc(animal.id).update({
+            lastInsemination: date, semen: bull, historyInsemination: history,
+            isPregnantConfirmed: false, usgStatus: 'pending',
+            lastActivityDate: new Date().toISOString().split('T')[0]
+        }).catch(e => console.error(e));
+        
+        count++;
+    });
+
+    showToast(navigator.onLine ? `Zapisano zacielenie dla ${count} sztuk!` : "Zapisano offline.", navigator.onLine ? "success" : "warning");
+    closeModal('insemModal');
 }
