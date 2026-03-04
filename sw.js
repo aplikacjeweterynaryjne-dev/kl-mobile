@@ -1,5 +1,5 @@
-// 🔒 Nazwa pamięci podręcznej (PODBITE DO v6)
-const CACHE_NAME = 'karta-leczenia-cache-v6';
+
+const CACHE_NAME = 'karta-leczenia-cache-v7';
 
 // 📦 Lista plików do zapamiętania offline (tzw. App Shell)
 const urlsToCache = [
