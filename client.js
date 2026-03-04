@@ -112,12 +112,24 @@ const DEFAULT_SETTINGS = {
     usg: { enabled: true, start: 45, end: 180, base: 'insem', label: 'Badanie USG' },
     heat: { enabled: true, start: 18, end: 24, base: 'insem', label: 'Powtórka Rui' },
     dry: { enabled: true, start: 40, end: 60, base: 'calving_minus', label: 'Zasuszenie' },
-    sync: { enabled: true, start: 60, end: 70, base: 'calving', label: 'Synchronizacja' }, // DODANO
+    sync: { enabled: true, start: 60, end: 70, base: 'calving', label: 'Synchronizacja' },
     rovac: { enabled: true, start: 21, end: 28, base: 'calving_minus', label: 'Rovac' },
     kexxtone: { enabled: true, start: 7, end: 14, base: 'calving_minus', label: 'Kexxtone' },
     gestation: 280, 
-    customRules: [] 
+    customRules: [],
+    customSyncProtocols: [] // ✅ NOWOŚĆ
 };
+
+// Funkcja pomocnicza łącząca wbudowane metody z własnymi
+function getMergedProtocols() {
+    const merged = JSON.parse(JSON.stringify(SYNC_PROTOCOLS)); // Głęboka kopia
+    if (userSettings && userSettings.customSyncProtocols) {
+        userSettings.customSyncProtocols.forEach((p, idx) => {
+            merged['custom_' + idx] = p;
+        });
+    }
+    return merged;
+}
 
 let userSettings = JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
 
@@ -355,7 +367,7 @@ function loadHerd() {
           renderHerdList('all'); 
           populateLists(); 
           generateAndRenderTasks(); 
-          renderLactationChart();
+          renderStatistics();
           renderCalendar(currentCalDate);
       }, error => console.error("Błąd stada:", error));
 }
@@ -2441,66 +2453,143 @@ async function executeMassTasks() {
     renderMassActionBar();
     // Odświeżenie nastąpi automatycznie przez saveTaskLog -> generateAndRenderTasks
 }
-function renderLactationChart() {
-    const canvas = document.getElementById('lactationChart');
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    
-    const buckets = [0, 0, 0, 0, 0, 0, 0];
-    // Nowa tablica przechowująca listy zwierząt dla każdego słupka
-    const bucketAnimals = [[], [], [], [], [], [], []];
-    const bucketLabels = ['0-2m', '2-4m', '4-6m', '6-8m', '8-10m', '10-12m', '>12m'];
+function renderStatistics() {
     const today = new Date();
-
-    myHerd.forEach(a => {
-        if (a.type === 'krowa' && a.lastCalving) {
-            const calvDate = new Date(a.lastCalving);
-            const months = (today - calvDate) / (1000 * 60 * 60 * 24 * 30.4);
-            let idx = 0;
-            if (months <= 2) idx = 0;
-            else if (months <= 4) idx = 1;
-            else if (months <= 6) idx = 2;
-            else if (months <= 8) idx = 3;
-            else if (months <= 10) idx = 4;
-            else if (months <= 12) idx = 5;
-            else idx = 6;
-            
-            buckets[idx]++;
-            // Dodajemy obiekt krowy do odpowiedniego kubełka
-            bucketAnimals[idx].push(a);
-        }
-    });
-
-    if (window.myChart) window.myChart.destroy();
     
-    window.myChart = new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: bucketLabels,
-            datasets: [{
-                label: 'Liczba krów',
-                data: buckets,
-                backgroundColor: '#2e7d32',
-                borderRadius: 4
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: { legend: { display: false } },
-            scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } },
-            // Dodana obsługa kliknięcia w słupek
-            onClick: (evt, activeEls) => {
-                if (activeEls.length > 0) {
-                    const idx = activeEls[0].index;
-                    const label = bucketLabels[idx];
-                    const animals = bucketAnimals[idx];
-                    // Wywołanie funkcji wyświetlającej modal z listą krów
-                    showListModal(`Krowy w laktacji: ${label}`, animals);
+    // --- 1. WYKRES LAKTACJI (Dni w dojeniu) ---
+    const ctxLactation = document.getElementById('lactationChart');
+    if (ctxLactation) {
+        const buckets = [0, 0, 0, 0, 0, 0, 0];
+        const bucketAnimals = [[], [], [], [], [], [], []];
+        const bucketLabels = ['0-2m', '2-4m', '4-6m', '6-8m', '8-10m', '10-12m', '>12m'];
+        
+        myHerd.forEach(a => {
+            if (a.type === 'krowa' && a.lastCalving) {
+                const calvDate = new Date(a.lastCalving);
+                const months = (today - calvDate) / (1000 * 60 * 60 * 24 * 30.4);
+                let idx = 0;
+                if (months <= 2) idx = 0;
+                else if (months <= 4) idx = 1;
+                else if (months <= 6) idx = 2;
+                else if (months <= 8) idx = 3;
+                else if (months <= 10) idx = 4;
+                else if (months <= 12) idx = 5;
+                else idx = 6;
+                
+                buckets[idx]++;
+                bucketAnimals[idx].push(a);
+            }
+        });
+        
+        if (window.myChartLactation) window.myChartLactation.destroy();
+        window.myChartLactation = new Chart(ctxLactation, {
+            type: 'bar',
+            data: {
+                labels: bucketLabels,
+                datasets: [{ label: 'Liczba krów', data: buckets, backgroundColor: '#8e44ad', borderRadius: 4 }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
+                scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } },
+                onClick: (evt, activeEls) => {
+                    if (activeEls.length > 0) {
+                        const idx = activeEls[0].index;
+                        showListModal(`Krowy w laktacji: ${bucketLabels[idx]}`, bucketAnimals[idx]);
+                    }
                 }
             }
+        });
+    }
+
+    // --- 2. WYKRES STATUSÓW (Krowy i Jałówki) ---
+    const ctxStatus = document.getElementById('statusPieChart');
+    if (ctxStatus) {
+        let cntCielne = 0, cntPuste = 0, cntUsg = 0, cntZasuszone = 0;
+        myHerd.forEach(a => {
+            if (a.type !== 'byk') {
+                const s = getDetailedStatus(a);
+                if (a.isDriedOff) cntZasuszone++;
+                else if (a.isPregnantConfirmed) cntCielne++;
+                else if (s.category === 'usg') cntUsg++;
+                else cntPuste++;
+            }
+        });
+
+        if (window.myChartStatus) window.myChartStatus.destroy();
+        window.myChartStatus = new Chart(ctxStatus, {
+            type: 'pie',
+            data: {
+                labels: ['Cielne', 'Zasuszone', 'Do USG', 'Puste (Niekryte/Neg)'],
+                datasets: [{
+                    data: [cntCielne, cntZasuszone, cntUsg, cntPuste],
+                    backgroundColor: ['#27ae60', '#7f8c8d', '#f39c12', '#2980b9']
+                }]
+            },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right' } } }
+        });
+    }
+
+    // --- 3. WYKRES STRUKTURY STADA (Typy) ---
+    const ctxType = document.getElementById('typePieChart');
+    if (ctxType) {
+        let cKrowy = 0, cJalowki = 0, cByki = 0;
+        myHerd.forEach(a => {
+            if (a.type === 'krowa') cKrowy++;
+            else if (a.type === 'jalowka') cJalowki++;
+            else if (a.type === 'byk') cByki++;
+        });
+
+        if (window.myChartType) window.myChartType.destroy();
+        window.myChartType = new Chart(ctxType, {
+            type: 'doughnut',
+            data: {
+                labels: ['Krowy', 'Jałówki', 'Byki'],
+                datasets: [{
+                    data: [cKrowy, cJalowki, cByki],
+                    backgroundColor: ['#2e7d32', '#f39c12', '#c0392b']
+                }]
+            },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right' } } }
+        });
+    }
+
+    // --- 4. PROGNOZA WYCIELEŃ (Słupki - Najbliższe 6 miesięcy) ---
+    const ctxCalving = document.getElementById('upcomingCalvingsChart');
+    if (ctxCalving) {
+        const monthNames = ["Sty", "Lut", "Mar", "Kwi", "Maj", "Cze", "Lip", "Sie", "Wrz", "Paź", "Lis", "Gru"];
+        const upcomingMonths = [];
+        const calvCounts = [0, 0, 0, 0, 0, 0];
+        const currentMonthIdx = today.getMonth();
+
+        // Generuj etykiety dla 6 najbliższych miesięcy
+        for (let i = 0; i < 6; i++) {
+            upcomingMonths.push(monthNames[(currentMonthIdx + i) % 12]);
         }
-    });
+
+        myHerd.forEach(a => {
+            if (a.isPregnantConfirmed && a.lastInsemination) {
+                const estCalv = addDays(new Date(a.lastInsemination), userSettings.gestation || 280);
+                // Sprawdzamy czy wycielenie wypada w ciągu najbliższych 6 miesięcy
+                const diffMonths = (estCalv.getFullYear() - today.getFullYear()) * 12 + (estCalv.getMonth() - today.getMonth());
+                if (diffMonths >= 0 && diffMonths < 6) {
+                    calvCounts[diffMonths]++;
+                }
+            }
+        });
+
+        if (window.myChartCalving) window.myChartCalving.destroy();
+        window.myChartCalving = new Chart(ctxCalving, {
+            type: 'bar',
+            data: {
+                labels: upcomingMonths,
+                datasets: [{ label: 'Spodziewane wycielenia', data: calvCounts, backgroundColor: '#e67e22', borderRadius: 4 }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
+                scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
+            }
+        });
+    }
 }
 // =====================================================================
 // ✅ FUNKCJE OBSŁUGI MODALU SYNCHRONIZACJI
@@ -2536,93 +2625,91 @@ function switchSyncTab(tab) {
 function populateSyncAnimals() {
     const list = document.getElementById('syncAnimalList');
     if (!list) return;
-    list.innerHTML = '';
     
     const method = document.getElementById('syncMethodSelect').value;
-    const searchTerm = document.getElementById('syncAnimalSearch').value.toLowerCase(); 
-    const today = new Date();
-    today.setHours(0,0,0,0);
+    const searchTerm = document.getElementById('syncAnimalSearch').value.toLowerCase().trim(); 
+    const today = new Date(); today.setHours(0,0,0,0);
 
-    // 1. FILTROWANIE
-    const eligible = myHerd.filter(a => {
-        // Odrzucamy byki
-        if (a.type === 'byk') return false;
+    // 1. ZBUDUJ LISTĘ RAZ (Jeśli jest pusta lub wymusiliśmy wyczyszczenie przy zmianie metody)
+    if (list.innerHTML.trim() === '') {
+        const eligible = myHerd.filter(a => a.type !== 'byk'); // Wszystkie krowy i jałówki
+        eligible.sort((a, b) => a.tag.localeCompare(b.tag));
 
-        // Filtr metody (Krowy vs Jałówki)
-        if (method === 'jalowki' && a.type !== 'jalowka') return false;
-        if ((method === 'g6g' || method === 'ovsynch') && a.type === 'jalowka') return false;
-
-        // Filtr wieku dla jałówek (> 13 msc)
-        if (a.type === 'jalowka' && a.dob) {
-            const ageMonths = (today - new Date(a.dob)) / (1000 * 60 * 60 * 24 * 30.4);
-            if (ageMonths < 13) return false;
+        if (eligible.length === 0) {
+            list.innerHTML = '<div style="padding:15px; text-align:center; color:#999;">Brak pasujących zwierząt.</div>';
+            updateSyncCount(); 
+            return;
         }
 
-        // Filtr wyszukiwarki
-        if (searchTerm && !a.tag.toLowerCase().includes(searchTerm)) return false;
+        eligible.forEach(a => {
+            const status = getDetailedStatus(a); 
+            let dimInfo = '';
+            if (a.type === 'krowa' && a.lastCalving) {
+                const diffDays = Math.floor((today - new Date(a.lastCalving)) / (1000 * 60 * 60 * 24));
+                dimInfo = ` | <span style="color:#2e7d32; font-weight:700;">DIM: ${diffDays}</span>`;
+            }
+            let subDetails = a.type.toUpperCase();
+            let ageMonths = 0;
+            if (a.dob) ageMonths = (today - new Date(a.dob)) / (1000 * 60 * 60 * 24 * 30.4);
+            if (a.type === 'jalowka') subDetails += ` (${Math.floor(ageMonths)} msc)`;
+            if (a.location) subDetails += ` | Lok: ${a.location}`;
 
-        return true;
-    });
-
-    // Sortowanie alfabetyczne
-    eligible.sort((a, b) => a.tag.localeCompare(b.tag));
-
-    if (eligible.length === 0) {
-        list.innerHTML = '<div style="padding:15px; text-align:center; color:#999;">Brak pasujących zwierząt.</div>';
-        updateSyncCount(); 
-        return;
+            const div = document.createElement('div');
+            div.className = 'sync-animal-row'; // Klasa do ukrywania
+            div.dataset.tag = a.tag.toLowerCase();
+            div.dataset.type = a.type;
+            div.dataset.age = ageMonths;
+            div.style.cssText = "display:flex; justify-content: space-between; align-items: center; padding: 12px 10px; border-bottom: 1px solid #eee; background: white; width: 100%; box-sizing: border-box;";
+            
+            div.innerHTML = `
+                <div style="text-align: left; flex-grow: 1; padding-right: 10px; cursor:pointer;" onclick="openAnimalCard('${a.id}')">
+                    <div style="display:flex; align-items:center; gap: 8px; margin-bottom: 4px; flex-wrap: wrap;">
+                        <span style="font-weight:800; font-size:15px; color:#2c3e50;">${a.tag}</span>
+                        <span style="font-size:10px; font-weight:bold; color:${status.color}; background:${status.color}15; border: 1px solid ${status.color}33; padding:2px 6px; border-radius:4px; white-space: nowrap;">
+                            ${status.text}
+                        </span>
+                    </div>
+                    <div style="font-size:11px; color:#7f8c8d; line-height: 1.4;">
+                        ${subDetails}${dimInfo}
+                    </div>
+                </div>
+                <input type="checkbox" class="sync-animal-cb" value="${a.id}" data-tag="${a.tag}" onchange="updateSyncCount()" style="width: 24px; height: 24px; cursor: pointer; flex-shrink: 0; accent-color: #8e44ad;">
+            `;
+            list.appendChild(div);
+        });
     }
 
-    // 2. GENEROWANIE LISTY
-    eligible.forEach(a => {
-        // Pobieramy status (Kolor i Tekst) z Twojej głównej logiki
-        const status = getDetailedStatus(a); 
+    // 2. FILTROWANIE LOKALNE (CSS)
+    const rows = list.querySelectorAll('.sync-animal-row');
+    rows.forEach(row => {
+        const tag = row.dataset.tag;
+        const type = row.dataset.type;
+        const age = parseFloat(row.dataset.age);
 
-        // Obliczanie DIM (Dni laktacji) dla krów
-        let dimInfo = '';
-        if (a.type === 'krowa' && a.lastCalving) {
-            const diffDays = Math.floor((today - new Date(a.lastCalving)) / (1000 * 60 * 60 * 24));
-            dimInfo = ` | <span style="color:#2e7d32; font-weight:700;">DIM: ${diffDays}</span>`;
-        }
+        let isVisible = true;
 
-        // Budowanie opisu (wiek dla jałówek, lokalizacja)
-        let subDetails = a.type.toUpperCase();
-        if (a.type === 'jalowka' && a.dob) {
-            const age = Math.floor((today - new Date(a.dob)) / (1000 * 60 * 60 * 24 * 30.4));
-            subDetails += ` (${age} msc)`;
-        }
-        if (a.location) subDetails += ` | Lok: ${a.location}`;
-
-        const div = document.createElement('div');
-        div.style.cssText = "display:flex; justify-content: space-between; align-items: center; padding: 12px 10px; border-bottom: 1px solid #eee; background: white; width: 100%; box-sizing: border-box;";
+        // Filtr wyszukiwarki
+        if (searchTerm !== '' && !tag.includes(searchTerm)) isVisible = false;
         
-        div.innerHTML = `
-            <div style="text-align: left; flex-grow: 1; padding-right: 10px;">
-                <div style="display:flex; align-items:center; gap: 8px; margin-bottom: 4px; flex-wrap: wrap;">
-                    <span style="font-weight:800; font-size:15px; color:#2c3e50;">${a.tag}</span>
-                    <span style="font-size:10px; font-weight:bold; color:${status.color}; background:${status.color}15; border: 1px solid ${status.color}33; padding:2px 6px; border-radius:4px; white-space: nowrap;">
-                        ${status.text}
-                    </span>
-                </div>
-                
-                <div style="font-size:11px; color:#7f8c8d; line-height: 1.4;">
-                    ${subDetails}${dimInfo}
-                </div>
-                
-                ${a.lastCalving ? `<div style="font-size:11px; color:#d35400; font-weight:600; margin-top:2px;">Ost. wycielenie: ${a.lastCalving}</div>` : ''}
-            </div>
-            
-            <input type="checkbox" class="sync-animal-cb" 
-                   value="${a.id}" 
-                   data-tag="${a.tag}" 
-                   onchange="updateSyncCount()" 
-                   style="width: 24px; height: 24px; cursor: pointer; flex-shrink: 0; accent-color: #8e44ad;">
-        `;
-        list.appendChild(div);
+        // Filtr Metody
+        if (method === 'jalowki' && type !== 'jalowka') isVisible = false;
+        if ((method === 'g6g' || method === 'ovsynch') && type === 'jalowka') isVisible = false;
+        
+        // Filtr Wiek Jałówki (>13 msc)
+        if (type === 'jalowka' && age < 13) isVisible = false;
+
+        row.style.display = isVisible ? 'flex' : 'none';
+        
+        // Jeśli wiersz jest ukrywany, odznacz jego checkbox, żeby nie wysłać do niego zadania!
+        if (!isVisible) {
+            const cb = row.querySelector('.sync-animal-cb');
+            if (cb) cb.checked = false;
+        }
     });
-    
+
     updateSyncCount();
 }
+
 function updateSyncCount() {
     const checked = document.querySelectorAll('.sync-animal-cb:checked').length;
     document.getElementById('syncAnimalCount').textContent = `${checked} wybrano`;
@@ -3816,4 +3903,192 @@ function deleteAnimalFromList(id) {
                 alert("Błąd podczas usuwania: " + error.message);
             });
     }
+}
+// =====================================================================
+// ✅ KREATOR WŁASNYCH METOD SYNCHRONIZACJI
+// =====================================================================
+
+function populateSyncMethods() {
+    const select = document.getElementById('syncMethodSelect');
+    if (!select) return;
+    
+    // Zapisz aktualnie wybrany element
+    const currentVal = select.value;
+    select.innerHTML = '';
+    
+    const allProtocols = getMergedProtocols();
+    
+    for (const [key, protocol] of Object.entries(allProtocols)) {
+        const opt = new Option(protocol.name, key);
+        select.add(opt);
+    }
+    
+    if (currentVal && allProtocols[currentVal]) {
+        select.value = currentVal;
+    }
+}
+
+// Nadpisujemy oryginalną funkcję startową, żeby wczytywała dynamiczną listę
+const originalOpenSyncManager = openSyncManager;
+openSyncManager = function() {
+    populateSyncMethods(); // Wypełnij selecta metodami
+    originalOpenSyncManager();
+};
+
+// Uruchamiamy też przy zmianie metody, żeby wyczyścić listę i zresetować filtry
+document.getElementById('syncMethodSelect').addEventListener('change', () => {
+    document.getElementById('syncAnimalList').innerHTML = '';
+    renderSyncPreview();
+    populateSyncAnimals();
+});
+
+// Zmodyfikowana funkcja zapisu by wspierała własne metody
+const originalStartSync = startSynchronization;
+startSynchronization = function() {
+    const methodKey = document.getElementById('syncMethodSelect').value;
+    const allProtocols = getMergedProtocols();
+    const protocolName = allProtocols[methodKey] ? allProtocols[methodKey].name : 'Nieznany program';
+    
+    // Podmieniamy to na żywo w obiekcie, zanim wyśle się do bazy
+    SYNC_PROTOCOLS[methodKey] = allProtocols[methodKey]; 
+    
+    originalStartSync();
+};
+
+const originalRenderSyncPreview = renderSyncPreview;
+renderSyncPreview = function() {
+    const preview = document.getElementById('syncPreview');
+    const methodKey = document.getElementById('syncMethodSelect').value;
+    const startDate = document.getElementById('syncStartDate').valueAsDate;
+    
+    if (!startDate) return;
+    
+    const protocol = getMergedProtocols()[methodKey];
+    if (!protocol) return;
+
+    let html = `<strong>Kroki dla: ${protocol.name}</strong><ul style="margin:5px 0 0 15px; padding:0;">`;
+    
+    protocol.steps.forEach(step => {
+        const d = addDays(startDate, step.dayOffset);
+        html += `<li>${d.toLocaleDateString('pl-PL')}: <b>${step.product}</b> ${step.time}</li>`;
+    });
+    html += '</ul>';
+    preview.innerHTML = html;
+};
+
+
+// UI Kreatora
+function openCustomSyncBuilder() {
+    document.getElementById('customSyncBuilderModal').style.display = 'flex';
+    renderCustomSyncList();
+    
+    // Wyczyść formularz na nową metodę
+    document.getElementById('csbName').value = '';
+    document.getElementById('csbStepsContainer').innerHTML = '';
+    addCustomSyncStepUI(0); // Pierwszy krok domyślnie
+}
+
+function renderCustomSyncList() {
+    const list = document.getElementById('customSyncList');
+    list.innerHTML = '';
+    
+    if (!userSettings.customSyncProtocols || userSettings.customSyncProtocols.length === 0) {
+        list.innerHTML = '<p style="color:#777; font-size:12px;">Brak własnych metod. Stwórz pierwszą poniżej.</p>';
+        return;
+    }
+    
+    userSettings.customSyncProtocols.forEach((p, idx) => {
+        const div = document.createElement('div');
+        div.style.cssText = "display:flex; justify-content:space-between; align-items:center; padding:10px; background:#fff; border:1px solid #ccc; border-radius:8px; margin-bottom:5px;";
+        div.innerHTML = `
+            <strong>${p.name}</strong>
+            <button class="btn warn small" style="margin:0; width:auto; padding:5px 10px;" onclick="deleteCustomSyncProtocol(${idx})">Usuń</button>
+        `;
+        list.appendChild(div);
+    });
+}
+
+function addCustomSyncStepUI(dayOffset = '') {
+    const container = document.getElementById('csbStepsContainer');
+    const stepDiv = document.createElement('div');
+    stepDiv.className = 'csb-step';
+    stepDiv.style.cssText = "background:#fff; padding:10px; border:1px dashed #bbb; border-radius:8px; position:relative;";
+    
+    stepDiv.innerHTML = `
+        <button class="btn-danger" style="position:absolute; top:5px; right:5px; width:25px; height:25px; padding:0; display:flex; align-items:center; justify-content:center; border-radius:4px;" onclick="this.parentElement.remove()">✕</button>
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+            <div>
+                <label style="font-size:11px;">Ile dni od startu?</label>
+                <input type="number" class="csb-day" placeholder="np. 0, 7, 9..." value="${dayOffset}" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:6px;">
+            </div>
+            <div>
+                <label style="font-size:11px;">Pora dnia</label>
+                <select class="csb-time" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:6px;">
+                    <option value="">Dowolna</option>
+                    <option value="(Rano)">(Rano)</option>
+                    <option value="(Wieczorem)">(Wieczorem)</option>
+                </select>
+            </div>
+            <div style="grid-column: span 2;">
+                <label style="font-size:11px;">Produkt (zastrzyk)</label>
+                <input type="text" class="csb-product" placeholder="np. Receptal" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:6px;">
+            </div>
+            <div style="grid-column: span 2;">
+                <label style="font-size:11px;">Dawka (opcjonalnie)</label>
+                <input type="text" class="csb-dose" placeholder="np. 2 ml im." style="width:100%; padding:8px; border:1px solid #ccc; border-radius:6px;">
+            </div>
+        </div>
+    `;
+    container.appendChild(stepDiv);
+}
+
+function saveCustomSyncProtocol() {
+    const name = document.getElementById('csbName').value.trim();
+    if (!name) return alert("Podaj nazwę programu!");
+
+    const stepsUI = document.querySelectorAll('.csb-step');
+    if (stepsUI.length === 0) return alert("Musisz dodać przynajmniej jeden krok!");
+
+    const steps = [];
+    let hasError = false;
+
+    stepsUI.forEach(s => {
+        const day = parseInt(s.querySelector('.csb-day').value);
+        const time = s.querySelector('.csb-time').value;
+        const prod = s.querySelector('.csb-product').value.trim();
+        const dose = s.querySelector('.csb-dose').value.trim();
+
+        if (isNaN(day) || !prod) hasError = true;
+        
+        steps.push({ dayOffset: day, time: time, product: prod, dose: dose });
+    });
+
+    if (hasError) return alert("Wypełnij poprawnie Dzień oraz Nazwę produktu we wszystkich krokach!");
+
+    // Sortuj kroki po dniach
+    steps.sort((a, b) => a.dayOffset - b.dayOffset);
+
+    const newProtocol = { name: name, steps: steps };
+
+    if (!userSettings.customSyncProtocols) userSettings.customSyncProtocols = [];
+    userSettings.customSyncProtocols.push(newProtocol);
+
+    saveConfiguration(false).then(() => {
+        alert("Zapisano nowy schemat!");
+        populateSyncMethods(); // Odśwież główną listę
+        renderCustomSyncList(); // Odśwież listę w edytorze
+        document.getElementById('csbName').value = '';
+        document.getElementById('csbStepsContainer').innerHTML = '';
+        addCustomSyncStepUI(0);
+    });
+}
+
+function deleteCustomSyncProtocol(index) {
+    if(!confirm("Usunąć ten schemat?")) return;
+    
+    userSettings.customSyncProtocols.splice(index, 1);
+    saveConfiguration(false).then(() => {
+        populateSyncMethods();
+        renderCustomSyncList();
+    });
 }
