@@ -3645,46 +3645,40 @@ function populateCustomTaskAnimals() {
 
 
 // ============================================================
-// ✅ MODUŁ: INSTALACJA PWA (W PANELU KLIENTA)
+// ✅ MODUŁ: INSTALACJA PWA (W PANELU KLIENTA) - WERSJA NIEZAWODNA
 // ============================================================
 let deferredPromptKlient;
 const installBtnKlient = document.getElementById('installAppBtnKlient');
 
-// Przechwytujemy zdarzenie gotowości przeglądarki do instalacji
+// Przechwytujemy gotowość systemu do instalacji (Android / Desktop)
 window.addEventListener('beforeinstallprompt', (e) => {
-    // Zapobiega domyślnemu paskowi w niektórych przeglądarkach
     e.preventDefault();
-    // Zapisujemy event, żeby móc wywołać instalację później
     deferredPromptKlient = e;
-    
-    // Pokazujemy nasz piękny zielony przycisk w panelu konfiguracyjnym
-    if (installBtnKlient) {
-        installBtnKlient.classList.remove('hidden');
-    }
 });
 
 // Nasłuchujemy kliknięcia na przycisk w panelu klienta
 if (installBtnKlient) {
     installBtnKlient.addEventListener('click', async () => {
         if (deferredPromptKlient) {
-            // Pokazujemy systemowy dialog instalacji PWA
+            // System pozwala na auto-instalację
             deferredPromptKlient.prompt();
-            // Czekamy na odpowiedź użytkownika
             const { outcome } = await deferredPromptKlient.userChoice;
             console.log(`Wynik instalacji: ${outcome}`);
-            
-            // Oczyszczamy event (można użyć tylko raz)
             deferredPromptKlient = null;
-            installBtnKlient.classList.add('hidden');
+            installBtnKlient.style.display = 'none'; // Ukryj po kliknięciu
+        } else {
+            // Awaryjny komunikat (np. dla iOS Safari lub gdy Chrome zablokuje auto-prompt)
+            alert("Zainstaluj aplikację ręcznie:\n\n1. Rozwiń menu przeglądarki (trzy kropki u góry lub ikona udostępniania na dole).\n2. Wybierz opcję 'Zainstaluj aplikację' lub 'Dodaj do ekranu głównego'.");
         }
     });
 }
 
-// Jeśli aplikacja została właśnie zainstalowana lub odpalona od razu jako standalone - ukrywamy guzik
+// Jeśli aplikacja została właśnie zainstalowana lub odpalona jako osobna apka - ukrywamy guzik całkowicie
 window.addEventListener('appinstalled', () => {
-    if (installBtnKlient) installBtnKlient.classList.add('hidden');
-    console.log('Aplikacja została zainstalowana na ekranie głównym');
+    if (installBtnKlient) installBtnKlient.style.display = 'none';
 });
-if (window.matchMedia('(display-mode: standalone)').matches) {
-    if (installBtnKlient) installBtnKlient.classList.add('hidden');
+
+// Wykrywanie trybu PWA (iOS oraz Android)
+if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true) {
+    if (installBtnKlient) installBtnKlient.style.display = 'none';
 }
