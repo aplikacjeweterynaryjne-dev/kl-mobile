@@ -1,5 +1,5 @@
 
-const CACHE_NAME = 'karta-leczenia-cache-v7';
+const CACHE_NAME = 'karta-leczenia-cache-v8';
 
 // 📦 Lista plików do zapamiętania offline (tzw. App Shell)
 const urlsToCache = [
