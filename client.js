@@ -3419,50 +3419,65 @@ function openInsemModal() {
     document.getElementById('insemDate').valueAsDate = new Date();
     document.getElementById('massInsemBull').value = '';
     document.getElementById('insemAnimalSearch').value = '';
+    
+    // ✅ WYMUSZAMY CZYSZCZENIE LISTY PRZY KAŻDYM NOWYM OTWARCIU MODALA
+    document.getElementById('insemAnimalList').innerHTML = ''; 
+    
     populateMassInsemAnimals();
 }
 
 function populateMassInsemAnimals() {
     const list = document.getElementById('insemAnimalList');
-    list.innerHTML = '';
-    const searchTerm = document.getElementById('insemAnimalSearch').value.toLowerCase();
+    const searchTerm = document.getElementById('insemAnimalSearch').value.toLowerCase().trim();
     
-    // Szukamy krów i jałówek
-    const eligible = myHerd.filter(a => {
-        if (a.type === 'byk') return false;
-        if (searchTerm && !a.tag.toLowerCase().includes(searchTerm)) return false;
-        return true;
-    });
+    // --- 1. BUDOWANIE LISTY ---
+    // (Uruchomi się tylko wtedy, gdy lista jest pusta - czyli zaraz po otwarciu modala)
+    if (list.innerHTML.trim() === '') {
+        // Szukamy tylko krów i jałówek
+        const eligible = myHerd.filter(a => a.type !== 'byk');
+        eligible.sort((a, b) => a.tag.localeCompare(b.tag));
 
-    eligible.sort((a,b) => a.tag.localeCompare(b.tag));
+        if(eligible.length === 0) {
+            list.innerHTML = '<div style="padding:10px; color:#999; text-align:center;">Brak zwierząt do zacielenia.</div>';
+            return;
+        }
 
-    if(eligible.length === 0) {
-        list.innerHTML = '<div style="padding:10px; color:#999; text-align:center;">Brak zwierząt.</div>';
-        return;
+        eligible.forEach(a => {
+            const status = getDetailedStatus(a);
+            const loc = a.location || 'Brak lokalizacji'; 
+            
+            const div = document.createElement('div');
+            div.className = 'mass-insem-row'; // ✅ Klasa potrzebna do ukrywania
+            div.dataset.tag = a.tag.toLowerCase(); // ✅ Zapisujemy kolczyk w tle do szukania
+            div.style.cssText = "display:flex; justify-content:space-between; align-items:center; padding:10px; border-bottom:1px solid #eee; background:white; border-radius:4px;";
+            
+            div.innerHTML = `
+                <div style="flex:1; cursor:pointer;" onclick="openAnimalCard('${a.id}')" title="Kliknij, aby otworzyć kartę">
+                    <div style="font-weight:bold; color:#2e7d32; font-size: 15px;">${a.tag}</div>
+                    <div style="font-size:11px; color:#555; margin-top: 2px;">📍 ${loc}</div>
+                    <div style="font-size:11px; font-weight:bold; color:${status.color}; margin-top: 2px;">${status.text}</div>
+                </div>
+                <div style="display:flex; gap:10px; align-items:center;">
+                    <input type="text" class="mass-insem-bull-input" data-id="${a.id}" list="semenList" placeholder="Nasienie" style="padding:8px; border:1px solid #ccc; border-radius:4px; width:100px; font-size:12px;">
+                    <input type="checkbox" class="mass-insem-cb" value="${a.id}" style="width:26px; height:26px; accent-color:#2980b9; cursor:pointer;">
+                </div>
+            `;
+            list.appendChild(div);
+        });
     }
 
-    eligible.forEach(a => {
-        const status = getDetailedStatus(a);
-        const loc = a.location || 'Brak lokalizacji'; // ✅ DODANO LOKALIZACJĘ
+    // --- 2. FILTROWANIE LOKALNE ---
+    // Zamiast kasować całą listę z zaznaczonymi checkboxami, po prostu ukrywamy wiersze CSS-em!
+    const rows = list.querySelectorAll('.mass-insem-row');
+    rows.forEach(row => {
+        const tag = row.dataset.tag;
         
-        const div = document.createElement('div');
-        div.style.cssText = "display:flex; justify-content:space-between; align-items:center; padding:10px; border-bottom:1px solid #eee; background:white; border-radius:4px;";
-        
-        // ✅ USUNIĘTO autozaznaczanie (isChecked)
-
-        // ✅ DODANO klikalny lewy blok, otwierający kartę sztuki
-        div.innerHTML = `
-            <div style="flex:1; cursor:pointer;" onclick="openAnimalCard('${a.id}')" title="Kliknij, aby otworzyć kartę">
-                <div style="font-weight:bold; color:#2e7d32; font-size: 15px;">${a.tag}</div>
-                <div style="font-size:11px; color:#555; margin-top: 2px;">📍 ${loc}</div>
-                <div style="font-size:11px; font-weight:bold; color:${status.color}; margin-top: 2px;">${status.text}</div>
-            </div>
-            <div style="display:flex; gap:10px; align-items:center;">
-                <input type="text" class="mass-insem-bull-input" data-id="${a.id}" list="semenList" placeholder="Nasienie" style="padding:8px; border:1px solid #ccc; border-radius:4px; width:100px; font-size:12px;">
-                <input type="checkbox" class="mass-insem-cb" value="${a.id}" style="width:26px; height:26px; accent-color:#2980b9; cursor:pointer;">
-            </div>
-        `;
-        list.appendChild(div);
+        // Jeśli wyszukiwarka jest pusta LUB wpisany tekst znajduje się w numerze kolczyka
+        if (searchTerm === '' || tag.includes(searchTerm)) {
+            row.style.display = 'flex'; // Pokaż wiersz
+        } else {
+            row.style.display = 'none'; // Ukryj wiersz
+        }
     });
 }
 
