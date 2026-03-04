@@ -3643,42 +3643,50 @@ function populateCustomTaskAnimals() {
         list.appendChild(div);
     });
 }
-
-
 // ============================================================
-// ✅ MODUŁ: INSTALACJA PWA (Z LOGIKĄ WYLOGOWANIA)
+// ✅ MODUŁ: INSTALACJA PWA (PŁYWAJĄCY GUZIK W PANELU KLIENTA)
 // ============================================================
 let deferredPromptKlient;
-const installBtnKlient = document.getElementById('installAppBtnKlient');
+const installBtnKlient = document.getElementById('installFloatingBtnKlient');
+
+// Sprawdź, czy aplikacja jest już zainstalowana (tryb standalone)
+const isStandaloneKlient = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+
+// 1. Pokaż przycisk DOMYŚLNIE zaraz po uruchomieniu, jeśli apka nie jest zainstalowana
+if (!isStandaloneKlient && installBtnKlient) {
+    installBtnKlient.style.display = 'flex';
+}
 
 window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();
     deferredPromptKlient = e;
+    if (!isStandaloneKlient && installBtnKlient) {
+        installBtnKlient.style.display = 'flex';
+    }
 });
 
 if (installBtnKlient) {
     installBtnKlient.addEventListener('click', async () => {
         if (deferredPromptKlient) {
-            // Jeśli przeglądarka nagle pozwoliła - instalujemy od razu
+            // Jeśli przeglądarka nagle pozwoliła - instalujemy od razu z tego ekranu
             deferredPromptKlient.prompt();
             const { outcome } = await deferredPromptKlient.userChoice;
             deferredPromptKlient = null;
-            installBtnKlient.style.display = 'none';
+            if (outcome === 'accepted') installBtnKlient.style.display = 'none';
         } else {
             // Sprawdzamy czy użytkownik ma urządzenie od Apple (iOS/iPadOS)
             const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
             
             if (isIOS) {
-                // Dla Apple okienko informacyjne (Safari nie obsługuje instalacji z przycisku)
-                alert("🍎 W systemie iOS instalacja działa inaczej:\n\n1. Kliknij ikonę 'Udostępnij' (kwadrat ze strzałką) na dolnym pasku przeglądarki Safari.\n2. Wybierz opcję 'Do ekranu początkowego'.");
+                // Dla Apple okienko informacyjne z instrukcją
+                alert("🍎 W systemie iOS Apple blokuje automatyczną instalację.\n\nAby zainstalować:\n1. Kliknij ikonę 'Udostępnij' (kwadrat ze strzałką w górę) na dolnym pasku przeglądarki Safari.\n2. Wybierz opcję 'Do ekranu początkowego'.");
             } else {
-                // Dla Androida / PC: Pytamy o wylogowanie i przenosimy do index.html
-                const msg = "Z uwagi na zabezpieczenia przeglądarki, instalacja musi odbyć się z ekranu początkowego.\n\nZostaniesz teraz bezpiecznie wylogowany i przeniesiony do okna logowania, gdzie pojawi się opcja instalacji.\n\nCzy chcesz kontynuować?";
+                // Dla Androida / PC: Logika wylogowania i przekierowania
+                const msg = "Ze względów bezpieczeństwa przeglądarki, instalacja musi odbyć się z ekranu głównego.\n\nZostaniesz teraz wylogowany i przeniesiony do okna logowania, gdzie od razu pojawi się instrukcja instalacji.\n\nCzy chcesz kontynuować?";
                 
-               if (confirm(msg)) {
+                if (confirm(msg)) {
                     if (typeof auth !== 'undefined') {
                         auth.signOut().then(() => {
-                            // ✅ Zmiana URL dodająca parametr instalacji
                             window.location.href = 'index.html?action=install'; 
                         });
                     } else {
@@ -3690,10 +3698,13 @@ if (installBtnKlient) {
     });
 }
 
+// Jeśli w międzyczasie zainstalowano aplikację - ukryj guzik
 window.addEventListener('appinstalled', () => {
     if (installBtnKlient) installBtnKlient.style.display = 'none';
 });
 
-if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true) {
+// Jeśli aplikacja jest uruchomiona w trybie pełnoekranowym (jako zainstalowana PWA) - ukryj guzik
+if (isStandaloneKlient) {
     if (installBtnKlient) installBtnKlient.style.display = 'none';
 }
+
