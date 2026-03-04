@@ -3633,4 +3633,180 @@ window.addEventListener('appinstalled', () => {
 if (isStandaloneKlient) {
     if (installBtnKlient) installBtnKlient.style.display = 'none';
 }
+// ============================================================
+// ✅ PRZYWRÓCONE FUNKCJE: KALENDARZ WYCIELEŃ I WYKRES LAKTACJI
+// ============================================================
 
+function addDays(date, days) { 
+    const r = new Date(date); 
+    r.setDate(r.getDate() + days); 
+    return r; 
+}
+
+function changeMonth(delta) { 
+    currentCalDate.setMonth(currentCalDate.getMonth() + delta); 
+    renderCalendar(currentCalDate); 
+}
+
+function renderCalendar(date) { 
+    const container = document.getElementById('calendarDays');
+    if (!container) return; // Zabezpieczenie przed błędem
+    container.innerHTML = ''; 
+    const year = date.getFullYear(); 
+    const month = date.getMonth(); 
+    
+    const calTitle = document.getElementById('calTitle');
+    if (calTitle) calTitle.textContent = date.toLocaleDateString('pl-PL', { month: 'long', year: 'numeric' });
+    
+    let monthEvents = []; 
+    myHerd.forEach(a => { 
+        if (!a.lastInsemination || a.usgStatus === 'negative') return; 
+        const est = addDays(new Date(a.lastInsemination), userSettings.gestation || 280); 
+        if (est.getFullYear() === year && est.getMonth() === month) { 
+            monthEvents.push({ animal: a, date: est }); 
+        } 
+    });
+    
+    monthEvents.sort((a,b) => a.date - b.date);
+    renderCalendarEventsList(monthEvents, `Wycielenia: ${date.toLocaleDateString('pl-PL', { month: 'long' })}`);
+    
+    const calMonthCount = document.getElementById('calMonthCount');
+    if (calMonthCount) calMonthCount.textContent = `+${monthEvents.length}`;
+    
+    const firstDay = new Date(year, month, 1).getDay(); 
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    let startOffset = firstDay === 0 ? 6 : firstDay - 1;
+    
+    for (let i = 0; i < startOffset; i++) container.appendChild(document.createElement('div'));
+    
+    for (let d = 1; d <= daysInMonth; d++) { 
+        const dayDiv = document.createElement('div'); 
+        dayDiv.className = 'cal-day'; 
+        dayDiv.textContent = d;
+        const dayEvents = monthEvents.filter(e => e.date.getDate() === d); 
+        if (dayEvents.length > 0) { 
+            dayDiv.classList.add('has-event'); 
+            const dot = document.createElement('div');
+            dot.className = 'cal-dot'; 
+            dayDiv.appendChild(dot); 
+            dayDiv.onclick = () => { renderCalendarEventsList(dayEvents, `Wycielenia: ${d}.${month+1}`); }; 
+        } 
+        const t = new Date();
+        if (d === t.getDate() && month === t.getMonth() && year === t.getFullYear()) dayDiv.classList.add('today'); 
+        container.appendChild(dayDiv);
+    }
+}
+
+function renderCalendarEventsList(events, title) { 
+    const list = document.getElementById('calEventsList'); 
+    if(!list) return;
+    list.innerHTML = ''; 
+    const titleEl = document.getElementById('calSelectedDateTitle');
+    if (titleEl) titleEl.textContent = title;
+    
+    if (events.length === 0) { 
+        list.innerHTML = '<p style="color:#999; text-align:center;">Brak wydarzeń</p>'; 
+        return;
+    } 
+    events.forEach(e => { 
+        const el = document.createElement('div'); 
+        el.className = 'card'; 
+        el.style.padding = '10px'; 
+        const dateStr = e.date.toLocaleDateString('pl-PL'); 
+        el.innerHTML = `<div style="display:flex; justify-content:space-between; align-items:center;"><span>🐮 <b>${e.animal.tag}</b></span><span style="font-size:11px; color:#555;">${dateStr}</span></div><div style="font-size:11px; color:#2e7d32;">Spodziewane wycielenie</div>`; 
+        el.onclick = () => openAnimalCard(e.animal.id); 
+        list.appendChild(el); 
+    });
+}
+
+function showListModal(title, animals) {
+    const modal = document.getElementById('listModal');
+    const contentEl = document.getElementById('listModalContent');
+    if(!modal || !contentEl) return;
+
+    document.getElementById('listModalTitle').textContent = title;
+    contentEl.innerHTML = '';
+    if (animals.length === 0) {
+        contentEl.innerHTML = '<p style="text-align:center; color:#999;">Brak zwierząt</p>';
+        return;
+    }
+
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    animals.forEach(a => {
+        const div = document.createElement('div');
+        div.className = 'card';
+        div.style.padding = '10px';
+        div.style.marginBottom = '10px';
+        div.style.cursor = 'pointer';
+
+        let lastActivityDateStr = a.lastInsemination || a.lastCalving || null; 
+        let isInactive = false;
+        
+        if (lastActivityDateStr) {
+            const lastActDate = new Date(lastActivityDateStr);
+            const diffDays = Math.floor((today - lastActDate) / (1000 * 60 * 60 * 24));
+            if (diffDays > 365) {
+                isInactive = true;
+            }
+        }
+
+        const statusInfo = getDetailedStatus(a);
+        let detailsHtml = '';
+        
+        if (isInactive) {
+            detailsHtml = `
+                <div style="margin-top:8px; padding:8px; background:#ffebee; border:1px solid #ffcdd2; border-radius:6px; font-size:12px;">
+                    <span style="color:#c0392b; font-weight:bold;">⚠️ Prawdopodobnie sprzedana (brak aktywności >365 dni)</span><br>
+                    <button class="btn btn-danger small" style="margin-top:5px; padding:4px 8px; font-size:11px;" onclick="event.stopPropagation(); deleteAnimalFromList('${a.id}')">🗑️ Usuń ze stada</button>
+                </div>
+            `;
+        } else if (a.type === 'krowa' || a.type === 'jalowka') {
+            const ins = a.lastInsemination || '-';
+            const loc = a.location || 'Brak lokalizacji';
+            let calv = '-';
+            
+            if (a.lastInsemination) {
+                const est = addDays(new Date(a.lastInsemination), userSettings.gestation || 280);
+                calv = est.toLocaleDateString('pl-PL');
+            }
+            
+            detailsHtml = `
+                <div style="font-size:11px; color:#555; margin-top:5px; display:grid; grid-template-columns: 1fr 1fr; gap:5px;">
+                    <span style="grid-column: span 2; color:#2980b9;">📍 Lok: <b>${loc}</b></span>
+                    <span>💉 Ost. zac: <b>${ins}</b></span>
+                    <span>👶 Termin: <b>${calv}</b></span>
+                    <span style="grid-column: span 2; font-weight:bold; color:${statusInfo.color}; text-align:right;">${statusInfo.text}</span>
+                </div>`;
+        }
+
+        div.innerHTML = `
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <strong style="color:#2e7d32; font-size:16px;">${a.tag}</strong>
+                <span class="badge" style="background:#eee; color:#333; padding:2px 6px; border-radius:10px; font-size:10px;">${a.type.toUpperCase()}</span>
+            </div>
+            ${detailsHtml}`;
+
+        div.onclick = () => {
+            closeModal('listModal'); 
+            openAnimalCard(a.id);    
+        };
+        
+        contentEl.appendChild(div);
+    });
+    
+    modal.style.display = 'flex';
+}
+
+function deleteAnimalFromList(id) {
+    if (confirm("Czy na pewno chcesz TRWALE usunąć to zwierzę ze stada?")) {
+        db.collection('animals').doc(id).delete()
+            .then(() => {
+                alert("Zwierzę zostało usunięte.");
+                closeModal('listModal'); 
+            })
+            .catch(error => {
+                alert("Błąd podczas usuwania: " + error.message);
+            });
+    }
+}
