@@ -352,7 +352,6 @@ function loadHerd() {
     db.collection('animals').where('ownerUid', '==', currentUser.uid)
       .onSnapshot(snapshot => {
           myHerd = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-          updateDashboardStats();
           renderHerdList('all'); 
           populateLists(); 
           generateAndRenderTasks(); 
@@ -360,7 +359,6 @@ function loadHerd() {
           renderCalendar(currentCalDate);
       }, error => console.error("Błąd stada:", error));
 }
-
 function loadCompletedTasks() {
     const dateLimit = new Date();
     dateLimit.setDate(dateLimit.getDate() - 60); 
@@ -1738,11 +1736,9 @@ db.collection('animals').doc(currentEditingAnimalId).update(updateData).catch(er
 
     // TO WYKONA SIĘ OD RAZU (NIE ZALEŻY OD INTERNETU)
     showToast(navigator.onLine ? "Zapisano zmiany!" : "Edycja zapisana offline. Dane zostaną wysłane w tle.", navigator.onLine ? "success" : "warning");
-    
     openAnimalCard(currentEditingAnimalId);
     // Ważne: Odśwież listę, bo zmiana typu wpływa na filtry
     renderHerdList(); 
-    updateDashboardStats();
 }
 function deleteCurrentAnimal() {
     if (!currentEditingAnimalId) return;
@@ -2124,11 +2120,7 @@ function filterHerd(type) {
     renderHerdList(type);
 }
 
-function updateDashboardStats() {
-    document.getElementById('cntCows').textContent = myHerd.filter(a => a.type === 'krowa').length;
-    document.getElementById('cntHeifers').textContent = myHerd.filter(a => a.type === 'jalowka').length;
-    document.getElementById('cntBulls').textContent = myHerd.filter(a => a.type === 'byk').length;
-}
+
 
 function setupNavigation() { 
     const logoutBtn = document.getElementById('logoutBtn');
