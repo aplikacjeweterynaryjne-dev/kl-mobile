@@ -1,16 +1,18 @@
 // 🔒 Nazwa pamięci podręcznej 
-const CACHE_NAME = 'karta-leczenia-cache-v1';
+const CACHE_NAME = 'karta-leczenia-cache-v2';
 
 // 📦 Lista plików do zapamiętania offline (tzw. App Shell)
 const urlsToCache = [
   './',
   'index.html',
-  'panel-klienta.html', // <--- ✅ DODANE!
+  'panel-klienta.html',
+  'client.js', // <--- ✅ KLUCZOWE: Brakowało tego pliku do zaliczenia testu offline!
   'manifest.json',
   'logo.jpg',
   'https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&display=swap',
   'https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css',
   'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js',
+  'https://cdn.jsdelivr.net/npm/chart.js', // <--- ✅ Dodane dla pewności (żeby wykresy działały bez neta)
   'https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js',
   'https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js',
   'https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js'
@@ -59,9 +61,8 @@ self.addEventListener('activate', event => {
 
 // 🌐 Przechwytywanie zapytań (Logika hybrydowa)
 self.addEventListener('fetch', event => {
-  // Sprawdź, czy zapytanie dotyczy strony (nawigacji), np. index.html
   if (event.request.mode === 'navigate') {
-    // --- STRATEGIA 1: Network First (dla index.html) ---
+    // --- STRATEGIA 1: Network First (dla stron HTML) ---
     event.respondWith(
       fetch(event.request)
         .then(networkResponse => {
@@ -72,20 +73,21 @@ self.addEventListener('fetch', event => {
           return networkResponse;
         })
         .catch(error => {
-          console.log('[Service Worker] Błąd sieci, zwracam offline index.html');
-          return caches.match(event.request);
+          console.log('[Service Worker] Błąd sieci, zwracam offline HTML');
+          // ✅ ignoreSearch: true sprawia, że ignorujemy parametry typu ?simulatedUid=123
+          return caches.match(event.request, { ignoreSearch: true }); 
         })
     );
   } else {
-    // --- STRATEGIA 2: Cache First (dla zasobów) ---
+    // --- STRATEGIA 2: Cache First (dla zasobów JS/CSS/Obrazków) ---
     event.respondWith(
-      caches.match(event.request)
+      // ✅ ignoreSearch: true sprawia, że plik client.js?v=1 odczyta się z cache tak samo jak zwykłe client.js
+      caches.match(event.request, { ignoreSearch: true })
         .then(cachedResponse => {
           if (cachedResponse) {
             return cachedResponse;
           }
           return fetch(event.request).then(networkResponse => {
-            // Sprawdź czy odpowiedź jest poprawna
             if (!networkResponse || networkResponse.status !== 200 || networkResponse.type !== 'basic' && networkResponse.type !== 'cors') {
               return networkResponse;
             }
