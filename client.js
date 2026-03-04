@@ -3675,13 +3675,14 @@ if (installBtnKlient) {
                 // Dla Androida / PC: Pytamy o wylogowanie i przenosimy do index.html
                 const msg = "Z uwagi na zabezpieczenia przeglądarki, instalacja musi odbyć się z ekranu początkowego.\n\nZostaniesz teraz bezpiecznie wylogowany i przeniesiony do okna logowania, gdzie pojawi się opcja instalacji.\n\nCzy chcesz kontynuować?";
                 
-                if (confirm(msg)) {
+               if (confirm(msg)) {
                     if (typeof auth !== 'undefined') {
                         auth.signOut().then(() => {
-                            window.location.href = 'index.html'; // Przeniesienie do okna logowania
+                            // ✅ Zmiana URL dodająca parametr instalacji
+                            window.location.href = 'index.html?action=install'; 
                         });
                     } else {
-                        window.location.href = 'index.html';
+                        window.location.href = 'index.html?action=install';
                     }
                 }
             }
