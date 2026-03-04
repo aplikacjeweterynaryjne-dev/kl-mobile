@@ -1,4 +1,4 @@
-// --- KONFIGURACJA FIREBASE ---
+// --- KONFIGURACJA FIREBASE --- 
 const firebaseConfig = {
     apiKey: "AIzaSyBFSlW9_i877sdlTfGHV4XKGeYlbKPAoM0",
     authDomain: "kl-mobile-3536f.firebaseapp.com",
