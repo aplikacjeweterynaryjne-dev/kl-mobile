@@ -226,31 +226,20 @@ function initApp() {
     const dateEl = document.getElementById('welcomeDate');
     if(dateEl) dateEl.textContent = new Date().toLocaleDateString('pl-PL', { weekday: 'long', day: 'numeric', month: 'long' });
     
-// ✅ POPRAWKA: Obsługa konta bez lecznicy i wczytywanie wyboru
-    const farmInputContainer = document.getElementById('cfgFarmNumber')?.parentElement;
-    const treatmentsSection = document.getElementById('section-treatments');
-
-    // Uruchom ładowanie opcji lecznic
+    // Uruchom ładowanie opcji lecznic (dla niebieskiego boxa w Kartach Leczenia)
     loadClinicsForOptions();
+    
+    const treatmentsList = document.getElementById('treatmentsList');
 
     if (!currentUser['ID lecznicy']) {
         // --- KLIENT NIEPOWIĄZANY ---
-        
-        if (farmInputContainer) {
-            farmInputContainer.innerHTML = `
-                <div style="background:#fff3e0; color:#d35400; padding:15px; border-radius:8px; font-size:13px; text-align:center; border: 1px solid #ffe0b2;">
-                    ⚠️ <strong>Brak wybranej lecznicy</strong><br>
-                    Wybierz lecznicę w niebieskim polu powyżej i kliknij "Zmień", aby odblokować dostęp do pobierania kart leczenia.
-                </div>`;
-        }
-
-        if (treatmentsSection) {
-            treatmentsSection.innerHTML = `
+        // Zamiast niszczyć całą sekcję z polami wyboru, wstawiamy błąd tylko w miejscu listy kart!
+        if (treatmentsList) {
+            treatmentsList.innerHTML = `
                 <div style="padding:40px 20px; text-align:center; color:#777;">
-                    <i class="bi bi-link-45deg" style="font-size:50px; color:#ccc;"></i>
-                    <h3>Brak połączenia</h3>
-                    <p>Twoje gospodarstwo nie jest powiązane z żadną lecznicą.</p>
-                    <p style="font-size:13px;">Przejdź do Opcji i wybierz lecznicę.</p>
+                    <i class="bi bi-exclamation-triangle" style="font-size:50px; color:#f39c12;"></i>
+                    <h3 style="color:#333;">Konto nieaktywne</h3>
+                    <p>Aby pobierać karty leczenia, najpierw wybierz swoją lecznicę w niebieskim polu na górze i kliknij "Zapisz".</p>
                 </div>
             `;
         }
@@ -826,13 +815,21 @@ function generateAndRenderTasks() {
             }
         }
 
-        // --- GENEROWANIE ZADAŃ WIZUALNYCH (Dla krów) ---
+       // --- GENEROWANIE ZADAŃ WIZUALNYCH (Dla krów) ---
 
         // Synchronizacja
-       if (animal.type === 'krowa' && animal.lastCalving) {
+        if (animal.type === 'krowa' && animal.lastCalving) {
             const lastCalv = new Date(animal.lastCalving);
             const dim = Math.floor((today - lastCalv) / (1000 * 60 * 60 * 24));
-            if (dim > 60 && dim < 365 && !animal.isPregnantConfirmed && animal.usgStatus !== 'pending') {
+            
+            // Sprawdzamy czy krowa ma aktywne zacielenie (wpisaną datę, która NIE została potwierdzona jako negatywna po USG)
+            const hasActiveInsemination = animal.lastInsemination && animal.usgStatus !== 'negative';
+            
+            // Krowa dostaje zadanie synchronizacji TYLKO jeśli:
+            // 1. Minęło 60 dni od wycielenia
+            // 2. NIE jest cielna
+            // 3. NIE ma aktywnego zacielenia (czyli nie czeka na USG / nie jest za wcześnie na USG)
+            if (dim > 60 && dim < 365 && !animal.isPregnantConfirmed && !hasActiveInsemination) {
                 addTask(generatedTasks, animal, 'Wykonaj synchronizację', today, today, 'warning', 'sync_alert', null, lastCalv);
             }
         }
@@ -2466,172 +2463,186 @@ async function executeMassTasks() {
 }
 function renderStatistics() {
     const today = new Date();
+    today.setHours(0,0,0,0);
     
     // --- 1. WYKRES LAKTACJI (Dni w dojeniu) ---
-    const ctxLactation = document.getElementById('lactationChart');
-    if (ctxLactation) {
-        const buckets = [0, 0, 0, 0, 0, 0, 0];
-        const bucketAnimals = [[], [], [], [], [], [], []];
-        const bucketLabels = ['0-2m', '2-4m', '4-6m', '6-8m', '8-10m', '10-12m', '>12m'];
-        
-        myHerd.forEach(a => {
-            if (a.type === 'krowa' && a.lastCalving) {
-                const calvDate = new Date(a.lastCalving);
-                const months = (today - calvDate) / (1000 * 60 * 60 * 24 * 30.4);
-                let idx = 0;
-                if (months <= 2) idx = 0;
-                else if (months <= 4) idx = 1;
-                else if (months <= 6) idx = 2;
-                else if (months <= 8) idx = 3;
-                else if (months <= 10) idx = 4;
-                else if (months <= 12) idx = 5;
-                else idx = 6;
-                
-                buckets[idx]++;
-                bucketAnimals[idx].push(a);
-            }
-        });
-        
-        if (window.myChartLactation) window.myChartLactation.destroy();
-        window.myChartLactation = new Chart(ctxLactation, {
-            type: 'bar',
-            data: {
-                labels: bucketLabels,
-                datasets: [{ label: 'Liczba krów', data: buckets, backgroundColor: '#8e44ad', borderRadius: 4 }]
-            },
-            options: {
-                responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
-                scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } },
-                onClick: (evt, activeEls) => {
-                    if (activeEls.length > 0) {
-                        const idx = activeEls[0].index;
-                        showListModal(`Krowy w laktacji: ${bucketLabels[idx]}`, bucketAnimals[idx]);
+    try {
+        const ctxLactation = document.getElementById('lactationChart');
+        if (ctxLactation) {
+            const buckets = [0, 0, 0, 0, 0, 0, 0];
+            const bucketAnimals = [[], [], [], [], [], [], []];
+            const bucketLabels = ['0-2m', '2-4m', '4-6m', '6-8m', '8-10m', '10-12m', '>12m'];
+            
+            myHerd.forEach(a => {
+                if (a.type === 'krowa' && a.lastCalving) {
+                    const calvDate = new Date(a.lastCalving);
+                    // ✅ ZABEZPIECZENIE: Sprawdź czy to jest poprawna data
+                    if (!isNaN(calvDate.getTime())) {
+                        const months = (today - calvDate) / (1000 * 60 * 60 * 24 * 30.4);
+                        let idx = 0;
+                        if (months <= 2) idx = 0;
+                        else if (months <= 4) idx = 1;
+                        else if (months <= 6) idx = 2;
+                        else if (months <= 8) idx = 3;
+                        else if (months <= 10) idx = 4;
+                        else if (months <= 12) idx = 5;
+                        else idx = 6;
+                        
+                        buckets[idx]++;
+                        bucketAnimals[idx].push(a);
                     }
                 }
-            }
-        });
-    }
+            });
+            
+            if (window.myChartLactation) window.myChartLactation.destroy();
+            window.myChartLactation = new Chart(ctxLactation, {
+                type: 'bar',
+                data: {
+                    labels: bucketLabels,
+                    datasets: [{ label: 'Liczba krów', data: buckets, backgroundColor: '#8e44ad', borderRadius: 4 }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
+                    scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } },
+                    onClick: (evt, activeEls) => {
+                        if (activeEls.length > 0) {
+                            const idx = activeEls[0].index;
+                            showListModal(`Krowy w laktacji: ${bucketLabels[idx]}`, bucketAnimals[idx]);
+                        }
+                    }
+                }
+            });
+        }
+    } catch(e) { console.error("Błąd wykresu laktacji:", e); }
 
     // --- 2. WYKRES STATUSÓW (Krowy i Jałówki) ---
-    const ctxStatus = document.getElementById('statusPieChart');
-    if (ctxStatus) {
-        // Zmieniliśmy na 5 pojemników
-        const statusBuckets = [0, 0, 0, 0, 0]; 
-        const statusAnimals = [[], [], [], [], []];
-        const statusLabels = ['Cielne', 'Zasuszone', 'Do USG', 'Czeka na USG', 'Puste (Niekryte/Neg)'];
+    try {
+        const ctxStatus = document.getElementById('statusPieChart');
+        if (ctxStatus) {
+            const statusBuckets = [0, 0, 0, 0, 0]; 
+            const statusAnimals = [[], [], [], [], []];
+            const statusLabels = ['Cielne', 'Zasuszone', 'Do USG', 'Czeka na USG', 'Puste (Niekryte/Neg)'];
 
-        myHerd.forEach(a => {
-            if (a.type !== 'byk') {
-                const s = getDetailedStatus(a);
-                if (a.isDriedOff) { statusBuckets[1]++; statusAnimals[1].push(a); }
-                else if (a.isPregnantConfirmed) { statusBuckets[0]++; statusAnimals[0].push(a); }
-                else if (s.category === 'usg') { statusBuckets[2]++; statusAnimals[2].push(a); }
-                else if (s.category === 'inne') { statusBuckets[3]++; statusAnimals[3].push(a); } // ✅ NOWA KATEGORIA
-                else { statusBuckets[4]++; statusAnimals[4].push(a); } // Reszta to Puste
-            }
-        });
+            myHerd.forEach(a => {
+                if (a.type !== 'byk') {
+                    const s = getDetailedStatus(a);
+                    if (a.isDriedOff) { statusBuckets[1]++; statusAnimals[1].push(a); }
+                    else if (a.isPregnantConfirmed) { statusBuckets[0]++; statusAnimals[0].push(a); }
+                    else if (s.category === 'usg') { statusBuckets[2]++; statusAnimals[2].push(a); }
+                    else if (s.category === 'inne') { statusBuckets[3]++; statusAnimals[3].push(a); } 
+                    else { statusBuckets[4]++; statusAnimals[4].push(a); } 
+                }
+            });
 
-        if (window.myChartStatus) window.myChartStatus.destroy();
-        window.myChartStatus = new Chart(ctxStatus, {
-            type: 'pie',
-            data: {
-                labels: statusLabels,
-                datasets: [{
-                    data: statusBuckets,
-                    // Dodano fioletowy kolor (#9b59b6)
-                    backgroundColor: ['#27ae60', '#7f8c8d', '#f39c12', '#9b59b6', '#2980b9'] 
-                }]
-            },
-            options: { 
-                responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right' } },
-                onClick: (evt, activeEls) => {
-                    if (activeEls.length > 0) {
-                        const idx = activeEls[0].index;
-                        showListModal(`Lista zwierząt: ${statusLabels[idx]}`, statusAnimals[idx]);
+            if (window.myChartStatus) window.myChartStatus.destroy();
+            window.myChartStatus = new Chart(ctxStatus, {
+                type: 'pie',
+                data: {
+                    labels: statusLabels,
+                    datasets: [{
+                        data: statusBuckets,
+                        backgroundColor: ['#27ae60', '#7f8c8d', '#f39c12', '#9b59b6', '#2980b9'] 
+                    }]
+                },
+                options: { 
+                    responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right' } },
+                    onClick: (evt, activeEls) => {
+                        if (activeEls.length > 0) {
+                            const idx = activeEls[0].index;
+                            showListModal(`Lista zwierząt: ${statusLabels[idx]}`, statusAnimals[idx]);
+                        }
                     }
                 }
-            }
-        });
-    }
+            });
+        }
+    } catch(e) { console.error("Błąd wykresu statusów:", e); }
 
     // --- 3. WYKRES STRUKTURY STADA (Typy) ---
-    const ctxType = document.getElementById('typePieChart');
-    if (ctxType) {
-        const typeBuckets = [0, 0, 0];
-        const typeAnimals = [[], [], []];
-        const typeLabels = ['Krowy', 'Jałówki', 'Byki'];
+    try {
+        const ctxType = document.getElementById('typePieChart');
+        if (ctxType) {
+            const typeBuckets = [0, 0, 0];
+            const typeAnimals = [[], [], []];
+            const typeLabels = ['Krowy', 'Jałówki', 'Byki'];
 
-        myHerd.forEach(a => {
-            if (a.type === 'krowa') { typeBuckets[0]++; typeAnimals[0].push(a); }
-            else if (a.type === 'jalowka') { typeBuckets[1]++; typeAnimals[1].push(a); }
-            else if (a.type === 'byk') { typeBuckets[2]++; typeAnimals[2].push(a); }
-        });
+            myHerd.forEach(a => {
+                if (a.type === 'krowa') { typeBuckets[0]++; typeAnimals[0].push(a); }
+                else if (a.type === 'jalowka') { typeBuckets[1]++; typeAnimals[1].push(a); }
+                else if (a.type === 'byk') { typeBuckets[2]++; typeAnimals[2].push(a); }
+            });
 
-        if (window.myChartType) window.myChartType.destroy();
-        window.myChartType = new Chart(ctxType, {
-            type: 'doughnut',
-            data: {
-                labels: typeLabels,
-                datasets: [{
-                    data: typeBuckets,
-                    backgroundColor: ['#2e7d32', '#f39c12', '#c0392b']
-                }]
-            },
-            options: { 
-                responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right' } },
-                onClick: (evt, activeEls) => {
-                    if (activeEls.length > 0) {
-                        const idx = activeEls[0].index;
-                        showListModal(`Zwierzęta typu: ${typeLabels[idx]}`, typeAnimals[idx]);
+            if (window.myChartType) window.myChartType.destroy();
+            window.myChartType = new Chart(ctxType, {
+                type: 'doughnut',
+                data: {
+                    labels: typeLabels,
+                    datasets: [{
+                        data: typeBuckets,
+                        backgroundColor: ['#2e7d32', '#f39c12', '#c0392b']
+                    }]
+                },
+                options: { 
+                    responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right' } },
+                    onClick: (evt, activeEls) => {
+                        if (activeEls.length > 0) {
+                            const idx = activeEls[0].index;
+                            showListModal(`Zwierzęta typu: ${typeLabels[idx]}`, typeAnimals[idx]);
+                        }
                     }
                 }
-            }
-        });
-    }
+            });
+        }
+    } catch(e) { console.error("Błąd wykresu typu:", e); }
 
     // --- 4. PROGNOZA WYCIELEŃ (Słupki - Najbliższe 6 miesięcy) ---
-    const ctxCalving = document.getElementById('upcomingCalvingsChart');
-    if (ctxCalving) {
-        const monthNames = ["Sty", "Lut", "Mar", "Kwi", "Maj", "Cze", "Lip", "Sie", "Wrz", "Paź", "Lis", "Gru"];
-        const upcomingMonths = [];
-        const calvCounts = [0, 0, 0, 0, 0, 0];
-        const calvAnimals = [[], [], [], [], [], []];
-        const currentMonthIdx = today.getMonth();
+    try {
+        const ctxCalving = document.getElementById('upcomingCalvingsChart');
+        if (ctxCalving) {
+            const monthNames = ["Sty", "Lut", "Mar", "Kwi", "Maj", "Cze", "Lip", "Sie", "Wrz", "Paź", "Lis", "Gru"];
+            const upcomingMonths = [];
+            const calvCounts = [0, 0, 0, 0, 0, 0];
+            const calvAnimals = [[], [], [], [], [], []];
+            const currentMonthIdx = today.getMonth();
 
-        for (let i = 0; i < 6; i++) {
-            upcomingMonths.push(monthNames[(currentMonthIdx + i) % 12]);
-        }
-
-        myHerd.forEach(a => {
-            if (a.isPregnantConfirmed && a.lastInsemination) {
-                const estCalv = addDays(new Date(a.lastInsemination), userSettings.gestation || 280);
-                const diffMonths = (estCalv.getFullYear() - today.getFullYear()) * 12 + (estCalv.getMonth() - today.getMonth());
-                if (diffMonths >= 0 && diffMonths < 6) {
-                    calvCounts[diffMonths]++;
-                    calvAnimals[diffMonths].push(a);
-                }
+            for (let i = 0; i < 6; i++) {
+                upcomingMonths.push(monthNames[(currentMonthIdx + i) % 12]);
             }
-        });
 
-        if (window.myChartCalving) window.myChartCalving.destroy();
-        window.myChartCalving = new Chart(ctxCalving, {
-            type: 'bar',
-            data: {
-                labels: upcomingMonths,
-                datasets: [{ label: 'Spodziewane wycielenia', data: calvCounts, backgroundColor: '#e67e22', borderRadius: 4 }]
-            },
-            options: {
-                responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
-                scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } },
-                onClick: (evt, activeEls) => {
-                    if (activeEls.length > 0) {
-                        const idx = activeEls[0].index;
-                        showListModal(`Wycielenia w miesiącu: ${upcomingMonths[idx]}`, calvAnimals[idx]);
+            myHerd.forEach(a => {
+                if (a.isPregnantConfirmed && a.lastInsemination) {
+                    const insemDate = new Date(a.lastInsemination);
+                    // ✅ ZABEZPIECZENIE: Sprawdź czy to jest poprawna data
+                    if (!isNaN(insemDate.getTime())) {
+                        const estCalv = addDays(insemDate, userSettings.gestation || 280);
+                        const diffMonths = (estCalv.getFullYear() - today.getFullYear()) * 12 + (estCalv.getMonth() - today.getMonth());
+                        if (diffMonths >= 0 && diffMonths < 6) {
+                            calvCounts[diffMonths]++;
+                            calvAnimals[diffMonths].push(a);
+                        }
                     }
                 }
-            }
-        });
-    }
+            });
+
+            if (window.myChartCalving) window.myChartCalving.destroy();
+            window.myChartCalving = new Chart(ctxCalving, {
+                type: 'bar',
+                data: {
+                    labels: upcomingMonths,
+                    datasets: [{ label: 'Spodziewane wycielenia', data: calvCounts, backgroundColor: '#e67e22', borderRadius: 4 }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
+                    scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } },
+                    onClick: (evt, activeEls) => {
+                        if (activeEls.length > 0) {
+                            const idx = activeEls[0].index;
+                            showListModal(`Wycielenia w miesiącu: ${upcomingMonths[idx]}`, calvAnimals[idx]);
+                        }
+                    }
+                }
+            });
+        }
+    } catch(e) { console.error("Błąd wykresu wycieleń:", e); }
 }
 // =====================================================================
 // ✅ FUNKCJE OBSŁUGI MODALU SYNCHRONIZACJI
