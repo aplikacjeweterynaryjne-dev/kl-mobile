@@ -3451,20 +3451,23 @@ function populateMassInsemAnimals() {
 
     eligible.forEach(a => {
         const status = getDetailedStatus(a);
+        const loc = a.location || 'Brak lokalizacji'; // ✅ DODANO LOKALIZACJĘ
+        
         const div = document.createElement('div');
         div.style.cssText = "display:flex; justify-content:space-between; align-items:center; padding:10px; border-bottom:1px solid #eee; background:white; border-radius:4px;";
         
-        // Zaznaczamy checkbox jeśli user jej szukał z palca
-        const isChecked = searchTerm && a.tag.toLowerCase().includes(searchTerm) ? 'checked' : '';
+        // ✅ USUNIĘTO autozaznaczanie (isChecked)
 
+        // ✅ DODANO klikalny lewy blok, otwierający kartę sztuki
         div.innerHTML = `
-            <div style="flex:1;">
-                <div style="font-weight:bold; color:#2c3e50;">${a.tag}</div>
-                <div style="font-size:10px; font-weight:bold; color:${status.color};">${status.text}</div>
+            <div style="flex:1; cursor:pointer;" onclick="openAnimalCard('${a.id}')" title="Kliknij, aby otworzyć kartę">
+                <div style="font-weight:bold; color:#2e7d32; font-size: 15px;">${a.tag}</div>
+                <div style="font-size:11px; color:#555; margin-top: 2px;">📍 ${loc}</div>
+                <div style="font-size:11px; font-weight:bold; color:${status.color}; margin-top: 2px;">${status.text}</div>
             </div>
             <div style="display:flex; gap:10px; align-items:center;">
-                <input type="text" class="mass-insem-bull-input" data-id="${a.id}" list="semenList" placeholder="Nasienie" style="padding:8px; border:1px solid #ccc; border-radius:4px; width:120px; font-size:12px;">
-                <input type="checkbox" class="mass-insem-cb" value="${a.id}" ${isChecked} style="width:24px; height:24px; accent-color:#2980b9; cursor:pointer;">
+                <input type="text" class="mass-insem-bull-input" data-id="${a.id}" list="semenList" placeholder="Nasienie" style="padding:8px; border:1px solid #ccc; border-radius:4px; width:100px; font-size:12px;">
+                <input type="checkbox" class="mass-insem-cb" value="${a.id}" style="width:26px; height:26px; accent-color:#2980b9; cursor:pointer;">
             </div>
         `;
         list.appendChild(div);
