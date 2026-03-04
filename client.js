@@ -3684,13 +3684,13 @@ if (installBtnKlient) {
                 // Dla Androida / PC: Logika wylogowania i przekierowania
                 const msg = "Ze względów bezpieczeństwa przeglądarki, instalacja musi odbyć się z ekranu głównego.\n\nZostaniesz teraz wylogowany i przeniesiony do okna logowania, gdzie od razu pojawi się instrukcja instalacji.\n\nCzy chcesz kontynuować?";
                 
-                if (confirm(msg)) {
+              if (confirm(msg)) {
+                    // Zapisujemy intencję w pamięci sesji, odpornej na wszelkie przekierowania
+                    sessionStorage.setItem('pwa_install_intent', 'true');
                     if (typeof auth !== 'undefined') {
-                        auth.signOut().then(() => {
-                            window.location.href = 'index.html?action=install'; 
-                        });
+                        auth.signOut(); // System autoryzacji sam wykryje wylogowanie i przeniesie do index.html
                     } else {
-                        window.location.href = 'index.html?action=install';
+                        window.location.href = 'index.html';
                     }
                 }
             }
