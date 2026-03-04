@@ -121,58 +121,74 @@ const DEFAULT_SETTINGS = {
 
 let userSettings = JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
 
-// --- AUTH & SYMULACJA (Zaktualizowane dla Pracownika) ---
+// --- AUTH & SYMULACJA (Zaktualizowane, Wersja Bezpieczna) ---
 auth.onAuthStateChanged(async (user) => {
     if (user) {
         try {
-            // 1. Sprawdź, kim jest zalogowany użytkownik (Ty)
-            const myProfileSnap = await db.collection('konfiguracja').where('uid', '==', user.uid).limit(1).get();
+            // 1. Sprawdź, kim jest zalogowany użytkownik
+            let myProfileSnap = await db.collection('konfiguracja').where('uid', '==', user.uid).limit(1).get();
             
+            // 🛟 KOŁO RATUNKOWE: Jeśli cache zwrócił pusto przez błąd po przelogowaniu, wymuś pobranie z serwera
+            if (myProfileSnap.empty && navigator.onLine) {
+                try {
+                    myProfileSnap = await db.collection('konfiguracja').where('uid', '==', user.uid).limit(1).get({ source: 'server' });
+                } catch(e) { console.error("Błąd zaciągania z serwera:", e); }
+            }
+
+            // 🛑 ZABEZPIECZENIE PRZED BIAŁYM EKRANEM (PĘTLĄ)
             if (myProfileSnap.empty) {
-                window.location.href = 'index.html'; // Brak profilu
+                console.error("Brak profilu w bazie konfiguracja!");
+                document.body.innerHTML = `
+                    <div style="display:flex; flex-direction:column; justify-content:center; align-items:center; height:100vh; background:#f4f7f6; font-family:sans-serif; text-align:center; padding:20px;">
+                        <h2 style="color: #e74c3c; margin-bottom: 5px;">Błąd synchronizacji</h2>
+                        <p style="color: #555; margin-bottom: 20px;">Aplikacja nie mogła odczytać Twojego profilu z pamięci telefonu.</p>
+                        <button onclick="window.location.reload()" style="padding: 14px 24px; background: #27ae60; color: white; border: none; border-radius: 8px; font-size:16px; margin-bottom: 10px; cursor: pointer; font-weight: bold; width: 100%; max-width: 300px; box-shadow: 0 4px 10px rgba(39,174,96,0.3);">🔄 Odśwież stronę</button>
+                        <button onclick="firebase.auth().signOut().then(() => window.location.href='index.html')" style="padding: 14px 24px; background: #34495e; color: white; border: none; border-radius: 8px; font-size:16px; cursor: pointer; font-weight: bold; width: 100%; max-width: 300px;">Wyloguj i spróbuj ponownie</button>
+                    </div>
+                `;
                 return;
             }
 
             const myProfile = myProfileSnap.docs[0].data();
             const myRole = myProfile.Rola;
 
-            // 2. Sprawdź, czy w URL jest prośba o symulację (przekazane UID klienta)
+            // 2. Sprawdź, czy w URL jest prośba o symulację
             const urlParams = new URLSearchParams(window.location.search);
             const simulatedUid = urlParams.get('simulatedUid');
 
-            // ✅ SCENARIUSZ A: Admin / Właściciel / PRACOWNIK chce podglądać Klienta
+            // ✅ SCENARIUSZ A: Admin / Właściciel / Pracownik przegląda Klienta
             if (simulatedUid && (myRole === 'administrator' || myRole === 'właściciel' || myRole === 'pracownik')) {
                 console.log("Tryb Symulacji: Personel przegląda konto klienta:", simulatedUid);
-                
-                // Pobierz dane symulowanego klienta
                 const clientSnap = await db.collection('konfiguracja').where('uid', '==', simulatedUid).limit(1).get();
-                
                 if (!clientSnap.empty) {
-                    // Ustawiamy currentUser na dane KLIENTA, ale uid bierzemy symulowane
                     currentUser = { id: clientSnap.docs[0].id, ...clientSnap.docs[0].data(), uid: simulatedUid };
-                    
-                    // Dodajemy wizualny pasek, że to tryb podglądu
                     showSimulationBanner(myProfile.Imie, currentUser.Imie + ' ' + currentUser.Nazwisko);
-                    
-                    initApp(); // Uruchom aplikację dla danych klienta
+                    initApp(); 
                     return;
                 } else {
                     alert("Nie znaleziono danych tego klienta.");
                 }
             }
 
-            // SCENARIUSZ B: Zwykłe logowanie (Prawdziwy Klient wchodzi na swoje konto)
+            // ✅ SCENARIUSZ B: Zwykłe logowanie (Prawdziwy Klient)
             if (myRole === 'klient') {
                 currentUser = { id: myProfileSnap.docs[0].id, ...myProfile, uid: user.uid };
                 initApp();
             } else {
-                // Jeśli personel wszedł tu bez parametru ?simulatedUid, odeślij go do panelu głównego
+                // Jeśli personel wszedł tu bez parametru, odeślij na główny ekran (To jest jednorazowe, bezpieczne przekierowanie)
                 window.location.href = 'index.html';
             }
 
         } catch (error) {
             console.error("Błąd autoryzacji:", error);
-            alert("Wystąpił błąd podczas logowania.");
+            document.body.innerHTML = `
+                <div style="display:flex; flex-direction:column; justify-content:center; align-items:center; height:100vh; background:#f4f7f6; font-family:sans-serif; text-align:center; padding:20px;">
+                    <h2 style="color: #e74c3c; margin-bottom: 5px;">Błąd krytyczny</h2>
+                    <p style="color: #555; margin-bottom: 20px;">${error.message}</p>
+                    <button onclick="window.location.reload()" style="padding: 14px 24px; background: #27ae60; color: white; border: none; border-radius: 8px; font-size:16px; margin-bottom: 10px; cursor: pointer; font-weight: bold; width: 100%; max-width: 300px;">🔄 Odśwież stronę</button>
+                    <button onclick="firebase.auth().signOut().then(() => window.location.href='index.html')" style="padding: 14px 24px; background: #34495e; color: white; border: none; border-radius: 8px; font-size:16px; cursor: pointer; font-weight: bold; width: 100%; max-width: 300px;">Wyloguj</button>
+                </div>
+            `;
         }
     } else {
         // Niezalogowany
