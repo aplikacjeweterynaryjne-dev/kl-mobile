@@ -2972,17 +2972,16 @@ function calculateDetailedStatusFromDate(dateIsoStr) {
 }
 
 
-// 3. Funkcja dodająca puste wiersze (6 kolumn: Tag | Typ | DOB | Calv | Insem | Status)
+// 3. Funkcja dodająca puste wiersze (7 kolumn z Lokalizacją)
 function addEmptyRows(count = 10) {
     const tbody = document.getElementById('importTableBody');
     if (!tbody) return;
     
     for (let i = 0; i < count; i++) {
         const tr = document.createElement('tr');
-        // Dodano onclick="this.select()" do statusu - ułatwia edycję
         tr.innerHTML = `
             <td><input type="text" class="imp-tag" placeholder="PL..."></td>
-            <td><input type="text" class="imp-type" list="impTypeList" placeholder="krowa"></td>
+            <td><input type="text" class="imp-loc" placeholder="np. Obora 1"></td> <td><input type="text" class="imp-type" list="impTypeList" placeholder="krowa"></td>
             <td><input type="text" class="imp-dob" placeholder="DD.MM.RRRR"></td>
             <td><input type="text" class="imp-calv" placeholder="DD.MM.RRRR"></td>
             <td><input type="text" class="imp-insem" placeholder="DD.MM.RRRR"></td>
@@ -3072,15 +3071,16 @@ async function processHerdImport() {
     let addedCount = 0;
     const batch = db.batch();
 
-    for (const row of rows) {
+  for (const row of rows) {
         const inputs = row.querySelectorAll('input');
-        // Indexy: 0=Tag, 1=Typ, 2=DOB, 3=Calv, 4=Insem, 5=Status
+        // Indexy: 0=Tag, 1=Loc, 2=Typ, 3=DOB, 4=Calv, 5=Insem, 6=Status
         const tag = inputs[0].value.trim();
-        const typeRaw = inputs[1].value.trim().toLowerCase();
-        const dobRaw = inputs[2].value.trim(); // NOWA KOLUMNA
-        const calvRaw = inputs[3].value.trim();
-        const insemRaw = inputs[4].value.trim();
-        const statusRaw = inputs[5].value.trim().toLowerCase();
+        const locRaw = inputs[1].value.trim(); // ✅ NOWE POLE: Lokalizacja
+        const typeRaw = inputs[2].value.trim().toLowerCase();
+        const dobRaw = inputs[3].value.trim(); 
+        const calvRaw = inputs[4].value.trim();
+        const insemRaw = inputs[5].value.trim();
+        const statusRaw = inputs[6].value.trim().toLowerCase();
 
         if (tag.length > 2) {
             // Typ
@@ -3122,10 +3122,11 @@ async function processHerdImport() {
                  else if (result.statusText === 'Do USG') { pregStatus = 'check'; usgStatus = 'pending'; }
             }
 
-            const animalRef = db.collection('animals').doc();
+           const animalRef = db.collection('animals').doc();
             batch.set(animalRef, {
                 ownerUid: currentUser.uid,
                 tag: tag,
+                location: locRaw, // ✅ NOWE POLE ZAPISYWANE DO BAZY
                 type: animalType,
                 dob: dob,                     // Data urodzenia
                 lastCalving: lastCalving,
