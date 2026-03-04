@@ -3646,40 +3646,53 @@ function populateCustomTaskAnimals() {
 
 
 // ============================================================
-// ✅ MODUŁ: INSTALACJA PWA (W PANELU KLIENTA) - WERSJA NIEZAWODNA
+// ✅ MODUŁ: INSTALACJA PWA (Z LOGIKĄ WYLOGOWANIA)
 // ============================================================
 let deferredPromptKlient;
 const installBtnKlient = document.getElementById('installAppBtnKlient');
 
-// Przechwytujemy gotowość systemu do instalacji (Android / Desktop)
 window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();
     deferredPromptKlient = e;
 });
 
-// Nasłuchujemy kliknięcia na przycisk w panelu klienta
 if (installBtnKlient) {
     installBtnKlient.addEventListener('click', async () => {
         if (deferredPromptKlient) {
-            // System pozwala na auto-instalację
+            // Jeśli przeglądarka nagle pozwoliła - instalujemy od razu
             deferredPromptKlient.prompt();
             const { outcome } = await deferredPromptKlient.userChoice;
-            console.log(`Wynik instalacji: ${outcome}`);
             deferredPromptKlient = null;
-            installBtnKlient.style.display = 'none'; // Ukryj po kliknięciu
+            installBtnKlient.style.display = 'none';
         } else {
-            // Awaryjny komunikat (np. dla iOS Safari lub gdy Chrome zablokuje auto-prompt)
-            alert("Zainstaluj aplikację ręcznie:\n\n1. Rozwiń menu przeglądarki (trzy kropki u góry lub ikona udostępniania na dole).\n2. Wybierz opcję 'Zainstaluj aplikację' lub 'Dodaj do ekranu głównego'.");
+            // Sprawdzamy czy użytkownik ma urządzenie od Apple (iOS/iPadOS)
+            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+            
+            if (isIOS) {
+                // Dla Apple okienko informacyjne (Safari nie obsługuje instalacji z przycisku)
+                alert("🍎 W systemie iOS instalacja działa inaczej:\n\n1. Kliknij ikonę 'Udostępnij' (kwadrat ze strzałką) na dolnym pasku przeglądarki Safari.\n2. Wybierz opcję 'Do ekranu początkowego'.");
+            } else {
+                // Dla Androida / PC: Pytamy o wylogowanie i przenosimy do index.html
+                const msg = "Z uwagi na zabezpieczenia przeglądarki, instalacja musi odbyć się z ekranu początkowego.\n\nZostaniesz teraz bezpiecznie wylogowany i przeniesiony do okna logowania, gdzie pojawi się opcja instalacji.\n\nCzy chcesz kontynuować?";
+                
+                if (confirm(msg)) {
+                    if (typeof auth !== 'undefined') {
+                        auth.signOut().then(() => {
+                            window.location.href = 'index.html'; // Przeniesienie do okna logowania
+                        });
+                    } else {
+                        window.location.href = 'index.html';
+                    }
+                }
+            }
         }
     });
 }
 
-// Jeśli aplikacja została właśnie zainstalowana lub odpalona jako osobna apka - ukrywamy guzik całkowicie
 window.addEventListener('appinstalled', () => {
     if (installBtnKlient) installBtnKlient.style.display = 'none';
 });
 
-// Wykrywanie trybu PWA (iOS oraz Android)
 if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true) {
     if (installBtnKlient) installBtnKlient.style.display = 'none';
 }
