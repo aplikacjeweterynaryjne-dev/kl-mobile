@@ -1,18 +1,18 @@
-// 🔒 Nazwa pamięci podręcznej 
-const CACHE_NAME = 'karta-leczenia-cache-v4';
+// 🔒 Nazwa pamięci podręcznej (PODBITE DO v5)
+const CACHE_NAME = 'karta-leczenia-cache-v5';
 
 // 📦 Lista plików do zapamiętania offline (tzw. App Shell)
 const urlsToCache = [
   './',
   'index.html',
   'panel-klienta.html',
-  'client.js', // <--- ✅ KLUCZOWE: Brakowało tego pliku do zaliczenia testu offline!
+  'client.js',
   'manifest.json',
   'logo.jpg',
   'https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&display=swap',
   'https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css',
   'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js',
-  'https://cdn.jsdelivr.net/npm/chart.js', // <--- ✅ Dodane dla pewności (żeby wykresy działały bez neta)
+  'https://cdn.jsdelivr.net/npm/chart.js',
   'https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js',
   'https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js',
   'https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js'
@@ -20,11 +20,8 @@ const urlsToCache = [
 
 // ⚙️ Instalacja Service Workera
 self.addEventListener('install', event => {
-  console.log('[Service Worker] Instalacja (v96)...');
+  console.log('[Service Worker] Instalacja (v5)...');
   
-  // ❌ UWAGA: USUNIĘTO self.skipWaiting(); STĄD! 
-  // Zrobimy to dopiero, gdy użytkownik kliknie OK.
-
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => {
@@ -34,7 +31,7 @@ self.addEventListener('install', event => {
   );
 });
 
-// ✅ NOWOŚĆ: Nasłuchiwanie na kliknięcie "OK" w panelu klienta
+// ✅ NOWOŚĆ: Nasłuchiwanie na kliknięcie "OK" w panelu klienta (aktualizacja)
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SKIP_WAITING') {
     console.log('[Service Worker] Otrzymano sygnał SKIP_WAITING. Aktywuję nową wersję...');
@@ -44,7 +41,7 @@ self.addEventListener('message', (event) => {
 
 // ♻️ Aktywacja — czyszczenie starych cache
 self.addEventListener('activate', event => {
-  console.log('[Service Worker] Aktywacja (v94)...');
+  console.log('[Service Worker] Aktywacja (v5)...');
   event.waitUntil(
     caches.keys().then(cacheNames => {
       return Promise.all(
@@ -61,6 +58,23 @@ self.addEventListener('activate', event => {
 
 // 🌐 Przechwytywanie zapytań (Logika hybrydowa)
 self.addEventListener('fetch', event => {
+  const url = new URL(event.request.url);
+
+  // 🛑 KLUCZOWA ZMIANA: Ignoruj zapytania do bazy danych i API zewnętrzne
+  // Pozwalamy przeglądarce obsłużyć je normalnie, dzięki czemu omijamy błędy pętli przekierowań przy Firestore
+  if (url.hostname.includes('firestore.googleapis.com') ||
+      url.hostname.includes('firebaseio.com') ||
+      url.hostname.includes('identitytoolkit') ||
+      url.hostname.includes('googleapis')) {
+    return; // Zakończ działanie SW dla tego zapytania - niech przeglądarka pobierze to z netu
+  }
+
+  // 🛑 IGNORUJ ZAPYTANIA INNE NIŻ GET
+  if (event.request.method !== 'GET') {
+      return;
+  }
+
+  // --- ZAPYTANIA O STRONY HTML ---
   if (event.request.mode === 'navigate') {
     // --- STRATEGIA 1: Network First (dla stron HTML) ---
     event.respondWith(
@@ -74,14 +88,15 @@ self.addEventListener('fetch', event => {
         })
         .catch(error => {
           console.log('[Service Worker] Błąd sieci, zwracam offline HTML');
-          // ✅ ignoreSearch: true sprawia, że ignorujemy parametry typu ?simulatedUid=123
+          // ✅ ignoreSearch: true sprawia, że ignorujemy parametry typu ?simulatedUid=123 lub ?action=install
           return caches.match(event.request, { ignoreSearch: true }); 
         })
     );
   } else {
-    // --- STRATEGIA 2: Cache First (dla zasobów JS/CSS/Obrazków) ---
+    // --- ZAPYTANIA O ZASOBY JS, CSS, OBRAZKI ---
+    // --- STRATEGIA 2: Cache First (dla zasobów) ---
     event.respondWith(
-      // ✅ ignoreSearch: true sprawia, że plik client.js?v=1 odczyta się z cache tak samo jak zwykłe client.js
+      // ✅ ignoreSearch: true sprawia, że plik client.js?v=5 odczyta się z cache tak samo jak zwykłe client.js
       caches.match(event.request, { ignoreSearch: true })
         .then(cachedResponse => {
           if (cachedResponse) {
@@ -102,14 +117,13 @@ self.addEventListener('fetch', event => {
   }
 });
 
-// 🔔 NOWOŚĆ: Obsługa kliknięcia w powiadomienie (Messenger style)
+// 🔔 Obsługa kliknięcia w powiadomienie (Messenger style)
 self.addEventListener('notificationclick', function(event) {
   console.log('[Service Worker] Kliknięto powiadomienie:', event.notification.tag);
   
   event.notification.close(); // Zamknij dymek powiadomienia
 
   // Pobierz URL z danych powiadomienia (jeśli istnieje) lub użyj głównego
-  // (To łączy się z kodem JS, gdzie ustawiliśmy data: { url: ... })
   const urlToOpen = event.notification.data && event.notification.data.url ? event.notification.data.url : '/';
 
   // Ta magia sprawia, że po kliknięciu otwiera się aplikacja
