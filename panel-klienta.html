@@ -99,6 +99,76 @@
             outline: none; background: transparent;
         }
         .import-table input:focus { background: #e3f2fd; }
+
+        /* --- KAFELKOWE MENU GŁÓWNE --- */
+        .tile-dashboard {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        .main-tile {
+            background: #fff;
+            border-radius: 16px;
+            padding: 20px 10px;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            border: 1px solid rgba(0,0,0,0.03);
+            cursor: pointer;
+            transition: transform 0.1s, box-shadow 0.1s;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            height: 120px;
+        }
+
+        .main-tile:active {
+            transform: scale(0.96);
+            box-shadow: inset 0 2px 5px rgba(0,0,0,0.05);
+        }
+
+        .main-tile i { font-size: 36px; color: var(--primary); }
+        .main-tile span { font-size: 14px; font-weight: 700; color: #333; line-height: 1.2; }
+
+        /* Kolory ikon kafelków */
+        .main-tile.t-stado i { color: #27ae60; }
+        .main-tile.t-zadania i { color: #e67e22; }
+        .main-tile.t-sync i { color: #8e44ad; }
+        .main-tile.t-karty i { color: #2980b9; }
+        .main-tile.t-ustawienia i { color: #7f8c8d; }
+
+        /* Znaczek ilości zadań */
+        .tile-badge {
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            background: #e74c3c;
+            color: white;
+            font-size: 14px;
+            font-weight: 900;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 0 4px 8px rgba(231, 76, 60, 0.4);
+            border: 2px solid white;
+        }
+
+        /* Pasek powrotu do menu na podstronach */
+        .top-back-bar {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #eee;
+        }
     /* --- STYL PŁYWAJĄCEGO GUZIKA INSTALACJI (PANEL KLIENTA) --- */
         #installFloatingBtnKlient {
             position: fixed;
@@ -133,34 +203,60 @@
     <div id="offlineBanner" class="hidden" style="position:fixed; top:0; left:0; width:100%; background:#e74c3c; color:white; text-align:center; padding:10px; z-index:9999; font-weight:bold; box-shadow: 0 2px 10px rgba(0,0,0,0.2);">
         ⚠️ Brak połączenia z internetem. Pracujesz w trybie offline.
     </div>
-    <div id="section-dashboard" class="section active">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-            <div><h2 style="margin:0; font-weight:900; color:#333;">Moje Stado</h2><small id="welcomeDate" style="color:#777;">...</small></div>
-            <button id="logoutBtn" style="background:none; border:none; color:var(--danger); font-size:24px;"><i class="bi bi-box-arrow-right"></i></button>
+  <div id="section-dashboard" class="section active">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
+            <div><h2 style="margin:0; font-weight:900; color:#333; font-size: 24px;">Panel Hodowcy</h2><small id="welcomeDate" style="color:#777;">...</small></div>
+            <button id="logoutBtn" style="background:none; border:none; color:var(--danger); font-size:26px;"><i class="bi bi-box-arrow-right"></i></button>
         </div>
-        <div class="stats-grid">
-            <div class="stat-box cows" onclick="filterHerd('krowa')"><span class="stat-val" id="cntCows">0</span><span class="stat-label">Krowy</span></div>
-            <div class="stat-box heifers" onclick="filterHerd('jalowka')"><span class="stat-val" id="cntHeifers">0</span><span class="stat-label">Jałówki</span></div>
-            <div class="stat-box bulls" onclick="filterHerd('byk')"><span class="stat-val" id="cntBulls">0</span><span class="stat-label">Byki</span></div>
-        </div>
-        <div class="card"><h3>📈 Stopień Laktacji</h3><canvas id="lactationChart" style="max-height: 200px;"></canvas></div>
-        <div class="card">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 10px;">
-                <h3 style="margin:0;">📋 Zadania</h3>
-                <button class="btn small" style="width:auto; margin:0; padding:6px 12px; background:#34495e; color:white; font-size:12px; border-radius:8px;" onclick="printCurrentTaskList()">🖨️ Drukuj listę</button>
+
+        <div class="tile-dashboard">
+            <div class="main-tile t-stado" onclick="switchSection('section-herd')">
+                <i class="bi bi-list-ul"></i>
+                <span>Moje Stado</span>
             </div>
-            <div class="sub-tabs">
-                <button class="sub-tab active" onclick="switchTaskFilter('todo')">Do zrobienia</button>
-                <button class="sub-tab" onclick="switchTaskFilter('month')">Ten miesiąc</button>
-                <button class="sub-tab" onclick="switchTaskFilter('overdue')">Przeterminowane</button>
-                <button class="sub-tab" onclick="switchTaskFilter('done')">Wykonane</button>
+            
+            <div class="main-tile t-zadania" onclick="switchSection('section-tasks')">
+                <i class="bi bi-check-square-fill"></i>
+                <span>Zadania na dziś</span>
+                <div id="tileTaskBadge" class="tile-badge" style="display: none;">0</div>
             </div>
-            <div id="taskTypeChips" class="task-filter-chips"></div>
-            <div id="tasksContainer"></div>
+
+            <div class="main-tile t-sync" onclick="openSyncManager()">
+                <i class="bi bi-arrow-repeat"></i>
+                <span>Menedżer<br>Synchronizacji</span>
+            </div>
+
+            <div class="main-tile t-karty" onclick="switchSection('section-treatments')">
+                <i class="bi bi-file-medical-fill"></i>
+                <span>Karty<br>Leczenia</span>
+            </div>
+
+            <div class="main-tile t-ustawienia" onclick="switchSection('section-config')">
+                <i class="bi bi-gear-fill"></i>
+                <span>Menedżer<br>Zadań</span>
+            </div>
         </div>
     </div>
 
+    <div id="section-tasks" class="section">
+        <div class="top-back-bar">
+            <button class="btn ghost small" style="width: auto; margin: 0; font-size: 14px;" onclick="switchSection('section-dashboard')">⬅️ Menu</button>
+            <h2 style="margin:0; flex: 1; text-align: right;">📋 Zadania</h2>
+            <button class="btn small" style="width:auto; margin:0; background:#34495e; color:white; padding: 8px 12px;" onclick="printCurrentTaskList()">🖨️</button>
+        </div>
+        
+        <div class="sub-tabs">
+            <button class="sub-tab active" onclick="switchTaskFilter('todo')">Do zrobienia</button>
+            <button class="sub-tab" onclick="switchTaskFilter('month')">Ten miesiąc</button>
+            <button class="sub-tab" onclick="switchTaskFilter('overdue')">Spóźnione</button>
+            <button class="sub-tab" onclick="switchTaskFilter('done')">Wykonane</button>
+        </div>
+        <div id="taskTypeChips" class="task-filter-chips"></div>
+        <div id="tasksContainer"></div>
+    </div>
+
     <div id="section-herd" class="section">
+        <button class="btn ghost small" style="width: auto; margin-bottom: 15px;" onclick="switchSection('section-dashboard')">⬅️ Wróć do menu</button>
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
             <h2 id="herdTitle" style="margin:0;">Pełna Lista</h2>
             <button class="btn small" style="width:auto; margin:0; padding:6px 12px; background:#34495e; color:white; font-size:12px; border-radius:8px;" onclick="printHerdList()">🖨️ Drukuj listę</button>
@@ -183,7 +279,8 @@
         <div id="herdList"></div>
     </div>
 
-    <div id="section-calendar" class="section">
+   <div id="section-calendar" class="section">
+        <button class="btn ghost small" style="width: auto; margin-bottom: 15px;" onclick="switchSection('section-dashboard')">⬅️ Wróć do menu</button>
         <div class="card">
             <div class="calendar-header">
                 <button onclick="changeMonth(-1)" style="background:#eee; border:none; width:40px; height:40px; border-radius:50%; font-size:20px;">❮</button>
@@ -197,18 +294,38 @@
         <div id="calEventsList"></div>
     </div>
 
-    <div id="section-treatments" class="section">
-        <h2>💊 Karty leczenia</h2>
-        <div class="card" style="background: #e3f2fd; border-color: #2980b9;">
-            <div style="font-size:13px; color:#555; margin-bottom:10px;">Zakres dat wizyt:</div>
-            <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 15px;">
-                <div style="width: 50%;">
-                    <label style="font-size: 11px; font-weight: bold;">Od:</label>
-                    <input type="date" id="treatmentsDateFrom" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:8px; font-size: 13px;">
+   <div id="section-treatments" class="section">
+        <button class="btn ghost small" style="width: auto; margin-bottom: 15px;" onclick="switchSection('section-dashboard')">⬅️ Wróć do menu</button>
+        <h2 style="margin-top: 0;">💊 Twoje Karty Leczenia</h2>
+        
+        <div style="background:#e3f2fd; padding:12px; border-radius:12px; border:1px solid #bbdefb; margin-bottom: 15px;">
+            <label style="font-size: 12px; font-weight: bold; color: #1565c0;">1. Z jakiej lecznicy pobrać karty?</label>
+            <div style="display:flex; gap:10px; margin-top: 5px;">
+                <select id="cfgLecznicaSelect" style="flex:1; padding: 8px; border-radius: 8px; border: 1px solid #ccc; font-size: 14px; background: #fff;">
+                    <option value="">Wczytywanie...</option>
+                </select>
+                <button onclick="saveClinicChoice()" class="btn" style="width:auto; margin:0; padding:0 15px; background:#2980b9; color:white;">Zapisz</button>
+            </div>
+        </div>
+
+        <div style="background:#fff3e0; padding:12px; border-radius:12px; border:1px solid #ffe0b2; margin-bottom: 15px;">
+            <label style="font-size: 12px; font-weight: bold; color: #d35400;">2. Twój Numer Gospodarstwa (ARiMR)</label>
+            <div style="display:flex; gap:10px; margin-top: 5px;">
+                <input type="text" id="cfgFarmNumber" placeholder="np. PL12345..." style="flex:1; padding: 8px; border: 1px solid #ccc; border-radius: 8px;">
+                <button onclick="saveFarmNumber()" class="btn" style="width:auto; margin:0; padding:0 15px; background:#e67e22; color:white;">Zapisz</button>
+            </div>
+        </div>
+
+        <div class="card" style="border-color: #2980b9;">
+            <div style="font-size:13px; color:#555; margin-bottom:10px; font-weight: bold;">3. Wybierz zakres dat wizyt:</div>
+            <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                <div style="flex: 1;">
+                    <label style="font-size: 11px;">Od:</label>
+                    <input type="date" id="treatmentsDateFrom" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:8px; box-sizing: border-box;">
                 </div>
-                <div style="width: 50%;">
-                    <label style="font-size: 11px; font-weight: bold;">Do:</label>
-                    <input type="date" id="treatmentsDateTo" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:8px; font-size: 13px;">
+                <div style="flex: 1;">
+                    <label style="font-size: 11px;">Do:</label>
+                    <input type="date" id="treatmentsDateTo" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:8px; box-sizing: border-box;">
                 </div>
             </div>
             <button onclick="loadTreatments()" class="btn btn-primary" style="margin:0;">🔍 Pobierz Karty</button>
@@ -216,39 +333,19 @@
         <div id="treatmentsList"></div>
     </div>
 
-  <div id="section-config" class="section">
-        <h2>⚙️ Konfiguracja</h2>
+<div id="section-config" class="section">
+        <button class="btn ghost small" style="width: auto; margin-bottom: 15px;" onclick="switchSection('section-dashboard')">⬅️ Wróć do menu</button>
+        <h2 style="margin-top: 0;">⚙️ Menedżer Zadań</h2>
         <div class="card">
+            <h3 style="margin-top: 0; color: #2980b9; font-size: 16px;">Automatyczne podpowiedzi systemu</h3>
+            <p style="font-size: 12px; color: #666;">Zaznacz, o jakich zabiegach aplikacja ma przypominać automatycznie.</p>
             
-            <div class="form-row" style="background:#e3f2fd; padding:12px; border-radius:12px; border:1px solid #bbdefb; margin-bottom: 15px;">
-                <label>Lecznica (Źródło kart leczenia)</label>
-                <div style="display:flex; gap:10px;">
-                    <select id="cfgLecznicaSelect" style="flex:1; padding: 8px; border-radius: 8px; border: 1px solid #ccc; font-size: 14px; background: #fff;">
-                        <option value="">Wczytywanie...</option>
-                    </select>
-                    <button onclick="saveClinicChoice()" class="btn" style="width:auto; margin:0; padding:0 15px; background:#2980b9; color:white;">Zmień</button>
-                </div>
-                <small style="color: #1565c0; font-size: 11px; display: block; margin-top: 5px;">Wybierz lecznicę, z której chcesz obecnie pobierać karty.</small>
-            </div>
-
-            <div class="form-row" style="background:#fff3e0; padding:12px; border-radius:12px; border:1px solid #ffe0b2; margin-bottom: 15px;">
-                <label>Twój Numer Gospodarstwa</label>
-                <div style="display:flex; gap:10px;">
-                    <input type="text" id="cfgFarmNumber" placeholder="np. PL12345..." style="flex:1;">
-                    <button onclick="saveFarmNumber()" class="btn" style="width:auto; margin:0; padding:0 15px; background:#e67e22; color:white;">Zapisz</button>
-                </div>
-                <small style="color: #d35400; font-size: 11px; display: block; margin-top: 5px;">Wymagany do pobierania kart leczenia.</small>
-            </div>
-            <hr>
             <div id="configList"></div>
-            <hr>
+            
+            <hr style="margin: 20px 0;">
 
-            <button class="btn btn-primary" style="width:100%; margin-bottom: 20px; background-color: #8e44ad; border-color: #732d91;" onclick="openSyncManager()">
-                🔄 Otwórz Menadżer Synchronizacji Rozrodu
-            </button>
-
-            <h3>Dodaj Własne Zadanie</h3>
-   <form id="customTaskForm">
+            <h3 style="margin-top: 0; color: #27ae60; font-size: 16px;">Dodaj Własne Zadanie (Np. Szczepienia)</h3>
+            <form id="customTaskForm">
                 <div class="form-row"><label>Nazwa Zadania</label><input type="text" id="newCfgName" required></div>
                 
                 <div class="form-row">
@@ -280,7 +377,7 @@
                             <input type="date" id="newCfgDateTo">
                         </div>
                     </div>
-            <div class="form-row" style="margin-bottom: 5px;">
+                    <div class="form-row" style="margin-bottom: 5px;">
                         <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
                             <input type="checkbox" id="newCfgAllHerd" checked onchange="document.getElementById('newCfgTagsRow').style.display = this.checked ? 'none' : 'block'; if(!this.checked) populateCustomTaskAnimals();" style="width:20px; height:20px;">
                             Zadanie dotyczy całego stada
@@ -296,15 +393,16 @@
 
                 <button type="submit" class="btn btn-primary">Dodaj Zadanie</button>
             </form>
-            
+             
             <div style="display: flex; gap: 10px; margin-top: 20px;">
-                <button class="btn btn-primary" onclick="saveConfiguration()" style="flex: 2;">💾 Zapisz Zmiany</button>
+                <button class="btn btn-primary" onclick="saveConfiguration()" style="flex: 2;">💾 Zapisz Zmiany Zadań</button>
                 <button class="btn" onclick="resetConfiguration()" style="flex: 1; background: #95a5a6; color: white;">🔄 Reset</button>
             </div>
+            
             <hr style="margin-top: 30px;">
             <div style="background:#ffebee; padding:15px; border-radius:10px; border:1px solid #ffcdd2; margin-top:20px; text-align: center;">
                 <h3 style="color:#c62828; font-size:16px; margin-top:0;">Strefa Niebezpieczna</h3>
-                <p style="font-size:12px; color:#c62828; margin-bottom: 10px;">Usunięcie konta jest nieodwracalne. Utracisz wszystkie dane.</p>
+                <p style="font-size:12px; color:#c62828; margin-bottom: 10px;">Usunięcie konta jest nieodwracalne. Utracisz wszystkie dane stada.</p>
                 <button class="btn btn-danger" onclick="deleteMyAccount()">🗑️ Usuń Moje Konto</button>
             </div>
         </div>
@@ -315,14 +413,6 @@
         <div class="action-tile tile-insem" onclick="openInsemModal()"><i class="bi bi-droplet-fill"></i><span>Zacielenie</span></div>
     </div>
     
-    <div class="bottom-nav">
-        <button class="nav-item active" data-target="section-dashboard"><i class="bi bi-grid-fill"></i>Pulpit</button>
-        <button class="nav-item" data-target="section-herd"><i class="bi bi-list-ul"></i>Stado</button>
-        <button class="nav-item" data-target="section-calendar"><i class="bi bi-calendar-date"></i>Kalendarz</button>
-        <button class="nav-item" data-target="section-treatments"><i class="bi bi-bandaid-fill"></i>Karty leczenia</button>
-        <button class="nav-item" data-target="section-config"><i class="bi bi-gear"></i>Opcje</button>
-    </div>
-
     <div id="animalCardModal" class="modal">
         <div class="modal-content">
             <button class="close-modal-fixed" onclick="closeModal('animalCardModal')">✕</button>
@@ -588,6 +678,6 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
-    <script src="client.js?v=5"></script>
+    <script src="client.js?v=6"></script>
 </body>
 </html>
