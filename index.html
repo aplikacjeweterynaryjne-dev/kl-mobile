@@ -7469,16 +7469,15 @@ auth.onAuthStateChanged(user => {
     // Użytkownik JEST zalogowany
     console.log("Użytkownik zalogowany:", user.email, "UID:", user.uid);
 
-    // ✅ KROK 1: Pobierz profil użytkownika z 'konfiguracja'
-    // Ta funkcja zajmie się pobraniem danych lub wylogowaniem w razie błędu
-    fetchUserProfile(user.uid); 
+// Pokaż wizualnie, że ładujemy aplikację (ukrywamy ekran logowania)
+            if (loginSection) loginSection.style.display = 'none';
 
-   
-// KROK 2: Pokaż UI
-if (loginSection) loginSection.style.display = 'none';
-showMainMenu(); // ✅ Używamy nowej funkcji zamiast linii poniżej
-// if (mainMenuSection) mainMenuSection.style.display = 'flex'; // <-- Już niepotrzebne
-if (mainTabBar) mainTabBar.style.display = 'none';
+            // ✅ KROK 1: Pobierz profil użytkownika z 'konfiguracja'
+            // UWAGA: Usunięto stąd wymuszenie showMainMenu() !
+            // Funkcja fetchUserProfile sama pobierze z bazy rolę i zadecyduje:
+            // Jeśli to Weterynarz -> pokaże Menu Główne.
+            // Jeśli to Klient -> płynnie przekieruje do panel-klienta.html.
+            fetchUserProfile(user.uid);
 
   } else {
     // Użytkownik NIE JEST zalogowany
@@ -22011,14 +22010,13 @@ window.addEventListener('appinstalled', () => {
     deferredPrompt = null;
 });
 
-// ✅ NOWOŚĆ: Obsługa przekierowania z Panelu Klienta
-const urlParams = new URLSearchParams(window.location.search);
-if (urlParams.get('action') === 'install' && !isStandalone) {
-    // Opóźniamy lekko komunikat, żeby strona zdążyła się wyrenderować
+// ✅ NOWOŚĆ: Obsługa przekierowania z Panelu Klienta (Pancerna metoda)
+if (sessionStorage.getItem('pwa_install_intent') === 'true' && !isStandalone) {
+    sessionStorage.removeItem('pwa_install_intent'); // Kasujemy z pamięci po odczytaniu
     setTimeout(() => {
-        alert("Zostałeś wylogowany z panelu hodowcy.\n\nAby zainstalować aplikację na swoim telefonie, kliknij ZIELONY PRZYCISK ZE STRZAŁKĄ w prawym górnym rogu tego ekranu.");
+        alert("Zostałeś bezpiecznie wylogowany z panelu hodowcy.\n\nAby zainstalować aplikację, kliknij ZIELONY PRZYCISK ZE STRZAŁKĄ w prawym górnym rogu ekranu, a następnie zaloguj się ponownie.");
     }, 500);
-};
+}
  /* ======================================================== */
 /* ✅ MODUŁ SPOŁECZNOŚCI (Czat v2.0 - Pełna wersja)         */
 /* ======================================================== */
