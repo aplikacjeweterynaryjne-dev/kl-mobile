@@ -21962,54 +21962,63 @@ document.getElementById('cardDebt').addEventListener('click', async () => {
         if (typeof applyReceiptFilters === 'function') applyReceiptFilters();
     }
 });
-    /* ======================================================== */
-/* ✅ LOGIKA INSTALACJI PWA (Przycisk "Zainstaluj")         */
+  /* ======================================================== */
+/* ✅ LOGIKA INSTALACJI PWA (NOWA WERSJA)                   */
 /* ======================================================== */
 
-let deferredPrompt; // Zmienna do przechowywania zdarzenia instalacji
+let deferredPrompt;
 const installBtn = document.getElementById('installFloatingBtn');
 
-// 1. Nasłuchuj, czy przeglądarka pozwala na instalację
+// Sprawdź, czy aplikacja jest już zainstalowana (standalone)
+const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+
+// 1. Pokaż przycisk DOMYŚLNIE (wszędzie, nawet na ekranie logowania), jeśli apka nie jest zainstalowana
+if (!isStandalone && installBtn) {
+    installBtn.style.display = 'flex';
+}
+
 window.addEventListener('beforeinstallprompt', (e) => {
-    // Zapobiegaj automatycznemu paskowi Chrome (mini-infobar)
     e.preventDefault();
-    // Zapisz zdarzenie na później
     deferredPrompt = e;
-    console.log("Możliwość instalacji PWA wykryta.");
-    
-    // Jeśli jesteśmy w Menu Głównym, pokaż przycisk od razu
-    const mainMenuSection = document.getElementById('mainMenuSection');
-    if (mainMenuSection && mainMenuSection.style.display !== 'none') {
-        if (installBtn) installBtn.style.display = 'flex';
-    }
+    console.log("Możliwość instalacji PWA wykryta przez przeglądarkę.");
+    if (!isStandalone && installBtn) installBtn.style.display = 'flex';
 });
 
-// 2. Obsługa kliknięcia w przycisk
 if (installBtn) {
     installBtn.addEventListener('click', async () => {
-        if (!deferredPrompt) return;
-
-        // Pokaż natywne okno instalacji
-        deferredPrompt.prompt();
-
-        // Czekaj na decyzję użytkownika
-        const { outcome } = await deferredPrompt.userChoice;
-        console.log(`Decyzja użytkownika: ${outcome}`);
-
-        // Resetuj zmienną (można użyć tylko raz)
-        deferredPrompt = null;
-        
-        // Ukryj przycisk po kliknięciu
-        installBtn.style.display = 'none';
+        if (deferredPrompt) {
+            // Jeśli system jest gotowy, wywołaj natywne okno instalacji
+            deferredPrompt.prompt();
+            const { outcome } = await deferredPrompt.userChoice;
+            console.log(`Decyzja użytkownika: ${outcome}`);
+            deferredPrompt = null;
+            if (outcome === 'accepted') installBtn.style.display = 'none';
+        } else {
+            // Awaryjny komunikat (np. zanim załaduje się service worker lub na iOS Safari)
+            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+            if (isIOS) {
+                alert("🍎 W systemie iOS Apple blokuje automatyczną instalację.\n\nAby zainstalować:\n1. Kliknij ikonę 'Udostępnij' (kwadrat ze strzałką w górę) na dolnym pasku Safari.\n2. Wybierz opcję 'Do ekranu początkowego'.");
+            } else {
+                alert("Przeglądarka przygotowuje pliki aplikacji. Spróbuj kliknąć za kilka sekund, lub dodaj aplikację do ekranu ręcznie z menu przeglądarki (trzy kropki w prawym górnym rogu).");
+            }
+        }
     });
 }
 
-// 3. Ukryj przycisk, jeśli aplikacja została zainstalowana
 window.addEventListener('appinstalled', () => {
-    console.log('Aplikacja została zainstalowana.');
+    console.log('Aplikacja została zainstalowana pomyślnie.');
     if (installBtn) installBtn.style.display = 'none';
     deferredPrompt = null;
 });
+
+// ✅ NOWOŚĆ: Obsługa przekierowania z Panelu Klienta
+const urlParams = new URLSearchParams(window.location.search);
+if (urlParams.get('action') === 'install' && !isStandalone) {
+    // Opóźniamy lekko komunikat, żeby strona zdążyła się wyrenderować
+    setTimeout(() => {
+        alert("Zostałeś wylogowany z panelu hodowcy.\n\nAby zainstalować aplikację na swoim telefonie, kliknij ZIELONY PRZYCISK ZE STRZAŁKĄ w prawym górnym rogu tego ekranu.");
+    }, 500);
+};
  /* ======================================================== */
 /* ✅ MODUŁ SPOŁECZNOŚCI (Czat v2.0 - Pełna wersja)         */
 /* ======================================================== */
