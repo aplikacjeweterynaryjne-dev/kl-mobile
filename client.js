@@ -2199,8 +2199,8 @@ function renderHerdList(forceType = null) {
     const searchInput = document.getElementById('herdSearch');
     const search = searchInput ? searchInput.value.toLowerCase() : '';
 
-    // 2. Liczniki (Aktualizacja)
-    const counts = { puste: 0, usg: 0, cielne: 0, jalowka: 0, krowa: 0, byk: 0, zasuszone: 0 };
+// 2. Liczniki (Aktualizacja)
+    const counts = { puste: 0, usg: 0, inne: 0, cielne: 0, jalowka: 0, krowa: 0, byk: 0, zasuszone: 0 };
     myHerd.forEach(a => {
         const s = getDetailedStatus(a);
         
@@ -2213,6 +2213,7 @@ function renderHerdList(forceType = null) {
         if (a.type !== 'byk') {
             if (s.category === 'puste') counts.puste++;
             if (s.category === 'usg') counts.usg++;
+            if (s.category === 'inne') counts.inne++; // ✅ NOWE
             if (a.isPregnantConfirmed) counts.cielne++;
             if (a.isDriedOff) counts.zasuszone++;
         }
@@ -2224,20 +2225,16 @@ function renderHerdList(forceType = null) {
     }
 
     // 3. Logika Filtrowania (ŚCISŁA)
-    // 3. Logika Filtrowania (ŚCISŁA)
-    // Byki i Jałówki widoczne TYLKO w swoich zakładkach
     if (activeHerdFilters.length > 0) {
         filtered = filtered.filter(a => {
-            // Jeśli wybrano filtr BYK - pokaż byki
             if (activeHerdFilters.includes('byk') && a.type === 'byk') return true;
-            // Jeśli wybrano filtr JAŁÓWKA - pokaż jałówki
             if (activeHerdFilters.includes('jalowka') && a.type === 'jalowka') return true;
             
-            // Filtry statusowe (Puste, Cielne, USG) - dotyczą tylko KRÓW i JAŁÓWEK
             if (a.type !== 'byk') {
                 const s = getDetailedStatus(a);
                 if (activeHerdFilters.includes('cielne') && a.isPregnantConfirmed) return true;
                 if (activeHerdFilters.includes('puste') && s.category === 'puste') return true;
+                if (activeHerdFilters.includes('inne') && s.category === 'inne') return true; // ✅ NOWE
                 if (activeHerdFilters.includes('usg') && s.category === 'usg') return true;
                 if (activeHerdFilters.includes('zasuszone') && a.isDriedOff) return true;
                 if (activeHerdFilters.includes('krowa') && a.type === 'krowa') return true;
@@ -2364,14 +2361,15 @@ function renderHerdList(forceType = null) {
                     </span>
                 </div>`;
         }
-   // --- WIDOK DLA KROWY (Z LOKALIZACJĄ) ---
+ // --- WIDOK DLA KROWY (Z LOKALIZACJĄ) ---
         else {
             const statusInfo = getDetailedStatus(a);
             const ins = a.lastInsemination ? a.lastInsemination : '-';
             let calvTermin = '-';
             let dimLabel = '-';
-
-            if (a.lastInsemination) {
+            
+            // ✅ POPRAWKA: Pokazuj termin tylko wtedy, gdy status USG NIE jest negatywny
+            if (a.lastInsemination && a.usgStatus !== 'negative') {
                 const est = addDays(new Date(a.lastInsemination), userSettings.gestation || 280);
                 calvTermin = est.toLocaleDateString('pl-PL');
             }
@@ -2517,9 +2515,10 @@ function renderStatistics() {
     // --- 2. WYKRES STATUSÓW (Krowy i Jałówki) ---
     const ctxStatus = document.getElementById('statusPieChart');
     if (ctxStatus) {
-        const statusBuckets = [0, 0, 0, 0];
-        const statusAnimals = [[], [], [], []];
-        const statusLabels = ['Cielne', 'Zasuszone', 'Do USG', 'Puste (Niekryte/Neg)'];
+        // Zmieniliśmy na 5 pojemników
+        const statusBuckets = [0, 0, 0, 0, 0]; 
+        const statusAnimals = [[], [], [], [], []];
+        const statusLabels = ['Cielne', 'Zasuszone', 'Do USG', 'Czeka na USG', 'Puste (Niekryte/Neg)'];
 
         myHerd.forEach(a => {
             if (a.type !== 'byk') {
@@ -2527,7 +2526,8 @@ function renderStatistics() {
                 if (a.isDriedOff) { statusBuckets[1]++; statusAnimals[1].push(a); }
                 else if (a.isPregnantConfirmed) { statusBuckets[0]++; statusAnimals[0].push(a); }
                 else if (s.category === 'usg') { statusBuckets[2]++; statusAnimals[2].push(a); }
-                else { statusBuckets[3]++; statusAnimals[3].push(a); }
+                else if (s.category === 'inne') { statusBuckets[3]++; statusAnimals[3].push(a); } // ✅ NOWA KATEGORIA
+                else { statusBuckets[4]++; statusAnimals[4].push(a); } // Reszta to Puste
             }
         });
 
@@ -2538,7 +2538,8 @@ function renderStatistics() {
                 labels: statusLabels,
                 datasets: [{
                     data: statusBuckets,
-                    backgroundColor: ['#27ae60', '#7f8c8d', '#f39c12', '#2980b9']
+                    // Dodano fioletowy kolor (#9b59b6)
+                    backgroundColor: ['#27ae60', '#7f8c8d', '#f39c12', '#9b59b6', '#2980b9'] 
                 }]
             },
             options: { 
@@ -3896,12 +3897,13 @@ function showListModal(title, animals) {
                     <button class="btn btn-danger small" style="margin-top:5px; padding:4px 8px; font-size:11px;" onclick="event.stopPropagation(); deleteAnimalFromList('${a.id}')">🗑️ Usuń ze stada</button>
                 </div>
             `;
-        } else if (a.type === 'krowa' || a.type === 'jalowka') {
+       } else if (a.type === 'krowa' || a.type === 'jalowka') {
             const ins = a.lastInsemination || '-';
             const loc = a.location || 'Brak lokalizacji';
             let calv = '-';
             
-            if (a.lastInsemination) {
+            // ✅ POPRAWKA: Ukrywaj datę u pustych po USG również w modalu
+            if (a.lastInsemination && a.usgStatus !== 'negative') {
                 const est = addDays(new Date(a.lastInsemination), userSettings.gestation || 280);
                 calv = est.toLocaleDateString('pl-PL');
             }
