@@ -829,11 +829,11 @@ function generateAndRenderTasks() {
         // --- GENEROWANIE ZADAŃ WIZUALNYCH (Dla krów) ---
 
         // Synchronizacja
-        if (animal.type === 'krowa' && animal.lastCalving) {
+       if (animal.type === 'krowa' && animal.lastCalving) {
             const lastCalv = new Date(animal.lastCalving);
             const dim = Math.floor((today - lastCalv) / (1000 * 60 * 60 * 24));
             if (dim > 60 && dim < 365 && !animal.isPregnantConfirmed && animal.usgStatus !== 'pending') {
-                addTask(generatedTasks, animal, 'Wykonaj synchronizację', today, today, 'warning', 'sync', null, lastCalv);
+                addTask(generatedTasks, animal, 'Wykonaj synchronizację', today, today, 'warning', 'sync_alert', null, lastCalv);
             }
         }
 
@@ -1239,7 +1239,8 @@ function renderTaskTypeChips(allTasks) {
    const labels = { 
         'all': 'Wszystkie', 'usg': 'USG', 'heat': 'Ruja', 
         'dry': 'Zasuszenie', 'rovac': 'Rovac', 'kexxtone': 'Kexxtone', 
-        'calving': 'Wycielenia', 'sync': 'Synchronizacja',
+        'calving': 'Wycielenia', 'sync': 'Kroki Synchronizacji',
+        'sync_alert': 'Do synchronizacji',
         // NOWE WPISY:
         'sell_20_24': 'Sprzedaż (20-24m)',
         'sell_24_30': 'Sprzedaż (24-30m)'
@@ -1299,6 +1300,18 @@ function initiateTaskCompletion(taskId, type, animalId, dueDateStr) {
 function confirmTaskStandard() {
     if(!pendingTask) return;
     
+    // 0. Obsługa zadania "Wykonaj synchronizację"
+    if (pendingTask.type === 'sync_alert') {
+        if (confirm("Czy chcesz przejść do Menedżera Synchronizacji i rozpisać dla niej program?\n\n[OK] - Otwórz Menedżera\n[Anuluj] - Tylko odhacz to przypomnienie")) {
+            closeModal('taskConfirmModal');
+            openSyncManager();
+        } else {
+            saveTaskLog(pendingTask, "Odhaczono ręcznie");
+            closeModal('taskConfirmModal');
+        }
+        return;
+    }
+
     // 1. Obsługa Sprzedaży Byka (PRIORYTET)
     if (pendingTask.type === 'sell_20_24' || pendingTask.type === 'sell_24_30') {
         
@@ -2504,14 +2517,17 @@ function renderStatistics() {
     // --- 2. WYKRES STATUSÓW (Krowy i Jałówki) ---
     const ctxStatus = document.getElementById('statusPieChart');
     if (ctxStatus) {
-        let cntCielne = 0, cntPuste = 0, cntUsg = 0, cntZasuszone = 0;
+        const statusBuckets = [0, 0, 0, 0];
+        const statusAnimals = [[], [], [], []];
+        const statusLabels = ['Cielne', 'Zasuszone', 'Do USG', 'Puste (Niekryte/Neg)'];
+
         myHerd.forEach(a => {
             if (a.type !== 'byk') {
                 const s = getDetailedStatus(a);
-                if (a.isDriedOff) cntZasuszone++;
-                else if (a.isPregnantConfirmed) cntCielne++;
-                else if (s.category === 'usg') cntUsg++;
-                else cntPuste++;
+                if (a.isDriedOff) { statusBuckets[1]++; statusAnimals[1].push(a); }
+                else if (a.isPregnantConfirmed) { statusBuckets[0]++; statusAnimals[0].push(a); }
+                else if (s.category === 'usg') { statusBuckets[2]++; statusAnimals[2].push(a); }
+                else { statusBuckets[3]++; statusAnimals[3].push(a); }
             }
         });
 
@@ -2519,37 +2535,56 @@ function renderStatistics() {
         window.myChartStatus = new Chart(ctxStatus, {
             type: 'pie',
             data: {
-                labels: ['Cielne', 'Zasuszone', 'Do USG', 'Puste (Niekryte/Neg)'],
+                labels: statusLabels,
                 datasets: [{
-                    data: [cntCielne, cntZasuszone, cntUsg, cntPuste],
+                    data: statusBuckets,
                     backgroundColor: ['#27ae60', '#7f8c8d', '#f39c12', '#2980b9']
                 }]
             },
-            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right' } } }
+            options: { 
+                responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right' } },
+                onClick: (evt, activeEls) => {
+                    if (activeEls.length > 0) {
+                        const idx = activeEls[0].index;
+                        showListModal(`Lista zwierząt: ${statusLabels[idx]}`, statusAnimals[idx]);
+                    }
+                }
+            }
         });
     }
 
     // --- 3. WYKRES STRUKTURY STADA (Typy) ---
     const ctxType = document.getElementById('typePieChart');
     if (ctxType) {
-        let cKrowy = 0, cJalowki = 0, cByki = 0;
+        const typeBuckets = [0, 0, 0];
+        const typeAnimals = [[], [], []];
+        const typeLabels = ['Krowy', 'Jałówki', 'Byki'];
+
         myHerd.forEach(a => {
-            if (a.type === 'krowa') cKrowy++;
-            else if (a.type === 'jalowka') cJalowki++;
-            else if (a.type === 'byk') cByki++;
+            if (a.type === 'krowa') { typeBuckets[0]++; typeAnimals[0].push(a); }
+            else if (a.type === 'jalowka') { typeBuckets[1]++; typeAnimals[1].push(a); }
+            else if (a.type === 'byk') { typeBuckets[2]++; typeAnimals[2].push(a); }
         });
 
         if (window.myChartType) window.myChartType.destroy();
         window.myChartType = new Chart(ctxType, {
             type: 'doughnut',
             data: {
-                labels: ['Krowy', 'Jałówki', 'Byki'],
+                labels: typeLabels,
                 datasets: [{
-                    data: [cKrowy, cJalowki, cByki],
+                    data: typeBuckets,
                     backgroundColor: ['#2e7d32', '#f39c12', '#c0392b']
                 }]
             },
-            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right' } } }
+            options: { 
+                responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right' } },
+                onClick: (evt, activeEls) => {
+                    if (activeEls.length > 0) {
+                        const idx = activeEls[0].index;
+                        showListModal(`Zwierzęta typu: ${typeLabels[idx]}`, typeAnimals[idx]);
+                    }
+                }
+            }
         });
     }
 
@@ -2559,9 +2594,9 @@ function renderStatistics() {
         const monthNames = ["Sty", "Lut", "Mar", "Kwi", "Maj", "Cze", "Lip", "Sie", "Wrz", "Paź", "Lis", "Gru"];
         const upcomingMonths = [];
         const calvCounts = [0, 0, 0, 0, 0, 0];
+        const calvAnimals = [[], [], [], [], [], []];
         const currentMonthIdx = today.getMonth();
 
-        // Generuj etykiety dla 6 najbliższych miesięcy
         for (let i = 0; i < 6; i++) {
             upcomingMonths.push(monthNames[(currentMonthIdx + i) % 12]);
         }
@@ -2569,10 +2604,10 @@ function renderStatistics() {
         myHerd.forEach(a => {
             if (a.isPregnantConfirmed && a.lastInsemination) {
                 const estCalv = addDays(new Date(a.lastInsemination), userSettings.gestation || 280);
-                // Sprawdzamy czy wycielenie wypada w ciągu najbliższych 6 miesięcy
                 const diffMonths = (estCalv.getFullYear() - today.getFullYear()) * 12 + (estCalv.getMonth() - today.getMonth());
                 if (diffMonths >= 0 && diffMonths < 6) {
                     calvCounts[diffMonths]++;
+                    calvAnimals[diffMonths].push(a);
                 }
             }
         });
@@ -2586,7 +2621,13 @@ function renderStatistics() {
             },
             options: {
                 responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
-                scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
+                scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } },
+                onClick: (evt, activeEls) => {
+                    if (activeEls.length > 0) {
+                        const idx = activeEls[0].index;
+                        showListModal(`Wycielenia w miesiącu: ${upcomingMonths[idx]}`, calvAnimals[idx]);
+                    }
+                }
             }
         });
     }
@@ -3952,8 +3993,35 @@ startSynchronization = function() {
     // Podmieniamy to na żywo w obiekcie, zanim wyśle się do bazy
     SYNC_PROTOCOLS[methodKey] = allProtocols[methodKey]; 
     
+    // --- AUTOMATYCZNE ODHACZANIE ZADAŃ "Wykonaj synchronizację" ---
+    // Sprawdzamy, które krowy zostały zaznaczone w Menedżerze
+    const checkboxes = document.querySelectorAll('.sync-animal-cb:checked');
+    const animalIds = Array.from(checkboxes).map(cb => cb.value);
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    animalIds.forEach(aId => {
+        // Generujemy ID zadania 'sync_alert' dla dzisiejszego dnia
+        const taskId = `${aId}_sync_alert_${todayStr}`;
+        
+        // Zapisujemy fałszywe ukończenie zadania w tle, aby od razu zniknęło z widoku "Zadań na dziś"
+        const fakeLogId = 'temp_auto_' + Date.now() + Math.random();
+        completedTasks.push({
+            logId: fakeLogId, taskId: taskId, taskType: 'sync_alert',
+            animalId: aId, result: "Rozpisano program", completedAt: { toDate: () => new Date() }
+        });
+        
+        // Wysyłamy info o ukończeniu zadania do Firebase
+        db.collection('task_logs').add({
+            ownerUid: currentUser.uid, taskId: taskId, taskType: 'sync_alert',
+            animalId: aId, result: "Rozpisano program", completedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+    });
+
     originalStartSync();
-};
+    
+    // Wymuś odświeżenie zadań na głównym ekranie, by ostrzeżenia zniknęły
+    setTimeout(generateAndRenderTasks, 500); 
+};;
 
 const originalRenderSyncPreview = renderSyncPreview;
 renderSyncPreview = function() {
@@ -4029,13 +4097,13 @@ function addCustomSyncStepUI(dayOffset = '') {
                     <option value="(Wieczorem)">(Wieczorem)</option>
                 </select>
             </div>
-            <div style="grid-column: span 2;">
+     <div style="grid-column: span 2;">
                 <label style="font-size:11px;">Produkt (zastrzyk)</label>
-                <input type="text" class="csb-product" placeholder="np. Receptal" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:6px;">
+                <input type="text" class="csb-product" placeholder="np. Receptal" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:6px; box-sizing: border-box;">
             </div>
             <div style="grid-column: span 2;">
                 <label style="font-size:11px;">Dawka (opcjonalnie)</label>
-                <input type="text" class="csb-dose" placeholder="np. 2 ml im." style="width:100%; padding:8px; border:1px solid #ccc; border-radius:6px;">
+                <input type="text" class="csb-dose" placeholder="np. 2 ml im." style="width:100%; padding:8px; border:1px solid #ccc; border-radius:6px; box-sizing: border-box;">
             </div>
         </div>
     `;
