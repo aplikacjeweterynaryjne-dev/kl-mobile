@@ -3013,7 +3013,7 @@ function handleSmartLogic(e) {
     }
 }
 
-// 5. Inteligentne wklejanie (Obsługuje 6 kolumn)
+// 5. Inteligentne wklejanie z zachowaniem pustych komórek/wierszy
 function handleImportPaste(e) {
     const targetInput = e.target;
     if (targetInput.tagName !== 'INPUT') return;
@@ -3021,7 +3021,15 @@ function handleImportPaste(e) {
     e.preventDefault();
     const clipboardData = e.clipboardData || window.clipboardData;
     const pastedData = clipboardData.getData('Text');
-    const rows = pastedData.split(/\r?\n/).filter(r => r.trim() !== '');
+    
+    // ✅ POPRAWKA: Rozdzielamy na linie, ale NIE usuwamy pustych ze środka
+    let rows = pastedData.split(/\r?\n/);
+    
+    // Usuwamy tylko OSTATNIĄ linię, jeśli jest całkowicie pusta 
+    // (Excel zawsze dodaje pusty znak nowej linii na końcu kopiowanego bloku)
+    if (rows.length > 0 && rows[rows.length - 1] === '') {
+        rows.pop();
+    }
 
     const targetCell = targetInput.parentElement;
     const targetRow = targetCell.parentElement;
@@ -3031,9 +3039,13 @@ function handleImportPaste(e) {
 
     rows.forEach((rowText, i) => {
         const rowIndex = startRowIndex + i;
+        
+        // Jeśli wklejasz więcej wierszy niż jest w tabeli, dodaj nowe (teraz mają 7 kolumn)
         if (rowIndex >= tableRows.length) addEmptyRows(1);
         
         const currentRow = tableRows[rowIndex];
+        
+        // Rozdzielamy wiersz na kolumny po znaku tabulacji (Taba)
         const cols = rowText.split('\t');
 
         cols.forEach((cellText, j) => {
@@ -3041,7 +3053,9 @@ function handleImportPaste(e) {
             if (currentRow.children[colIndex]) {
                 const input = currentRow.children[colIndex].querySelector('input');
                 if (input) {
-                    input.value = cellText.trim();
+                    // Wpisujemy wartość. Jeśli Excel miał pustą komórkę, wpisze się pusty ciąg.
+                    input.value = cellText.trim(); 
+                    
                     // Wywołaj event dla daty zacielenia, żeby przeliczyć status
                     if (input.classList.contains('imp-insem')) {
                         input.dispatchEvent(new Event('input', { bubbles: true }));
@@ -3051,7 +3065,6 @@ function handleImportPaste(e) {
         });
     });
 }
-
 // 6. Konwerter daty
 function parseDatePL(dateStr) {
     if (!dateStr) return null;
