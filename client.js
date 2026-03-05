@@ -694,6 +694,14 @@ function generateA4HTML(header, rowsHTML) {
         </html>
     `;
 }
+
+// --- POMOCNICZA FUNKCJA KOLORÓW KOLCZYKÓW ---
+function getTagColor(type) {
+    if (type === 'jalowka') return '#27ae60'; // Zielony
+    if (type === 'byk') return '#c0392b';     // Czerwony
+    return '#2e7d32';                         // Standardowy ciemnozielony dla krów
+}
+
 // --- NOWA LOGIKA STATUSÓW ---
 function getDetailedStatus(a) {
     const today = new Date();
@@ -702,43 +710,39 @@ function getDetailedStatus(a) {
     const insDate = a.lastInsemination ? new Date(a.lastInsemination) : null;
     const diffCalv = calvDate ? Math.floor((today - calvDate) / (1000 * 60 * 60 * 24)) : null;
 
-    // 1. ZASUSZONA (Najwyższy priorytet wizualny)
-    // Jeśli krowa jest zasuszona, wyświetlamy to nawet jeśli jest cielna.
     if (a.isDriedOff) return { text: '❄️ Zasuszona', color: '#7f8c8d', category: 'zasuszone' };
-
-    // 2. Cielna (Potwierdzona)
     if (a.isPregnantConfirmed) return { text: '✅ Cielna', color: 'green', category: 'cielne' };
-    
-    // 3. Logika po inseminacji (ale jeszcze nie potwierdzona)
+
     if (insDate) {
         const diffInsem = Math.floor((today - insDate) / (1000 * 60 * 60 * 24));
-        
         if (a.usgStatus === 'negative') return { text: '❌ Pusta (po USG)', color: '#c0392b', category: 'puste' };
-
-        // ODLICZANIE DO USG
+        
         const usgStart = (userSettings && userSettings.usg) ? Math.min(userSettings.usg.start, userSettings.usg.end) : 40;
-
         if (diffInsem < usgStart) {
             const daysLeft = usgStart - diffInsem;
             return { text: `⏳ Do USG za ${daysLeft} dni`, color: '#9b59b6', category: 'inne' };
         }
-
         return { text: '❓ Do badania USG', color: '#f39c12', category: 'usg' };
     }
 
-    // 4. Logika po wycieleniu (bez inseminacji)
     if (calvDate) {
-        // Tu jest status "świeżej" krowy
         if (diffCalv <= 60) return { text: '🍼 Wycielona < 60 dni', color: '#2980b9', category: 'puste' };
         if (diffCalv > 365) return { text: '⚠️ Niecielna > 1 rok', color: '#e74c3c', category: 'puste' };
     }
 
-    // 5. Jałówki i pozostałe puste
-    if (a.type === 'jalowka' && !insDate) return { text: '⚪ Jałówka (niekryta)', color: '#7f8c8d', category: 'puste' };
-
+    // 5. Jałówki i pozostałe puste (Z WYRÓŻNIENIEM STARSZYCH NIŻ 13 MSC)
+    if (a.type === 'jalowka' && !insDate) {
+        if (a.dob) {
+            const dobDate = new Date(a.dob);
+            const ageMonths = (today - dobDate) / (1000 * 60 * 60 * 24 * 30.44);
+            if (ageMonths >= 13) {
+                return { text: '⚪ Jałówka >13m (Gotowa)', color: '#d35400', category: 'puste' }; 
+            }
+        }
+        return { text: '⚪ Jałówka (niekryta)', color: '#7f8c8d', category: 'puste' };
+    }
     return { text: '⚪ Pusta', color: '#7f8c8d', category: 'puste' };
 }
-
 function generateAndRenderTasks() {
     const today = new Date();
     today.setHours(0,0,0,0);
@@ -1516,8 +1520,9 @@ function openAnimalCard(id) {
     document.getElementById('viewMode').classList.remove('hidden');
     document.getElementById('editMode').classList.add('hidden');
 
-    // --- 1. Podstawowe dane ---
+  // --- 1. Podstawowe dane ---
     document.getElementById('cardTag').textContent = animal.tag;
+    document.getElementById('cardTag').style.color = getTagColor(animal.type);
     document.getElementById('cardDob').textContent = animal.dob;
     document.getElementById('cardType').textContent = animal.type.toUpperCase();
     
@@ -1786,10 +1791,17 @@ function toggleEditMode() {
 
 function saveAnimalChanges() {
     if(!currentEditingAnimalId) return;
-    
-    const newType = document.getElementById('editType').value; // NOWE
+    let newType = document.getElementById('editType').value; 
     const newTag = document.getElementById('editTag').value;
     const dob = document.getElementById('editDob').value;
+    
+    const lastCalvDate = document.getElementById('editLastCalving') ? document.getElementById('editLastCalving').value : null;
+
+    // ✅ AUTO-AWANS: Jeśli to była jałówka i dopisano datę wycielenia, staje się krową
+    if (newType === 'jalowka' && lastCalvDate) {
+        newType = 'krowa';
+        document.getElementById('editType').value = 'krowa'; // Odśwież widok selektora
+    }
     const location = document.getElementById('editLocation').value || '';
     const motherTag = document.getElementById('editMother').value || '';
     const fatherSemen = document.getElementById('editFather').value || '';
@@ -1939,10 +1951,17 @@ document.getElementById('animalForm').addEventListener('submit', (e) => {
         e.preventDefault();
         
         // 1. Podstawowe dane
-        const type = document.getElementById('inpType').value;
+        let type = document.getElementById('inpType').value;
         const tag = document.getElementById('inpTag').value;
         const dob = document.getElementById('inpDob').value;
         
+        const lastCalving = document.getElementById('inpLastCalving').value || null;
+
+        // ✅ AUTO-AWANS: Jeśli dodajemy jałówkę, ale wpisano wycielenie -> staje się krową
+        if (type === 'jalowka' && lastCalving) {
+            type = 'krowa';
+        }
+
         // 2. NOWE POLA: Lokalizacja i Rodzina
         const location = document.getElementById('inpLocation')?.value || '';
         const motherTag = document.getElementById('inpMother')?.value || '';
@@ -2467,7 +2486,7 @@ div.innerHTML = `
             <div style="display:flex; justify-content:space-between; align-items:center;">
                 <div style="display:flex; align-items:center; gap:10px;">
                     <input type="checkbox" class="mass-animal-cb" value="${a.id}" onchange="toggleMassAnimalSelection()" style="width:20px; height:20px; accent-color:#c0392b;" onclick="event.stopPropagation();">
-                    <strong style="color:#2e7d32; font-size:16px;">${a.tag}</strong>
+                    <strong style="color:${getTagColor(a.type)}; font-size:16px;">${a.tag}</strong>
                 </div>
                 <span class="badge" style="background:#eee; color:#333; padding:2px 8px; border-radius:10px; font-size:10px;">${a.type.toUpperCase()}</span>
             </div>
@@ -3800,11 +3819,11 @@ function printHerdList() {
         const loc = a.location || '-';
         const statusInfo = getDetailedStatus(a);
         
-        rowsHTML += `
+  rowsHTML += `
             <tr>
                 <td style="text-align:center;">${index + 1}</td>
                 <td>${typ}</td>
-                <td style="font-weight:bold; color:#2e7d32;">${tag}</td>
+                <td style="font-weight:bold; color:${getTagColor(a.type)};">${tag}</td>
                 <td style="text-align:center;">${dob}</td>
                 <td>${loc}</td>
                 <td style="font-weight:bold; color:${statusInfo.color};">${statusInfo.text}</td>
@@ -3896,9 +3915,9 @@ function populateMassInsemAnimals() {
             div.dataset.tag = a.tag.toLowerCase(); // ✅ Zapisujemy kolczyk w tle do szukania
             div.style.cssText = "display:flex; justify-content:space-between; align-items:center; padding:10px; border-bottom:1px solid #eee; background:white; border-radius:4px;";
             
-            div.innerHTML = `
+       div.innerHTML = `
                 <div style="flex:1; cursor:pointer;" onclick="openAnimalCard('${a.id}')" title="Kliknij, aby otworzyć kartę">
-                    <div style="font-weight:bold; color:#2e7d32; font-size: 15px;">${a.tag}</div>
+                    <div style="font-weight:bold; color:${getTagColor(a.type)}; font-size: 15px;">${a.tag}</div>
                     <div style="font-size:11px; color:#555; margin-top: 2px;">📍 ${loc}</div>
                     <div style="font-size:11px; font-weight:bold; color:${status.color}; margin-top: 2px;">${status.text}</div>
                 </div>
@@ -4163,12 +4182,12 @@ function renderCalendarEventsList(events, title) {
         list.innerHTML = '<p style="color:#999; text-align:center;">Brak wydarzeń</p>'; 
         return;
     } 
-    events.forEach(e => { 
+  events.forEach(e => { 
         const el = document.createElement('div'); 
         el.className = 'card'; 
         el.style.padding = '10px'; 
         const dateStr = e.date.toLocaleDateString('pl-PL'); 
-        el.innerHTML = `<div style="display:flex; justify-content:space-between; align-items:center;"><span>🐮 <b>${e.animal.tag}</b></span><span style="font-size:11px; color:#555;">${dateStr}</span></div><div style="font-size:11px; color:#2e7d32;">Spodziewane wycielenie</div>`; 
+        el.innerHTML = `<div style="display:flex; justify-content:space-between; align-items:center;"><span>🐮 <b style="color:${getTagColor(e.animal.type)};">${e.animal.tag}</b></span><span style="font-size:11px; color:#555;">${dateStr}</span></div><div style="font-size:11px; color:#2e7d32;">Spodziewane wycielenie</div>`; 
         el.onclick = () => openAnimalCard(e.animal.id); 
         list.appendChild(el); 
     });
@@ -4238,11 +4257,10 @@ function showListModal(title, animals) {
 
         div.innerHTML = `
             <div style="display:flex; justify-content:space-between; align-items:center;">
-                <strong style="color:#2e7d32; font-size:16px;">${a.tag}</strong>
+                <strong style="color:${getTagColor(a.type)}; font-size:16px;">${a.tag}</strong>
                 <span class="badge" style="background:#eee; color:#333; padding:2px 6px; border-radius:10px; font-size:10px;">${a.type.toUpperCase()}</span>
             </div>
             ${detailsHtml}`;
-
         div.onclick = () => {
             closeModal('listModal'); 
             openAnimalCard(a.id);    
