@@ -8387,74 +8387,98 @@ document.getElementById('calcKlientInput').addEventListener('input', function() 
 
 /**
  * Sprawdza w bazie 'konfiguracja' czy wpisany klient posiada konto (uid).
- * Jeśli tak, pokazuje przycisk "Panel Klienta". (WERSJA PANCERNA)
+ * Pokazuje przycisk "Panel Klienta" w Kalkulatorze. (WERSJA ZAAWANSOWANA)
  */
 async function checkIfClientHasPanel(clientName) {
     const btn = document.getElementById('calcClientPanelBtn');
-    if (!btn) return;
+    if (!btn) {
+        console.error("[WETERYNARZ] Błąd: Nie znaleziono guzika w HTML (id: calcClientPanelBtn)");
+        return;
+    }
     
     btn.style.display = 'none'; // domyślnie ukrywamy
     btn.onclick = null; // resetujemy akcję
 
     if (!clientName || !currentUserProfile) return;
 
+    console.log(`[WETERYNARZ] Szukam konta (panelu) dla klienta wpisanego jako: "${clientName}"`);
+
     try {
         let foundUid = null;
         const clinicId = currentUserProfile['ID lecznicy'];
-        const searchName = clientName.toLowerCase().trim();
+        
+        // Funkcja pomocnicza czyszcząca polskie znaki (jeśli klient wpisany z błędami)
+        const norm = (s) => {
+            if (!s) return "";
+            return s.toLowerCase().trim()
+                .replace(/ą/g, 'a').replace(/ć/g, 'c').replace(/ę/g, 'e')
+                .replace(/ł/g, 'l').replace(/ń/g, 'n').replace(/ó/g, 'o')
+                .replace(/ś/g, 's').replace(/ź/g, 'z').replace(/ż/g, 'z');
+        };
+        const searchNameNorm = norm(clientName);
 
-        // 1. ZNAJDŹ KLIENTA W BAZIE KLIENTÓW (aby wyciągnąć jego E-mail jako najpewniejszy łącznik)
+        // 1. ZNAJDŹ E-MAIL W BAZIE KLIENTÓW (szukamy idealnego dopasowania nazwy)
+        let clientEmail = null;
         const klienciSnap = await db.collection("klienci")
             .where("idLecznicy", "==", clinicId)
             .where("nazwa", "==", clientName)
             .limit(1)
             .get();
 
-        let clientEmail = null;
         if (!klienciSnap.empty) {
             clientEmail = klienciSnap.docs[0].data().email;
+            console.log(`[WETERYNARZ] Znalazłem go w bazie 'klienci'. Zapisany e-mail to: ${clientEmail || 'BRAK'}`);
+        } else {
+            console.log(`[WETERYNARZ] Nie znalazłem idealnego dopasowania nazwy w bazie 'klienci'.`);
         }
 
-        // 2. PRZESZUKAJ KONFIGURACJĘ (Profile logowania)
+        // 2. PRZESZUKAJ KONFIGURACJĘ (Konta Rolników)
         const konfRef = db.collection("konfiguracja")
             .where("Rola", "==", "klient")
             .where("ID lecznicy", "==", clinicId);
         
         const snap = await konfRef.get();
+        console.log(`[WETERYNARZ] Przeszukuję ${snap.size} przypisanych kont klientów w tej lecznicy...`);
 
-        snap.docs.forEach(doc => {
+        for (const doc of snap.docs) {
             const data = doc.data();
+            const imie = (data.Imie || '').trim();
+            const nazwisko = (data.Nazwisko || '').trim();
+            const konfEmail = (data['Adres email'] || '').trim();
             
-            // DOPASOWANIE 1: Po E-mailu (To działa bezbłędnie, nawet jeśli nazwa to "Gospodarstwo X")
-            if (clientEmail && data['Adres email'] && clientEmail.trim().toLowerCase() === data['Adres email'].trim().toLowerCase()) {
+            const imieNorm = norm(imie);
+            const nazwiskoNorm = norm(nazwisko);
+
+            // DOPASOWANIE 1: Po E-mailu (Działa na 100%)
+            if (clientEmail && konfEmail && clientEmail.toLowerCase() === konfEmail.toLowerCase()) {
+                console.log(`[WETERYNARZ] ✅ ZGODNOŚĆ: E-mail z bazy klientów zgadza się z mailem konta: ${imie} ${nazwisko}`);
                 foundUid = data.uid;
-                return; // Znaleziono, przerywamy szukanie
+                break;
             }
 
-            // DOPASOWANIE 2: Elastyczne po imieniu i nazwisku
-            const imie = (data.Imie || '').trim().toLowerCase();
-            const nazwisko = (data.Nazwisko || '').trim().toLowerCase();
-
-            // Jeśli nazwa w kalkulatorze to dokładnie "Jan Kowalski" lub "Kowalski Jan"
-            if (`${imie} ${nazwisko}` === searchName || `${nazwisko} ${imie}` === searchName) {
+            // DOPASOWANIE 2: Elastyczne dopasowanie po imieniu i nazwisku
+            if (imieNorm && nazwiskoNorm && searchNameNorm.includes(imieNorm) && searchNameNorm.includes(nazwiskoNorm)) {
+                console.log(`[WETERYNARZ] ✅ ZGODNOŚĆ: Nazwa w kalkulatorze zawiera imię i nazwisko z konta: ${imie} ${nazwisko}`);
                 foundUid = data.uid;
+                break;
             }
-            // Lub jeśli nazwa w kalkulatorze ZAWIEra imię i nazwisko (np. "Gospodarstwo Kowalski Jan")
-            else if (imie && nazwisko && searchName.includes(imie) && searchName.includes(nazwisko)) {
-                foundUid = data.uid;
-            }
-        });
+        }
 
         // 3. JEŚLI ZNALEZIONO KONTO -> POKAŻ PRZYCISK
         if (foundUid) {
-            btn.style.display = 'inline-block';
+            // Używamy display: block i wymuszamy widoczność, zdejmując elastyczne zwężanie (flexShrink)
+            btn.style.display = 'block'; 
+            btn.style.flexShrink = '0'; 
+            
             btn.onclick = (e) => {
                 e.preventDefault();
                 window.open(`panel-klienta.html?simulatedUid=${foundUid}`, '_blank');
             };
+        } else {
+            console.log("[WETERYNARZ] ❌ Nie udało się powiązać wpisanej nazwy z żadnym założonym kontem.");
         }
     } catch(e) {
-        console.error("Błąd sprawdzania panelu klienta w kalkulatorze:", e);
+        console.error("[WETERYNARZ] Błąd sprawdzania panelu klienta w kalkulatorze:", e);
     }
 }
 
