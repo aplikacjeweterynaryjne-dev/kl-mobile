@@ -8386,7 +8386,7 @@ document.getElementById('calcKlientInput').addEventListener('input', function() 
 
 /**
  * Sprawdza w bazie 'konfiguracja' czy wpisany klient posiada konto (uid).
- * Jeśli tak, pokazuje przycisk "Panel Klienta".
+ * Jeśli tak, pokazuje przycisk "Panel Klienta". (WERSJA PANCERNA)
  */
 async function checkIfClientHasPanel(clientName) {
     const btn = document.getElementById('calcClientPanelBtn');
@@ -8398,25 +8398,53 @@ async function checkIfClientHasPanel(clientName) {
     if (!clientName || !currentUserProfile) return;
 
     try {
-        // Szukamy wśród kont o roli 'klient' w naszej lecznicy
-        const q = db.collection("konfiguracja")
-            .where("Rola", "==", "klient")
-            .where("ID lecznicy", "==", currentUserProfile['ID lecznicy']);
-        
-        const snap = await q.get();
         let foundUid = null;
+        const clinicId = currentUserProfile['ID lecznicy'];
+        const searchName = clientName.toLowerCase().trim();
+
+        // 1. ZNAJDŹ KLIENTA W BAZIE KLIENTÓW (aby wyciągnąć jego E-mail jako najpewniejszy łącznik)
+        const klienciSnap = await db.collection("klienci")
+            .where("idLecznicy", "==", clinicId)
+            .where("nazwa", "==", clientName)
+            .limit(1)
+            .get();
+
+        let clientEmail = null;
+        if (!klienciSnap.empty) {
+            clientEmail = klienciSnap.docs[0].data().email;
+        }
+
+        // 2. PRZESZUKAJ KONFIGURACJĘ (Profile logowania)
+        const konfRef = db.collection("konfiguracja")
+            .where("Rola", "==", "klient")
+            .where("ID lecznicy", "==", clinicId);
+        
+        const snap = await konfRef.get();
 
         snap.docs.forEach(doc => {
             const data = doc.data();
-            // Łączymy Imię i Nazwisko tak jak zapisuje się to w bazie
-            const fullName = `${data.Imie || ''} ${data.Nazwisko || ''}`.trim().toLowerCase();
             
-            if (fullName === clientName.toLowerCase()) {
+            // DOPASOWANIE 1: Po E-mailu (To działa bezbłędnie, nawet jeśli nazwa to "Gospodarstwo X")
+            if (clientEmail && data['Adres email'] && clientEmail.trim().toLowerCase() === data['Adres email'].trim().toLowerCase()) {
+                foundUid = data.uid;
+                return; // Znaleziono, przerywamy szukanie
+            }
+
+            // DOPASOWANIE 2: Elastyczne po imieniu i nazwisku
+            const imie = (data.Imie || '').trim().toLowerCase();
+            const nazwisko = (data.Nazwisko || '').trim().toLowerCase();
+
+            // Jeśli nazwa w kalkulatorze to dokładnie "Jan Kowalski" lub "Kowalski Jan"
+            if (`${imie} ${nazwisko}` === searchName || `${nazwisko} ${imie}` === searchName) {
+                foundUid = data.uid;
+            }
+            // Lub jeśli nazwa w kalkulatorze ZAWIEra imię i nazwisko (np. "Gospodarstwo Kowalski Jan")
+            else if (imie && nazwisko && searchName.includes(imie) && searchName.includes(nazwisko)) {
                 foundUid = data.uid;
             }
         });
 
-        // Jeśli klient z takim samym imieniem i nazwiskiem ma konto:
+        // 3. JEŚLI ZNALEZIONO KONTO -> POKAŻ PRZYCISK
         if (foundUid) {
             btn.style.display = 'inline-block';
             btn.onclick = (e) => {
