@@ -730,18 +730,21 @@ function getDetailedStatus(a) {
         if (diffCalv > 365) return { text: '⚠️ Niecielna > 1 rok', color: '#e74c3c', category: 'puste' };
     }
 
-    // 5. Jałówki i pozostałe puste (Z WYRÓŻNIENIEM STARSZYCH NIŻ 13 MSC)
+  // 5. Jałówki i pozostałe puste (Z WYRÓŻNIENIEM STARSZYCH NIŻ 13 MSC)
     if (a.type === 'jalowka' && !insDate) {
         if (a.dob) {
             const dobDate = new Date(a.dob);
             const ageMonths = (today - dobDate) / (1000 * 60 * 60 * 24 * 30.44);
             if (ageMonths >= 13) {
-                return { text: '⚪ Jałówka >13m (Gotowa)', color: '#d35400', category: 'puste' }; 
+                // Zmieniono category z 'puste' na 'jalowki_niekryte'
+                return { text: '⚪ Jałówka >13m (Gotowa)', color: '#d35400', category: 'jalowki_niekryte' };
             }
         }
-        return { text: '⚪ Jałówka (niekryta)', color: '#7f8c8d', category: 'puste' };
+        // Zmieniono category z 'puste' na 'jalowki_niekryte'
+        return { text: '⚪ Jałówka (niekryta)', color: '#7f8c8d', category: 'jalowki_niekryte' };
     }
-    return { text: '⚪ Pusta', color: '#7f8c8d', category: 'puste' };
+    // To zwróci się już tylko dla Krów, które nie miały żadnych zabiegów
+    return { text: '⚪ Pusta (Krowa)', color: '#7f8c8d', category: 'puste' };
 }
 function generateAndRenderTasks() {
     const today = new Date();
@@ -815,10 +818,11 @@ function generateAndRenderTasks() {
             db.collection('animals').doc(animal.id).update({ isDriedOff: true });
         }
 
-        if (animal.isPregnantConfirmed && calvingDate && daysToCalving < -7) {
+       if (animal.isPregnantConfirmed && calvingDate && daysToCalving < -7) {
             const taskId = `${animal.id}_calving_${calvingDate.toISOString().split('T')[0]}`;
             if (!completedTasks.some(t => t.taskId === taskId)) {
-                confirmTaskCalving({ animalId: animal.id, taskId: taskId }, calvingDate, true);
+                // ✅ NAPRAWIONY BŁĄD: Dodano type: 'calving', dzięki czemu Firebase nie wyrzuca undefined
+                confirmTaskCalving({ animalId: animal.id, taskId: taskId, type: 'calving' }, calvingDate, true);
             }
         }
 
@@ -2714,9 +2718,10 @@ function renderStatistics() {
         const ctxStatus = document.getElementById('statusPieChart');
         if (ctxStatus) {
             const statusBuckets = [0, 0, 0, 0, 0]; 
-            const statusAnimals = [[], [], [], [], []];
-            const statusLabels = ['Cielne', 'Zasuszone', 'Do USG', 'Czeka na USG', 'Puste (Niekryte/Neg)'];
-
+           const statusAnimals = [[], [], [], [], []];
+            // Zmieniono etykietę na "Puste (Krowy)"
+            const statusLabels = ['Cielne', 'Zasuszone', 'Do USG', 'Czeka na USG', 'Puste (Krowy)'];
+            
             myHerd.forEach(a => {
                 if (a.type !== 'byk') {
                     const s = getDetailedStatus(a);
@@ -2724,7 +2729,10 @@ function renderStatistics() {
                     else if (a.isPregnantConfirmed) { statusBuckets[0]++; statusAnimals[0].push(a); }
                     else if (s.category === 'usg') { statusBuckets[2]++; statusAnimals[2].push(a); }
                     else if (s.category === 'inne') { statusBuckets[3]++; statusAnimals[3].push(a); } 
-                    else { statusBuckets[4]++; statusAnimals[4].push(a); } 
+                    // ✅ Warunek wpuszcza do wykresu TYLKO krowy z kategorią puste. Niekryte jałówki są ignorowane na wykresie.
+                    else if (a.type === 'krowa' && s.category === 'puste') { 
+                        statusBuckets[4]++; statusAnimals[4].push(a); 
+                    } 
                 }
             });
 
