@@ -64,7 +64,7 @@ if ('serviceWorker' in navigator) {
 let activeSynchronizations = [];
 let pendingSyncTaskToConfirm = null; // Do zapisu id zadania zgrupowanego
 
-// Słownik programów synchronizacji
+// Słownik programów synchronizacji (Zaktualizowany o Inseminację)
 const SYNC_PROTOCOLS = {
     'g6g': {
         name: 'Synchronizacja G6G',
@@ -74,7 +74,8 @@ const SYNC_PROTOCOLS = {
             { dayOffset: 8, time: '(Rano)', product: 'Ovarelin', dose: '2 ml im./szt' },
             { dayOffset: 15, time: '(Rano)', product: 'Luteosyl', dose: '2 ml im./szt' },
             { dayOffset: 16, time: '(Rano)', product: 'Luteosyl', dose: '2 ml im./szt' },
-            { dayOffset: 16, time: '(Wieczorem)', product: 'Ovarelin', dose: '2 ml im./szt' }
+            { dayOffset: 16, time: '(Wieczorem)', product: 'Ovarelin', dose: '2 ml im./szt' },
+            { dayOffset: 17, time: '', product: 'Zabieg', dose: 'Inseminacja' }
         ]
     },
     'ovsynch': {
@@ -83,7 +84,8 @@ const SYNC_PROTOCOLS = {
             { dayOffset: 0, time: '', product: 'Ovarelin', dose: '2 ml im./szt' },
             { dayOffset: 6, time: '(Rano)', product: 'Luteosyl', dose: '2 ml im./szt' },
             { dayOffset: 7, time: '(Rano)', product: 'Luteosyl', dose: '2 ml im./szt' },
-            { dayOffset: 8, time: '(Wieczorem)', product: 'Ovarelin', dose: '2 ml im./szt' }
+            { dayOffset: 8, time: '(Wieczorem)', product: 'Ovarelin', dose: '2 ml im./szt' },
+            { dayOffset: 9, time: '', product: 'Zabieg', dose: 'Inseminacja' }
         ]
     },
     'jalowki': {
@@ -92,7 +94,8 @@ const SYNC_PROTOCOLS = {
             { dayOffset: 0, time: '', product: 'Ovarelin', dose: '2 ml im./szt' },
             { dayOffset: 4, time: '(Rano)', product: 'Luteosyl', dose: '2 ml im./szt' },
             { dayOffset: 5, time: '(Rano)', product: 'Luteosyl', dose: '2 ml im./szt' },
-            { dayOffset: 7, time: '(Wieczorem)', product: 'Ovarelin', dose: '2 ml im./szt' }
+            { dayOffset: 7, time: '(Wieczorem)', product: 'Ovarelin', dose: '2 ml im./szt' },
+            { dayOffset: 8, time: '', product: 'Zabieg', dose: 'Inseminacja' }
         ]
     }
 };
@@ -852,9 +855,24 @@ function generateAndRenderTasks() {
         if (!calvingDate && !insDate) return;
 
         // USG i Ruja
-        if (!animal.isPregnantConfirmed && insDate) {
-            checkRuleAndAddTask(generatedTasks, animal, userSettings.usg, daysSinceInsem, insDate, 'usg', calvingDate);
-            checkRuleAndAddTask(generatedTasks, animal, userSettings.heat, daysSinceInsem, insDate, 'heat', calvingDate);
+        // USG i Ruja (Zabezpieczone, żeby zapisane zadania nie znikały po zmianie statusu)
+        if (insDate) {
+            const usgRule = userSettings.usg || { start: 40, end: 40 };
+            const usgDateStr = addDays(insDate, Math.max(usgRule.start, usgRule.end)).toISOString().split('T')[0];
+            const isUsgDone = completedTasks.some(t => t.taskId === `${animal.id}_usg_${usgDateStr}`);
+
+            // Pokazujemy USG jeśli NIE jest cielna LUB jeśli zadanie zostało już wcześniej wykonane
+            if (!animal.isPregnantConfirmed || isUsgDone) {
+                checkRuleAndAddTask(generatedTasks, animal, userSettings.usg, daysSinceInsem, insDate, 'usg', calvingDate);
+            }
+
+            const heatRule = userSettings.heat || { start: 21, end: 21 };
+            const heatDateStr = addDays(insDate, Math.max(heatRule.start, heatRule.end)).toISOString().split('T')[0];
+            const isHeatDone = completedTasks.some(t => t.taskId === `${animal.id}_heat_${heatDateStr}`);
+
+            if (!animal.isPregnantConfirmed || isHeatDone) {
+                checkRuleAndAddTask(generatedTasks, animal, userSettings.heat, daysSinceInsem, insDate, 'heat', calvingDate);
+            }
         }
 
         // Zasuszenie / Profilaktyka
@@ -1445,12 +1463,12 @@ function undoTask(logId) {
               .then(() => console.log("Cofnięto status zasuszenia w bazie."));
         }
 
-        // Jeśli cofamy USG (które było pozytywne) -> odznaczamy cielność
-        if (taskLog.taskType === 'usg' && taskLog.result === 'Pozytywny') {
+      // Jeśli cofamy USG -> odznaczamy cielność i cofamy status
+        if (taskLog.taskType === 'usg') {
              db.collection('animals').doc(taskLog.animalId).update({ 
                  isPregnantConfirmed: false, 
-                 usgStatus: 'pending' // Ustawiamy na 'oczekujący', żeby znów wpadła do badania
-             }).then(() => console.log("Cofnięto potwierdzenie cielności."));
+                 usgStatus: 'pending' // Niezależnie od tego czy była Pusta czy Cielna, wraca do 'Do badania'
+              }).then(() => console.log("Cofnięto badanie USG."));
         }
     }
 }
@@ -2801,42 +2819,39 @@ function renderStatistics() {
         }
    } catch(e) { console.error("Błąd wykresu wycieleń:", e); }
 
-    // --- 5. WYKRES SKUTECZNOŚCI INSEMINACJI ---
+   // --- 5. WYKRES SKUTECZNOŚCI INSEMINACJI ---
     try {
         const ctxEfficiency = document.getElementById('chartInsemEfficiency');
         if (ctxEfficiency) {
-            const effBuckets = [0, 0, 0, 0]; // Index 0: "1-2", Index 1: "3-4", Index 2: "5-6", Index 3: ">6"
+            const effBuckets = [0, 0, 0, 0]; 
+            const effAnimals = [[], [], [], []]; // NOWOŚĆ: Tablice z krowami dla każdego słupka
             const effLabels = ['1-2 zab.', '3-4 zab.', '5-6 zab.', '> 6 zab.'];
 
             myHerd.forEach(a => {
                 if(a.type !== 'krowa' && a.type !== 'jalowka') return;
                 
-                const calvings = (a.historyCalving || []).map(c => new Date(c.date)).sort((x,y) => x - y); // od najstarszego
+                const calvings = (a.historyCalving || []).map(c => new Date(c.date)).sort((x,y) => x - y);
                 const insems = (a.historyInsemination || []).map(i => new Date(i.date)).sort((x,y) => x - y);
 
                 let currentCount = 0;
 
-                // Grupujemy inseminacje w ciąże
                 for (let i = 0; i < insems.length; i++) {
                     const insD = insems[i];
                     currentCount++;
                     
-                    // Czy to zacielenie zakończyło się znanym z historii wycieleniem?
                     const matchingCalving = calvings.find(c => {
                         const diff = (c - insD) / (1000 * 3600 * 24);
                         return diff >= 260 && diff <= 300;
                     });
                     
-                    // Lub czy to jest to udane zacielenie prowadzące do obecnej (potwierdzonej) ciąży?
                     const isCurrentPregnancy = a.isPregnantConfirmed && a.lastInsemination && insD.getTime() === new Date(a.lastInsemination).getTime();
 
-                    // Jeśli mamy sukces (potwierdzona ciąża lub wycielenie) -> zaliczamy próbę do wiadra
                     if (matchingCalving || isCurrentPregnancy) {
-                        if (currentCount <= 2) effBuckets[0]++;
-                        else if (currentCount <= 4) effBuckets[1]++;
-                        else if (currentCount <= 6) effBuckets[2]++;
-                        else effBuckets[3]++;
-                        currentCount = 0; // Zerujemy licznik na poczet kolejnej ciąży
+                        if (currentCount <= 2) { effBuckets[0]++; effAnimals[0].push(a); }
+                        else if (currentCount <= 4) { effBuckets[1]++; effAnimals[1].push(a); }
+                        else if (currentCount <= 6) { effBuckets[2]++; effAnimals[2].push(a); }
+                        else { effBuckets[3]++; effAnimals[3].push(a); }
+                        currentCount = 0; 
                     }
                 }
             });
@@ -2857,7 +2872,15 @@ function renderStatistics() {
                     responsive: true, 
                     maintainAspectRatio: false, 
                     plugins: { legend: { display: false } },
-                    scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
+                    scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } },
+                    // NOWOŚĆ: Wykres stał się klikalny!
+                    onClick: (evt, activeEls) => {
+                        if (activeEls.length > 0) {
+                            const idx = activeEls[0].index;
+                            // Używamy globalnej funkcji modala
+                            showListModal(`Ciąża z: ${effLabels[idx]}`, effAnimals[idx]);
+                        }
+                    }
                 }
             });
         }
@@ -3097,33 +3120,51 @@ function initiateSyncTaskCompletion(taskId) {
 function confirmSyncTask() {
     if (!pendingSyncTaskToConfirm) return;
     const t = pendingSyncTaskToConfirm;
+    
+    // Sprawdzamy czy to zadanie Inseminacji
+    const isInsem = t.doseDetails === 'Inseminacja' || t.title.includes('Zabieg');
 
-    // Ponieważ to jest zadanie "grupowe", zapisujemy to jako jeden wpis w task_logs
-    // (Z zaznaczeniem, że dotyczy wielu zwierząt)
     const fakeLogId = 'temp_sync_' + Date.now();
     completedTasks.push({
         logId: fakeLogId, 
         taskId: t.id, 
         taskType: 'sync',
-        animalId: 'GROUP', // Specjalne ID
+        animalId: 'GROUP', 
         result: `Wykonano dla ${t.animalTags.length} szt.`, 
         completedAt: { toDate: () => new Date() }
     });
-    
-    generateAndRenderTasks(); // Odśwież UI
+    generateAndRenderTasks(); 
 
     db.collection('task_logs').add({
         ownerUid: currentUser.uid, 
         taskId: t.id, 
         taskType: 'sync',
-        animalId: 'GROUP', // Oznaczamy, że to grupowe
-        animalTags: t.animalTags, // Zapisujemy dla kogo to było
+        animalId: 'GROUP', 
+        animalTags: t.animalTags, 
         result: "Wykonano", 
         completedAt: firebase.firestore.FieldValue.serverTimestamp()
     });
-
     closeModal('syncTaskConfirmModal');
-    showToast("Zatwierdzono podanie leków w ramach synchronizacji!", "success");
+    
+    if (isInsem) {
+        showToast("Otwieram panel masowej inseminacji...", "info");
+        openInsemModal();
+        
+        // Zaznacz automatycznie krowy należące do tego zadania
+        setTimeout(() => {
+            const checkboxes = document.querySelectorAll('.mass-insem-cb');
+            const tagsToSelect = t.animalTags.map(tag => tag.toLowerCase());
+            
+            checkboxes.forEach(cb => {
+                const row = cb.closest('.mass-insem-row');
+                if (row && tagsToSelect.includes(row.dataset.tag)) {
+                    cb.checked = true;
+                }
+            });
+        }, 400); // 400ms pozwala na bezpieczne załadowanie modala insem
+    } else {
+        showToast("Zatwierdzono podanie leków w ramach synchronizacji!", "success");
+    }
 }
 // ============================================================
 // ✅ NOWY MODUŁ IMPORTU (6 KOLUMN + DOB + WSPÓLNA LOGIKA)
@@ -4411,10 +4452,16 @@ function saveCustomSyncProtocol() {
         steps.push({ dayOffset: day, time: time, product: prod, dose: dose });
     });
 
-    if (hasError) return alert("Wypełnij poprawnie Dzień oraz Nazwę produktu we wszystkich krokach!");
-
+   if (hasError) return alert("Wypełnij poprawnie Dzień oraz Nazwę produktu we wszystkich krokach!");
     // Sortuj kroki po dniach
     steps.sort((a, b) => a.dayOffset - b.dayOffset);
+
+    // Dodaj inseminację jeśli wpisano wartość
+    const insemOffset = parseInt(document.getElementById('csbInsemOffset').value);
+    if (!isNaN(insemOffset) && steps.length > 0) {
+        const maxDay = steps[steps.length - 1].dayOffset;
+        steps.push({ dayOffset: maxDay + insemOffset, time: '', product: 'Zabieg', dose: 'Inseminacja' });
+    }
 
     const newProtocol = { name: name, steps: steps };
 
