@@ -1968,7 +1968,7 @@ document.getElementById('animalForm').addEventListener('submit', (e) => {
         const fatherSemen = document.getElementById('inpFather')?.value || '';
 
         // 3. Dane rozrodcze (to co zniknęło)
-        const lastCalving = document.getElementById('inpLastCalving').value || null;
+        // (Usunięto zdublowaną zmienną lastCalving)
         const lastInsem = document.getElementById('inpLastInsem').value || null;
         const semen = document.getElementById('inpSemen')?.value || null;
         const pregStatus = document.getElementById('inpPregStatus').value;
