@@ -1577,12 +1577,50 @@ function openAnimalCard(id) {
             }
         }
 
-  // Status Cielności
+// Status Cielności
         const statusDiv = document.getElementById('cardPregStatus');
         if(statusDiv) {
             const statusInfo = getDetailedStatus(animal); 
             statusDiv.textContent = statusInfo.text;
             statusDiv.style.color = statusInfo.color;
+        }
+
+        // ✅ NOWOŚĆ: Obliczanie i wyświetlanie Statystyk Inseminacji w Karcie
+        const insemStatsDiv = document.getElementById('cardInsemStats');
+        if (insemStatsDiv) {
+            if (animal.type === 'krowa' || animal.type === 'jalowka') {
+                let currentLactInsems = 0;
+                let prevLactInsems = 0;
+                let totalInsems = animal.historyInsemination ? animal.historyInsemination.length : 0;
+
+                const sortedCalvings = (animal.historyCalving || []).map(c => new Date(c.date)).sort((a,b) => b - a); // Najnowsze wycielenia najpierw
+                const lastCalv = sortedCalvings[0] || new Date(0);
+                const prevCalv = sortedCalvings[1] || new Date(0);
+
+                (animal.historyInsemination || []).forEach(ins => {
+                    const d = new Date(ins.date);
+                    if (d >= lastCalv) currentLactInsems++;
+                    else if (d >= prevCalv && d < lastCalv) prevLactInsems++;
+                });
+
+                // Liczymy udane ciąże
+                let pregnanciesCount = sortedCalvings.length + (animal.isPregnantConfirmed ? 1 : 0);
+                let avgInsems = pregnanciesCount > 0 ? (totalInsems / pregnanciesCount).toFixed(1) : 0;
+
+                insemStatsDiv.innerHTML = `
+                    <div style="display:flex; justify-content: space-between; border-bottom: 1px dashed #ccc; padding-bottom: 4px; margin-bottom: 4px;">
+                        <span style="color:#2e7d32; font-weight:bold;">Skuteczność:</span> <strong style="color:#2e7d32;">${avgInsems} zab. / ciążę</strong>
+                    </div>
+                    <div style="display:flex; justify-content: space-between; color: #555;">
+                        <span title="Inseminacje po ostatnim wycieleniu">Bieżąca: <b>${currentLactInsems}</b></span>
+                        <span title="Inseminacje w poprzedniej laktacji">Poprzednia: <b>${prevLactInsems}</b></span>
+                        <span>Razem: <b>${totalInsems}</b></span>
+                    </div>
+                `;
+                insemStatsDiv.style.display = 'block';
+            } else {
+                insemStatsDiv.style.display = 'none';
+            }
         }
 
         // ✅ NOWOŚĆ: Sekcja Zadań w Karcie
@@ -1673,16 +1711,34 @@ function renderSubListsForCow(animal) {
             offspringDiv.innerHTML = '<div style="color:#999; font-size:12px; padding:5px;">Brak potomstwa.</div>';
         }
     }
-    // Historia Insem
+   // Historia Insem + Logika Skuteczności
     const histDiv = document.getElementById('cardHistory');
     if(histDiv) {
         histDiv.innerHTML = '';
         const h = animal.historyInsemination || [];
+        
+        // Przygotowanie danych do sprawdzenia, czy inseminacja była udana
+        const calvings = (animal.historyCalving || []).map(c => new Date(c.date));
+        const checkSuccess = (insemItem) => {
+            // 1. Jeśli krowa jest obecnie cielna i to jest to zacielenie
+            if (animal.isPregnantConfirmed && insemItem.date === animal.lastInsemination) return true;
+            // 2. Jeśli zacielenie doprowadziło do historycznego wycielenia (ciąża trwa ok. 270-295 dni)
+            const insemD = new Date(insemItem.date);
+            return calvings.some(calvD => {
+                const diff = (calvD - insemD) / (1000 * 3600 * 24);
+                return diff >= 260 && diff <= 300;
+            });
+        };
+
         h.map((val, idx) => ({val, idx})).reverse().forEach(item => {
             const x = item.val;
             const row = document.createElement('div');
             row.style.cssText = 'border-bottom:1px solid #eee; padding:5px 0; display:flex; justify-content:space-between; align-items:center;';
-            row.innerHTML = `<span>💉 ${x.date} <small>(${x.bull})</small></span>
+            
+            const timeStr = x.time ? ` ${x.time}` : '';
+            const successIcon = checkSuccess(x) ? '<span style="color:#27ae60; font-weight:bold; margin-left:5px;" title="Skuteczne zacielenie">✅</span>' : '';
+
+            row.innerHTML = `<span>💉 ${x.date}${timeStr} <small>(${x.bull})</small>${successIcon}</span>
                 <button class="btn-danger" style="padding:2px 8px; font-size:10px;" onclick="deleteInsemination('${animal.id}', ${item.idx})">🗑</button>`;
             histDiv.appendChild(row);
         });
@@ -2743,8 +2799,72 @@ function renderStatistics() {
                 }
             });
         }
-    } catch(e) { console.error("Błąd wykresu wycieleń:", e); }
-}
+   } catch(e) { console.error("Błąd wykresu wycieleń:", e); }
+
+    // --- 5. WYKRES SKUTECZNOŚCI INSEMINACJI ---
+    try {
+        const ctxEfficiency = document.getElementById('chartInsemEfficiency');
+        if (ctxEfficiency) {
+            const effBuckets = [0, 0, 0, 0]; // Index 0: "1-2", Index 1: "3-4", Index 2: "5-6", Index 3: ">6"
+            const effLabels = ['1-2 zab.', '3-4 zab.', '5-6 zab.', '> 6 zab.'];
+
+            myHerd.forEach(a => {
+                if(a.type !== 'krowa' && a.type !== 'jalowka') return;
+                
+                const calvings = (a.historyCalving || []).map(c => new Date(c.date)).sort((x,y) => x - y); // od najstarszego
+                const insems = (a.historyInsemination || []).map(i => new Date(i.date)).sort((x,y) => x - y);
+
+                let currentCount = 0;
+
+                // Grupujemy inseminacje w ciąże
+                for (let i = 0; i < insems.length; i++) {
+                    const insD = insems[i];
+                    currentCount++;
+                    
+                    // Czy to zacielenie zakończyło się znanym z historii wycieleniem?
+                    const matchingCalving = calvings.find(c => {
+                        const diff = (c - insD) / (1000 * 3600 * 24);
+                        return diff >= 260 && diff <= 300;
+                    });
+                    
+                    // Lub czy to jest to udane zacielenie prowadzące do obecnej (potwierdzonej) ciąży?
+                    const isCurrentPregnancy = a.isPregnantConfirmed && a.lastInsemination && insD.getTime() === new Date(a.lastInsemination).getTime();
+
+                    // Jeśli mamy sukces (potwierdzona ciąża lub wycielenie) -> zaliczamy próbę do wiadra
+                    if (matchingCalving || isCurrentPregnancy) {
+                        if (currentCount <= 2) effBuckets[0]++;
+                        else if (currentCount <= 4) effBuckets[1]++;
+                        else if (currentCount <= 6) effBuckets[2]++;
+                        else effBuckets[3]++;
+                        currentCount = 0; // Zerujemy licznik na poczet kolejnej ciąży
+                    }
+                }
+            });
+
+            if (window.myChartEfficiency) window.myChartEfficiency.destroy();
+            window.myChartEfficiency = new Chart(ctxEfficiency, {
+                type: 'bar',
+                data: {
+                    labels: effLabels,
+                    datasets: [{ 
+                        label: 'Liczba uzyskanych ciąż', 
+                        data: effBuckets, 
+                        backgroundColor: ['#27ae60', '#f39c12', '#e67e22', '#c0392b'], 
+                        borderRadius: 4 
+                    }]
+                },
+                options: {
+                    responsive: true, 
+                    maintainAspectRatio: false, 
+                    plugins: { legend: { display: false } },
+                    scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
+                }
+            });
+        }
+    } catch(e) { console.error("Błąd wykresu skuteczności inseminacji:", e); }
+
+} // <-- TO JEST KONIEC FUNKCJI renderStatistics()
+
 // =====================================================================
 // ✅ FUNKCJE OBSŁUGI MODALU SYNCHRONIZACJI
 // =====================================================================
@@ -3340,28 +3460,22 @@ async function deleteMyAccount() {
 }
 // ✅ FUNKCJA: Otwórz inseminację z Karty Zwierzęcia
 function openInsemForCurrentAnimal() {
-    // 1. Sprawdź czy mamy otwarte zwierzę
     if (!currentEditingAnimalId) return;
     const animal = myHerd.find(a => a.id === currentEditingAnimalId);
     if (!animal) return;
-
-    // 2. Zamknij kartę zwierzęcia (dla przejrzystości)
-    closeModal('animalCardModal');
     
-    // 3. Otwórz formularz inseminacji
+    closeModal('animalCardModal');
     openInsemModal();
     
-    // 4. Wypełnij dane
-    document.getElementById('insemTagInput').value = animal.tag; // Wpisz kolczyk
+    document.getElementById('insemTagInput') ? document.getElementById('insemTagInput').value = animal.tag : null;
     
-    // Ustaw datę na dziś (jeśli pole jest puste)
     const dateInput = document.getElementById('insemDate');
-    if (!dateInput.value) {
-        dateInput.valueAsDate = new Date();
-    }
+    if (!dateInput.value) dateInput.valueAsDate = new Date();
+
+    const timeInput = document.getElementById('insemTime');
+    if (timeInput && !timeInput.value) timeInput.value = new Date().toTimeString().slice(0,5);
     
-    // Opcjonalnie: wyczyść pole buhaja, żeby użytkownik musiał wybrać nowego
-    document.getElementById('insemBull').value = '';
+    if (document.getElementById('insemBull')) document.getElementById('insemBull').value = '';
 }
 // ============================================================
 // ✅ MODUŁ: ZMIANA LECZNICY (W OPCJACH)
@@ -3704,8 +3818,11 @@ function printHerdList() {
 function openInsemModal() { 
     document.getElementById('insemModal').style.display = 'flex'; 
     document.getElementById('insemDate').valueAsDate = new Date();
+    // NOWOŚĆ: Ustawienie aktualnej godziny
+    const timeInput = document.getElementById('insemTime');
+    if (timeInput) timeInput.value = new Date().toTimeString().slice(0,5);
+    
     document.getElementById('massInsemBull').value = '';
-    document.getElementById('insemAnimalSearch').value = '';
     
     // ✅ WYMUSZAMY CZYSZCZENIE LISTY PRZY KAŻDYM NOWYM OTWARCIU MODALA
     document.getElementById('insemAnimalList').innerHTML = ''; 
@@ -3789,13 +3906,15 @@ function applyMassSemen() {
 
 function submitMassInsem() {
     const date = document.getElementById('insemDate').value;
+    const timeInput = document.getElementById('insemTime');
+    const time = timeInput ? timeInput.value : ''; // Pobierz godzinę
+    
     if (!date) return alert("Wybierz datę inseminacji!");
 
     const checkboxes = document.querySelectorAll('.mass-insem-cb:checked');
     if (checkboxes.length === 0) return alert("Zaznacz ptaszkiem przynajmniej jedną sztukę do zacielenia!");
 
     let count = 0;
-
     checkboxes.forEach(cb => {
         const animalId = cb.value;
         const bullInput = document.querySelector(`.mass-insem-bull-input[data-id="${animalId}"]`);
@@ -3804,7 +3923,8 @@ function submitMassInsem() {
         const animal = myHerd.find(a => a.id === animalId);
         if (!animal) return;
 
-        const newHistory = { date, bull, note: 'Zacielenie', added: new Date().toISOString() };
+        // ✅ Dodano parametr "time" do zapisywanej historii
+        const newHistory = { date: date, time: time, bull: bull, note: 'Zacielenie', added: new Date().toISOString() };
         const history = animal.historyInsemination || [];
         history.push(newHistory);
 
