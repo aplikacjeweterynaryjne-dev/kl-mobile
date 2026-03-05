@@ -3610,10 +3610,13 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
 </div>
         </div>
 
-        <div style="background: #f7f7f7; padding: 15px; border-radius: 8px; border: 1px solid #eee;">
+<div style="background: #f7f7f7; padding: 15px; border-radius: 8px; border: 1px solid #eee;">
             <div class="form-row">
                 <label for="calcKlientInput">Klient (Możesz wpisać nowego):</label>
-                <input type="text" id="calcKlientInput" list="klientList" placeholder="Wpisz lub wybierz z listy..." style="width: 100%;">
+                <div style="display: flex; gap: 8px; align-items: center;">
+                    <input type="text" id="calcKlientInput" list="klientList" placeholder="Wpisz lub wybierz z listy..." style="width: 100%;">
+                    <button id="calcClientPanelBtn" class="btn primary small" style="display: none; background-color: #8e44ad; border-color: #732d91; margin: 0; white-space: nowrap; height: 100%;" title="Otwórz Panel Klienta">📱 Panel</button>
+                </div>
             </div>
             
             <div class="form-row">
@@ -4102,7 +4105,6 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
         
         <div id="archiveActionButtons" style="display:none; gap:5px; margin-top:10px; flex-wrap:wrap;">
              <button class="btn small" style="background:#34495e; color:white; flex:1;" onclick="loadCardsForUser(archiveUserSelect.value, '30days')">📅 Ost. 30 dni</button>
-             <button class="btn small" style="background:#7f8c8d; color:white; flex:1;" onclick="loadCardsForUser(archiveUserSelect.value, 'filter')">🔍 Wg filtrów</button>
              <button class="btn small" style="background:#c0392b; color:white; flex:1;" onclick="loadCardsForUser(archiveUserSelect.value, 'all')">📂 Wszystkie</button>
         </div>
     </div>
@@ -4112,9 +4114,9 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
     <input type="date" id="arcCardDateEnd" title="Data do">
     <input type="text" id="arcCardClient" placeholder="Filtruj klienta...">
     <input type="text" id="arcCardDoc" placeholder="Filtruj nr dok...">
+    <button id="btnFilterCards" class="btn primary" style="grid-column: 1 / -1;" onclick="loadCardsForUser(archiveUserSelect.value, 'filter')">🔍 Filtruj Wyniki</button>
     <button id="printSelectedCardsBtn" class="btn" style="background-color: #34495e; color: white; grid-column: 1 / -1;">🖨️ Drukuj Zaznaczone (0)</button>
 </div>
-
     <div class="table-container">
         <table id="archiveCardTable" class="sortable-table">
      <thead>
@@ -4154,20 +4156,21 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
         
         <div id="archiveReceiptActionButtons" style="display:none; gap:5px; margin-top:10px; flex-wrap:wrap;">
              <button class="btn small" style="background:#34495e; color:white; flex:1;" onclick="loadReceiptsForUser(archiveReceiptUserSelect.value, '30days')">📅 Ost. 30 dni</button>
-             <button class="btn small" style="background:#7f8c8d; color:white; flex:1;" onclick="loadReceiptsForUser(archiveReceiptUserSelect.value, 'filter')">🔍 Wg filtrów</button>
              <button class="btn small" style="background:#c0392b; color:white; flex:1;" onclick="loadReceiptsForUser(archiveReceiptUserSelect.value, 'all')">📂 Wszystkie</button>
         </div>
     </div>
 
-    <div id="archiveReceiptFilterControls" class="archive-filter-controls" style="display: none;"> <input type="date" id="arcReceiptDateStart" title="Data od">
+    <div id="archiveReceiptFilterControls" class="archive-filter-controls" style="display: none;"> 
+        <input type="date" id="arcReceiptDateStart" title="Data od">
         <input type="date" id="arcReceiptDateEnd" title="Data do">
         <input type="text" id="arcReceiptClient" placeholder="Filtruj klienta...">
-       <select id="arcReceiptStatus">
+        <select id="arcReceiptStatus">
             <option value="">Filtruj status...</option>
             <option value="Zapłacone">Zapłacone (Gotówka)</option>
-            <option value="Przelew">Przelew</option> <option value="Dług">Dług</option>
-            <option value="Nie wybrano">Nie wybrano</option>
+            <option value="Przelew">Przelew</option> 
+            <option value="Dług">Dług</option>
         </select>
+        <button id="btnFilterReceipts" class="btn primary" style="grid-column: 1 / -1;" onclick="loadReceiptsForUser(archiveReceiptUserSelect.value, 'filter')">🔍 Filtruj Wyniki</button>
     </div>
 
     <div class="table-container">
@@ -8368,15 +8371,63 @@ async function saveReceiptToArchive(receiptData) {
 
     // ✅ MODUŁ 5: Listener dla zmian klienta i checkboxa korekty
 
-// --- 1. Zmiana klienta w polu Kalkulatora uruchamia ładowanie paragonów ---
+// --- 1. Zmiana klienta w polu Kalkulatora ---
 document.getElementById('calcKlientInput').addEventListener('input', function() {
     const clientName = this.value.trim();
     
-    // Uruchom ładowanie (funkcja zaktualizowana w pkt. 2)
+    // A. Ładowanie starych paragonów do korekty
     if (typeof loadArchivedReceiptsForCorrection === 'function') {
         loadArchivedReceiptsForCorrection(clientName);
     }
+    
+    // B. Sprawdź, czy pokazać przycisk "Panel Klienta"
+    checkIfClientHasPanel(clientName);
 });
+
+/**
+ * Sprawdza w bazie 'konfiguracja' czy wpisany klient posiada konto (uid).
+ * Jeśli tak, pokazuje przycisk "Panel Klienta".
+ */
+async function checkIfClientHasPanel(clientName) {
+    const btn = document.getElementById('calcClientPanelBtn');
+    if (!btn) return;
+    
+    btn.style.display = 'none'; // domyślnie ukrywamy
+    btn.onclick = null; // resetujemy akcję
+
+    if (!clientName || !currentUserProfile) return;
+
+    try {
+        // Szukamy wśród kont o roli 'klient' w naszej lecznicy
+        const q = db.collection("konfiguracja")
+            .where("Rola", "==", "klient")
+            .where("ID lecznicy", "==", currentUserProfile['ID lecznicy']);
+        
+        const snap = await q.get();
+        let foundUid = null;
+
+        snap.docs.forEach(doc => {
+            const data = doc.data();
+            // Łączymy Imię i Nazwisko tak jak zapisuje się to w bazie
+            const fullName = `${data.Imie || ''} ${data.Nazwisko || ''}`.trim().toLowerCase();
+            
+            if (fullName === clientName.toLowerCase()) {
+                foundUid = data.uid;
+            }
+        });
+
+        // Jeśli klient z takim samym imieniem i nazwiskiem ma konto:
+        if (foundUid) {
+            btn.style.display = 'inline-block';
+            btn.onclick = (e) => {
+                e.preventDefault();
+                window.open(`panel-klienta.html?simulatedUid=${foundUid}`, '_blank');
+            };
+        }
+    } catch(e) {
+        console.error("Błąd sprawdzania panelu klienta w kalkulatorze:", e);
+    }
+}
 
 // --- 2. Zmiana filtra uruchamia filtrowanie (po stronie klienta) ---
 const correctionFilterInputs = ['corrDateStart', 'corrDateEnd', 'corrSumStart', 'corrSumEnd'];
@@ -12193,8 +12244,17 @@ async function loadCardsForUser(lekarz_uid, mode = '30days') {
         q = q.where("lekarz_uid", "==", lekarz_uid);
     }
 
-    // 2. OBSŁUGA TRYBÓW
+   // 2. OBSŁUGA TRYBÓW
+    if (mode === '30days' || mode === 'all') {
+        // Czyszczenie filtrów
+        document.getElementById('arcReceiptDateStart').value = '';
+        document.getElementById('arcReceiptDateEnd').value = '';
+        document.getElementById('arcReceiptClient').value = '';
+        document.getElementById('arcReceiptStatus').value = '';
+    }
+
     if (mode === '30days') {
+        const d = new Date();
         console.log("Tryb: Ostatnie 30 dni");
         // Ogranicz do daty
         const d = new Date();
@@ -12273,6 +12333,11 @@ async function loadCardsForUser(lekarz_uid, mode = '30days') {
 
         // Podepnij listenery checkboxów
         if (typeof setupArchiveCheckboxListeners === 'function') setupArchiveCheckboxListeners();
+
+        // Jeśli kliknięto "Filtruj", przefiltruj tabelę tekstowo po załadowaniu
+        if (mode === 'filter') {
+            applyCardFilters();
+        }
 
     } catch (error) {
         console.error("Błąd wczytywania kart:", error);
@@ -12851,8 +12916,17 @@ async function loadReceiptsForUser(lekarz_uid, mode = '30days') {
         q = q.where("lekarz_uid", "==", lekarz_uid);
     }
 
-    // 2. OBSŁUGA TRYBÓW
+   // 2. OBSŁUGA TRYBÓW
+    if (mode === '30days' || mode === 'all') {
+        // Czyszczenie filtrów po kliknięciu "30 dni" lub "Wszystkie"
+        document.getElementById('arcCardDateStart').value = '';
+        document.getElementById('arcCardDateEnd').value = '';
+        document.getElementById('arcCardClient').value = '';
+        document.getElementById('arcCardDoc').value = '';
+    }
+
     if (mode === '30days') {
+        console.log("Tryb: Ostatnie 30 dni");
         const d = new Date();
         d.setDate(d.getDate() - 30);
         const dateStr = d.toISOString().split('T')[0];
@@ -12918,8 +12992,13 @@ async function loadReceiptsForUser(lekarz_uid, mode = '30days') {
                     ${receipt.status === "Dług" ? `<button class="btn small btn-pay-debt" style="background-color: #27ae60; color: white;" data-receipt-id="${receipt.id}" data-receipt-klient="${receipt.klient}" data-receipt-suma="${suma}">Spłata</button>` : ''}
                 </td>
             `;
-            tableBody.appendChild(tr);
+       tableBody.appendChild(tr);
         });
+
+        // Jeśli kliknięto "Filtruj", przefiltruj lokalnie (Klient i Status)
+        if (mode === 'filter') {
+            applyReceiptFilters();
+        }
 
     } catch (error) {
         console.error("Błąd wczytywania paragonów:", error);
@@ -13299,27 +13378,11 @@ function sortTable(table, th) {
  * Podłącza wszystkie listenery do filtrów i sortowania
  */
 function setupArchiveEventListeners() {
-    // === Filtrowanie Kart ===
-    const cardFilters = ['arcCardDateStart', 'arcCardDateEnd', 'arcCardClient', 'arcCardDoc'];
-    cardFilters.forEach(id => {
-        const el = document.getElementById(id);
-        if (el) {
-            el.addEventListener('input', applyCardFilters);
-        }
-    });
+    // UWAGA: Usunięto automatyczne filtrowanie 'oninput' i 'onchange'. 
+    // Teraz filtrowanie odbywa się wyłącznie po naciśnięciu przycisku "Filtruj Wyniki" 
+    // (który wywołuje w HTML funkcję loadCardsForUser/loadReceiptsForUser).
 
-    // === Filtrowanie Paragonów ===
-    const receiptFilters = ['arcReceiptDateStart', 'arcReceiptDateEnd', 'arcReceiptClient', 'arcReceiptStatus'];
-    receiptFilters.forEach(id => {
-        const el = document.getElementById(id);
-        if (el) {
-            // Użyj 'change' dla <select> i <input type="date">, 'input' dla <input type="text">
-            const eventType = (el.tagName === 'SELECT' || el.type === 'date') ? 'change' : 'input';
-            el.addEventListener(eventType, applyReceiptFilters);
-        }
-    });
-
-    // === Sortowanie (obie tabele) ===
+    // === Sortowanie (obie tabele) pozostaje bez zmian ===
     document.querySelectorAll('.sortable-table th[data-sort-key]').forEach(th => {
         th.addEventListener('click', () => {
             const table = th.closest('.sortable-table');
