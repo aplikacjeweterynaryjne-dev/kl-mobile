@@ -75,7 +75,7 @@ const SYNC_PROTOCOLS = {
             { dayOffset: 15, time: '(Rano)', product: 'Luteosyl', dose: '2 ml im./szt' },
             { dayOffset: 16, time: '(Rano)', product: 'Luteosyl', dose: '2 ml im./szt' },
             { dayOffset: 16, time: '(Wieczorem)', product: 'Ovarelin', dose: '2 ml im./szt' },
-            { dayOffset: 17, time: '', product: 'Zabieg', dose: 'Inseminacja' }
+            { dayOffset: 17, time: '', product: 'Zacielenie', dose: 'Inseminacja' }
         ]
     },
     'ovsynch': {
@@ -85,7 +85,7 @@ const SYNC_PROTOCOLS = {
             { dayOffset: 6, time: '(Rano)', product: 'Luteosyl', dose: '2 ml im./szt' },
             { dayOffset: 7, time: '(Rano)', product: 'Luteosyl', dose: '2 ml im./szt' },
             { dayOffset: 8, time: '(Wieczorem)', product: 'Ovarelin', dose: '2 ml im./szt' },
-            { dayOffset: 9, time: '', product: 'Zabieg', dose: 'Inseminacja' }
+            { dayOffset: 9, time: '', product: 'Zacielenie', dose: 'Inseminacja' }
         ]
     },
     'jalowki': {
@@ -95,7 +95,7 @@ const SYNC_PROTOCOLS = {
             { dayOffset: 4, time: '(Rano)', product: 'Luteosyl', dose: '2 ml im./szt' },
             { dayOffset: 5, time: '(Rano)', product: 'Luteosyl', dose: '2 ml im./szt' },
             { dayOffset: 7, time: '(Wieczorem)', product: 'Ovarelin', dose: '2 ml im./szt' },
-            { dayOffset: 8, time: '', product: 'Zabieg', dose: 'Inseminacja' }
+            { dayOffset: 8, time: '', product: 'Zacielenie', dose: 'Inseminacja' }
         ]
     }
 };
@@ -3122,7 +3122,7 @@ function confirmSyncTask() {
     const t = pendingSyncTaskToConfirm;
     
     // Sprawdzamy czy to zadanie Inseminacji
-    const isInsem = t.doseDetails === 'Inseminacja' || t.title.includes('Zabieg');
+    const isInsem = t.doseDetails === 'Inseminacja' || t.title.includes('Zacielenie');
 
     const fakeLogId = 'temp_sync_' + Date.now();
     completedTasks.push({
@@ -4460,7 +4460,7 @@ function saveCustomSyncProtocol() {
     const insemOffset = parseInt(document.getElementById('csbInsemOffset').value);
     if (!isNaN(insemOffset) && steps.length > 0) {
         const maxDay = steps[steps.length - 1].dayOffset;
-        steps.push({ dayOffset: maxDay + insemOffset, time: '', product: 'Zabieg', dose: 'Inseminacja' });
+        steps.push({ dayOffset: maxDay + insemOffset, time: '', product: 'Zacielenie', dose: 'Inseminacja' });
     }
 
     const newProtocol = { name: name, steps: steps };
