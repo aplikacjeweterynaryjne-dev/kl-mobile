@@ -2389,15 +2389,116 @@ function renderHerdList(forceType = null) {
                     </span>
                 </div>`;
         }
-        div.innerHTML = `
+div.innerHTML = `
             <div style="display:flex; justify-content:space-between; align-items:center;">
-                <strong style="color:#2e7d32; font-size:16px;">${a.tag}</strong>
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <input type="checkbox" class="mass-animal-cb" value="${a.id}" onchange="toggleMassAnimalSelection()" style="width:20px; height:20px; accent-color:#c0392b;" onclick="event.stopPropagation();">
+                    <strong style="color:#2e7d32; font-size:16px;">${a.tag}</strong>
+                </div>
                 <span class="badge" style="background:#eee; color:#333; padding:2px 8px; border-radius:10px; font-size:10px;">${a.type.toUpperCase()}</span>
             </div>
             ${detailsHtml}
         `;
         list.appendChild(div);
     });
+}
+
+// ============================================================
+// ✅ LOGIKA MASOWEGO USUWANIA ZWIERZĄT
+// ============================================================
+
+function toggleMassAnimalSelection() {
+    const checkedBoxes = document.querySelectorAll('.mass-animal-cb:checked');
+    let bar = document.getElementById('massAnimalActionBar');
+    
+    if (!bar) {
+        bar = document.createElement('div');
+        bar.id = 'massAnimalActionBar';
+        bar.style.cssText = "position:fixed; bottom:75px; left:50%; transform:translateX(-50%); background:#c0392b; color:white; padding:15px 20px; border-radius:30px; display:none; align-items:center; gap:15px; z-index:9999; box-shadow: 0 5px 15px rgba(0,0,0,0.3);";
+        bar.innerHTML = `
+            <span id="massAnimalCount" style="font-weight:bold;">0 zazn.</span>
+            <button onclick="executeMassAnimalDelete()" style="background:white; color:#c0392b; border:none; padding:8px 15px; border-radius:20px; font-weight:bold; cursor:pointer;">🗑️ Usuń zaznaczone</button>
+            <button onclick="clearMassAnimalSelection()" style="background:transparent; border:1px solid white; color:white; padding:8px 15px; border-radius:20px; cursor:pointer;">❌</button>
+        `;
+        document.body.appendChild(bar);
+    }
+
+    if (checkedBoxes.length > 0) {
+        bar.style.display = 'flex';
+        document.getElementById('massAnimalCount').textContent = `${checkedBoxes.length} zazn.`;
+    } else {
+        bar.style.display = 'none';
+    }
+}
+
+function clearMassAnimalSelection() {
+    document.querySelectorAll('.mass-animal-cb:checked').forEach(cb => cb.checked = false);
+    toggleMassAnimalSelection();
+}
+
+async function executeMassAnimalDelete() {
+    const checkedBoxes = document.querySelectorAll('.mass-animal-cb:checked');
+    const idsToDelete = Array.from(checkedBoxes).map(cb => cb.value);
+
+    if (!confirm(`⚠️ Czy na pewno chcesz BEZPOWROTNIE usunąć ${idsToDelete.length} zaznaczonych zwierząt ze stada?`)) {
+        return;
+    }
+
+    try {
+        const batch = db.batch();
+        idsToDelete.forEach(id => {
+            const ref = db.collection('animals').doc(id);
+            batch.delete(ref);
+        });
+        await batch.commit();
+        
+        clearMassAnimalSelection();
+        showToast(`Usunięto ${idsToDelete.length} zwierząt.`, "success");
+    } catch (e) {
+        console.error("Błąd masowego usuwania:", e);
+        alert("Wystąpił błąd podczas usuwania.");
+    }
+}
+
+async function deleteAllHerd() {
+    if (!myHerd || myHerd.length === 0) {
+        alert("Twoje stado jest już puste.");
+        return;
+    }
+    
+    if (!confirm(`⚠️ KRYTYCZNE OSTRZEŻENIE ⚠️\n\nCzy na pewno chcesz usunąć WSZYSTKIE ${myHerd.length} ZWIERZĄT ze swojego stada?\n\nTej operacji nie można cofnąć!`)) {
+        return;
+    }
+    
+    const verify = prompt('Aby potwierdzić, wpisz wielkimi literami: USUŃ');
+    if (verify !== 'USUŃ') {
+        alert("Anulowano operację.");
+        return;
+    }
+
+    try {
+        const batch = db.batch();
+        let counter = 0;
+        
+        for (const animal of myHerd) {
+            batch.delete(db.collection('animals').doc(animal.id));
+            counter++;
+            
+            if (counter % 450 === 0) {
+                await batch.commit(); // Opróżnij partię, żeby nie przekroczyć limitu Firestore
+            }
+        }
+        
+        if (counter > 0) {
+            await batch.commit();
+        }
+        
+        showToast("Całe stado zostało usunięte.", "success");
+        clearMassAnimalSelection();
+    } catch (e) {
+        console.error("Błąd usuwania całego stada:", e);
+        alert("Wystąpił błąd podczas usuwania.");
+    }
 }
 // --- MASOWE AKCJE ---
 
@@ -2944,46 +3045,34 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-// 2. WSPÓLNA FUNKCJA LOGIKI STATUSU (Używa ustawień usg z konfiguracji)
+// 2. WSPÓLNA FUNKCJA LOGIKI STATUSU (Naprawiona)
 function calculateDetailedStatusFromDate(dateIsoStr) {
-    if (!dateIsoStr) return { statusText: "Pusta", color: "#333", isPregnant: false, isDriedOff: false };
-
+    if (!dateIsoStr) return { statusText: "Pusta", color: "#333", isPregnant: false, isDriedOff: false, usgStatus: 'negative' };
     const today = new Date();
     const eventDate = new Date(dateIsoStr);
     const diffDays = Math.floor((today - eventDate) / (1000 * 60 * 60 * 24));
-
-    // Pobierz ustawienia USG z globalnych (jeśli są, w przeciwnym razie domyślne)
+    
     const usgEnd = (typeof userSettings !== 'undefined' && userSettings.usg) ? userSettings.usg.end : 180; 
     const usgStart = (typeof userSettings !== 'undefined' && userSettings.usg) ? userSettings.usg.start : 30;
 
-    let statusText = "";
-    let color = "#333";
-    let isPregnant = false;
-    let isDriedOff = false;
+    let statusText = ""; let color = "#333"; let isPregnant = false; let isDriedOff = false; let usgStatus = 'negative';
 
     if (diffDays > 220) {
-        statusText = "Zasuszona";
-        color = "#c0392b"; // Czerwony
-        isPregnant = true;
-        isDriedOff = true;
+        statusText = "Zasuszona"; color = "#7f8c8d"; isPregnant = true; isDriedOff = true; usgStatus = 'positive';
     } else if (diffDays > usgEnd) {
-        // Przekroczyło termin badania -> Zakładamy Cielna
-        statusText = "Cielna";
-        color = "#27ae60"; // Zielony
-        isPregnant = true;
+        statusText = "Cielna"; color = "#27ae60"; isPregnant = true; usgStatus = 'positive';
     } else if (diffDays > usgStart) {
-        statusText = "Do USG";
-        color = "#f39c12"; // Pomarańczowy
+        statusText = "Do USG"; color = "#f39c12"; usgStatus = 'pending';
     } else {
-        statusText = "Pusta";
-        color = "#2980b9"; // Niebieski
+        // ✅ POPRAWKA: Za wcześnie na USG!
+        statusText = "Zacielona (<" + usgStart + " dni)"; color = "#9b59b6"; usgStatus = 'pending';
     }
 
-    return { statusText, color, isPregnant, isDriedOff };
+    return { statusText, color, isPregnant, isDriedOff, usgStatus };
 }
 
 
-// 3. Funkcja dodająca puste wiersze (7 kolumn z Lokalizacją)
+// 3. Funkcja dodająca puste wiersze (8 kolumn - dodana Matka)
 function addEmptyRows(count = 10) {
     const tbody = document.getElementById('importTableBody');
     if (!tbody) return;
@@ -2992,7 +3081,9 @@ function addEmptyRows(count = 10) {
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td><input type="text" class="imp-tag" placeholder="PL..."></td>
-            <td><input type="text" class="imp-loc" placeholder="np. Obora 1"></td> <td><input type="text" class="imp-type" list="impTypeList" placeholder="krowa"></td>
+            <td><input type="text" class="imp-loc" placeholder="np. Obora 1"></td>
+            <td><input type="text" class="imp-mother" placeholder="PL..."></td>
+            <td><input type="text" class="imp-type" list="impTypeList" placeholder="krowa"></td>
             <td><input type="text" class="imp-dob" placeholder="DD.MM.RRRR"></td>
             <td><input type="text" class="imp-calv" placeholder="DD.MM.RRRR"></td>
             <td><input type="text" class="imp-insem" placeholder="DD.MM.RRRR"></td>
@@ -3088,77 +3179,120 @@ function parseDatePL(dateStr) {
     return null;
 }
 
-// 7. Główny Import do Bazy
+// 7. Główny Import do Bazy (Z WALIDACJĄ I NAPRAWĄ WYKRESÓW)
 async function processHerdImport() {
     const tbody = document.getElementById('importTableBody');
     const rows = tbody.querySelectorAll('tr');
+    
+    // --- 1. ETAP WALIDACJI DANYCH ---
+    let hasErrors = false;
+    const allowedStatuses = ['pusta', 'do usg', 'cielna', 'zasuszona', 'wycielona < 60 dni', 'zacielona', '']; // Akceptowalne statusy
+
+    for (const row of rows) {
+        const inputs = row.querySelectorAll('input');
+        if (inputs.length < 8) continue;
+        
+        const tag = inputs[0].value.trim();
+        if (tag.length < 3) continue; // Pusty wiersz - ignorujemy
+
+        // Walidacja Dat (muszą przejść przez parseDatePL jeśli są wpisane)
+        [4, 5, 6].forEach(idx => {
+            const dateVal = inputs[idx].value.trim();
+            if (dateVal && !parseDatePL(dateVal)) {
+                inputs[idx].style.backgroundColor = '#ffcdd2'; // Czerwone tło błędu
+                hasErrors = true;
+            } else {
+                inputs[idx].style.backgroundColor = ''; // Reset
+            }
+        });
+
+        // Walidacja Statusu (Musi pasować do jakiegoś słowa z listy)
+        const statusVal = inputs[7].value.trim().toLowerCase();
+        const isStatusValid = allowedStatuses.some(s => statusVal.includes(s)) || statusVal === '';
+        
+        if (!isStatusValid) {
+            inputs[7].style.backgroundColor = '#ffcdd2';
+            hasErrors = true;
+        } else {
+            inputs[7].style.backgroundColor = '';
+        }
+    }
+
+    if (hasErrors) {
+        alert("❌ Wykryto błędy w danych!\n\nKomórki ze złym formatem daty lub nieprawidłowym statusem zostały zaznaczone na czerwono. Popraw je przed zapisem.");
+        return; // PRZERYWAMY IMPORT!
+    }
+
+    // --- 2. ETAP ZAPISU DO BAZY ---
     let addedCount = 0;
     const batch = db.batch();
 
-  for (const row of rows) {
+    for (const row of rows) {
         const inputs = row.querySelectorAll('input');
-        // Indexy: 0=Tag, 1=Loc, 2=Typ, 3=DOB, 4=Calv, 5=Insem, 6=Status
+        if (inputs.length < 8) continue;
+
+        // Indexy: 0=Tag, 1=Loc, 2=Mother, 3=Typ, 4=DOB, 5=Calv, 6=Insem, 7=Status
         const tag = inputs[0].value.trim();
-        const locRaw = inputs[1].value.trim(); // ✅ NOWE POLE: Lokalizacja
-        const typeRaw = inputs[2].value.trim().toLowerCase();
-        const dobRaw = inputs[3].value.trim(); 
-        const calvRaw = inputs[4].value.trim();
-        const insemRaw = inputs[5].value.trim();
-        const statusRaw = inputs[6].value.trim().toLowerCase();
+        const locRaw = inputs[1].value.trim(); 
+        const motherRaw = inputs[2].value.trim(); // ✅ KOLUMNA MATKA
+        const typeRaw = inputs[3].value.trim().toLowerCase();
+        const dobRaw = inputs[4].value.trim(); 
+        const calvRaw = inputs[5].value.trim();
+        const insemRaw = inputs[6].value.trim();
+        const statusRaw = inputs[7].value.trim().toLowerCase();
 
         if (tag.length > 2) {
-            // Typ
             let animalType = 'krowa';
             if (typeRaw.includes('jał') || typeRaw.includes('jal')) animalType = 'jalowka';
             else if (typeRaw.includes('byk')) animalType = 'byk';
-            
-            // Daty
+
             const dob = parseDatePL(dobRaw);
             const lastCalving = parseDatePL(calvRaw);
             const lastInsem = parseDatePL(insemRaw);
             
-            // Logika Statusu (Priorytety: Wpisany ręcznie > Obliczony z daty)
             let pregStatus = 'negative';
             let isPregnant = false;
             let usgStatus = 'negative';
             let isDriedOff = false;
 
-            // Jeśli wpisany status zawiera słowa kluczowe
+            // Zaawansowana logika statusu
             if (statusRaw.includes('zasusz')) {
-                isDriedOff = true; isPregnant = true; pregStatus = 'pregnant'; usgStatus = 'positive';
+                isDriedOff = true; isPregnant = true; usgStatus = 'positive';
             } else if (statusRaw.includes('cieln') || statusRaw.includes('ciąża')) {
-                isPregnant = true; pregStatus = 'pregnant'; usgStatus = 'positive';
+                isPregnant = true; usgStatus = 'positive';
             } else if (statusRaw.includes('usg') || statusRaw.includes('badani')) {
-                pregStatus = 'check'; usgStatus = 'pending';
-            }
-            // Jeśli użytkownik zostawił puste, a data wskazuje na Pusta -> to Pusta
-            // System wyliczył status wizualnie w funkcji handleSmartLogic, 
-            // ale tutaj musimy upewnić się, co zapisać w bazie.
-            
-            // Jeśli jest data zacielenia, ale status nie wskazuje na ciążę/usg -> traktujemy jako pusta po kryciu (np. wynik negatywny usg)
-            // Chyba że funkcja smart wstawiła "Pusta" lub "Do USG", wtedy user to widzi.
-            
-            // Dodatkowe zabezpieczenie: Jeśli data zacielenia > 220 dni i status pusty (user nie zmienił), wymuś zasuszenie
-            if (lastInsem && !isPregnant && !isDriedOff) {
-                 const result = calculateDetailedStatusFromDate(lastInsem);
-                 if (result.isDriedOff) { isDriedOff = true; isPregnant = true; pregStatus = 'pregnant'; usgStatus = 'positive'; }
-                 else if (result.isPregnant) { isPregnant = true; pregStatus = 'pregnant'; usgStatus = 'positive'; }
-                 else if (result.statusText === 'Do USG') { pregStatus = 'check'; usgStatus = 'pending'; }
+                usgStatus = 'pending';
+            } else if (statusRaw.includes('zacielona')) {
+                usgStatus = 'pending'; // Nowy status "Za wcześnie"
             }
 
-           const animalRef = db.collection('animals').doc();
+            // Jeśli użytkownik nic nie wpisał, pozwól systemowi zadecydować
+            if (lastInsem && !isPregnant && !isDriedOff && usgStatus === 'negative') {
+                 const result = calculateDetailedStatusFromDate(lastInsem);
+                 isDriedOff = result.isDriedOff;
+                 isPregnant = result.isPregnant;
+                 usgStatus = result.usgStatus;
+            }
+
+            const animalRef = db.collection('animals').doc();
             batch.set(animalRef, {
                 ownerUid: currentUser.uid,
                 tag: tag,
-                location: locRaw, // ✅ NOWE POLE ZAPISYWANE DO BAZY
+                location: locRaw, 
+                motherTag: motherRaw, // ✅ ZAPIS MATKI
                 type: animalType,
-                dob: dob,                     // Data urodzenia
+                dob: dob,       
                 lastCalving: lastCalving,
                 lastInsemination: lastInsem,
                 isPregnantConfirmed: isPregnant,
                 usgStatus: usgStatus,
                 isDriedOff: isDriedOff,
-                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                
+                // ✅ FIX WYKRESÓW: Te 3 linie ratują aplikację przed crashowaniem!
+                historyInsemination: [],
+                historyCalving: [],
+                lastActivityDate: new Date().toISOString().split('T')[0]
             });
             addedCount++;
 
@@ -3173,10 +3307,9 @@ async function processHerdImport() {
         addEmptyRows(20);
         closeModal('importHerdModal');
     } else {
-        alert("Brak danych do importu.");
+        alert("Brak danych do importu (upewnij się, że wpisałeś numery kolczyków).");
     }
 }
-
 // ✅ FUNKCJA USUWANIA KONTA (BEZ ZMIAN)
 async function deleteMyAccount() {
     const confirmation = prompt("⚠️ USUWANIE KONTA ⚠️\n\nAby trwale usunąć konto i wszystkie dane stada, wpisz wielkimi literami słowo: USUŃ");
