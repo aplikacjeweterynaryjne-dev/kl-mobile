@@ -1118,15 +1118,26 @@ function renderTasks(allTasks) {
                           onclick="event.stopPropagation(); initiateSyncTaskCompletion('${t.id}')">`;
 
         } else {
-            // --- WYGLĄD STANDARDOWEGO ZADANIA ---
-            const insemStr = t.insemDate ? (new Date(t.insemDate).toLocaleDateString('pl-PL')) : '-';
-            const estCalvStr = t.calvDate ? (new Date(t.calvDate).toLocaleDateString('pl-PL')) : '-';
+           // --- WYGLĄD STANDARDOWEGO ZADANIA ---
+            let insemStr = '-';
+            let estCalvStr = '-';
             
-        infoHtml = `
+            // Pokazujemy daty tylko jeśli krowa NIE JEST oznaczona jako "Pusta po USG"
+            if (taskAnimal && taskAnimal.lastInsemination && taskAnimal.usgStatus !== 'negative') {
+                insemStr = new Date(taskAnimal.lastInsemination).toLocaleDateString('pl-PL');
+                if (taskAnimal.isPregnantConfirmed || taskAnimal.usgStatus === 'pending') {
+                    const est = addDays(new Date(taskAnimal.lastInsemination), userSettings.gestation || 280);
+                    estCalvStr = est.toLocaleDateString('pl-PL');
+                }
+            }
+
+            infoHtml = `
                 <div style="font-size:15px; font-weight:bold; color:#333;">${t.title}</div>
                 <div style="font-size: 11px; color: #777; margin: 4px 0; line-height: 1.4;">
                     Termin: <b style="color:${dateColor}">${dueStr}</b><br>
-                    💉 Krycie: <b>${insemStr}</b> | 🍼 Przew. poród: <b>${estCalvStr}</b>
+                    ${(taskAnimal && taskAnimal.usgStatus !== 'negative' && taskAnimal.lastInsemination) 
+                        ? `💉 Krycie: <b>${insemStr}</b> | 🍼 Przew. poród: <b>${estCalvStr}</b>` 
+                        : '<span style="color:#c0392b; font-weight:bold;">❌ Pusta (Gotowa do zabiegu)</span>'}
                 </div>
                 <div class="task-animal-tag" onclick="openAnimalCard('${t.animalId}')">
                     ${t.tag} 
@@ -1578,10 +1589,13 @@ function openAnimalCard(id) {
             30 mies: <b>${d30.toLocaleDateString('pl-PL')}</b>
         `;
     } 
-    // --- 4. SEKCJA DLA KROWY (Laktacja i Dane) ---
+   // --- 4. SEKCJA DLA KROWY (Laktacja i Dane) ---
     else {
         document.getElementById('cardLastCalving').textContent = animal.lastCalving || '---';
-        document.getElementById('cardLastInsem').textContent = animal.lastInsemination || '---';
+        
+        // Ukryj datę, jeśli krowa po USG jest pusta (widać to będzie w panelu historii)
+        const insText = (animal.lastInsemination && animal.usgStatus !== 'negative') ? animal.lastInsemination : 'Brak aktywnego';
+        document.getElementById('cardLastInsem').textContent = insText;
         
         // --- OBLICZANIE DNI LAKTACJI (DIM) ---
         const dimEl = document.getElementById('cardDimStat');
@@ -1604,23 +1618,32 @@ function openAnimalCard(id) {
             }
         }
 
-// Status Cielności
+// Status Cielności i Prognozowane Wycielenie
         const statusDiv = document.getElementById('cardPregStatus');
         if(statusDiv) {
             const statusInfo = getDetailedStatus(animal); 
             statusDiv.textContent = statusInfo.text;
             statusDiv.style.color = statusInfo.color;
+            
+            // Dodaj prognozowaną datę wycielenia, TYLKO jeśli krowa jest po aktywnym/pozytywnym zabiegu
+            if (animal.lastInsemination && animal.usgStatus !== 'negative') {
+                const estCalv = addDays(new Date(animal.lastInsemination), userSettings.gestation || 280);
+                const estCalvStr = estCalv.toLocaleDateString('pl-PL');
+                statusDiv.innerHTML += `<br><span style="color:#e67e22; font-size: 13px; font-weight: normal;">🐮 Prognozowany poród: <b style="font-size:14px;">${estCalvStr}</b></span>`;
+            }
         }
 
-        // ✅ NOWOŚĆ: Obliczanie i wyświetlanie Statystyk Inseminacji w Karcie
+        // ✅ STATYSTYKI INSEMINACJI (Naprawiona skuteczność)
         const insemStatsDiv = document.getElementById('cardInsemStats');
         if (insemStatsDiv) {
             if (animal.type === 'krowa' || animal.type === 'jalowka') {
                 let currentLactInsems = 0;
                 let prevLactInsems = 0;
+                
+                // Licznik absolutnie WSZYSTKICH prób w historii (udanych i nieudanych)
                 let totalInsems = animal.historyInsemination ? animal.historyInsemination.length : 0;
-
-                const sortedCalvings = (animal.historyCalving || []).map(c => new Date(c.date)).sort((a,b) => b - a); // Najnowsze wycielenia najpierw
+                
+                const sortedCalvings = (animal.historyCalving || []).map(c => new Date(c.date)).sort((a,b) => b - a);
                 const lastCalv = sortedCalvings[0] || new Date(0);
                 const prevCalv = sortedCalvings[1] || new Date(0);
 
@@ -1630,18 +1653,25 @@ function openAnimalCard(id) {
                     else if (d >= prevCalv && d < lastCalv) prevLactInsems++;
                 });
 
-                // Liczymy udane ciąże
+                // Liczymy TYLKO potwierdzone ciąże (czyli te z historii wycieleń + ewentualna trwająca)
                 let pregnanciesCount = sortedCalvings.length + (animal.isPregnantConfirmed ? 1 : 0);
-                let avgInsems = pregnanciesCount > 0 ? (totalInsems / pregnanciesCount).toFixed(1) : 0;
+                
+                // Prawidłowa matematyka dla średniej: jeśli jest 0 ciąż, wyświetl liczbę "zmarnowanych" prób
+                let avgDisplay = '';
+                if (pregnanciesCount > 0) {
+                    avgDisplay = (totalInsems / pregnanciesCount).toFixed(1) + ' zab. / ciążę';
+                } else {
+                    avgDisplay = totalInsems + ' zab. (Brak ciąż)';
+                }
 
                 insemStatsDiv.innerHTML = `
                     <div style="display:flex; justify-content: space-between; border-bottom: 1px dashed #ccc; padding-bottom: 4px; margin-bottom: 4px;">
-                        <span style="color:#2e7d32; font-weight:bold;">Skuteczność:</span> <strong style="color:#2e7d32;">${avgInsems} zab. / ciążę</strong>
+                        <span style="color:#2e7d32; font-weight:bold;">Średnia skuteczność:</span> <strong style="color:#c0392b;">${avgDisplay}</strong>
                     </div>
                     <div style="display:flex; justify-content: space-between; color: #555;">
                         <span title="Inseminacje po ostatnim wycieleniu">Bieżąca: <b>${currentLactInsems}</b></span>
                         <span title="Inseminacje w poprzedniej laktacji">Poprzednia: <b>${prevLactInsems}</b></span>
-                        <span>Razem: <b>${totalInsems}</b></span>
+                        <span>Łącznie prób: <b>${totalInsems}</b></span>
                     </div>
                 `;
                 insemStatsDiv.style.display = 'block';
@@ -2441,10 +2471,11 @@ function renderHerdList(forceType = null) {
                     </div>
                 </div>`;
         } 
-        // --- WIDOK DLA JAŁÓWKI (Pkt 6 + status cielności) ---
+       // --- WIDOK DLA JAŁÓWKI (Pkt 6 + status cielności) ---
         else if (a.type === 'jalowka') {
             const statusInfo = getDetailedStatus(a);
-            const ins = a.lastInsemination ? a.lastInsemination : '-';
+            // Ukrywamy datę, jeśli po USG jest pusta
+            const ins = (a.lastInsemination && a.usgStatus !== 'negative') ? a.lastInsemination : '-';
             
             detailsHtml = `
                 <div style="font-size:11px; color:#555; margin-top:5px; display:grid; grid-template-columns: 1fr 1fr; gap:5px;">
@@ -2455,10 +2486,11 @@ function renderHerdList(forceType = null) {
                     </span>
                 </div>`;
         }
- // --- WIDOK DLA KROWY (Z LOKALIZACJĄ) ---
+// --- WIDOK DLA KROWY (Z LOKALIZACJĄ) ---
         else {
             const statusInfo = getDetailedStatus(a);
-            const ins = a.lastInsemination ? a.lastInsemination : '-';
+            // Ukrywamy datę, jeśli po USG jest pusta
+            const ins = (a.lastInsemination && a.usgStatus !== 'negative') ? a.lastInsemination : '-';
             let calvTermin = '-';
             let dimLabel = '-';
             
