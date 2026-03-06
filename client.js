@@ -1331,6 +1331,38 @@ function initiateTaskCompletion(taskId, type, animalId, dueDateStr) {
     modal.style.display = 'flex';
 }
 
+// ============================================================
+// ✅ RĘCZNE / WCZEŚNIEJSZE WYCIELENIE
+// ============================================================
+function initiateEarlyCalving(animalId) {
+    const animal = myHerd.find(a => a.id === animalId);
+    if (!animal) return;
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    
+    // Zapisujemy "sztuczne" zadanie w systemie, 
+    // aby stara, sprawdzona logika mogła je płynnie przejąć.
+    pendingTask = { 
+        taskId: `${animalId}_calving_manual_${Date.now()}`, 
+        type: 'calving', 
+        animalId: animalId, 
+        dueDate: new Date() 
+    };
+    
+    const modal = document.getElementById('taskConfirmModal');
+    const txt = document.getElementById('taskConfirmText');
+    
+    document.getElementById('usgResultOptions').classList.add('hidden');
+    document.getElementById('calvingConfirmOptions').classList.remove('hidden');
+    document.getElementById('standardConfirmBtns').classList.add('hidden');
+    
+    txt.innerHTML = `Zgłaszasz wycielenie dla: <b style="color:#2e7d32;">${animal.tag}</b>.<br>Potwierdź datę:`;
+    document.getElementById('calvingRealDate').value = todayStr;
+    
+    closeModal('animalCardModal'); // Zamykamy kartę krowy
+    modal.style.display = 'flex';  // Otwieramy modal potwierdzenia
+}
+
 function confirmTaskStandard() {
     if(!pendingTask) return;
     
@@ -1680,10 +1712,29 @@ function openAnimalCard(id) {
             }
         }
 
+       // ✅ NOWOŚĆ: Guzik "Zgłoś Wycielenie" w Karcie Krowy (tylko dla cielnych)
+        const existingEarlyBtn = document.getElementById('btnEarlyCalvingDynamic');
+        if (existingEarlyBtn) existingEarlyBtn.remove(); 
+
+        if (animal.isPregnantConfirmed) {
+            const earlyBtn = document.createElement('button');
+            earlyBtn.id = 'btnEarlyCalvingDynamic';
+            earlyBtn.className = 'btn small';
+            // Ciemnopomarańczowy kolor (wyróżniający)
+            earlyBtn.style.cssText = 'background:#d35400; color:white; margin-top:10px; width:100%; border:none; font-weight:bold; font-size:14px; padding: 10px; border-radius: 8px; cursor:pointer;';
+            earlyBtn.innerHTML = '🍼 Zgłoś Wycielenie';
+            earlyBtn.onclick = () => initiateEarlyCalving(animal.id);
+            
+            const statsPanel = document.getElementById('cowStatsPanel');
+            if (statsPanel) {
+                // Wstawiamy guzik na sam dół panelu danych rozrodczych
+                statsPanel.appendChild(earlyBtn);
+            }
+        }
+
         // ✅ NOWOŚĆ: Sekcja Zadań w Karcie
         const cardTasksDiv = document.getElementById('cardTasksSection');
         if (cardTasksDiv) cardTasksDiv.remove(); // Usuń starą sekcję jeśli istnieje (żeby nie dublować)
-
         // Szukamy aktywnych zadań dla tego zwierzęcia
         const animalTasks = window.myAllTasksGlobal.filter(t => t.animalId === id && !t.isDone);
 
