@@ -2425,25 +2425,34 @@ tr.filled-row td {
 #reportWizytyTable .col-zuzycia li {
     margin-bottom: 2px !important; /* Mały odstęp między lekami */
 }
-/* --- POPRAWIONE STYLE DLA ZNACZNIKÓW ROZLICZENIA --- */
+/* --- POPRAWIONE STYLE DLA ZNACZNIKÓW ROZLICZENIA I DNI WOLNYCH --- */
 
 /* Styl dla dnia, który jest ROZLICZONY (Zielone tło) */
 .day-cell.is-settled {
-    background-color: #d4edda !important; /* Jasna zieleń */
-    border: 1px solid #155724 !important; /* Ciemniejsza ramka */
+    background-color: #d4edda !important; 
+    border: 1px solid #155724 !important; 
     position: relative;
 }
-
-/* Dodajemy mały znaczek "✔" w tle, żeby było wiadomo dlaczego jest zielone */
 .day-cell.is-settled::after {
-    content: '✔';
-    position: absolute;
-    top: 2px;
-    right: 4px;
-    font-size: 14px;
-    color: #155724;
-    font-weight: bold;
-    opacity: 0.6;
+    content: '✔'; position: absolute; top: 2px; right: 4px;
+    font-size: 14px; color: #155724; font-weight: bold; opacity: 0.6;
+}
+
+/* Styl dla dnia, który jest WOLNY (Antracytowe tło) */
+.day-cell.is-day-off {
+    background-color: #36454F !important; /* Antracyt */
+    color: #ffffff !important; /* Biały tekst, żeby był czytelny na ciemnym tle */
+    border: 1px solid #2C3E50 !important; 
+    position: relative;
+}
+.day-cell.is-day-off::after {
+    content: '🏖️'; position: absolute; top: 2px; right: 4px;
+    font-size: 14px; opacity: 0.9;
+}
+/* Modyfikacja licznika zadań na antracycie */
+.day-cell.is-day-off .day-summary {
+    background: rgba(255,255,255,0.2) !important;
+    color: white !important;
 }
 
 /* Zapobiegamy zaznaczaniu tekstu podczas przytrzymywania */
@@ -12337,7 +12346,7 @@ async function loadCardsForUser(lekarz_uid, mode = '30days') {
         filterControls.style.display = 'grid';
     }
 
-    try {
+ try {
         const snapshot = await q.get();
         
         if (snapshot.empty) {
@@ -12347,8 +12356,27 @@ async function loadCardsForUser(lekarz_uid, mode = '30days') {
         
         tableBody.innerHTML = '';
         
-        snapshot.docs.forEach(doc => {
-            const card = { id: doc.id, ...doc.data() };
+        // 1. Zamień pobrane dane na zwykłą tablicę
+        let cardsArray = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+        // 2. ✅ LOGIKA SORTOWANIA: Data malejąco -> Numer malejąco
+        cardsArray.sort((a, b) => {
+            const dateA = a.dataWykonania || '';
+            const dateB = b.dataWykonania || '';
+            
+            // Jeśli daty są różne, ułóż najnowsze na górze
+            if (dateA !== dateB) {
+                return dateB.localeCompare(dateA); 
+            }
+            
+            // Jeśli daty są te same (ten sam dzień), ułóż po numerze (liczniku) od największego
+            const counterA = parseInt(a.counter) || 0;
+            const counterB = parseInt(b.counter) || 0;
+            return counterB - counterA; 
+        });
+        
+        // 3. Renderuj już idealnie posortowaną listę
+        cardsArray.forEach(card => {
             currentArchiveCardsCache.push(card); // Dodaj do cache
 
             const tr = document.createElement('tr');
@@ -13807,20 +13835,22 @@ async function checkLastSettlement(targetUid) {
         return;
     }
 
-    try {
-        // 3. Szukamy najnowszej daty w kolekcji ZNACZNIKÓW KALENDARZA
-        // Kolekcja: kalendarz_rozliczenia, sortowanie po dacie malejąco
+try {
+        // 3. Szukamy najnowszej daty rozliczenia (z pominięciem dni wolnych)
+        // Pobieramy 7 najnowszych znaczników, by w JavaScript wyfiltrować wolne dni bez konieczności tworzenia złożonych indeksów bazy
         const q = db.collection("kalendarz_rozliczenia")
                     .where("uid", "==", targetUid)
-                    .orderBy("data", "desc") // Najnowsze na górze
-                    .limit(1);
+                    .orderBy("data", "desc") 
+                    .limit(7);
 
         const snapshot = await q.get();
+        
+        // Szukamy pierwszego znacznika, który NIE JEST "dniem wolnym" (czyli jest rozliczony lub stary wpis bez ustalonego typu)
+        const validDoc = snapshot.docs.find(doc => doc.data().typ !== 'wolny');
 
-        if (!snapshot.empty) {
-            // Znaleziono wpis
-            const data = snapshot.docs[0].data();
-            const lastDate = data.data; // Data w formacie YYYY-MM-DD
+        if (validDoc) {
+            const data = validDoc.data();
+            const lastDate = data.data;
             
             // Formatowanie daty na polski (DD.MM.RRRR)
             const parts = lastDate.split('-');
@@ -15805,9 +15835,9 @@ function renderTodayView(visits, dateToShow) {
         const month = date.getMonth(); // 0-11
         monthViewTitle.textContent = date.toLocaleDateString('pl-PL', { month: 'long', year: 'numeric' });
 
-        // --- 1. PRZYGOTOWANIE DANYCH ROZLICZEŃ ---
+       // --- 1. PRZYGOTOWANIE DANYCH ZNACZNIKÓW (ROZLICZEŃ I WOLNEGO) ---
         const targetUid = calendarUserSelect.value;
-        let settledDaysSet = new Set();
+        let dayStatusMap = new Map(); // Zmieniono na Map, żeby trzymać typ statusu
 
         // Jeśli wybrano konkretnego użytkownika (nie "ALL"), pobierz jego znaczniki
         if (targetUid && targetUid !== "ALL") {
@@ -15818,10 +15848,12 @@ function renderTodayView(visits, dateToShow) {
                             .where("miesiac", "==", monthStr);
                 const snap = await q.get();
                 snap.forEach(doc => {
-                    settledDaysSet.add(doc.data().data); 
+                    const data = doc.data();
+                    // Zapisujemy: "2025-11-15" => "rozliczony" lub "wolny" (domyślnie rozliczony dla starych danych)
+                    dayStatusMap.set(data.data, data.typ || 'rozliczony'); 
                 });
             } catch (e) {
-                console.error("Błąd pobierania znaczników rozliczeń:", e);
+                console.error("Błąd pobierania znaczników kalendarza:", e);
             }
         }
 
@@ -15858,9 +15890,14 @@ function renderTodayView(visits, dateToShow) {
             const todayISO = new Date().toISOString().split('T')[0];
             if (dayString === todayISO) cell.classList.add('is-today');
 
-            // --- CZY ROZLICZONY (ZIELONY) ---
-            if (settledDaysSet.has(dayString)) {
-                cell.classList.add('is-settled');
+          // --- CZY ROZLICZONY CZY WOLNY ---
+            if (dayStatusMap.has(dayString)) {
+                const typStatusu = dayStatusMap.get(dayString);
+                if (typStatusu === 'wolny') {
+                    cell.classList.add('is-day-off'); // Antracyt
+                } else {
+                    cell.classList.add('is-settled'); // Zielony
+                }
             }
 
             // Zawartość komórki
@@ -15941,59 +15978,90 @@ function renderTodayView(visits, dateToShow) {
             monthGridBody.appendChild(cell);
         }
     }
-    /**
-     * ✅ FUNKCJA OBSŁUGI DŁUGIEGO PRZYTRZYMANIA
-     * Wyświetla potwierdzenie i zmienia kolor dnia.
+   /**
+     * ✅ NOWA FUNKCJA OBSŁUGI DŁUGIEGO PRZYTRZYMANIA
+     * Otwiera okienko modalne z wyborem typu (Rozliczony / Dzień Wolny)
      */
     async function handleLongPressSettlement(dateString, uid, cellElement) {
         if (!currentUserProfile) return;
         
-        // Sprawdź czy wybrano konkretnego usera
         if (!uid || uid === "ALL") {
-            alert("Aby rozliczać dni, wybierz konkretnego pracownika z listy filtrów.");
+            alert("Aby zarządzać dniami, wybierz konkretnego pracownika z listy filtrów.");
             return;
         }
 
-        // Sprawdź uprawnienia
         const canEdit = (currentUserProfile.Rola === 'administrator' || currentUserProfile.Rola === 'właściciel' || currentUserProfile.uid === uid);
         if (!canEdit) {
-            alert("Nie masz uprawnień do oznaczania rozliczeń tego pracownika.");
+            alert("Nie masz uprawnień do edycji kalendarza tego pracownika.");
             return;
         }
 
-        const isCurrentlySettled = cellElement.classList.contains('is-settled');
-        const actionText = isCurrentlySettled ? "COFNĄĆ rozliczenie" : "ZATWIERDZIĆ rozliczenie";
-        
-        // ✅ WYŚWIETL ZAPYTANIE (CONFIRM)
-        if (confirm(`Czy na pewno chcesz ${actionText} dla dnia ${dateString}?`)) {
-            
-            // --- LOGIKA ZAPISU DO BAZY (Taka sama jak wcześniej) ---
-            const monthStr = dateString.substring(0, 7); 
-            const docId = `${uid}_${dateString}`; 
+        const isSettled = cellElement.classList.contains('is-settled');
+        const isDayOff = cellElement.classList.contains('is-day-off');
+        const hasAnyMarker = isSettled || isDayOff;
 
+        // Tworzymy na szybko overlay z wyborem
+        const choiceOverlay = document.createElement('div');
+        choiceOverlay.style.cssText = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:20000;display:flex;justify-content:center;align-items:center;";
+
+        const deleteBtnHtml = hasAnyMarker 
+            ? `<button id="btnRemoveMarker" class="btn warn" style="width:100%; margin-bottom:15px; font-size:16px;">🗑️ Usuń oznaczenie</button>` 
+            : '';
+
+        choiceOverlay.innerHTML = `
+            <div class="form-card" style="width:320px; text-align:center; padding:25px; background:white; border-radius:12px; box-shadow:0 10px 30px rgba(0,0,0,0.3);">
+                <h3 style="margin-top:0; margin-bottom:20px; color:#333;">Oznaczanie dnia: ${dateString}</h3>
+                
+                <button id="btnSetSettled" class="btn" style="width:100%; margin-bottom:10px; background-color:#27ae60; color:white; font-size:16px;">✅ Oznacz: Dzień Rozliczony</button>
+                <button id="btnSetDayOff" class="btn" style="width:100%; margin-bottom:20px; background-color:#36454F; color:white; font-size:16px;">🏖️ Oznacz: Dzień Wolny</button>
+                
+                ${deleteBtnHtml}
+                
+                <hr style="border:0; border-top:1px solid #eee; margin:15px 0;">
+                <button id="btnCancelMarker" class="btn ghost small" style="width:100%;">Anuluj</button>
+            </div>
+        `;
+        document.body.appendChild(choiceOverlay);
+
+        const closeChoice = () => { if(choiceOverlay.parentNode) choiceOverlay.parentNode.removeChild(choiceOverlay); };
+        
+        const monthStr = dateString.substring(0, 7); 
+        const docId = `${uid}_${dateString}`;
+
+        // Akcja: ZAPISZ
+        const saveMarker = async (type) => {
+            closeChoice();
             try {
-                if (isCurrentlySettled) {
-                    // Usuwanie
-                    await db.collection("kalendarz_rozliczenia").doc(docId).delete();
-                    cellElement.classList.remove('is-settled');
-                    showToast(`Cofnięto rozliczenie: ${dateString}`, 'info');
-                } else {
-                    // Dodawanie
-                    await db.collection("kalendarz_rozliczenia").doc(docId).set({
-                        uid: uid,
-                        data: dateString,
-                        miesiac: monthStr,
-                        timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-                        oznaczyl_kto: `${currentUserProfile.Imie} ${currentUserProfile.Nazwisko}`
-                    });
-                    cellElement.classList.add('is-settled');
-                    showToast(`Rozliczono dzień: ${dateString}`, 'success');
-                }
-            } catch (error) {
-                console.error("Błąd bazy:", error);
-                alert("Wystąpił błąd połączenia.");
-            }
-        }
+                await db.collection("kalendarz_rozliczenia").doc(docId).set({
+                    uid: uid,
+                    data: dateString,
+                    miesiac: monthStr,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                    oznaczyl_kto: `${currentUserProfile.Imie} ${currentUserProfile.Nazwisko}`,
+                    typ: type // 'rozliczony' lub 'wolny'
+                });
+                
+                cellElement.classList.remove('is-settled', 'is-day-off');
+                cellElement.classList.add(type === 'wolny' ? 'is-day-off' : 'is-settled');
+                showToast(`Zapisano status dnia: ${dateString}`, 'success');
+            } catch(e) { console.error(e); alert("Błąd zapisu."); }
+        };
+
+        // Akcja: USUŃ
+        const removeMarker = async () => {
+            closeChoice();
+            try {
+                await db.collection("kalendarz_rozliczenia").doc(docId).delete();
+                cellElement.classList.remove('is-settled', 'is-day-off');
+                showToast(`Usunięto oznaczenie: ${dateString}`, 'info');
+            } catch(e) { console.error(e); alert("Błąd usuwania."); }
+        };
+
+        // Podpinanie przycisków
+        document.getElementById('btnCancelMarker').onclick = closeChoice;
+        document.getElementById('btnSetSettled').onclick = () => saveMarker('rozliczony');
+        document.getElementById('btnSetDayOff').onclick = () => saveMarker('wolny');
+        if (hasAnyMarker) document.getElementById('btnRemoveMarker').onclick = removeMarker;
     }
     /**
      * ✅ NOWA FUNKCJA: Przełącza status rozliczenia dnia (zielony ptaszek).
