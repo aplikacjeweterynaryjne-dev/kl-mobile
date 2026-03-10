@@ -15616,14 +15616,18 @@ async function loadCalendarUsers() {
         calendarUserSelect.innerHTML = ''; 
         if(modalUserSelect) modalUserSelect.innerHTML = '';
 
-        // Dodajemy opcję "Wszyscy" do filtra
-        calendarUserSelect.add(new Option("Wszyscy", "ALL")); 
-        
-        snapshot.docs.forEach(doc => {
-            const user = doc.data();
-            const optionText = `${user.Imie} ${user.Nazwisko}`;
+       // Dodajemy opcję "Wszyscy" do filtra
+            calendarUserSelect.add(new Option("Wszyscy", "ALL")); 
             
-            // ✅ POPRAWKA: Szukamy numeru pod różnymi nazwami pól, żeby mieć pewność
+            snapshot.docs.forEach(doc => {
+                const user = doc.data();
+                
+                // ✅ NOWOŚĆ: Ignorujemy konta klientów w Kalendarzu!
+                if (user.Rola === 'klient') return;
+
+                const optionText = `${user.Imie} ${user.Nazwisko}`;
+                
+                // ✅ POPRAWKA: Szukamy numeru pod różnymi nazwami pól, żeby mieć pewność
             // Usuwamy też spacje od razu przy pobieraniu
             let rawPhone = user['Nr telefonu'] || user['telefon'] || user['Telefon'] || '';
             const userPhone = rawPhone.replace(/\s/g, ''); 
@@ -15951,15 +15955,26 @@ function renderTodayView(visits, dateToShow) {
             const todayISO = new Date().toISOString().split('T')[0];
             if (dayString === todayISO) cell.classList.add('is-today');
 
-     // --- WIZUALIZACJA: CZY ROZLICZONY CZY WOLNY ---
+   // --- WIZUALIZACJA: CZY ROZLICZONY CZY WOLNY ---
             let extraChipsHtml = '';
 
             if (targetUid === "ALL") {
-                // WIDOK ZBIORCZY: Generujemy małe antracytowe plakietki z inicjałami
+                // WIDOK ZBIORCZY: Generujemy małe kolorowe plakietki z inicjałami i licznikiem
                 if (clinicDaysOff[dayString] && clinicDaysOff[dayString].length > 0) {
                     extraChipsHtml += '<div style="display:flex; flex-direction:column; gap:2px; margin-top:2px; width:100%; align-items:center;">';
                     clinicDaysOff[dayString].forEach(person => {
-                        extraChipsHtml += `<div style="background:#36454F; color:#fff; font-size:9px; font-weight:bold; padding:2px 4px; border-radius:4px; width:90%; box-sizing:border-box; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; box-shadow: 0 1px 3px rgba(0,0,0,0.3);" title="${person.name} ma wolne">🏖️ ${person.initials}</div>`;
+                        
+                        // 1. Generowanie stałego, unikalnego koloru dla pracownika na podstawie jego UID
+                        let hash = 0;
+                        for (let i = 0; i < person.uid.length; i++) hash = person.uid.charCodeAt(i) + ((hash << 5) - hash);
+                        // Paleta ładnych, czytelnych kolorów
+                        const niceColors = ['#e6194B', '#2980b9', '#d35400', '#8e44ad', '#16a085', '#c0392b', '#27ae60', '#f39c12', '#34495e', '#D980FA', '#006266', '#B53471'];
+                        const userColor = niceColors[Math.abs(hash) % niceColors.length];
+                        
+                        // 2. Liczba dni wolnych w danym miesiącu
+                        const countOff = window.currentMonthDaysOffCount ? (window.currentMonthDaysOffCount[person.uid] || 0) : 0;
+
+                        extraChipsHtml += `<div style="background:${userColor}; color:#fff; font-size:9.5px; font-weight:bold; padding:2px 4px; border-radius:4px; width:95%; box-sizing:border-box; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; box-shadow: 0 1px 3px rgba(0,0,0,0.3);" title="${person.name} ma wolne (${countOff} dni w tym msc)">🏖️ ${person.initials} (${countOff})</div>`;
                     });
                     extraChipsHtml += '</div>';
                 }
