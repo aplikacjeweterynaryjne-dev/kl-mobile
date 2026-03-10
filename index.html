@@ -2441,6 +2441,22 @@ tr.filled-row td {
 /* Styl dla dnia, który jest WOLNY (Antracytowe tło) */
 .day-cell.is-day-off {
     background-color: #36454F !important; /* Antracyt */
+    color: #ffffff !important; /* Biały tekst na ciemnym tle */
+    border: 1px solid #2C3E50 !important; 
+    position: relative;
+}
+.day-cell.is-day-off::after {
+    content: '🏖️'; position: absolute; top: 2px; right: 4px;
+    font-size: 14px; opacity: 0.9;
+}
+/* Modyfikacja licznika zadań na antracycie */
+.day-cell.is-day-off .day-summary {
+    background: rgba(255,255,255,0.2) !important;
+    color: white !important;
+}
+/* Styl dla dnia, który jest WOLNY (Antracytowe tło) */
+.day-cell.is-day-off {
+    background-color: #36454F !important; /* Antracyt */
     color: #ffffff !important; /* Biały tekst, żeby był czytelny na ciemnym tle */
     border: 1px solid #2C3E50 !important; 
     position: relative;
@@ -15835,27 +15851,72 @@ function renderTodayView(visits, dateToShow) {
         const month = date.getMonth(); // 0-11
         monthViewTitle.textContent = date.toLocaleDateString('pl-PL', { month: 'long', year: 'numeric' });
 
-       // --- 1. PRZYGOTOWANIE DANYCH ZNACZNIKÓW (ROZLICZEŃ I WOLNEGO) ---
+      // --- 1. PRZYGOTOWANIE DANYCH ZNACZNIKÓW (ROZLICZEŃ I WOLNEGO) ---
         const targetUid = calendarUserSelect.value;
-        let dayStatusMap = new Map(); // Zmieniono na Map, żeby trzymać typ statusu
+        let dayStatusMap = new Map(); // Dla widoku pojedynczego usera
+        let clinicDaysOff = {}; // Dla widoku zbiorczego: { '2025-11-15': [{uid, name, initials}] }
+        let userDaysOffCount = {}; // Licznik dni wolnych w miesiącu
+        
+        const monthStr = `${year}-${String(month + 1).padStart(2, '0')}`;
 
-        // Jeśli wybrano konkretnego użytkownika (nie "ALL"), pobierz jego znaczniki
+        // Zmapuj wszystkich pracowników w lecznicy z listy filtrów
+        const clinicUids = [];
+        const clinicUsersMap = {};
+        if (calendarUserSelect && calendarUserSelect.options) {
+            Array.from(calendarUserSelect.options).forEach(o => {
+                if(o.value && o.value !== 'ALL') {
+                    clinicUids.push(o.value);
+                    const parts = o.text.split(' ').filter(p => p.length > 0);
+                    const init = parts.length > 1 ? (parts[0][0] + parts[1][0]).toUpperCase() : parts[0].substring(0, 2).toUpperCase();
+                    clinicUsersMap[o.value] = { name: o.text, initials: init };
+                    userDaysOffCount[o.value] = 0; // Zerujemy licznik
+                }
+            });
+        }
+
         if (targetUid && targetUid !== "ALL") {
+            // WIDOK POJEDYNCZY: Pobieramy znaczniki jednego usera
             try {
-                const monthStr = `${year}-${String(month + 1).padStart(2, '0')}`;
                 const q = db.collection("kalendarz_rozliczenia")
                             .where("uid", "==", targetUid)
                             .where("miesiac", "==", monthStr);
                 const snap = await q.get();
                 snap.forEach(doc => {
                     const data = doc.data();
-                    // Zapisujemy: "2025-11-15" => "rozliczony" lub "wolny" (domyślnie rozliczony dla starych danych)
-                    dayStatusMap.set(data.data, data.typ || 'rozliczony'); 
+                    dayStatusMap.set(data.data, data.typ || 'rozliczony');
                 });
-            } catch (e) {
-                console.error("Błąd pobierania znaczników kalendarza:", e);
-            }
+            } catch (e) { console.error("Błąd pobierania znaczników:", e); }
+            
+        } else if (targetUid === "ALL" && clinicUids.length > 0) {
+            // WIDOK ZBIORCZY: Pobieramy znaczniki "wolne" WSZYSTKICH pracowników
+            try {
+                // Firebase pozwala na 'in' dla max 10 elementów. Dzielimy na paczki.
+                const chunks = [];
+                for (let i = 0; i < clinicUids.length; i += 10) chunks.push(clinicUids.slice(i, i + 10));
+                
+                for (const chunk of chunks) {
+                    const q = db.collection("kalendarz_rozliczenia")
+                                .where("miesiac", "==", monthStr)
+                                .where("uid", "in", chunk);
+                    const snap = await q.get();
+                    snap.forEach(doc => {
+                        const data = doc.data();
+                        if (data.typ === 'wolny') {
+                            if (!clinicDaysOff[data.data]) clinicDaysOff[data.data] = [];
+                            clinicDaysOff[data.data].push({
+                                uid: data.uid,
+                                name: clinicUsersMap[data.uid]?.name || 'NN',
+                                initials: clinicUsersMap[data.uid]?.initials || 'NN'
+                            });
+                            userDaysOffCount[data.uid]++;
+                        }
+                    });
+                }
+            } catch (e) { console.error("Błąd pobierania zbiorczych znaczników:", e); }
         }
+        
+        // Zapisz licznik globalnie dla Menedżera Urlopów
+        window.currentMonthDaysOffCount = userDaysOffCount; 
 
         // --- 2. GRUPOWANIE WIZYT ---
         const visitsByDate = new Map();
@@ -15890,18 +15951,32 @@ function renderTodayView(visits, dateToShow) {
             const todayISO = new Date().toISOString().split('T')[0];
             if (dayString === todayISO) cell.classList.add('is-today');
 
-          // --- CZY ROZLICZONY CZY WOLNY ---
-            if (dayStatusMap.has(dayString)) {
-                const typStatusu = dayStatusMap.get(dayString);
-                if (typStatusu === 'wolny') {
-                    cell.classList.add('is-day-off'); // Antracyt
-                } else {
-                    cell.classList.add('is-settled'); // Zielony
+     // --- WIZUALIZACJA: CZY ROZLICZONY CZY WOLNY ---
+            let extraChipsHtml = '';
+
+            if (targetUid === "ALL") {
+                // WIDOK ZBIORCZY: Generujemy małe antracytowe plakietki z inicjałami
+                if (clinicDaysOff[dayString] && clinicDaysOff[dayString].length > 0) {
+                    extraChipsHtml += '<div style="display:flex; flex-direction:column; gap:2px; margin-top:2px; width:100%; align-items:center;">';
+                    clinicDaysOff[dayString].forEach(person => {
+                        extraChipsHtml += `<div style="background:#36454F; color:#fff; font-size:9px; font-weight:bold; padding:2px 4px; border-radius:4px; width:90%; box-sizing:border-box; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; box-shadow: 0 1px 3px rgba(0,0,0,0.3);" title="${person.name} ma wolne">🏖️ ${person.initials}</div>`;
+                    });
+                    extraChipsHtml += '</div>';
+                }
+            } else {
+                // WIDOK POJEDYNCZY: Kolorujemy całą komórkę na zielono (Rozliczone) lub antracytowo (Wolne)
+                if (dayStatusMap.has(dayString)) {
+                    const typStatusu = dayStatusMap.get(dayString);
+                    if (typStatusu === 'wolny') {
+                        cell.classList.add('is-day-off'); 
+                    } else {
+                        cell.classList.add('is-settled'); 
+                    }
                 }
             }
 
-            // Zawartość komórki
-            let cellContent = `<span class="day-number">${day}</span>`;
+            // Zawartość komórki (dodajemy wygenerowane plakietki do numeru dnia)
+            let cellContent = `<span class="day-number">${day}</span>${extraChipsHtml}`;
 
             // Statystyki wizyt
             const visitsForThisDay = visitsByDate.get(dayString) || [];
@@ -15978,18 +16053,20 @@ function renderTodayView(visits, dateToShow) {
             monthGridBody.appendChild(cell);
         }
     }
-   /**
+/**
      * ✅ NOWA FUNKCJA OBSŁUGI DŁUGIEGO PRZYTRZYMANIA
      * Otwiera okienko modalne z wyborem typu (Rozliczony / Dzień Wolny)
      */
     async function handleLongPressSettlement(dateString, uid, cellElement) {
         if (!currentUserProfile) return;
         
+        // --- 1. WIDOK ZBIORCZY: OTWARCIE MENEDŻERA GRUPOWEGO ---
         if (!uid || uid === "ALL") {
-            alert("Aby zarządzać dniami, wybierz konkretnego pracownika z listy filtrów.");
+            openGroupDayOffManager(dateString);
             return;
         }
 
+        // --- 2. WIDOK POJEDYNCZY: MENU OZNACZANIA DNIA ---
         const canEdit = (currentUserProfile.Rola === 'administrator' || currentUserProfile.Rola === 'właściciel' || currentUserProfile.uid === uid);
         if (!canEdit) {
             alert("Nie masz uprawnień do edycji kalendarza tego pracownika.");
@@ -16062,6 +16139,155 @@ function renderTodayView(visits, dateToShow) {
         document.getElementById('btnSetSettled').onclick = () => saveMarker('rozliczony');
         document.getElementById('btnSetDayOff').onclick = () => saveMarker('wolny');
         if (hasAnyMarker) document.getElementById('btnRemoveMarker').onclick = removeMarker;
+    }
+    /**
+     * ✅ ZBIORCZY MENEDŻER DNI WOLNYCH (Otwiera się w filtrze "Wszyscy")
+     */
+    function openGroupDayOffManager(dateString) {
+        const canEdit = (currentUserProfile.Rola === 'administrator' || currentUserProfile.Rola === 'właściciel');
+        if (!canEdit) {
+            alert("Tylko Właściciel lub Administrator może zbiorczo zarządzać dniami wolnymi zespołu.");
+            return;
+        }
+
+        // Pobierz dane o pracownikach z filtra
+        const clinicUsers = Array.from(calendarUserSelect.options).filter(o => o.value && o.value !== 'ALL').map(o => ({
+            uid: o.value,
+            name: o.text
+        }));
+
+        if (clinicUsers.length === 0) {
+            alert("Brak pracowników w lecznicy."); return;
+        }
+
+        const monthStr = dateString.substring(0, 7);
+        const daysOffCount = window.currentMonthDaysOffCount || {};
+
+        // Szkielet modala
+        const choiceOverlay = document.createElement('div');
+        choiceOverlay.style.cssText = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:20000;display:flex;justify-content:center;align-items:center;";
+        choiceOverlay.innerHTML = `
+            <div class="form-card" style="width:95%; max-width:450px; padding:20px; background:white; border-radius:12px; box-shadow:0 10px 30px rgba(0,0,0,0.3); display:flex; flex-direction:column; max-height:85vh;">
+                <h3 style="margin-top:0; margin-bottom:15px; color:#333; text-align:center;">Zarządzanie: ${dateString}</h3>
+                <div id="groupDayOffList" style="flex:1; overflow-y:auto; margin-bottom:15px; padding-right:5px;">
+                    <div style="text-align:center; color:#999; margin: 30px 0;">Ładowanie danych zespołu... ⏳</div>
+                </div>
+                <div style="display:flex; gap:10px;">
+                    <button id="btnCancelGroup" class="btn ghost" style="flex:1; font-size:16px;">Anuluj</button>
+                    <button id="btnSaveGroup" class="btn primary" style="flex:1; background:#27ae60; font-size:16px;">💾 Zapisz Stan</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(choiceOverlay);
+
+        const closeChoice = () => { if(choiceOverlay.parentNode) choiceOverlay.parentNode.removeChild(choiceOverlay); };
+        document.getElementById('btnCancelGroup').onclick = closeChoice;
+
+        // Pobierz stan bazy na TEN DZIEŃ (Szukamy kto ma dzisiaj oznaczone 'wolny')
+        const uids = clinicUsers.map(u => u.uid);
+        const chunks = [];
+        for (let i = 0; i < uids.length; i += 10) chunks.push(uids.slice(i, i + 10));
+
+        let currentDayStatus = {}; // { uid: true } jeśli ma wolne
+
+        Promise.all(chunks.map(chunk => 
+            db.collection("kalendarz_rozliczenia")
+              .where("data", "==", dateString)
+              .where("uid", "in", chunk)
+              .where("typ", "==", "wolny")
+              .get()
+        )).then(snapshots => {
+            snapshots.forEach(snap => {
+                snap.forEach(doc => { currentDayStatus[doc.data().uid] = true; });
+            });
+
+            const listDiv = document.getElementById('groupDayOffList');
+            listDiv.innerHTML = '';
+
+            clinicUsers.forEach(user => {
+                const isOff = currentDayStatus[user.uid] === true;
+                const count = daysOffCount[user.uid] || 0;
+
+                const userDiv = document.createElement('div');
+                userDiv.style.cssText = "display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #eee; padding:12px 0;";
+                userDiv.innerHTML = `
+                    <div style="line-height:1.4;">
+                        <strong style="font-size:16px;">${user.name}</strong><br>
+                        <small style="color:#777;">Wolne w tym msc: <b style="color:${count > 0 ? '#36454F' : '#999'}">${count}</b> dni</small>
+                    </div>
+                    <select class="group-day-off-select" data-uid="${user.uid}" style="padding:10px; font-size:14px; font-weight:bold; border-radius:8px; border:1px solid ${isOff ? '#36454F' : '#ccc'}; background:${isOff ? '#36454F' : '#fff'}; color:${isOff ? '#fff' : '#333'}; outline:none; cursor:pointer;">
+                        <option value="pracuje" style="color:#333; background:#fff;" ${!isOff ? 'selected' : ''}>👷 Pracuje</option>
+                        <option value="wolny" style="color:#fff; background:#36454F;" ${isOff ? 'selected' : ''}>🏖️ Wolne</option>
+                    </select>
+                `;
+                
+                // Interaktywna zmiana kolorów dla selektora
+                const sel = userDiv.querySelector('select');
+                sel.addEventListener('change', function() {
+                    if (this.value === 'wolny') {
+                        this.style.border = '1px solid #36454F';
+                        this.style.background = '#36454F';
+                        this.style.color = '#fff';
+                    } else {
+                        this.style.border = '1px solid #ccc';
+                        this.style.background = '#fff';
+                        this.style.color = '#333';
+                    }
+                });
+
+                listDiv.appendChild(userDiv);
+            });
+
+            // Akcja zapisu
+            document.getElementById('btnSaveGroup').onclick = async () => {
+                const selects = document.querySelectorAll('.group-day-off-select');
+                const batch = db.batch();
+                
+                document.getElementById('btnSaveGroup').disabled = true;
+                document.getElementById('btnSaveGroup').textContent = "Zapisywanie... ⏳";
+
+                selects.forEach(sel => {
+                    const uid = sel.dataset.uid;
+                    const val = sel.value;
+                    const docId = `${uid}_${dateString}`;
+                    const docRef = db.collection("kalendarz_rozliczenia").doc(docId);
+
+                    const wasOff = currentDayStatus[uid] === true;
+                    const isNowOff = val === 'wolny';
+
+                    if (!wasOff && isNowOff) {
+                        // Tworzy dzień wolny, zdejmując przy okazji ewentualne zielone "rozliczenie" jeśli było (nadpisze dokument)
+                        batch.set(docRef, {
+                            uid: uid,
+                            data: dateString,
+                            miesiac: monthStr,
+                            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                            oznaczyl_kto: `${currentUserProfile.Imie} ${currentUserProfile.Nazwisko}`,
+                            typ: 'wolny'
+                        });
+                    } else if (wasOff && !isNowOff) {
+                        // Usuwa wolne z kalendarza, wracając do czystego pracującego dnia
+                        batch.delete(docRef);
+                    }
+                });
+
+                try {
+                    await batch.commit();
+                    showToast("Zapisano grafik urlopowy.", "success");
+                    closeChoice();
+                    fetchAndRenderVisits(); // Przeładuj widok kalendarza
+                } catch (e) {
+                    console.error("Błąd zapisu zbiorczego:", e);
+                    alert("Wystąpił błąd podczas zapisu.");
+                    document.getElementById('btnSaveGroup').disabled = false;
+                    document.getElementById('btnSaveGroup').textContent = "💾 Zapisz Stan";
+                }
+            };
+
+        }).catch(err => {
+            console.error(err);
+            document.getElementById('groupDayOffList').innerHTML = '<div style="color:red; text-align:center;">Błąd połączenia z bazą.</div>';
+        });
     }
     /**
      * ✅ NOWA FUNKCJA: Przełącza status rozliczenia dnia (zielony ptaszek).
