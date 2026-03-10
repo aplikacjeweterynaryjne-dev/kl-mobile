@@ -15855,15 +15855,18 @@ function renderTodayView(visits, dateToShow) {
         const month = date.getMonth(); // 0-11
         monthViewTitle.textContent = date.toLocaleDateString('pl-PL', { month: 'long', year: 'numeric' });
 
-      // --- 1. PRZYGOTOWANIE DANYCH ZNACZNIKÓW (ROZLICZEŃ I WOLNEGO) ---
+     // --- 1. PRZYGOTOWANIE DANYCH ZNACZNIKÓW (WSZYSTKIE TYPY) ---
         const targetUid = calendarUserSelect.value;
-        let dayStatusMap = new Map(); // Dla widoku pojedynczego usera
-        let clinicDaysOff = {}; // Dla widoku zbiorczego: { '2025-11-15': [{uid, name, initials}] }
-        let userDaysOffCount = {}; // Licznik dni wolnych w miesiącu
+        
+        // Obiekt przechowujący dla danego dnia wszystkie flagi pojedynczego usera
+        let singleUserStatusMap = new Map(); 
+        
+        // Obiekt dla widoku zbiorczego: podział na kategorie
+        let clinicMarkers = {}; 
+        let userDaysOffCount = {}; 
         
         const monthStr = `${year}-${String(month + 1).padStart(2, '0')}`;
 
-        // Zmapuj wszystkich pracowników w lecznicy z listy filtrów
         const clinicUids = [];
         const clinicUsersMap = {};
         if (calendarUserSelect && calendarUserSelect.options) {
@@ -15873,13 +15876,12 @@ function renderTodayView(visits, dateToShow) {
                     const parts = o.text.split(' ').filter(p => p.length > 0);
                     const init = parts.length > 1 ? (parts[0][0] + parts[1][0]).toUpperCase() : parts[0].substring(0, 2).toUpperCase();
                     clinicUsersMap[o.value] = { name: o.text, initials: init };
-                    userDaysOffCount[o.value] = 0; // Zerujemy licznik
+                    userDaysOffCount[o.value] = 0;
                 }
             });
         }
 
         if (targetUid && targetUid !== "ALL") {
-            // WIDOK POJEDYNCZY: Pobieramy znaczniki jednego usera
             try {
                 const q = db.collection("kalendarz_rozliczenia")
                             .where("uid", "==", targetUid)
@@ -15887,14 +15889,19 @@ function renderTodayView(visits, dateToShow) {
                 const snap = await q.get();
                 snap.forEach(doc => {
                     const data = doc.data();
-                    dayStatusMap.set(data.data, data.typ || 'rozliczony');
+                    if (!singleUserStatusMap.has(data.data)) {
+                        singleUserStatusMap.set(data.data, { rozliczony: false, wolny: false, nocka: false, dodatek: false });
+                    }
+                    const dayObj = singleUserStatusMap.get(data.data);
+                    if (data.typ === 'wolny') dayObj.wolny = true;
+                    else if (data.typ === 'nocka') dayObj.nocka = true;
+                    else if (data.typ === 'dodatek') dayObj.dodatek = true;
+                    else dayObj.rozliczony = true; 
                 });
             } catch (e) { console.error("Błąd pobierania znaczników:", e); }
             
         } else if (targetUid === "ALL" && clinicUids.length > 0) {
-            // WIDOK ZBIORCZY: Pobieramy znaczniki "wolne" WSZYSTKICH pracowników
             try {
-                // Firebase pozwala na 'in' dla max 10 elementów. Dzielimy na paczki.
                 const chunks = [];
                 for (let i = 0; i < clinicUids.length; i += 10) chunks.push(clinicUids.slice(i, i + 10));
                 
@@ -15905,21 +15912,29 @@ function renderTodayView(visits, dateToShow) {
                     const snap = await q.get();
                     snap.forEach(doc => {
                         const data = doc.data();
+                        if (!clinicMarkers[data.data]) {
+                            clinicMarkers[data.data] = { wolne: [], nocki: [], dodatki: [] };
+                        }
+                        
+                        const personData = {
+                            uid: data.uid,
+                            name: clinicUsersMap[data.uid]?.name || 'NN',
+                            initials: clinicUsersMap[data.uid]?.initials || 'NN'
+                        };
+
                         if (data.typ === 'wolny') {
-                            if (!clinicDaysOff[data.data]) clinicDaysOff[data.data] = [];
-                            clinicDaysOff[data.data].push({
-                                uid: data.uid,
-                                name: clinicUsersMap[data.uid]?.name || 'NN',
-                                initials: clinicUsersMap[data.uid]?.initials || 'NN'
-                            });
+                            clinicMarkers[data.data].wolne.push(personData);
                             userDaysOffCount[data.uid]++;
+                        } else if (data.typ === 'nocka') {
+                            clinicMarkers[data.data].nocki.push(personData);
+                        } else if (data.typ === 'dodatek') {
+                            clinicMarkers[data.data].dodatki.push(personData);
                         }
                     });
                 }
             } catch (e) { console.error("Błąd pobierania zbiorczych znaczników:", e); }
         }
         
-        // Zapisz licznik globalnie dla Menedżera Urlopów
         window.currentMonthDaysOffCount = userDaysOffCount; 
 
         // --- 2. GRUPOWANIE WIZYT ---
@@ -15955,43 +15970,55 @@ function renderTodayView(visits, dateToShow) {
             const todayISO = new Date().toISOString().split('T')[0];
             if (dayString === todayISO) cell.classList.add('is-today');
 
-   // --- WIZUALIZACJA: CZY ROZLICZONY CZY WOLNY ---
+// --- WIZUALIZACJA: ZNACZNIKI (NOCKI, DODATKI, URLOPY, ROZLICZENIA) ---
             let extraChipsHtml = '';
+            let singleUserIconsHtml = '';
 
             if (targetUid === "ALL") {
-                // WIDOK ZBIORCZY: Generujemy małe kolorowe plakietki z inicjałami i licznikiem
-                if (clinicDaysOff[dayString] && clinicDaysOff[dayString].length > 0) {
+                // WIDOK ZBIORCZY: Generujemy małe kolorowe plakietki
+                const markers = clinicMarkers[dayString];
+                if (markers && (markers.nocki.length > 0 || markers.dodatki.length > 0 || markers.wolne.length > 0)) {
                     extraChipsHtml += '<div style="display:flex; flex-direction:column; gap:2px; margin-top:2px; width:100%; align-items:center;">';
-                    clinicDaysOff[dayString].forEach(person => {
-                        
-                        // 1. Generowanie stałego, unikalnego koloru dla pracownika na podstawie jego UID
+                    
+                    // 1. Nocki (Ciemnogranatowe - na samej górze)
+                    markers.nocki.forEach(p => {
+                        extraChipsHtml += `<div style="background:#192a56; color:#f1c40f; font-size:9.5px; font-weight:bold; padding:2px 4px; border-radius:4px; width:95%; box-sizing:border-box; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; box-shadow: 0 1px 3px rgba(0,0,0,0.3);" title="${p.name} - Nocka">🌙 ${p.initials}</div>`;
+                    });
+
+                    // 2. Dodatki (Turkusowe)
+                    markers.dodatki.forEach(p => {
+                        extraChipsHtml += `<div style="background:#006266; color:#1abc9c; font-size:9.5px; font-weight:bold; padding:2px 4px; border-radius:4px; width:95%; box-sizing:border-box; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; box-shadow: 0 1px 3px rgba(0,0,0,0.3);" title="${p.name} - Dodatek">➕ ${p.initials}</div>`;
+                    });
+
+                    // 3. Urlopy (Kolor z palety)
+                    markers.wolne.forEach(p => {
                         let hash = 0;
-                        for (let i = 0; i < person.uid.length; i++) hash = person.uid.charCodeAt(i) + ((hash << 5) - hash);
-                        // Paleta ładnych, czytelnych kolorów
+                        for (let i = 0; i < p.uid.length; i++) hash = p.uid.charCodeAt(i) + ((hash << 5) - hash);
                         const niceColors = ['#e6194B', '#2980b9', '#d35400', '#8e44ad', '#16a085', '#c0392b', '#27ae60', '#f39c12', '#34495e', '#D980FA', '#006266', '#B53471'];
                         const userColor = niceColors[Math.abs(hash) % niceColors.length];
-                        
-                        // 2. Liczba dni wolnych w danym miesiącu
-                        const countOff = window.currentMonthDaysOffCount ? (window.currentMonthDaysOffCount[person.uid] || 0) : 0;
+                        const countOff = window.currentMonthDaysOffCount ? (window.currentMonthDaysOffCount[p.uid] || 0) : 0;
 
-                        extraChipsHtml += `<div style="background:${userColor}; color:#fff; font-size:9.5px; font-weight:bold; padding:2px 4px; border-radius:4px; width:95%; box-sizing:border-box; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; box-shadow: 0 1px 3px rgba(0,0,0,0.3);" title="${person.name} ma wolne (${countOff} dni w tym msc)">🏖️ ${person.initials} (${countOff})</div>`;
+                        extraChipsHtml += `<div style="background:${userColor}; color:#fff; font-size:9.5px; font-weight:bold; padding:2px 4px; border-radius:4px; width:95%; box-sizing:border-box; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; box-shadow: 0 1px 3px rgba(0,0,0,0.3);" title="${p.name} ma wolne (${countOff} dni w tym msc)">🏖️ ${p.initials} (${countOff})</div>`;
                     });
+                    
                     extraChipsHtml += '</div>';
                 }
             } else {
-                // WIDOK POJEDYNCZY: Kolorujemy całą komórkę na zielono (Rozliczone) lub antracytowo (Wolne)
-                if (dayStatusMap.has(dayString)) {
-                    const typStatusu = dayStatusMap.get(dayString);
-                    if (typStatusu === 'wolny') {
-                        cell.classList.add('is-day-off'); 
-                    } else {
-                        cell.classList.add('is-settled'); 
-                    }
+                // WIDOK POJEDYNCZY
+                const dayInfo = singleUserStatusMap.get(dayString);
+                if (dayInfo) {
+                    // Tło główne (Wolne vs Rozliczone)
+                    if (dayInfo.wolny) cell.classList.add('is-day-off'); 
+                    else if (dayInfo.rozliczony) cell.classList.add('is-settled'); 
+
+                    // Ikonki (Nocka / Dodatek) - nałóż je tuż pod cyferką
+                    if (dayInfo.nocka) singleUserIconsHtml += '🌙';
+                    if (dayInfo.dodatek) singleUserIconsHtml += '➕';
                 }
             }
 
-            // Zawartość komórki (dodajemy wygenerowane plakietki do numeru dnia)
-            let cellContent = `<span class="day-number">${day}</span>${extraChipsHtml}`;
+            let iconsDiv = singleUserIconsHtml ? `<div style="font-size:12px; margin-top:2px;">${singleUserIconsHtml}</div>` : '';
+            let cellContent = `<span class="day-number">${day}</span>${iconsDiv}${extraChipsHtml}`;
 
             // Statystyki wizyt
             const visitsForThisDay = visitsByDate.get(dayString) || [];
@@ -16158,22 +16185,29 @@ function renderTodayView(visits, dateToShow) {
     /**
      * ✅ ZBIORCZY MENEDŻER DNI WOLNYCH (Otwiera się w filtrze "Wszyscy")
      */
+/**
+     * ✅ ZBIORCZY MENEDŻER ZMIAN (Wolne / Nocki / Dodatki)
+     */
     function openGroupDayOffManager(dateString) {
         const canEdit = (currentUserProfile.Rola === 'administrator' || currentUserProfile.Rola === 'właściciel');
         if (!canEdit) {
-            alert("Tylko Właściciel lub Administrator może zbiorczo zarządzać dniami wolnymi zespołu.");
+            alert("Tylko Właściciel lub Administrator może zbiorczo zarządzać grafikiem zespołu.");
             return;
         }
 
-        // Pobierz dane o pracownikach z filtra
+        // Pobierz dane o pracownikach z filtra.
+        // PAMIĘTAJ: Filtr w tym momencie już NIE ZAWIERA klientów ani administratora (zrobiliśmy to w loadCalendarUsers)
         const clinicUsers = Array.from(calendarUserSelect.options).filter(o => o.value && o.value !== 'ALL').map(o => ({
             uid: o.value,
             name: o.text
         }));
 
-        if (clinicUsers.length === 0) {
-            alert("Brak pracowników w lecznicy."); return;
-        }
+        if (clinicUsers.length === 0) { alert("Brak pracowników w lecznicy (lub filtr jest pusty)."); return; }
+
+        // Ustalamy czy kliknięto w sobotę (Dzień 6) - BARDZO WAŻNE DLA DODATKÓW
+        const dParts = dateString.split('-');
+        const dateObj = new Date(dParts[0], dParts[1] - 1, dParts[2]);
+        const isSaturday = dateObj.getDay() === 6;
 
         const monthStr = dateString.substring(0, 7);
         const daysOffCount = window.currentMonthDaysOffCount || {};
@@ -16183,13 +16217,13 @@ function renderTodayView(visits, dateToShow) {
         choiceOverlay.style.cssText = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:20000;display:flex;justify-content:center;align-items:center;";
         choiceOverlay.innerHTML = `
             <div class="form-card" style="width:95%; max-width:450px; padding:20px; background:white; border-radius:12px; box-shadow:0 10px 30px rgba(0,0,0,0.3); display:flex; flex-direction:column; max-height:85vh;">
-                <h3 style="margin-top:0; margin-bottom:15px; color:#333; text-align:center;">Zarządzanie: ${dateString}</h3>
+                <h3 style="margin:0; margin-bottom:15px; color:#333; text-align:center;">Grafik zespołu: ${dateString}</h3>
                 <div id="groupDayOffList" style="flex:1; overflow-y:auto; margin-bottom:15px; padding-right:5px;">
                     <div style="text-align:center; color:#999; margin: 30px 0;">Ładowanie danych zespołu... ⏳</div>
                 </div>
                 <div style="display:flex; gap:10px;">
                     <button id="btnCancelGroup" class="btn ghost" style="flex:1; font-size:16px;">Anuluj</button>
-                    <button id="btnSaveGroup" class="btn primary" style="flex:1; background:#27ae60; font-size:16px;">💾 Zapisz Stan</button>
+                    <button id="btnSaveGroup" class="btn primary" style="flex:1; background:#27ae60; font-size:16px;">💾 Zapisz Grafik</button>
                 </div>
             </div>
         `;
@@ -16198,37 +16232,65 @@ function renderTodayView(visits, dateToShow) {
         const closeChoice = () => { if(choiceOverlay.parentNode) choiceOverlay.parentNode.removeChild(choiceOverlay); };
         document.getElementById('btnCancelGroup').onclick = closeChoice;
 
-        // Pobierz stan bazy na TEN DZIEŃ (Szukamy kto ma dzisiaj oznaczone 'wolny')
+        // Dzielimy UID na paczki, bo Firestore pozwala na max 10 elementów w zapytaniu 'in'
         const uids = clinicUsers.map(u => u.uid);
         const chunks = [];
         for (let i = 0; i < uids.length; i += 10) chunks.push(uids.slice(i, i + 10));
 
-        let currentDayStatus = {}; // { uid: true } jeśli ma wolne
+        // Obiekt trzymający statusy: { "UID": { wolny: bool, nocka: bool, dodatek: bool } }
+        let dayMarkers = {}; 
 
+        // Pobieramy WSZYSTKIE znaczniki (wolne, nocki, dodatki) na TEN DZIEŃ
         Promise.all(chunks.map(chunk => 
             db.collection("kalendarz_rozliczenia")
               .where("data", "==", dateString)
               .where("uid", "in", chunk)
-              .where("typ", "==", "wolny")
               .get()
         )).then(snapshots => {
             snapshots.forEach(snap => {
-                snap.forEach(doc => { currentDayStatus[doc.data().uid] = true; });
+                snap.forEach(doc => { 
+                    const data = doc.data();
+                    if (!dayMarkers[data.uid]) dayMarkers[data.uid] = {};
+                    
+                    if (data.typ === 'wolny') dayMarkers[data.uid].wolny = true;
+                    else if (data.typ === 'nocka') dayMarkers[data.uid].nocka = true;
+                    else if (data.typ === 'dodatek') dayMarkers[data.uid].dodatek = true;
+                });
             });
 
             const listDiv = document.getElementById('groupDayOffList');
             listDiv.innerHTML = '';
 
+            // Generujemy wiersz dla każdego pracownika
             clinicUsers.forEach(user => {
-                const isOff = currentDayStatus[user.uid] === true;
+                const markers = dayMarkers[user.uid] || {};
+                const isOff = markers.wolny === true;
+                const isNocka = markers.nocka === true;
+                const isDodatek = markers.dodatek === true;
                 const count = daysOffCount[user.uid] || 0;
+
+                // Opcjonalny kod dla checkboxa Dodatku (wyświetlany TYLKO w Sobotę)
+                let dodatekHtml = isSaturday ? 
+                    `<label style="display:flex; align-items:center; gap:3px; font-size:13px; color:#006266; font-weight:bold; margin-left: 10px;">
+                        <input type="checkbox" class="group-dodatek-cb" data-uid="${user.uid}" ${isDodatek ? 'checked' : ''} style="width:16px; height:16px; accent-color:#006266;">
+                        ➕ Dodatek
+                    </label>` : '';
 
                 const userDiv = document.createElement('div');
                 userDiv.style.cssText = "display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #eee; padding:12px 0;";
+                
+                // HTML wiersza: Info (nazwa + licznik) -> Checkboxy (Nocka + Dodatek) -> Select (Pracuje/Wolne)
                 userDiv.innerHTML = `
-                    <div style="line-height:1.4;">
+                    <div style="line-height:1.4; flex:1;">
                         <strong style="font-size:16px;">${user.name}</strong><br>
                         <small style="color:#777;">Wolne w tym msc: <b style="color:${count > 0 ? '#36454F' : '#999'}">${count}</b> dni</small>
+                        <div style="display:flex; align-items:center; margin-top:6px;">
+                            <label style="display:flex; align-items:center; gap:3px; font-size:13px; color:#192a56; font-weight:bold;">
+                                <input type="checkbox" class="group-nocka-cb" data-uid="${user.uid}" ${isNocka ? 'checked' : ''} style="width:16px; height:16px; accent-color:#192a56;">
+                                🌙 Nocka
+                            </label>
+                            ${dodatekHtml}
+                        </div>
                     </div>
                     <select class="group-day-off-select" data-uid="${user.uid}" style="padding:10px; font-size:14px; font-weight:bold; border-radius:8px; border:1px solid ${isOff ? '#36454F' : '#ccc'}; background:${isOff ? '#36454F' : '#fff'}; color:${isOff ? '#fff' : '#333'}; outline:none; cursor:pointer;">
                         <option value="pracuje" style="color:#333; background:#fff;" ${!isOff ? 'selected' : ''}>👷 Pracuje</option>
@@ -16236,7 +16298,7 @@ function renderTodayView(visits, dateToShow) {
                     </select>
                 `;
                 
-                // Interaktywna zmiana kolorów dla selektora
+                // Interaktywna zmiana kolorów dla selektora Urlopu
                 const sel = userDiv.querySelector('select');
                 sel.addEventListener('change', function() {
                     if (this.value === 'wolny') {
@@ -16253,49 +16315,79 @@ function renderTodayView(visits, dateToShow) {
                 listDiv.appendChild(userDiv);
             });
 
-            // Akcja zapisu
+            // --- AKCJA ZAPISU ---
             document.getElementById('btnSaveGroup').onclick = async () => {
-                const selects = document.querySelectorAll('.group-day-off-select');
                 const batch = db.batch();
-                
                 document.getElementById('btnSaveGroup').disabled = true;
                 document.getElementById('btnSaveGroup').textContent = "Zapisywanie... ⏳";
 
-                selects.forEach(sel => {
+                // A. ZAPIS URLOPÓW (Wolne / Pracuje)
+                document.querySelectorAll('.group-day-off-select').forEach(sel => {
                     const uid = sel.dataset.uid;
-                    const val = sel.value;
-                    const docId = `${uid}_${dateString}`;
-                    const docRef = db.collection("kalendarz_rozliczenia").doc(docId);
-
-                    const wasOff = currentDayStatus[uid] === true;
-                    const isNowOff = val === 'wolny';
+                    const isNowOff = sel.value === 'wolny';
+                    const wasOff = (dayMarkers[uid] && dayMarkers[uid].wolny === true);
+                    const docId = `${uid}_${dateString}`; // Główny marker dnia
 
                     if (!wasOff && isNowOff) {
-                        // Tworzy dzień wolny, zdejmując przy okazji ewentualne zielone "rozliczenie" jeśli było (nadpisze dokument)
-                        batch.set(docRef, {
-                            uid: uid,
-                            data: dateString,
-                            miesiac: monthStr,
+                        batch.set(db.collection("kalendarz_rozliczenia").doc(docId), {
+                            uid: uid, data: dateString, miesiac: monthStr,
                             timestamp: firebase.firestore.FieldValue.serverTimestamp(),
                             oznaczyl_kto: `${currentUserProfile.Imie} ${currentUserProfile.Nazwisko}`,
                             typ: 'wolny'
                         });
                     } else if (wasOff && !isNowOff) {
-                        // Usuwa wolne z kalendarza, wracając do czystego pracującego dnia
-                        batch.delete(docRef);
+                        batch.delete(db.collection("kalendarz_rozliczenia").doc(docId));
+                    }
+                });
+
+                // B. ZAPIS NOCEK (Tworzymy OSOBNE dokumenty z dopiskiem _nocka)
+                document.querySelectorAll('.group-nocka-cb').forEach(cb => {
+                    const uid = cb.dataset.uid;
+                    const isNowNocka = cb.checked;
+                    const wasNocka = (dayMarkers[uid] && dayMarkers[uid].nocka === true);
+                    const docId = `${uid}_${dateString}_nocka`; 
+
+                    if (!wasNocka && isNowNocka) {
+                        batch.set(db.collection("kalendarz_rozliczenia").doc(docId), {
+                            uid: uid, data: dateString, miesiac: monthStr,
+                            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                            oznaczyl_kto: `${currentUserProfile.Imie} ${currentUserProfile.Nazwisko}`,
+                            typ: 'nocka'
+                        });
+                    } else if (wasNocka && !isNowNocka) {
+                        batch.delete(db.collection("kalendarz_rozliczenia").doc(docId));
+                    }
+                });
+
+                // C. ZAPIS DODATKÓW W SOBOTĘ (Osobne dokumenty z dopiskiem _dodatek)
+                document.querySelectorAll('.group-dodatek-cb').forEach(cb => {
+                    const uid = cb.dataset.uid;
+                    const isNowDodatek = cb.checked;
+                    const wasDodatek = (dayMarkers[uid] && dayMarkers[uid].dodatek === true);
+                    const docId = `${uid}_${dateString}_dodatek`; 
+
+                    if (!wasDodatek && isNowDodatek) {
+                        batch.set(db.collection("kalendarz_rozliczenia").doc(docId), {
+                            uid: uid, data: dateString, miesiac: monthStr,
+                            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                            oznaczyl_kto: `${currentUserProfile.Imie} ${currentUserProfile.Nazwisko}`,
+                            typ: 'dodatek'
+                        });
+                    } else if (wasDodatek && !isNowDodatek) {
+                        batch.delete(db.collection("kalendarz_rozliczenia").doc(docId));
                     }
                 });
 
                 try {
                     await batch.commit();
-                    showToast("Zapisano grafik urlopowy.", "success");
+                    showToast("Grafik zespołu zaktualizowany.", "success");
                     closeChoice();
-                    fetchAndRenderVisits(); // Przeładuj widok kalendarza
+                    fetchAndRenderVisits(); // Przeładuj widok kalendarza, żeby narysować plakietki
                 } catch (e) {
-                    console.error("Błąd zapisu zbiorczego:", e);
+                    console.error("Błąd zapisu grafiku:", e);
                     alert("Wystąpił błąd podczas zapisu.");
                     document.getElementById('btnSaveGroup').disabled = false;
-                    document.getElementById('btnSaveGroup').textContent = "💾 Zapisz Stan";
+                    document.getElementById('btnSaveGroup').textContent = "💾 Zapisz Grafik";
                 }
             };
 
