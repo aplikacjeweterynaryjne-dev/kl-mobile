@@ -26293,7 +26293,7 @@ if (btnSmsToDoctor) {
 }
  /**
      * =========================================================================
-     * 🤖 AUTOMATYCZNY SCHEDULER GRAFIKU Z WYBOREM PRACOWNIKÓW
+     * 🤖 AUTOMATYCZNY SCHEDULER GRAFIKU Z OSOBNYM OKIENKIEM WYBORU
      * =========================================================================
      */
     function openAutoSchedulerModal(monthStr, daysInMonth) {
@@ -26301,7 +26301,7 @@ if (btnSmsToDoctor) {
             alert("Brak uprawnień."); return;
         }
 
-        // 1. Pobierz listę pracowników do stworzenia checkboxów
+        // 1. Pobierz listę pracowników 
         const clinicUsers = Array.from(calendarUserSelect.options)
                                 .filter(o => o.value && o.value !== 'ALL')
                                 .map(o => ({ uid: o.value, name: o.text }));
@@ -26310,32 +26310,8 @@ if (btnSmsToDoctor) {
             alert("Brak pracowników w lecznicy."); return;
         }
 
-       // 2. Zbuduj HTML dla listy wyboru pracowników (nowoczesna rozwijana lista)
-        let usersCheckboxesHtml = `
-            <details style="margin-bottom: 15px; border: 1px solid #ce93d8; border-radius: 8px; background: #fdfdfd; overflow: hidden;">
-                <summary style="padding: 12px; font-weight: bold; color: #8e44ad; cursor: pointer; background: #f3e5f5; list-style: none; display: flex; justify-content: space-between; align-items: center; outline: none;">
-                    <span style="display: flex; align-items: center; gap: 8px;">
-                        <i class="bi bi-people-fill" style="font-size: 18px;"></i> 
-                        Kogo uwzględnić w grafiku? (${clinicUsers.length})
-                    </span>
-                    <span style="font-size: 14px; background: #fff; padding: 2px 8px; border-radius: 12px; border: 1px solid #ce93d8;">Rozwiń ⏷</span>
-                </summary>
-                <div style="padding: 10px; max-height: 180px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; border-top: 1px solid #e1bee7;">
-        `;
-        
-        clinicUsers.forEach(u => {
-            usersCheckboxesHtml += `
-                    <label style="display: flex; align-items: center; justify-content: space-between; padding: 10px 15px; background: white; border: 1px solid #eee; border-radius: 8px; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
-                        <span style="font-weight: 600; color: #444; font-size: 14px;">${u.name}</span>
-                        <input type="checkbox" class="auto-user-cb" value="${u.uid}" checked style="width: 22px; height: 22px; accent-color: #8e44ad; cursor: pointer;">
-                    </label>
-            `;
-        });
-        
-        usersCheckboxesHtml += `
-                </div>
-            </details>
-        `;
+        // 2. Zmienna przechowująca wybrane osoby (domyślnie wszyscy)
+        let selectedUids = clinicUsers.map(u => u.uid);
 
         const overlay = document.createElement('div');
         overlay.style.cssText = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:20000;display:flex;justify-content:center;align-items:center;";
@@ -26343,9 +26319,13 @@ if (btnSmsToDoctor) {
         overlay.innerHTML = `
             <div class="form-card" style="width:95%; max-width:400px; padding:20px; background:white; border-radius:12px; max-height:90vh; overflow-y:auto;">
                 <h3 style="margin-top:0; color:#8e44ad; text-align:center;">🤖 Kreator Grafiku (${monthStr})</h3>
-                <p style="font-size:12px; color:#666; margin-bottom:15px;">Automat wypełni brakujące dni. Zaznacz poniżej, kogo algorytm ma uwzględnić (np. odznacz osoby pracujące tylko na miejscu).</p>
+                <p style="font-size:12px; color:#666; margin-bottom:15px;">Automat wypełni puste dni. Wybierz, dla kogo chcesz przeliczyć grafik.</p>
                 
-                ${usersCheckboxesHtml}
+                <div class="form-row" style="margin-bottom: 20px;">
+                    <button id="btnSelectAutoUsers" class="btn ghost" style="width:100%; border: 1px solid #ce93d8; color: #8e44ad; font-weight: bold;">
+                        👥 Wybierz pracowników (${selectedUids.length}/${clinicUsers.length})
+                    </button>
+                </div>
                 
                 <div class="form-row">
                     <label>Ile dni wolnych dla każdego z zaznaczonych?</label>
@@ -26375,6 +26355,45 @@ if (btnSmsToDoctor) {
 
         document.getElementById('btnCancelAuto').onclick = () => document.body.removeChild(overlay);
 
+        // --- ✅ NOWOŚĆ: MODAL WYBORU PRACOWNIKÓW ---
+        document.getElementById('btnSelectAutoUsers').onclick = () => {
+            const userOverlay = document.createElement('div');
+            // Z-index większy o 5, żeby nałożył się na główny modal
+            userOverlay.style.cssText = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);z-index:20005;display:flex;justify-content:center;align-items:center;";
+            
+            let userListHtml = '<div style="display:flex; flex-direction:column; gap:8px; margin-bottom: 20px; max-height: 50vh; overflow-y: auto;">';
+            clinicUsers.forEach(u => {
+                const isChecked = selectedUids.includes(u.uid) ? 'checked' : '';
+                userListHtml += `
+                    <label style="display: flex; align-items: center; justify-content: space-between; padding: 12px 15px; background: #f9f9f9; border: 1px solid #eee; border-radius: 8px; cursor: pointer; font-size:16px;">
+                        <span style="font-weight: 600; color: #444;">${u.name}</span>
+                        <input type="checkbox" class="temp-user-cb" value="${u.uid}" ${isChecked} style="width: 24px; height: 24px; accent-color: #8e44ad; cursor: pointer;">
+                    </label>
+                `;
+            });
+            userListHtml += '</div>';
+
+            userOverlay.innerHTML = `
+                <div class="form-card" style="width:95%; max-width:350px; padding:20px; background:white; border-radius:12px;">
+                    <h3 style="margin-top:0; color:#8e44ad; text-align:center;">Kogo uwzględnić?</h3>
+                    ${userListHtml}
+                    <div style="display:flex; gap:10px;">
+                        <button id="btnCancelUserSel" class="btn ghost" style="flex:1;">Anuluj</button>
+                        <button id="btnSaveUserSel" class="btn primary" style="flex:1; background:#8e44ad; border-color:#732d91;">Gotowe</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(userOverlay);
+
+            document.getElementById('btnCancelUserSel').onclick = () => document.body.removeChild(userOverlay);
+            document.getElementById('btnSaveUserSel').onclick = () => {
+                const checkboxes = userOverlay.querySelectorAll('.temp-user-cb:checked');
+                selectedUids = Array.from(checkboxes).map(cb => cb.value);
+                document.getElementById('btnSelectAutoUsers').innerHTML = `👥 Wybierz pracowników (${selectedUids.length}/${clinicUsers.length})`;
+                document.body.removeChild(userOverlay);
+            };
+        };
+
         // --- LOGIKA WYCOFYWANIA AUTOMATU ---
         document.getElementById('btnUndoAuto').onclick = async () => {
             if (!confirm(`Czy na pewno chcesz USUNĄĆ wszystkie wpisy wygenerowane przez Automat dla miesiąca ${monthStr}?`)) return;
@@ -26384,7 +26403,6 @@ if (btnSmsToDoctor) {
             btnUndo.textContent = "Usuwanie... ⏳";
 
             try {
-                // Do usunięcia bierzemy WSZYSTKICH pracowników, żeby wyczyścić ślady automatu całkowicie
                 const uids = clinicUsers.map(o => o.uid);
                 let deletedCount = 0;
                 const chunks = [];
@@ -26426,9 +26444,8 @@ if (btnSmsToDoctor) {
             const tSats = parseInt(document.getElementById('autoSaturdays').value) || 0;
             const minWorkers = parseInt(document.getElementById('autoMinWorkers').value) || 1;
 
-            // ✅ NOWOŚĆ: Pobieramy tylko tych, którzy są zaznaczeni w HTML
-            const checkedUserCbs = document.querySelectorAll('.auto-user-cb:checked');
-            const targetUids = Array.from(checkedUserCbs).map(cb => cb.value);
+            // ✅ Używamy tablicy osób wybranych z pod-okienka
+            const targetUids = selectedUids;
 
             if(targetUids.length === 0) {
                 alert("Musisz zaznaczyć przynajmniej jednego pracownika do ułożenia grafiku.");
