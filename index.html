@@ -26296,7 +26296,7 @@ if (btnSmsToDoctor) {
         
         overlay.innerHTML = `
             <div class="form-card" style="width:95%; max-width:400px; padding:20px; background:white; border-radius:12px;">
-                <h3 style="margin-top:0; color:#8e44ad; text-align:center;">🤖 Kreator Grafiku (${monthStr})</h3>
+                <h3 style="margin:0; color:#8e44ad; text-align:center;">🤖 Kreator Grafiku (${monthStr})</h3>
                 <p style="font-size:12px; color:#666; margin-bottom:15px;">Automat wypełni brakujące dni tak, by spełnić Twoje założenia. Nie nadpisze dni, które już wprowadziłeś ręcznie.</p>
                 
                 <div class="form-row">
@@ -26317,16 +26317,73 @@ if (btnSmsToDoctor) {
                     <small style="color:#777;">Automat nie da komuś wolnego, jeśli przez to w lecznicy zostałoby za mało osób.</small>
                 </div>
 
-                <div style="display:flex; gap:10px; margin-top:20px;">
-                    <button id="btnCancelAuto" class="btn ghost">Anuluj</button>
-                    <button id="btnRunAuto" class="btn primary" style="background:#8e44ad; border-color:#732d91;">🚀 Generuj Grafik</button>
+                <div style="display:flex; gap:10px; margin-top:20px; flex-wrap:wrap;">
+                    <button id="btnCancelAuto" class="btn ghost" style="flex:1; min-width:80px;">Anuluj</button>
+                    <button id="btnUndoAuto" class="btn warn" style="flex:1; min-width:120px; background:#c0392b; color:white; border:none;" title="Usuwa tylko wpisy wygenerowane przez automat">⏪ Wycofaj Automat</button>
                 </div>
+                <button id="btnRunAuto" class="btn primary" style="width:100%; margin-top:10px; background:#8e44ad; border-color:#732d91;">🚀 Generuj Grafik</button>
             </div>
         `;
         document.body.appendChild(overlay);
 
         document.getElementById('btnCancelAuto').onclick = () => document.body.removeChild(overlay);
 
+        // --- ✅ NOWOŚĆ: LOGIKA WYCOFYWANIA AUTOMATU ---
+        document.getElementById('btnUndoAuto').onclick = async () => {
+            if (!confirm(`Czy na pewno chcesz USUNĄĆ wszystkie wpisy wygenerowane przez Automat dla miesiąca ${monthStr}?\n\nRęczne wpisy grafiku pozostaną nienaruszone.`)) {
+                return;
+            }
+            
+            const btnUndo = document.getElementById('btnUndoAuto');
+            btnUndo.disabled = true;
+            btnUndo.textContent = "Usuwanie... ⏳";
+
+            try {
+                const uids = Array.from(calendarUserSelect.options).filter(o => o.value && o.value !== 'ALL').map(o => o.value);
+                if (uids.length === 0) throw new Error("Brak pracowników.");
+
+                let deletedCount = 0;
+                const chunks = [];
+                for (let i = 0; i < uids.length; i += 10) chunks.push(uids.slice(i, i + 10));
+
+                for (const chunk of chunks) {
+                    const snap = await db.collection("kalendarz_rozliczenia")
+                                        .where("miesiac", "==", monthStr)
+                                        .where("uid", "in", chunk)
+                                        .get(); // Pobieramy wszystko z danego miesiąca
+                    
+                    let batch = db.batch();
+                    let batchCount = 0;
+                    
+                    snap.docs.forEach(doc => {
+                        // Filtrujemy w JavaScript, aby uniknąć błędów braku indeksów w Firestore
+                        if (doc.data().oznaczyl_kto === 'Automat') {
+                            batch.delete(doc.ref);
+                            deletedCount++;
+                            batchCount++;
+                        }
+                    });
+                    
+                    if (batchCount > 0) {
+                        await batch.commit();
+                    }
+                }
+
+                showToast(`Pomyślnie wycofano ${deletedCount} wpisów z Automatu.`, "info");
+                
+                if (document.body.contains(overlay)) document.body.removeChild(overlay);
+                const calSelect = document.getElementById('calendarUserSelect');
+                if (calSelect) calSelect.dispatchEvent(new Event('change'));
+
+            } catch (e) {
+                console.error("Błąd wycofywania automatu:", e);
+                alert("Błąd: " + e.message);
+                btnUndo.disabled = false;
+                btnUndo.textContent = "⏪ Wycofaj Automat";
+            }
+        };
+
+        // --- LOGIKA GENEROWANIA GRAFIKU ---
         document.getElementById('btnRunAuto').onclick = async () => {
             const tOff = parseInt(document.getElementById('autoDaysOff').value) || 0;
             const tNights = parseInt(document.getElementById('autoNights').value) || 0;
@@ -26469,17 +26526,28 @@ if (btnSmsToDoctor) {
                     showToast("Brak miejsc do wygenerowania, lub normy są już spełnione.", "info");
                 }
                 
-                document.body.removeChild(overlay);
-                fetchAndRenderVisits(); // Przeładuj widok kalendarza by pokazać wygenerowane paski
+                if (document.body.contains(overlay)) {
+                    document.body.removeChild(overlay);
+                }
+
+                // Odświeżenie
+                const calSelect = document.getElementById('calendarUserSelect');
+                if (calSelect) {
+                    calSelect.dispatchEvent(new Event('change'));
+                }
                 
             } catch(e) {
                 console.error(e);
                 alert("Błąd automatu: " + e.message);
-                document.getElementById('btnRunAuto').disabled = false;
-                document.getElementById('btnRunAuto').textContent = '🚀 Generuj Grafik';
+                const btnAuto = document.getElementById('btnRunAuto');
+                if (btnAuto) {
+                    btnAuto.disabled = false;
+                    btnAuto.textContent = '🚀 Generuj Grafik';
+                }
             }
         };
     }
+    
 </script>
 </body>
 </html>
