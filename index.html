@@ -26303,7 +26303,7 @@ if (btnSmsToDoctor) {
 }
 /**
      * =========================================================================
-     * 🤖 AUTOMATYCZNY SCHEDULER GRAFIKU (PAMIĘĆ USTAWIEŃ + PERFEKCYJNE BHP)
+     * 🤖 AUTOMATYCZNY SCHEDULER GRAFIKU (MIN/MAX BHP, IZOLACJA PRACOWNIKÓW)
      * =========================================================================
      */
     function openAutoSchedulerModal(monthStr, daysInMonth) {
@@ -26321,10 +26321,10 @@ if (btnSmsToDoctor) {
 
         // ✅ Wczytywanie zapisanych preferencji
         const savedOpts = JSON.parse(localStorage.getItem('autoGrafikSettings')) || {
-            daysOff: 8, minWorkers: 2, genNights: true, genSats: true, selectedUids: []
+            daysOff: 8, minWorkers: 2, maxWorkers: 4, genNights: true, genSats: true, selectedUids: []
         };
 
-        // Przywróć wybranych pracowników (lub wszystkich, jeśli brak zapisu)
+        // Przywróć wybranych pracowników
         let selectedUids = (savedOpts.selectedUids && savedOpts.selectedUids.length > 0) 
             ? savedOpts.selectedUids.filter(uid => clinicUsers.some(u => u.uid === uid)) 
             : clinicUsers.map(u => u.uid);
@@ -26335,7 +26335,7 @@ if (btnSmsToDoctor) {
         overlay.innerHTML = `
             <div class="form-card" style="width:95%; max-width:400px; padding:20px; background:white; border-radius:12px; max-height:90vh; overflow-y:auto;">
                 <h3 style="margin-top:0; color:#8e44ad; text-align:center;">🤖 Kreator Grafiku (${monthStr})</h3>
-                <p style="font-size:12px; color:#666; margin-bottom:15px;">Automat inteligentnie wypełni puste dni i zapamięta Twoje ustawienia na przyszłość.</p>
+                <p style="font-size:12px; color:#666; margin-bottom:15px;">Automat bierze pod uwagę TYLKO zaznaczone osoby. Odznaczeni pracownicy nie wliczają się do BHP i są ignorowani.</p>
                 
                 <div class="form-row" style="margin-bottom: 20px;">
                     <button id="btnSelectAutoUsers" class="btn ghost" style="width:100%; border: 1px solid #ce93d8; color: #8e44ad; font-weight: bold;">
@@ -26344,7 +26344,7 @@ if (btnSmsToDoctor) {
                 </div>
                 
                 <div class="form-row">
-                    <label>Ile dni wolnych dla każdego z zaznaczonych?</label>
+                    <label>Ile dni wolnych planowo dla każdego?</label>
                     <input type="number" id="autoDaysOff" value="${savedOpts.daysOff}" min="0" max="15">
                 </div>
                 
@@ -26359,8 +26359,18 @@ if (btnSmsToDoctor) {
                 </div>
                 
                 <div class="form-row" style="background:#fff3e0; padding:10px; border-radius:8px; border:1px solid #ffe0b2;">
-                    <label style="color:#d35400;">Min. obsada w lecznicy w dzień (BHP)</label>
-                    <input type="number" id="autoMinWorkers" value="${savedOpts.minWorkers}" min="1" max="10">
+                    <label style="color:#d35400; font-weight:bold;">Obsada DZIENNA w lecznicy (BHP)</label>
+                    <div style="display:flex; gap: 10px; margin-top: 5px;">
+                        <div style="flex:1;">
+                            <small style="color:#777;">Minimum osób:</small>
+                            <input type="number" id="autoMinWorkers" value="${savedOpts.minWorkers || 2}" min="1" max="10">
+                        </div>
+                        <div style="flex:1;">
+                            <small style="color:#777;">Maksimum osób:</small>
+                            <input type="number" id="autoMaxWorkers" value="${savedOpts.maxWorkers || 4}" min="1" max="10">
+                        </div>
+                    </div>
+                    <small style="color:#777; display:block; margin-top:5px; line-height: 1.2;">Jeśli przekroczysz MAX, automat wymusi dodatkowe wolne na losowych pracownikach.</small>
                 </div>
 
                 <div style="display:flex; gap:10px; margin-top:20px; flex-wrap:wrap;">
@@ -26419,6 +26429,7 @@ if (btnSmsToDoctor) {
             btnUndo.disabled = true; btnUndo.textContent = "Usuwanie... ⏳";
 
             try {
+                // Przy wycofywaniu usuwamy wszystkie slady automatu z calej lecznicy
                 const uids = clinicUsers.map(o => o.uid);
                 let deletedCount = 0;
                 const chunks = [];
@@ -26451,6 +26462,7 @@ if (btnSmsToDoctor) {
         document.getElementById('btnRunAuto').onclick = async () => {
             const tOff = parseInt(document.getElementById('autoDaysOff').value) || 0;
             const minWorkers = parseInt(document.getElementById('autoMinWorkers').value) || 1;
+            const maxWorkers = parseInt(document.getElementById('autoMaxWorkers').value) || 4;
             const generateNights = document.getElementById('autoNightsCb').checked;
             const generateSats = document.getElementById('autoSatsCb').checked;
             const targetUids = selectedUids;
@@ -26460,9 +26472,9 @@ if (btnSmsToDoctor) {
                 return;
             }
 
-            // ✅ Zapisujemy ustawienia, żeby okienko "pamiętało" je na przyszłość
+            // Zapis ustawień
             localStorage.setItem('autoGrafikSettings', JSON.stringify({
-                daysOff: tOff, minWorkers: minWorkers, 
+                daysOff: tOff, minWorkers: minWorkers, maxWorkers: maxWorkers,
                 genNights: generateNights, genSats: generateSats, selectedUids: targetUids
             }));
 
@@ -26470,19 +26482,18 @@ if (btnSmsToDoctor) {
             document.getElementById('btnRunAuto').textContent = 'Przetwarzanie... ⏳';
 
             try {
-                // ✅ Pobieramy wpisy dla CAŁEJ lecznicy, żeby prawdziwie przeliczyć obsadę (BHP)
                 const allRecordsSnap = await db.collection("kalendarz_rozliczenia").where("miesiac", "==", monthStr).get();
                 
                 const existingData = {}; 
                 const nightsCoveredPerDay = {}; 
                 const satsCoveredPerDay = {};
-                const workersPerDay = {}; 
+                // ✅ ZMIANA: Obsada dzienna startuje z puli TYLKO zaznaczonych pracowników
+                const availableForDayShift = {}; 
                 const satsDates = [];
 
-                // Przygotowujemy dni
                 for (let d = 1; d <= daysInMonth; d++) {
                     const dateStr = `${monthStr}-${String(d).padStart(2, '0')}`;
-                    workersPerDay[dateStr] = clinicUsers.length; // Startujemy z maksymalną obsadą lecznicy
+                    availableForDayShift[dateStr] = targetUids.length; // Max to tylko nasza pula wyselekcjonowana
                     nightsCoveredPerDay[dateStr] = 0;
                     satsCoveredPerDay[dateStr] = 0;
                     
@@ -26490,19 +26501,34 @@ if (btnSmsToDoctor) {
                     if (dateObj.getDay() === 6) satsDates.push(dateStr);
                 }
 
-                // Wpisujemy istniejące dane
                 allRecordsSnap.forEach(doc => {
                     const d = doc.data();
                     existingData[`${d.uid}_${d.data}_${d.typ}`] = true; 
-                    if (d.typ === 'wolny' && workersPerDay[d.data] !== undefined) workersPerDay[d.data]--;
-                    if (d.typ === 'nocka' && nightsCoveredPerDay[d.data] !== undefined) nightsCoveredPerDay[d.data]++;
-                    if (d.typ === 'dodatek' && satsCoveredPerDay[d.data] !== undefined) satsCoveredPerDay[d.data]++;
+                    
+                    // ✅ Odliczamy od BHP TYLKO jeśli ten pracownik jest w naszej puli targetUids
+                    if (targetUids.includes(d.uid)) {
+                        if (d.typ === 'wolny' && availableForDayShift[d.data] !== undefined) availableForDayShift[d.data]--;
+                        if (d.typ === 'nocka' && availableForDayShift[d.data] !== undefined) {
+                            nightsCoveredPerDay[d.data]++;
+                            availableForDayShift[d.data]--; // Nocka NIE pracuje w dzień
+                        }
+                        if (d.typ === 'dodatek' && satsCoveredPerDay[d.data] !== undefined) satsCoveredPerDay[d.data]++;
+                    }
                 });
+
+                // Z góry rezerwujemy miejsce na nockę w obsadzie dziennej
+                if (generateNights) {
+                    for (let d = 1; d <= daysInMonth; d++) {
+                        const dateStr = `${monthStr}-${String(d).padStart(2, '0')}`;
+                        if (nightsCoveredPerDay[dateStr] === 0) {
+                            availableForDayShift[dateStr]--; // Zostawiamy "zapas" na osobę z nocki
+                        }
+                    }
+                }
 
                 const schedule = { wolne: {}, nocki: {}, dodatki: {} };
                 targetUids.forEach(uid => { schedule.wolne[uid] = 0; schedule.nocki[uid] = 0; schedule.dodatki[uid] = 0; });
 
-                // Sprawdzamy ile aktualnie z zaznaczonych osób ma przypisane dyżury
                 allRecordsSnap.forEach(doc => {
                     const d = doc.data();
                     if (targetUids.includes(d.uid)) {
@@ -26515,30 +26541,57 @@ if (btnSmsToDoctor) {
                 const batch = db.batch();
                 let addedCount = 0;
 
-                // ALGORYTM 1: WOLNE (Ciągi 2-3 dni, chroniąc BHP min. osób)
+                // 🔴 ALGORYTM 0: REDUKCJA NADMIARU (MAX BHP)
+                // Wymuszamy wolne dla losowych osób z puli, jeśli w pracy jest więcej osób niż MAX.
+                for (let d = 1; d <= daysInMonth; d++) {
+                    const dateStr = `${monthStr}-${String(d).padStart(2, '0')}`;
+                    let safety = 0;
+                    while (availableForDayShift[dateStr] > maxWorkers && safety < 100) {
+                        safety++;
+                        // Szukamy kogoś z naszej puli w pracy (kto nie ma wolnego, ani nocki)
+                        let eligible = targetUids.filter(uid => !existingData[`${uid}_${dateStr}_wolny`] && !existingData[`${uid}_${dateStr}_nocka`]);
+                        if (eligible.length > 0) {
+                            // Dajemy wolne temu, kto ma go najmniej
+                            eligible.sort((a, b) => schedule.wolne[a] - schedule.wolne[b]);
+                            const tied = eligible.filter(uid => schedule.wolne[uid] === schedule.wolne[eligible[0]]);
+                            const chosen = tied[Math.floor(Math.random() * tied.length)];
+
+                            const docRef = db.collection("kalendarz_rozliczenia").doc(`${chosen}_${dateStr}`);
+                            batch.set(docRef, { uid: chosen, data: dateStr, miesiac: monthStr, timestamp: firebase.firestore.FieldValue.serverTimestamp(), typ: 'wolny', oznaczyl_kto: 'Automat' });
+                            existingData[`${chosen}_${dateStr}_wolny`] = true;
+                            availableForDayShift[dateStr]--;
+                            schedule.wolne[chosen]++;
+                            addedCount++;
+                        } else {
+                            break;
+                        }
+                    }
+                }
+
+                // 🟢 ALGORYTM 1: WOLNE DO LIMITU (chroniąc MIN BHP)
                 targetUids.forEach(uid => {
                     let currentOff = schedule.wolne[uid];
                     let safetyCounter = 0;
-                    while (currentOff < tOff && safetyCounter < 150) {
+                    
+                    while (currentOff < tOff && safetyCounter < 500) {
                         safetyCounter++;
                         const randomD = Math.floor(Math.random() * daysInMonth) + 1;
                         const date1 = `${monthStr}-${String(randomD).padStart(2, '0')}`;
                         const date2 = `${monthStr}-${String(randomD+1).padStart(2, '0')}`; 
 
-                        if (randomD <= daysInMonth && !existingData[`${uid}_${date1}_wolny`] && workersPerDay[date1] > minWorkers) {
+                        if (randomD <= daysInMonth && !existingData[`${uid}_${date1}_wolny`] && availableForDayShift[date1] > minWorkers) {
                             const docRef = db.collection("kalendarz_rozliczenia").doc(`${uid}_${date1}`);
                             batch.set(docRef, { uid, data: date1, miesiac: monthStr, timestamp: firebase.firestore.FieldValue.serverTimestamp(), typ: 'wolny', oznaczyl_kto: 'Automat' });
                             existingData[`${uid}_${date1}_wolny`] = true;
-                            workersPerDay[date1]--;
+                            availableForDayShift[date1]--;
                             currentOff++;
                             addedCount++;
                             
-                            // Druga część ciągu wolnego
-                            if (currentOff < tOff && randomD + 1 <= daysInMonth && !existingData[`${uid}_${date2}_wolny`] && workersPerDay[date2] > minWorkers) {
+                            if (currentOff < tOff && randomD + 1 <= daysInMonth && !existingData[`${uid}_${date2}_wolny`] && availableForDayShift[date2] > minWorkers) {
                                 const docRef2 = db.collection("kalendarz_rozliczenia").doc(`${uid}_${date2}`);
                                 batch.set(docRef2, { uid, data: date2, miesiac: monthStr, timestamp: firebase.firestore.FieldValue.serverTimestamp(), typ: 'wolny', oznaczyl_kto: 'Automat' });
                                 existingData[`${uid}_${date2}_wolny`] = true;
-                                workersPerDay[date2]--;
+                                availableForDayShift[date2]--;
                                 currentOff++;
                                 addedCount++;
                             }
@@ -26546,7 +26599,7 @@ if (btnSmsToDoctor) {
                     }
                 });
 
-                // ALGORYTM 2: NOCKI (Dokładnie 1 na dzień z pracujących)
+                // 🌙 ALGORYTM 2: NOCKI (Dokładnie 1 pracownik)
                 if (generateNights) {
                     for (let d = 1; d <= daysInMonth; d++) {
                         const dStr = `${monthStr}-${String(d).padStart(2, '0')}`;
@@ -26569,7 +26622,7 @@ if (btnSmsToDoctor) {
                     }
                 }
 
-                // ALGORYTM 3: DODATKI (Dokładnie 1 na SOBOTĘ z pracujących)
+                // ➕ ALGORYTM 3: DODATKI (Dokładnie 1 pracownik w każdą sobotę)
                 if (generateSats) {
                     for (const sDate of satsDates) {
                         if (satsCoveredPerDay[sDate] === 0) {
@@ -26593,9 +26646,9 @@ if (btnSmsToDoctor) {
 
                 if (addedCount > 0) {
                     await batch.commit();
-                    showToast(`Wygenerowano ${addedCount} nowych wpisów w grafiku!`, "success");
+                    showToast(`Wygenerowano ${addedCount} nowych wpisów. Zastosowano BHP.`, "success");
                 } else {
-                    showToast("Brak miejsc do wygenerowania, lub opcje są odznaczone.", "info");
+                    showToast("Brak miejsc do wygenerowania, lub opcje zostały odznaczone.", "info");
                 }
                 
                 if (document.body.contains(overlay)) document.body.removeChild(overlay);
