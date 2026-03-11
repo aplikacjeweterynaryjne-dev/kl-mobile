@@ -26310,17 +26310,32 @@ if (btnSmsToDoctor) {
             alert("Brak pracowników w lecznicy."); return;
         }
 
-        // 2. Zbuduj HTML dla listy wyboru pracowników (domyślnie wszyscy zaznaczeni)
-        let usersCheckboxesHtml = '<div style="max-height: 120px; overflow-y: auto; background: #f9f9f9; border: 1px solid #ddd; padding: 10px; border-radius: 8px; margin-bottom: 15px;">';
+       // 2. Zbuduj HTML dla listy wyboru pracowników (nowoczesna rozwijana lista)
+        let usersCheckboxesHtml = `
+            <details style="margin-bottom: 15px; border: 1px solid #ce93d8; border-radius: 8px; background: #fdfdfd; overflow: hidden;">
+                <summary style="padding: 12px; font-weight: bold; color: #8e44ad; cursor: pointer; background: #f3e5f5; list-style: none; display: flex; justify-content: space-between; align-items: center; outline: none;">
+                    <span style="display: flex; align-items: center; gap: 8px;">
+                        <i class="bi bi-people-fill" style="font-size: 18px;"></i> 
+                        Kogo uwzględnić w grafiku? (${clinicUsers.length})
+                    </span>
+                    <span style="font-size: 14px; background: #fff; padding: 2px 8px; border-radius: 12px; border: 1px solid #ce93d8;">Rozwiń ⏷</span>
+                </summary>
+                <div style="padding: 10px; max-height: 180px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; border-top: 1px solid #e1bee7;">
+        `;
+        
         clinicUsers.forEach(u => {
             usersCheckboxesHtml += `
-                <label style="display:flex; align-items:center; margin-bottom:6px; font-size:13px; cursor:pointer;">
-                    <input type="checkbox" class="auto-user-cb" value="${u.uid}" checked style="width:16px; height:16px; accent-color:#8e44ad; margin-right:8px;">
-                    ${u.name}
-                </label>
+                    <label style="display: flex; align-items: center; justify-content: space-between; padding: 10px 15px; background: white; border: 1px solid #eee; border-radius: 8px; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                        <span style="font-weight: 600; color: #444; font-size: 14px;">${u.name}</span>
+                        <input type="checkbox" class="auto-user-cb" value="${u.uid}" checked style="width: 22px; height: 22px; accent-color: #8e44ad; cursor: pointer;">
+                    </label>
             `;
         });
-        usersCheckboxesHtml += '</div>';
+        
+        usersCheckboxesHtml += `
+                </div>
+            </details>
+        `;
 
         const overlay = document.createElement('div');
         overlay.style.cssText = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:20000;display:flex;justify-content:center;align-items:center;";
