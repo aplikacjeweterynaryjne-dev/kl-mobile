@@ -16024,7 +16024,7 @@ function renderTodayView(visits, dateToShow) {
                     
                     extraChipsHtml += '</div>';
                 }
-           } else {
+          } else {
                 // WIDOK POJEDYNCZY
                 const dayInfo = singleUserStatusMap.get(dayString);
                 if (dayInfo) {
@@ -16049,6 +16049,24 @@ function renderTodayView(visits, dateToShow) {
             let iconsDiv = singleUserIconsHtml ? `<div style="font-size:12px; margin-top:2px;">${singleUserIconsHtml}</div>` : '';
             let cellContent = `<span class="day-number">${day}</span>${iconsDiv}${extraChipsHtml}`;
             
+            // --- PRZYWRÓCONY ZAGUBIONY KOD (Statystyki wizyt i Kropki) ---
+            const visitsForThisDay = visitsByDate.get(dayString) || [];
+            const visitsToDo = visitsForThisDay.filter(v => v.status === 'Nowa').length;
+            if (visitsToDo > 0) {
+                cellContent += `<div class="day-summary">${visitsToDo}</div>`;
+            }
+
+            // Kropki (wskaźniki wizyt)
+            const pory = new Set(visitsForThisDay.map(v => v.poraDnia));
+            let dotsHtml = '<div class="day-dots">';
+            if (pory.has('Pilne')) dotsHtml += '<div class="day-dot dot-pilne"></div>';
+            if (pory.has('Obojętne')) dotsHtml += '<div class="day-dot dot-obojetne"></div>';
+            if (pory.has('6-10') || pory.has('10-15') || pory.has('15-20')) {
+                dotsHtml += '<div class="day-dot dot-standard"></div>';
+            }
+            dotsHtml += '</div>';
+            // --------------------------------------------------------------
+
             cell.innerHTML = cellContent + dotsHtml;
 
             // ============================================================
