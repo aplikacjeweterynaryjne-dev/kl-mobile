@@ -26301,9 +26301,9 @@ if (btnSmsToDoctor) {
         window.location.href = finalLink;
     });
 }
- /**
+/**
      * =========================================================================
-     * 🤖 AUTOMATYCZNY SCHEDULER GRAFIKU Z INTELIGENTNYM ROZDZIAŁEM NOCEK
+     * 🤖 AUTOMATYCZNY SCHEDULER GRAFIKU (PAMIĘĆ USTAWIEŃ + PERFEKCYJNE BHP)
      * =========================================================================
      */
     function openAutoSchedulerModal(monthStr, daysInMonth) {
@@ -26319,7 +26319,15 @@ if (btnSmsToDoctor) {
             alert("Brak pracowników w lecznicy."); return;
         }
 
-        let selectedUids = clinicUsers.map(u => u.uid);
+        // ✅ Wczytywanie zapisanych preferencji
+        const savedOpts = JSON.parse(localStorage.getItem('autoGrafikSettings')) || {
+            daysOff: 8, minWorkers: 2, genNights: true, genSats: true, selectedUids: []
+        };
+
+        // Przywróć wybranych pracowników (lub wszystkich, jeśli brak zapisu)
+        let selectedUids = (savedOpts.selectedUids && savedOpts.selectedUids.length > 0) 
+            ? savedOpts.selectedUids.filter(uid => clinicUsers.some(u => u.uid === uid)) 
+            : clinicUsers.map(u => u.uid);
 
         const overlay = document.createElement('div');
         overlay.style.cssText = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:20000;display:flex;justify-content:center;align-items:center;";
@@ -26327,7 +26335,7 @@ if (btnSmsToDoctor) {
         overlay.innerHTML = `
             <div class="form-card" style="width:95%; max-width:400px; padding:20px; background:white; border-radius:12px; max-height:90vh; overflow-y:auto;">
                 <h3 style="margin-top:0; color:#8e44ad; text-align:center;">🤖 Kreator Grafiku (${monthStr})</h3>
-                <p style="font-size:12px; color:#666; margin-bottom:15px;">Automat wypełni puste dni. Wybierz, dla kogo chcesz przeliczyć grafik.</p>
+                <p style="font-size:12px; color:#666; margin-bottom:15px;">Automat inteligentnie wypełni puste dni i zapamięta Twoje ustawienia na przyszłość.</p>
                 
                 <div class="form-row" style="margin-bottom: 20px;">
                     <button id="btnSelectAutoUsers" class="btn ghost" style="width:100%; border: 1px solid #ce93d8; color: #8e44ad; font-weight: bold;">
@@ -26337,22 +26345,22 @@ if (btnSmsToDoctor) {
                 
                 <div class="form-row">
                     <label>Ile dni wolnych dla każdego z zaznaczonych?</label>
-                    <input type="number" id="autoDaysOff" value="8" min="0" max="15">
+                    <input type="number" id="autoDaysOff" value="${savedOpts.daysOff}" min="0" max="15">
                 </div>
                 
                 <div class="form-row" style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 10px; background: #f3e5f5; padding: 10px; border-radius: 8px;">
-                    <label style="margin:0; font-size: 13px; font-weight: bold; color: #8e44ad;">🌙 Generuj nocki (każdy dzień = 1 pracownik)</label>
-                    <input type="checkbox" id="autoNightsCb" checked style="width:18px; height:18px; accent-color:#8e44ad; cursor:pointer;">
+                    <label style="margin:0; font-size: 13px; font-weight: bold; color: #8e44ad;">🌙 Nocki (każdy dzień = 1 pracownik)</label>
+                    <input type="checkbox" id="autoNightsCb" ${savedOpts.genNights ? 'checked' : ''} style="width:18px; height:18px; accent-color:#8e44ad; cursor:pointer;">
                 </div>
 
-                <div class="form-row">
-                    <label>Ile sobót "z dodatkiem" dla każdego?</label>
-                    <input type="number" id="autoSaturdays" value="1" min="0" max="4">
+                <div class="form-row" style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 15px; background: #e0f2f1; padding: 10px; border-radius: 8px;">
+                    <label style="margin:0; font-size: 13px; font-weight: bold; color: #00695c;">➕ Dodatki (każda sobota = 1 pracownik)</label>
+                    <input type="checkbox" id="autoSatsCb" ${savedOpts.genSats ? 'checked' : ''} style="width:18px; height:18px; accent-color:#00897b; cursor:pointer;">
                 </div>
                 
                 <div class="form-row" style="background:#fff3e0; padding:10px; border-radius:8px; border:1px solid #ffe0b2;">
-                    <label style="color:#d35400;">Min. pracowników na zmianie dziennej (BHP)</label>
-                    <input type="number" id="autoMinWorkers" value="2" min="1" max="10">
+                    <label style="color:#d35400;">Min. obsada w lecznicy w dzień (BHP)</label>
+                    <input type="number" id="autoMinWorkers" value="${savedOpts.minWorkers}" min="1" max="10">
                 </div>
 
                 <div style="display:flex; gap:10px; margin-top:20px; flex-wrap:wrap;">
@@ -26407,10 +26415,8 @@ if (btnSmsToDoctor) {
         // --- LOGIKA WYCOFYWANIA AUTOMATU ---
         document.getElementById('btnUndoAuto').onclick = async () => {
             if (!confirm(`Czy na pewno chcesz USUNĄĆ wszystkie wpisy wygenerowane przez Automat dla miesiąca ${monthStr}?`)) return;
-            
             const btnUndo = document.getElementById('btnUndoAuto');
-            btnUndo.disabled = true;
-            btnUndo.textContent = "Usuwanie... ⏳";
+            btnUndo.disabled = true; btnUndo.textContent = "Usuwanie... ⏳";
 
             try {
                 const uids = clinicUsers.map(o => o.uid);
@@ -26419,18 +26425,13 @@ if (btnSmsToDoctor) {
                 for (let i = 0; i < uids.length; i += 10) chunks.push(uids.slice(i, i + 10));
 
                 for (const chunk of chunks) {
-                    const snap = await db.collection("kalendarz_rozliczenia")
-                                        .where("miesiac", "==", monthStr)
-                                        .where("uid", "in", chunk).get(); 
-                    
+                    const snap = await db.collection("kalendarz_rozliczenia").where("miesiac", "==", monthStr).where("uid", "in", chunk).get(); 
                     let batch = db.batch();
                     let batchCount = 0;
-                    
                     snap.docs.forEach(doc => {
                         if (doc.data().oznaczyl_kto === 'Automat') {
                             batch.delete(doc.ref);
-                            deletedCount++;
-                            batchCount++;
+                            deletedCount++; batchCount++;
                         }
                     });
                     if (batchCount > 0) await batch.commit();
@@ -26440,7 +26441,6 @@ if (btnSmsToDoctor) {
                 if (document.body.contains(overlay)) document.body.removeChild(overlay);
                 const calSelect = document.getElementById('calendarUserSelect');
                 if (calSelect) calSelect.dispatchEvent(new Event('change'));
-
             } catch (e) {
                 console.error(e); alert("Błąd: " + e.message);
                 btnUndo.disabled = false; btnUndo.textContent = "⏪ Wycofaj Automat";
@@ -26450,71 +26450,76 @@ if (btnSmsToDoctor) {
         // --- LOGIKA GENEROWANIA GRAFIKU ---
         document.getElementById('btnRunAuto').onclick = async () => {
             const tOff = parseInt(document.getElementById('autoDaysOff').value) || 0;
-            const tSats = parseInt(document.getElementById('autoSaturdays').value) || 0;
             const minWorkers = parseInt(document.getElementById('autoMinWorkers').value) || 1;
             const generateNights = document.getElementById('autoNightsCb').checked;
-
+            const generateSats = document.getElementById('autoSatsCb').checked;
             const targetUids = selectedUids;
+
             if(targetUids.length === 0) {
                 alert("Musisz zaznaczyć przynajmniej jednego pracownika do ułożenia grafiku.");
                 return;
             }
 
+            // ✅ Zapisujemy ustawienia, żeby okienko "pamiętało" je na przyszłość
+            localStorage.setItem('autoGrafikSettings', JSON.stringify({
+                daysOff: tOff, minWorkers: minWorkers, 
+                genNights: generateNights, genSats: generateSats, selectedUids: targetUids
+            }));
+
             document.getElementById('btnRunAuto').disabled = true;
             document.getElementById('btnRunAuto').textContent = 'Przetwarzanie... ⏳';
 
             try {
-                const existingData = {}; 
-                const chunks = [];
-                for (let i = 0; i < targetUids.length; i += 10) chunks.push(targetUids.slice(i, i + 10));
+                // ✅ Pobieramy wpisy dla CAŁEJ lecznicy, żeby prawdziwie przeliczyć obsadę (BHP)
+                const allRecordsSnap = await db.collection("kalendarz_rozliczenia").where("miesiac", "==", monthStr).get();
                 
-                for (const chunk of chunks) {
-                    const snap = await db.collection("kalendarz_rozliczenia").where("miesiac", "==", monthStr).where("uid", "in", chunk).get();
-                    snap.forEach(doc => {
-                        const d = doc.data();
-                        existingData[`${d.uid}_${d.data}_${d.typ}`] = true; 
-                    });
-                }
-
-                const schedule = { wolne: {}, nocki: {}, dodatki: {} };
+                const existingData = {}; 
+                const nightsCoveredPerDay = {}; 
+                const satsCoveredPerDay = {};
                 const workersPerDay = {}; 
-                const nightsCoveredPerDay = {}; // ✅ Śledzimy czy dany dzień ma już obsadzoną nockę
-                const sats = [];
+                const satsDates = [];
 
+                // Przygotowujemy dni
                 for (let d = 1; d <= daysInMonth; d++) {
                     const dateStr = `${monthStr}-${String(d).padStart(2, '0')}`;
-                    workersPerDay[dateStr] = targetUids.length; 
+                    workersPerDay[dateStr] = clinicUsers.length; // Startujemy z maksymalną obsadą lecznicy
                     nightsCoveredPerDay[dateStr] = 0;
+                    satsCoveredPerDay[dateStr] = 0;
                     
                     const dateObj = new Date(monthStr.split('-')[0], parseInt(monthStr.split('-')[1]) - 1, d);
-                    if (dateObj.getDay() === 6) sats.push(dateStr);
-
-                    targetUids.forEach(uid => {
-                        if (existingData[`${uid}_${dateStr}_wolny`]) {
-                            workersPerDay[dateStr]--;
-                            if(!schedule.wolne[uid]) schedule.wolne[uid] = 0;
-                            schedule.wolne[uid]++;
-                        }
-                        if (existingData[`${uid}_${dateStr}_nocka`]) {
-                            nightsCoveredPerDay[dateStr]++;
-                            if(!schedule.nocki[uid]) schedule.nocki[uid] = 0;
-                            schedule.nocki[uid]++;
-                        }
-                        if (existingData[`${uid}_${dateStr}_dodatek`]) {
-                            if(!schedule.dodatki[uid]) schedule.dodatki[uid] = 0;
-                            schedule.dodatki[uid]++;
-                        }
-                    });
+                    if (dateObj.getDay() === 6) satsDates.push(dateStr);
                 }
+
+                // Wpisujemy istniejące dane
+                allRecordsSnap.forEach(doc => {
+                    const d = doc.data();
+                    existingData[`${d.uid}_${d.data}_${d.typ}`] = true; 
+                    if (d.typ === 'wolny' && workersPerDay[d.data] !== undefined) workersPerDay[d.data]--;
+                    if (d.typ === 'nocka' && nightsCoveredPerDay[d.data] !== undefined) nightsCoveredPerDay[d.data]++;
+                    if (d.typ === 'dodatek' && satsCoveredPerDay[d.data] !== undefined) satsCoveredPerDay[d.data]++;
+                });
+
+                const schedule = { wolne: {}, nocki: {}, dodatki: {} };
+                targetUids.forEach(uid => { schedule.wolne[uid] = 0; schedule.nocki[uid] = 0; schedule.dodatki[uid] = 0; });
+
+                // Sprawdzamy ile aktualnie z zaznaczonych osób ma przypisane dyżury
+                allRecordsSnap.forEach(doc => {
+                    const d = doc.data();
+                    if (targetUids.includes(d.uid)) {
+                        if (d.typ === 'wolny') schedule.wolne[d.uid]++;
+                        if (d.typ === 'nocka') schedule.nocki[d.uid]++;
+                        if (d.typ === 'dodatek') schedule.dodatki[d.uid]++;
+                    }
+                });
 
                 const batch = db.batch();
                 let addedCount = 0;
 
                 // ALGORYTM 1: WOLNE (Ciągi 2-3 dni, chroniąc BHP min. osób)
                 targetUids.forEach(uid => {
-                    let currentOff = schedule.wolne[uid] || 0;
+                    let currentOff = schedule.wolne[uid];
                     let safetyCounter = 0;
-                    while (currentOff < tOff && safetyCounter < 100) {
+                    while (currentOff < tOff && safetyCounter < 150) {
                         safetyCounter++;
                         const randomD = Math.floor(Math.random() * daysInMonth) + 1;
                         const date1 = `${monthStr}-${String(randomD).padStart(2, '0')}`;
@@ -26528,6 +26533,7 @@ if (btnSmsToDoctor) {
                             currentOff++;
                             addedCount++;
                             
+                            // Druga część ciągu wolnego
                             if (currentOff < tOff && randomD + 1 <= daysInMonth && !existingData[`${uid}_${date2}_wolny`] && workersPerDay[date2] > minWorkers) {
                                 const docRef2 = db.collection("kalendarz_rozliczenia").doc(`${uid}_${date2}`);
                                 batch.set(docRef2, { uid, data: date2, miesiac: monthStr, timestamp: firebase.firestore.FieldValue.serverTimestamp(), typ: 'wolny', oznaczyl_kto: 'Automat' });
@@ -26540,59 +26546,56 @@ if (btnSmsToDoctor) {
                     }
                 });
 
-                // ALGORYTM 2: ✅ NOCKI (Każdy dzień ma 1 nockę, przydzielaną sprawiedliwie pracującym)
+                // ALGORYTM 2: NOCKI (Dokładnie 1 na dzień z pracujących)
                 if (generateNights) {
                     for (let d = 1; d <= daysInMonth; d++) {
                         const dStr = `${monthStr}-${String(d).padStart(2, '0')}`;
-                        
-                        // Jeśli dany dzień jeszcze nie ma przypisanej nocki
                         if (nightsCoveredPerDay[dStr] === 0) {
-                            // Kto z zaznaczonych JEST DZIŚ W PRACY? (nie ma wolnego)
-                            let eligibleWorkers = targetUids.filter(uid => !existingData[`${uid}_${dStr}_wolny`]);
-                            
-                            if (eligibleWorkers.length > 0) {
-                                // Sprawiedliwy przydział: szukamy tego, kto ma najmniej nocek
-                                eligibleWorkers.sort((a, b) => (schedule.nocki[a] || 0) - (schedule.nocki[b] || 0));
-                                
-                                // Wśród tych z najmniejszą ilością wybieramy losowo (żeby nie było ciągle tej samej osoby pierwszej)
-                                const minNightsCount = schedule.nocki[eligibleWorkers[0]] || 0;
-                                const tiedWorkers = eligibleWorkers.filter(uid => (schedule.nocki[uid] || 0) === minNightsCount);
-                                const chosenUid = tiedWorkers[Math.floor(Math.random() * tiedWorkers.length)];
+                            let eligible = targetUids.filter(uid => !existingData[`${uid}_${dStr}_wolny`]);
+                            if (eligible.length > 0) {
+                                eligible.sort((a, b) => schedule.nocki[a] - schedule.nocki[b]);
+                                const minNights = schedule.nocki[eligible[0]];
+                                const tied = eligible.filter(uid => schedule.nocki[uid] === minNights);
+                                const chosen = tied[Math.floor(Math.random() * tied.length)];
 
-                                const docRef = db.collection("kalendarz_rozliczenia").doc(`${chosenUid}_${dStr}_nocka`);
-                                batch.set(docRef, { uid: chosenUid, data: dStr, miesiac: monthStr, timestamp: firebase.firestore.FieldValue.serverTimestamp(), typ: 'nocka', oznaczyl_kto: 'Automat' });
-                                
-                                existingData[`${chosenUid}_${dStr}_nocka`] = true;
+                                const docRef = db.collection("kalendarz_rozliczenia").doc(`${chosen}_${dStr}_nocka`);
+                                batch.set(docRef, { uid: chosen, data: dStr, miesiac: monthStr, timestamp: firebase.firestore.FieldValue.serverTimestamp(), typ: 'nocka', oznaczyl_kto: 'Automat' });
+                                existingData[`${chosen}_${dStr}_nocka`] = true;
                                 nightsCoveredPerDay[dStr]++;
-                                if (!schedule.nocki[chosenUid]) schedule.nocki[chosenUid] = 0;
-                                schedule.nocki[chosenUid]++;
+                                schedule.nocki[chosen]++;
                                 addedCount++;
                             }
                         }
                     }
                 }
 
-                // ALGORYTM 3: DODATKI (Soboty)
-                targetUids.forEach(uid => {
-                    let currentSats = schedule.dodatki[uid] || 0;
-                    let availableSats = [...sats].sort(() => 0.5 - Math.random()); 
-                    for (const sDate of availableSats) {
-                        if (currentSats >= tSats) break;
-                        if (!existingData[`${uid}_${sDate}_dodatek`] && !existingData[`${uid}_${sDate}_wolny`]) {
-                            const docRef = db.collection("kalendarz_rozliczenia").doc(`${uid}_${sDate}_dodatek`);
-                            batch.set(docRef, { uid, data: sDate, miesiac: monthStr, timestamp: firebase.firestore.FieldValue.serverTimestamp(), typ: 'dodatek', oznaczyl_kto: 'Automat' });
-                            existingData[`${uid}_${sDate}_dodatek`] = true;
-                            currentSats++;
-                            addedCount++;
+                // ALGORYTM 3: DODATKI (Dokładnie 1 na SOBOTĘ z pracujących)
+                if (generateSats) {
+                    for (const sDate of satsDates) {
+                        if (satsCoveredPerDay[sDate] === 0) {
+                            let eligible = targetUids.filter(uid => !existingData[`${uid}_${sDate}_wolny`]);
+                            if (eligible.length > 0) {
+                                eligible.sort((a, b) => schedule.dodatki[a] - schedule.dodatki[b]);
+                                const minSats = schedule.dodatki[eligible[0]];
+                                const tied = eligible.filter(uid => schedule.dodatki[uid] === minSats);
+                                const chosen = tied[Math.floor(Math.random() * tied.length)];
+
+                                const docRef = db.collection("kalendarz_rozliczenia").doc(`${chosen}_${sDate}_dodatek`);
+                                batch.set(docRef, { uid: chosen, data: sDate, miesiac: monthStr, timestamp: firebase.firestore.FieldValue.serverTimestamp(), typ: 'dodatek', oznaczyl_kto: 'Automat' });
+                                existingData[`${chosen}_${sDate}_dodatek`] = true;
+                                satsCoveredPerDay[sDate]++;
+                                schedule.dodatki[chosen]++;
+                                addedCount++;
+                            }
                         }
                     }
-                });
+                }
 
                 if (addedCount > 0) {
                     await batch.commit();
-                    showToast(`Wygenerowano ${addedCount} nowych wpisów (w tym dyżury nocne)!`, "success");
+                    showToast(`Wygenerowano ${addedCount} nowych wpisów w grafiku!`, "success");
                 } else {
-                    showToast("Brak miejsc, lub wybrane normy są już spełnione.", "info");
+                    showToast("Brak miejsc do wygenerowania, lub opcje są odznaczone.", "info");
                 }
                 
                 if (document.body.contains(overlay)) document.body.removeChild(overlay);
