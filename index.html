@@ -2456,8 +2456,8 @@ tr.filled-row td {
 }
 /* Styl dla dnia, który jest WOLNY (Antracytowe tło) */
 .day-cell.is-day-off {
-    background-color: #36454F !important; /* Antracyt */
-    color: #ffffff !important; /* Biały tekst, żeby był czytelny na ciemnym tle */
+    background-color: #36454F !important; 
+    color: #ffffff !important; 
     border: 1px solid #2C3E50 !important; 
     position: relative;
 }
@@ -2465,10 +2465,27 @@ tr.filled-row td {
     content: '🏖️'; position: absolute; top: 2px; right: 4px;
     font-size: 14px; opacity: 0.9;
 }
-/* Modyfikacja licznika zadań na antracycie */
 .day-cell.is-day-off .day-summary {
     background: rgba(255,255,255,0.2) !important;
     color: white !important;
+}
+
+/* Styl dla dnia rozliczonego przez INNĄ osobę (Jasnoróżowy) */
+.day-cell.is-settled-other {
+    background-color: #fce4ec !important; /* Jasnoróżowy */
+    border: 1px solid #f48fb1 !important; 
+    position: relative;
+}
+.day-cell.is-settled-other::after {
+    content: '✔'; position: absolute; top: 2px; right: 4px;
+    font-size: 14px; color: #d81b60; font-weight: bold; opacity: 0.6;
+}
+
+/* Styl dla paska legendy na dole kalendarza */
+#calendarGroupLegend {
+    background: #fdfdfd; border: 1px dashed #ccc; border-radius: 8px; 
+    padding: 15px; margin-top: 15px; display: none; align-items: center; 
+    justify-content: space-between; flex-wrap: wrap; gap: 10px;
 }
 
 /* Zapobiegamy zaznaczaniu tekstu podczas przytrzymywania */
@@ -15616,8 +15633,8 @@ async function loadCalendarUsers() {
         calendarUserSelect.innerHTML = ''; 
         if(modalUserSelect) modalUserSelect.innerHTML = '';
 
-       // Dodajemy opcję "Wszyscy" do filtra
-            calendarUserSelect.add(new Option("Wszyscy", "ALL")); 
+        // Dodajemy opcję "Wszyscy" do filtra
+        calendarUserSelect.add(new Option("Wszyscy / Grafik", "ALL"));
             
             snapshot.docs.forEach(doc => {
                 const user = doc.data();
@@ -15881,7 +15898,7 @@ function renderTodayView(visits, dateToShow) {
             });
         }
 
-        if (targetUid && targetUid !== "ALL") {
+       if (targetUid && targetUid !== "ALL") {
             try {
                 const q = db.collection("kalendarz_rozliczenia")
                             .where("uid", "==", targetUid)
@@ -15890,13 +15907,17 @@ function renderTodayView(visits, dateToShow) {
                 snap.forEach(doc => {
                     const data = doc.data();
                     if (!singleUserStatusMap.has(data.data)) {
-                        singleUserStatusMap.set(data.data, { rozliczony: false, wolny: false, nocka: false, dodatek: false });
+                        // ✅ Dodajemy 'oznaczyl_uid' do obiektu
+                        singleUserStatusMap.set(data.data, { rozliczony: false, wolny: false, nocka: false, dodatek: false, oznaczyl_uid: null });
                     }
                     const dayObj = singleUserStatusMap.get(data.data);
                     if (data.typ === 'wolny') dayObj.wolny = true;
                     else if (data.typ === 'nocka') dayObj.nocka = true;
                     else if (data.typ === 'dodatek') dayObj.dodatek = true;
-                    else dayObj.rozliczony = true; 
+                    else {
+                        dayObj.rozliczony = true; 
+                        dayObj.oznaczyl_uid = data.oznaczyl_uid; // Zapisujemy, kto kliknął rozliczenie
+                    }
                 });
             } catch (e) { console.error("Błąd pobierania znaczników:", e); }
             
@@ -16003,13 +16024,21 @@ function renderTodayView(visits, dateToShow) {
                     
                     extraChipsHtml += '</div>';
                 }
-            } else {
+           } else {
                 // WIDOK POJEDYNCZY
                 const dayInfo = singleUserStatusMap.get(dayString);
                 if (dayInfo) {
                     // Tło główne (Wolne vs Rozliczone)
-                    if (dayInfo.wolny) cell.classList.add('is-day-off'); 
-                    else if (dayInfo.rozliczony) cell.classList.add('is-settled'); 
+                    if (dayInfo.wolny) {
+                        cell.classList.add('is-day-off'); 
+                    } else if (dayInfo.rozliczony) {
+                        // ✅ RÓŻOWY vs ZIELONY: Sprawdzamy czy to ja rozliczyłem siebie, czy zrobił to ktoś inny (np. Szef)
+                        if (dayInfo.oznaczyl_uid && dayInfo.oznaczyl_uid !== targetUid) {
+                            cell.classList.add('is-settled-other'); // Różowy (Oznaczone przez kogoś innego)
+                        } else {
+                            cell.classList.add('is-settled'); // Zielony (Moje oznaczenie)
+                        }
+                    } 
 
                     // Ikonki (Nocka / Dodatek) - nałóż je tuż pod cyferką
                     if (dayInfo.nocka) singleUserIconsHtml += '🌙';
@@ -16019,23 +16048,6 @@ function renderTodayView(visits, dateToShow) {
 
             let iconsDiv = singleUserIconsHtml ? `<div style="font-size:12px; margin-top:2px;">${singleUserIconsHtml}</div>` : '';
             let cellContent = `<span class="day-number">${day}</span>${iconsDiv}${extraChipsHtml}`;
-
-            // Statystyki wizyt
-            const visitsForThisDay = visitsByDate.get(dayString) || [];
-            const visitsToDo = visitsForThisDay.filter(v => v.status === 'Nowa').length;
-            if (visitsToDo > 0) {
-                cellContent += `<div class="day-summary">${visitsToDo}</div>`;
-            }
-
-            // Kropki (wskaźniki wizyt)
-            const pory = new Set(visitsForThisDay.map(v => v.poraDnia));
-            let dotsHtml = '<div class="day-dots">';
-            if (pory.has('Pilne')) dotsHtml += '<div class="day-dot dot-pilne"></div>';
-            if (pory.has('Obojętne')) dotsHtml += '<div class="day-dot dot-obojetne"></div>';
-            if (pory.has('6-10') || pory.has('10-15') || pory.has('15-20')) {
-                dotsHtml += '<div class="day-dot dot-standard"></div>';
-            }
-            dotsHtml += '</div>';
             
             cell.innerHTML = cellContent + dotsHtml;
 
@@ -16083,16 +16095,40 @@ function renderTodayView(visits, dateToShow) {
                  return false;
             });
 
-            // GŁÓWNY CLICK (Przejście do dnia)
+ // GŁÓWNY CLICK (Przejście do dnia)
             cell.addEventListener('click', (e) => {
                 // Przejdź do dnia TYLKO jeśli NIE było to długie przytrzymanie
                 if (!longPressTriggered) {
-                    switchToDayView(dayString);
+                     switchToDayView(dayString);
                 }
                 // Jeśli longPressTriggered == true, to nic nie rób (obsłużono w timeout)
             });
 
             monthGridBody.appendChild(cell);
+        }
+
+        // ✅ WSTRZYKIWANIE LEGENDY I PRZYCISKU AUTOMATU
+        let legendContainer = document.getElementById('calendarGroupLegend');
+        if (!legendContainer) {
+            legendContainer = document.createElement('div');
+            legendContainer.id = 'calendarGroupLegend';
+            // Wstaw pod kalendarz
+            monthViewContainer.appendChild(legendContainer);
+        }
+
+        // Pokaż legendę TYLKO w widoku "Wszyscy / Grafik"
+        if (targetUid === "ALL") {
+            const currentMonthISO = `${year}-${String(month + 1).padStart(2, '0')}`;
+            legendContainer.style.display = 'flex';
+            legendContainer.innerHTML = `
+                <div style="font-size:12px; color:#555; display:flex; align-items:center; gap:8px;">
+                    <i class="bi bi-info-circle-fill" style="font-size:18px; color:#34495e;"></i>
+                    <span><b>Podpowiedź:</b> Przytrzymaj daną kartkę z kalendarza palcem, aby ustalić grafik ręcznie.</span>
+                </div>
+                <button class="btn primary small" style="margin:0; background:#8e44ad; border-color:#732d91;" onclick="openAutoSchedulerModal('${currentMonthISO}', ${daysInMonth})">🤖 Użyj Automatu</button>
+            `;
+        } else {
+            legendContainer.style.display = 'none';
         }
     }
 /**
@@ -26227,7 +26263,205 @@ if (btnSmsToDoctor) {
         window.location.href = finalLink;
     });
 }
-  
+  /**
+     * =========================================================================
+     * 🤖 AUTOMATYCZNY SCHEDULER GRAFIKU (URLOPY, NOCKI, DODATKI)
+     * =========================================================================
+     */
+    function openAutoSchedulerModal(monthStr, daysInMonth) {
+        if (currentUserProfile.Rola !== 'administrator' && currentUserProfile.Rola !== 'właściciel') {
+            alert("Brak uprawnień."); return;
+        }
+
+        const overlay = document.createElement('div');
+        overlay.style.cssText = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:20000;display:flex;justify-content:center;align-items:center;";
+        
+        overlay.innerHTML = `
+            <div class="form-card" style="width:95%; max-width:400px; padding:20px; background:white; border-radius:12px;">
+                <h3 style="margin-top:0; color:#8e44ad; text-align:center;">🤖 Kreator Grafiku (${monthStr})</h3>
+                <p style="font-size:12px; color:#666; margin-bottom:15px;">Automat wypełni brakujące dni tak, by spełnić Twoje założenia. Nie nadpisze dni, które już wprowadziłeś ręcznie.</p>
+                
+                <div class="form-row">
+                    <label>Ile dni wolnych dla każdego pracownika?</label>
+                    <input type="number" id="autoDaysOff" value="8" min="0" max="15">
+                </div>
+                <div class="form-row">
+                    <label>Ile nocek dla każdego pracownika?</label>
+                    <input type="number" id="autoNights" value="4" min="0" max="15">
+                </div>
+                <div class="form-row">
+                    <label>Ile sobót "z dodatkiem" (pracujących) dla każdego?</label>
+                    <input type="number" id="autoSaturdays" value="1" min="0" max="4">
+                </div>
+                <div class="form-row" style="background:#fff3e0; padding:10px; border-radius:8px; border:1px solid #ffe0b2;">
+                    <label style="color:#d35400;">Min. pracowników na zmianie dziennej (BHP)</label>
+                    <input type="number" id="autoMinWorkers" value="2" min="1" max="10">
+                    <small style="color:#777;">Automat nie da komuś wolnego, jeśli przez to w lecznicy zostałoby za mało osób.</small>
+                </div>
+
+                <div style="display:flex; gap:10px; margin-top:20px;">
+                    <button id="btnCancelAuto" class="btn ghost">Anuluj</button>
+                    <button id="btnRunAuto" class="btn primary" style="background:#8e44ad; border-color:#732d91;">🚀 Generuj Grafik</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+
+        document.getElementById('btnCancelAuto').onclick = () => document.body.removeChild(overlay);
+
+        document.getElementById('btnRunAuto').onclick = async () => {
+            const tOff = parseInt(document.getElementById('autoDaysOff').value) || 0;
+            const tNights = parseInt(document.getElementById('autoNights').value) || 0;
+            const tSats = parseInt(document.getElementById('autoSaturdays').value) || 0;
+            const minWorkers = parseInt(document.getElementById('autoMinWorkers').value) || 1;
+
+            document.getElementById('btnRunAuto').disabled = true;
+            document.getElementById('btnRunAuto').textContent = 'Przetwarzanie... ⏳';
+
+            try {
+                // 1. Pobierz pracowników
+                const uids = Array.from(calendarUserSelect.options)
+                                .filter(o => o.value && o.value !== 'ALL')
+                                .map(o => o.value);
+
+                if(uids.length === 0) throw new Error("Brak pracowników.");
+                
+                // 2. Pobierz obecny stan, żeby nie nadpisać
+                const existingData = {}; // { "uid_data": "wolny" }
+                const chunks = [];
+                for (let i = 0; i < uids.length; i += 10) chunks.push(uids.slice(i, i + 10));
+                
+                for (const chunk of chunks) {
+                    const snap = await db.collection("kalendarz_rozliczenia").where("miesiac", "==", monthStr).where("uid", "in", chunk).get();
+                    snap.forEach(doc => {
+                        const d = doc.data();
+                        existingData[`${d.uid}_${d.data}_${d.typ}`] = true; 
+                    });
+                }
+
+                // 3. Inicjalizacja liczników
+                const schedule = { wolne: {}, nocki: {}, dodatki: {} };
+                const workersPerDay = {}; 
+                const sats = [];
+
+                for (let d = 1; d <= daysInMonth; d++) {
+                    const dateStr = `${monthStr}-${String(d).padStart(2, '0')}`;
+                    workersPerDay[dateStr] = uids.length; // Domyślnie wszyscy pracują
+                    
+                    const dateObj = new Date(monthStr.split('-')[0], parseInt(monthStr.split('-')[1]) - 1, d);
+                    if (dateObj.getDay() === 6) sats.push(dateStr);
+
+                    uids.forEach(uid => {
+                        // Uwzględnij istniejące wolne w liczeniu BHP
+                        if (existingData[`${uid}_${dateStr}_wolny`]) {
+                            workersPerDay[dateStr]--;
+                            if(!schedule.wolne[uid]) schedule.wolne[uid] = 0;
+                            schedule.wolne[uid]++;
+                        }
+                        if (existingData[`${uid}_${dateStr}_nocka`]) {
+                            if(!schedule.nocki[uid]) schedule.nocki[uid] = 0;
+                            schedule.nocki[uid]++;
+                        }
+                        if (existingData[`${uid}_${dateStr}_dodatek`]) {
+                            if(!schedule.dodatki[uid]) schedule.dodatki[uid] = 0;
+                            schedule.dodatki[uid]++;
+                        }
+                    });
+                }
+
+                const batch = db.batch();
+                let addedCount = 0;
+
+                // --- ALGORYTM 1: DNI WOLNE (Ciągi 2 dni) ---
+                uids.forEach(uid => {
+                    let currentOff = schedule.wolne[uid] || 0;
+                    let safetyCounter = 0;
+
+                    while (currentOff < tOff && safetyCounter < 100) {
+                        safetyCounter++;
+                        // Wybierz losowy dzień
+                        const randomD = Math.floor(Math.random() * daysInMonth) + 1;
+                        const date1 = `${monthStr}-${String(randomD).padStart(2, '0')}`;
+                        const date2 = `${monthStr}-${String(randomD+1).padStart(2, '0')}`; // Spróbuj dać 2 dni z rzędu
+
+                        // Sprawdź czy może wziąć wolne w dniu 1
+                        if (randomD <= daysInMonth && !existingData[`${uid}_${date1}_wolny`] && workersPerDay[date1] > minWorkers) {
+                            const docRef = db.collection("kalendarz_rozliczenia").doc(`${uid}_${date1}`);
+                            batch.set(docRef, { uid, data: date1, miesiac: monthStr, timestamp: firebase.firestore.FieldValue.serverTimestamp(), typ: 'wolny', oznaczyl_kto: 'Automat' });
+                            existingData[`${uid}_${date1}_wolny`] = true;
+                            workersPerDay[date1]--;
+                            currentOff++;
+                            addedCount++;
+                            
+                            // Jeśli wciąż potrzebuje wolnego, spróbuj dać mu od razu kolejny dzień (dzień 2)
+                            if (currentOff < tOff && randomD + 1 <= daysInMonth && !existingData[`${uid}_${date2}_wolny`] && workersPerDay[date2] > minWorkers) {
+                                const docRef2 = db.collection("kalendarz_rozliczenia").doc(`${uid}_${date2}`);
+                                batch.set(docRef2, { uid, data: date2, miesiac: monthStr, timestamp: firebase.firestore.FieldValue.serverTimestamp(), typ: 'wolny', oznaczyl_kto: 'Automat' });
+                                existingData[`${uid}_${date2}_wolny`] = true;
+                                workersPerDay[date2]--;
+                                currentOff++;
+                                addedCount++;
+                            }
+                        }
+                    }
+                });
+
+                // --- ALGORYTM 2: NOCKI ---
+                uids.forEach(uid => {
+                    let currentNights = schedule.nocki[uid] || 0;
+                    let safetyCounter = 0;
+                    while (currentNights < tNights && safetyCounter < 100) {
+                        safetyCounter++;
+                        const randomD = Math.floor(Math.random() * daysInMonth) + 1;
+                        const dStr = `${monthStr}-${String(randomD).padStart(2, '0')}`;
+                        
+                        // Nie ma nocki i NIE MA WOLNEGO
+                        if (!existingData[`${uid}_${dStr}_nocka`] && !existingData[`${uid}_${dStr}_wolny`]) {
+                            const docRef = db.collection("kalendarz_rozliczenia").doc(`${uid}_${dStr}_nocka`);
+                            batch.set(docRef, { uid, data: dStr, miesiac: monthStr, timestamp: firebase.firestore.FieldValue.serverTimestamp(), typ: 'nocka', oznaczyl_kto: 'Automat' });
+                            existingData[`${uid}_${dStr}_nocka`] = true;
+                            currentNights++;
+                            addedCount++;
+                        }
+                    }
+                });
+
+                // --- ALGORYTM 3: DODATKI (Tylko w soboty) ---
+                uids.forEach(uid => {
+                    let currentSats = schedule.dodatki[uid] || 0;
+                    let availableSats = [...sats].sort(() => 0.5 - Math.random()); // Losowe soboty
+                    
+                    for (const sDate of availableSats) {
+                        if (currentSats >= tSats) break;
+                        
+                        if (!existingData[`${uid}_${sDate}_dodatek`] && !existingData[`${uid}_${sDate}_wolny`]) {
+                            const docRef = db.collection("kalendarz_rozliczenia").doc(`${uid}_${sDate}_dodatek`);
+                            batch.set(docRef, { uid, data: sDate, miesiac: monthStr, timestamp: firebase.firestore.FieldValue.serverTimestamp(), typ: 'dodatek', oznaczyl_kto: 'Automat' });
+                            existingData[`${uid}_${sDate}_dodatek`] = true;
+                            currentSats++;
+                            addedCount++;
+                        }
+                    }
+                });
+
+                if (addedCount > 0) {
+                    await batch.commit();
+                    showToast(`Automat wygenerował ${addedCount} nowych wpisów w grafiku!`, "success");
+                } else {
+                    showToast("Brak miejsc do wygenerowania, lub normy są już spełnione.", "info");
+                }
+                
+                document.body.removeChild(overlay);
+                fetchAndRenderVisits(); // Przeładuj widok kalendarza by pokazać wygenerowane paski
+                
+            } catch(e) {
+                console.error(e);
+                alert("Błąd automatu: " + e.message);
+                document.getElementById('btnRunAuto').disabled = false;
+                document.getElementById('btnRunAuto').textContent = '🚀 Generuj Grafik';
+            }
+        };
+    }
 </script>
 </body>
 </html>
