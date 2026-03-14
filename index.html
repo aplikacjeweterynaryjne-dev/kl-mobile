@@ -15937,11 +15937,11 @@ function renderTodayView(visits, dateToShow) {
                             clinicMarkers[data.data] = { wolne: [], nocki: [], dodatki: [] };
                         }
                         
-                      const personData = {
+                     const personData = {
                             uid: data.uid,
                             name: clinicUsersMap[data.uid]?.name || 'NN',
                             initials: clinicUsersMap[data.uid]?.initials || 'NN',
-                            // ✅ Zapisujemy czas utworzenia i autora
+                            // ✅ POBIERAMY CZAS I AUTORA WPISU:
                             timestamp: data.timestamp,
                             oznaczyl_kto: data.oznaczyl_kto || 'Nieznany'
                         };
@@ -16268,11 +16268,8 @@ function renderTodayView(visits, dateToShow) {
         document.getElementById('btnSetDayOff').onclick = () => saveMarker('wolny');
         if (hasAnyMarker) document.getElementById('btnRemoveMarker').onclick = removeMarker;
     }
-    /**
-     * ✅ ZBIORCZY MENEDŻER DNI WOLNYCH (Otwiera się w filtrze "Wszyscy")
-     */
 /**
-     * ✅ ZBIORCZY MENEDŻER ZMIAN (Wolne / Nocki / Dodatki)
+     * ✅ ZBIORCZY MENEDŻER ZMIAN (Wolne / Nocki / Dodatki + Widoczny czas dodania urlopu)
      */
     function openGroupDayOffManager(dateString) {
         const canEdit = (currentUserProfile.Rola === 'administrator' || currentUserProfile.Rola === 'właściciel');
@@ -16281,8 +16278,6 @@ function renderTodayView(visits, dateToShow) {
             return;
         }
 
-        // Pobierz dane o pracownikach z filtra.
-        // PAMIĘTAJ: Filtr w tym momencie już NIE ZAWIERA klientów ani administratora (zrobiliśmy to w loadCalendarUsers)
         const clinicUsers = Array.from(calendarUserSelect.options).filter(o => o.value && o.value !== 'ALL').map(o => ({
             uid: o.value,
             name: o.text
@@ -16290,7 +16285,6 @@ function renderTodayView(visits, dateToShow) {
 
         if (clinicUsers.length === 0) { alert("Brak pracowników w lecznicy (lub filtr jest pusty)."); return; }
 
-        // Ustalamy czy kliknięto w sobotę (Dzień 6) - BARDZO WAŻNE DLA DODATKÓW
         const dParts = dateString.split('-');
         const dateObj = new Date(dParts[0], dParts[1] - 1, dParts[2]);
         const isSaturday = dateObj.getDay() === 6;
@@ -16298,7 +16292,6 @@ function renderTodayView(visits, dateToShow) {
         const monthStr = dateString.substring(0, 7);
         const daysOffCount = window.currentMonthDaysOffCount || {};
 
-        // Szkielet modala
         const choiceOverlay = document.createElement('div');
         choiceOverlay.style.cssText = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:20000;display:flex;justify-content:center;align-items:center;";
         choiceOverlay.innerHTML = `
@@ -16318,15 +16311,12 @@ function renderTodayView(visits, dateToShow) {
         const closeChoice = () => { if(choiceOverlay.parentNode) choiceOverlay.parentNode.removeChild(choiceOverlay); };
         document.getElementById('btnCancelGroup').onclick = closeChoice;
 
-        // Dzielimy UID na paczki, bo Firestore pozwala na max 10 elementów w zapytaniu 'in'
         const uids = clinicUsers.map(u => u.uid);
         const chunks = [];
         for (let i = 0; i < uids.length; i += 10) chunks.push(uids.slice(i, i + 10));
 
-        // Obiekt trzymający statusy: { "UID": { wolny: bool, nocka: bool, dodatek: bool } }
         let dayMarkers = {}; 
 
-        // Pobieramy WSZYSTKIE znaczniki (wolne, nocki, dodatki) na TEN DZIEŃ
         Promise.all(chunks.map(chunk => 
             db.collection("kalendarz_rozliczenia")
               .where("data", "==", dateString)
@@ -16338,7 +16328,12 @@ function renderTodayView(visits, dateToShow) {
                     const data = doc.data();
                     if (!dayMarkers[data.uid]) dayMarkers[data.uid] = {};
                     
-                    if (data.typ === 'wolny') dayMarkers[data.uid].wolny = true;
+                    if (data.typ === 'wolny') {
+                        dayMarkers[data.uid].wolny = true;
+                        // ✅ POBIERAMY CZAS I AUTORA DLA WIDOKU MOBILNEGO
+                        dayMarkers[data.uid].timestamp = data.timestamp;
+                        dayMarkers[data.uid].oznaczyl_kto = data.oznaczyl_kto || 'Nieznany';
+                    }
                     else if (data.typ === 'nocka') dayMarkers[data.uid].nocka = true;
                     else if (data.typ === 'dodatek') dayMarkers[data.uid].dodatek = true;
                 });
@@ -16347,7 +16342,6 @@ function renderTodayView(visits, dateToShow) {
             const listDiv = document.getElementById('groupDayOffList');
             listDiv.innerHTML = '';
 
-            // Generujemy wiersz dla każdego pracownika
             clinicUsers.forEach(user => {
                 const markers = dayMarkers[user.uid] || {};
                 const isOff = markers.wolny === true;
@@ -16355,21 +16349,34 @@ function renderTodayView(visits, dateToShow) {
                 const isDodatek = markers.dodatek === true;
                 const count = daysOffCount[user.uid] || 0;
 
-                // Opcjonalny kod dla checkboxa Dodatku (wyświetlany TYLKO w Sobotę)
                 let dodatekHtml = isSaturday ? 
                     `<label style="display:flex; align-items:center; gap:3px; font-size:13px; color:#006266; font-weight:bold; margin-left: 10px;">
                         <input type="checkbox" class="group-dodatek-cb" data-uid="${user.uid}" ${isDodatek ? 'checked' : ''} style="width:16px; height:16px; accent-color:#006266;">
                         ➕ Dodatek
                     </label>` : '';
 
+                // ✅ BUDUJEMY ETYKIETKĘ Z CZASEM DODANIA URLOPU
+                let timeInfoHtml = '';
+                if (isOff) {
+                    let timeStr = "Brak danych";
+                    if (markers.timestamp && typeof markers.timestamp.toDate === 'function') {
+                        timeStr = markers.timestamp.toDate().toLocaleString('pl-PL', {day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'});
+                    }
+                    timeInfoHtml = `
+                        <div style="font-size: 11px; color: #d35400; margin-top: 4px; background: #fdf2e9; padding: 3px 6px; border-radius: 4px; display: inline-block; border: 1px solid #fae5d3;">
+                            📅 ${timeStr} | 👤 ${markers.oznaczyl_kto}
+                        </div>
+                    `;
+                }
+
                 const userDiv = document.createElement('div');
                 userDiv.style.cssText = "display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #eee; padding:12px 0;";
                 
-                // HTML wiersza: Info (nazwa + licznik) -> Checkboxy (Nocka + Dodatek) -> Select (Pracuje/Wolne)
                 userDiv.innerHTML = `
                     <div style="line-height:1.4; flex:1;">
                         <strong style="font-size:16px;">${user.name}</strong><br>
-                        <small style="color:#777;">Wolne w tym msc: <b style="color:${count > 0 ? '#36454F' : '#999'}">${count}</b> dni</small>
+                        <small style="color:#777;">Wolne w tym msc: <b style="color:${count > 0 ? '#36454F' : '#999'}">${count}</b> dni</small><br>
+                        ${timeInfoHtml}
                         <div style="display:flex; align-items:center; margin-top:6px;">
                             <label style="display:flex; align-items:center; gap:3px; font-size:13px; color:#192a56; font-weight:bold;">
                                 <input type="checkbox" class="group-nocka-cb" data-uid="${user.uid}" ${isNocka ? 'checked' : ''} style="width:16px; height:16px; accent-color:#192a56;">
@@ -16384,7 +16391,6 @@ function renderTodayView(visits, dateToShow) {
                     </select>
                 `;
                 
-                // Interaktywna zmiana kolorów dla selektora Urlopu
                 const sel = userDiv.querySelector('select');
                 sel.addEventListener('change', function() {
                     if (this.value === 'wolny') {
@@ -16401,18 +16407,16 @@ function renderTodayView(visits, dateToShow) {
                 listDiv.appendChild(userDiv);
             });
 
-            // --- AKCJA ZAPISU ---
             document.getElementById('btnSaveGroup').onclick = async () => {
                 const batch = db.batch();
                 document.getElementById('btnSaveGroup').disabled = true;
                 document.getElementById('btnSaveGroup').textContent = "Zapisywanie... ⏳";
 
-                // A. ZAPIS URLOPÓW (Wolne / Pracuje)
                 document.querySelectorAll('.group-day-off-select').forEach(sel => {
                     const uid = sel.dataset.uid;
                     const isNowOff = sel.value === 'wolny';
                     const wasOff = (dayMarkers[uid] && dayMarkers[uid].wolny === true);
-                    const docId = `${uid}_${dateString}`; // Główny marker dnia
+                    const docId = `${uid}_${dateString}`;
 
                     if (!wasOff && isNowOff) {
                         batch.set(db.collection("kalendarz_rozliczenia").doc(docId), {
@@ -16426,7 +16430,6 @@ function renderTodayView(visits, dateToShow) {
                     }
                 });
 
-                // B. ZAPIS NOCEK (Tworzymy OSOBNE dokumenty z dopiskiem _nocka)
                 document.querySelectorAll('.group-nocka-cb').forEach(cb => {
                     const uid = cb.dataset.uid;
                     const isNowNocka = cb.checked;
@@ -16445,7 +16448,6 @@ function renderTodayView(visits, dateToShow) {
                     }
                 });
 
-                // C. ZAPIS DODATKÓW W SOBOTĘ (Osobne dokumenty z dopiskiem _dodatek)
                 document.querySelectorAll('.group-dodatek-cb').forEach(cb => {
                     const uid = cb.dataset.uid;
                     const isNowDodatek = cb.checked;
@@ -16468,7 +16470,7 @@ function renderTodayView(visits, dateToShow) {
                     await batch.commit();
                     showToast("Grafik zespołu zaktualizowany.", "success");
                     closeChoice();
-                    fetchAndRenderVisits(); // Przeładuj widok kalendarza, żeby narysować plakietki
+                    fetchAndRenderVisits(); 
                 } catch (e) {
                     console.error("Błąd zapisu grafiku:", e);
                     alert("Wystąpił błąd podczas zapisu.");
@@ -26411,7 +26413,7 @@ if (btnSmsToDoctor) {
                     <select class="temp-user-group-sel" data-uid="${u.uid}" style="margin-top:6px; padding:4px; font-size:12px; border-radius:4px; border:1px solid #ccc; width:100%;">
                         <option value="A" ${uGroup==='A'?'selected':''}>Grupa A (np. Teren 1)</option>
                         <option value="B" ${uGroup==='B'?'selected':''}>Grupa B (np. Teren 2)</option>
-                        <option value="C" ${uGroup==='C'?'selected':''}>Grupa C (np. Szpital)</option>
+                        <option value="C" ${uGroup==='C'?'selected':''}>Grupa C (np. Teren 3)</option>
                         <option value="D" ${uGroup==='D'?'selected':''}>Grupa D</option>
                     </select>
                 `;
