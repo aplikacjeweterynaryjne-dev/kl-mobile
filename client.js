@@ -285,24 +285,24 @@ function loadSynchronizations() {
       .onSnapshot(snap => {
           activeSynchronizations = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
           
-          // Auto-czyszczenie (usuń jeśli ostatnia data minęła > 3 dni temu)
           const today = new Date();
           today.setHours(0,0,0,0);
+          const allProtocols = getMergedProtocols(); // ✅ Uwzględnia schematy użytkownika!
           
           activeSynchronizations.forEach(sync => {
-              const protocol = SYNC_PROTOCOLS[sync.method];
-              if (protocol) {
+              const protocol = allProtocols[sync.method];
+              if (protocol && protocol.steps && protocol.steps.length > 0) {
                   const maxDay = Math.max(...protocol.steps.map(s => s.dayOffset));
                   const lastDate = addDays(new Date(sync.startDate), maxDay);
                   const diff = (today - lastDate) / (1000 * 60 * 60 * 24);
+                  
+                  // Auto-czyszczenie: Usuń z bazy program, który zakończył się dawniej niż 3 dni temu
                   if (diff > 3) {
-                      // Usuń zakończony program z bazy
                       db.collection('synchronizacje').doc(sync.id).delete();
                   }
               }
           });
-          
-          generateAndRenderTasks(); // Odśwież widok zadań
+          generateAndRenderTasks(); 
       });
 }
 // --- FUNKCJE POMOCNICZE (GLOBALNE) ---
@@ -828,20 +828,17 @@ function generateAndRenderTasks() {
 
        // --- GENEROWANIE ZADAŃ WIZUALNYCH (Dla krów) ---
 
-        // Synchronizacja
+       // Synchronizacja
         if (animal.type === 'krowa' && animal.lastCalving) {
             const lastCalv = new Date(animal.lastCalving);
             const dim = Math.floor((today - lastCalv) / (1000 * 60 * 60 * 24));
-            
-            // Sprawdzamy czy krowa ma aktywne zacielenie (wpisaną datę, która NIE została potwierdzona jako negatywna po USG)
             const hasActiveInsemination = animal.lastInsemination && animal.usgStatus !== 'negative';
             
-            // Krowa dostaje zadanie synchronizacji TYLKO jeśli:
-            // 1. Minęło 60 dni od wycielenia
-            // 2. NIE jest cielna
-            // 3. NIE ma aktywnego zacielenia (czyli nie czeka na USG / nie jest za wcześnie na USG)
-            if (dim > 60 && dim < 365 && !animal.isPregnantConfirmed && !hasActiveInsemination) {
-                addTask(generatedTasks, animal, 'Wykonaj synchronizację', today, today, 'warning', 'sync_alert', null, lastCalv);
+            // ✅ NOWOŚĆ: Sprawdzamy, czy sztuka jest już przypisana do jakiegoś aktywnego programu synchronizacji
+            const isInActiveSync = activeSynchronizations.some(sync => sync.animalIds && sync.animalIds.includes(animal.id));
+
+            if (dim > 60 && dim < 365 && !animal.isPregnantConfirmed && !hasActiveInsemination && !isInActiveSync) {
+                 addTask(generatedTasks, animal, 'Wykonaj synchronizację', today, today, 'warning', 'sync_alert', null, lastCalv);
             }
         }
 
@@ -3177,13 +3174,28 @@ function startSynchronization() {
 function renderActiveSyncs() {
     const list = document.getElementById('activeSyncList');
     list.innerHTML = '';
+    
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    const allProtocols = getMergedProtocols(); // Pobieramy metody podstawowe + własne
 
-    if (activeSynchronizations.length === 0) {
+    // ✅ Filtrujemy tylko te programy, w których ostatni krok jest dzisiaj lub w przyszłości
+    const reallyActiveSyncs = activeSynchronizations.filter(sync => {
+        const protocol = allProtocols[sync.method];
+        if (!protocol || !protocol.steps || protocol.steps.length === 0) return false;
+        
+        const maxDay = Math.max(...protocol.steps.map(s => s.dayOffset));
+        const lastDate = addDays(new Date(sync.startDate), maxDay);
+        
+        return today <= lastDate; // Program jest aktywny tylko jeśli nie minęła jego data końcowa
+    });
+
+    if (reallyActiveSyncs.length === 0) {
         list.innerHTML = '<p style="text-align:center; color:#999;">Brak aktywnych programów.</p>';
         return;
     }
 
-    activeSynchronizations.forEach(sync => {
+    reallyActiveSyncs.forEach(sync => {
         const start = new Date(sync.startDate).toLocaleDateString('pl-PL');
         const animals = (sync.animalTags || []).join(', ');
         const div = document.createElement('div');
@@ -3198,7 +3210,6 @@ function renderActiveSyncs() {
         list.appendChild(div);
     });
 }
-
 function deleteSynchronization(syncId) {
     if (confirm("Czy usunąć ten program? Spowoduje to skasowanie wszystkich ZAPLANOWANYCH kroków (już wykonane zostaną w historii).")) {
         db.collection('synchronizacje').doc(syncId).delete()
