@@ -287,16 +287,24 @@ function loadSynchronizations() {
           
           const today = new Date();
           today.setHours(0,0,0,0);
-          const allProtocols = getMergedProtocols(); // ✅ Uwzględnia schematy użytkownika!
+          const allProtocols = getMergedProtocols(); 
           
           activeSynchronizations.forEach(sync => {
               const protocol = allProtocols[sync.method];
               if (protocol && protocol.steps && protocol.steps.length > 0) {
                   const maxDay = Math.max(...protocol.steps.map(s => s.dayOffset));
-                  const lastDate = addDays(new Date(sync.startDate), maxDay);
-                  const diff = (today - lastDate) / (1000 * 60 * 60 * 24);
                   
-                  // Auto-czyszczenie: Usuń z bazy program, który zakończył się dawniej niż 3 dni temu
+                  // ✅ To samo zerowanie daty dla silnika kasującego z bazy
+                  const startDateObj = new Date(sync.startDate);
+                  startDateObj.setHours(0,0,0,0);
+                  
+                  const lastDate = addDays(startDateObj, maxDay);
+                  lastDate.setHours(0,0,0,0);
+                  
+                  // Obliczamy różnicę dni
+                  const diff = Math.floor((today - lastDate) / (1000 * 60 * 60 * 24));
+                  
+                  // Jeśli od końca programu minęło WIĘCEJ niż 3 dni, skasuj go bezpowrotnie z bazy
                   if (diff > 3) {
                       db.collection('synchronizacje').doc(sync.id).delete();
                   }
@@ -3175,19 +3183,29 @@ function renderActiveSyncs() {
     const list = document.getElementById('activeSyncList');
     list.innerHTML = '';
     
+    // Pobieramy "dzisiaj" i brutalnie zerujemy mu godziny, minuty i sekundy (północ)
     const today = new Date();
     today.setHours(0,0,0,0);
-    const allProtocols = getMergedProtocols(); // Pobieramy metody podstawowe + własne
+    
+    const allProtocols = getMergedProtocols(); 
 
-    // ✅ Filtrujemy tylko te programy, w których ostatni krok jest dzisiaj lub w przyszłości
+    // ✅ ZAAWANSOWANE FILTROWANIE (Oporne na strefy czasowe)
     const reallyActiveSyncs = activeSynchronizations.filter(sync => {
         const protocol = allProtocols[sync.method];
         if (!protocol || !protocol.steps || protocol.steps.length === 0) return false;
         
         const maxDay = Math.max(...protocol.steps.map(s => s.dayOffset));
-        const lastDate = addDays(new Date(sync.startDate), maxDay);
         
-        return today <= lastDate; // Program jest aktywny tylko jeśli nie minęła jego data końcowa
+        // Pobieramy datę startu i też ją zerujemy
+        const startDateObj = new Date(sync.startDate);
+        startDateObj.setHours(0,0,0,0);
+        
+        // Dodajemy dni do zera i wyliczamy dokładną datę końca
+        const lastDate = addDays(startDateObj, maxDay);
+        lastDate.setHours(0,0,0,0); 
+        
+        // Zwróci PRAWDA (pokaże na liście), tylko jeśli dzisiaj NIE przekroczyło daty końca
+        return today <= lastDate; 
     });
 
     if (reallyActiveSyncs.length === 0) {
@@ -3202,8 +3220,11 @@ function renderActiveSyncs() {
         div.className = 'sync-item-card';
         div.innerHTML = `
             <div>
-                <strong>${sync.protocolName}</strong><br>
-                <div class="details">Start: ${start}<br>Zwierzęta: ${animals}</div>
+                <strong style="color:#8e44ad;">${sync.protocolName}</strong><br>
+                <div class="details" style="font-size:12px; color:#555; margin-top:4px;">
+                    Start: <b>${start}</b><br>
+                    Zwierzęta: <b>${animals}</b>
+                </div>
             </div>
             <button class="btn warn small" onclick="deleteSynchronization('${sync.id}')">Usuń</button>
         `;
