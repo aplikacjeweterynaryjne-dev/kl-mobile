@@ -4847,10 +4847,11 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
         </div>
     </div>
 
-    <div style="display:flex; gap:15px; margin-bottom:15px; font-size:13px; justify-content:center; flex-wrap:wrap; background: #fff; padding: 10px; border-radius: 8px; border: 1px solid #eee;">
+<div style="display:flex; gap:15px; margin-bottom:15px; font-size:13px; justify-content:center; flex-wrap:wrap; background: #fff; padding: 10px; border-radius: 8px; border: 1px solid #eee;">
         <span style="display:flex; align-items:center; gap:5px;"><div style="width:15px; height:15px; background:#ffffff; border:2px solid #bdc3c7; border-radius:3px;"></div> Stan OK</span>
         <span style="display:flex; align-items:center; gap:5px;"><div style="width:15px; height:15px; background:#f39c12; border:2px solid #e67e22; border-radius:3px;"></div> Kończy się</span>
-        <span style="display:flex; align-items:center; gap:5px;"><div style="width:15px; height:15px; background:#e74c3c; border:2px solid #c0392b; border-radius:3px;"></div> Brak (Zamów)</span>
+        <span style="display:flex; align-items:center; gap:5px;"><div style="width:15px; height:15px; background:#e74c3c; border:2px solid #c0392b; border-radius:3px;"></div> Brak</span>
+        <span style="display:flex; align-items:center; gap:5px;"><div style="width:15px; height:15px; background:#2ecc71; border:2px solid #27ae60; border-radius:3px;"></div> Zamówione</span>
     </div>
 
     <div id="semenGridContainer" class="semen-grid-layout">
@@ -26791,7 +26792,7 @@ if (btnSmsToDoctor) {
             }
         };
     }
-    /* ======================================================== */
+   /* ======================================================== */
 /* ✅ MODUŁ: MAGAZYN NASIENIA (Logika + Dynamiczne Style CSS) */
 /* ======================================================== */
 
@@ -26838,6 +26839,13 @@ semenStyles.innerHTML = `
 .semen-tile.status-empty {
     background-color: #e74c3c;
     border: 3px solid #c0392b;
+    color: #ffffff;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+}
+/* ✅ NOWY STATUS: ZAMÓWIONE */
+.semen-tile.status-ordered {
+    background-color: #2ecc71;
+    border: 3px solid #27ae60;
     color: #ffffff;
     text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
 }
@@ -26917,13 +26925,11 @@ function renderSemenGrid() {
             <div class="semen-delete-btn" title="Usuń buhaja">✕</div>
         `;
         
-        // Logika kliknięcia w krzyżyk (usuwanie) - MUSI zatrzymać kliknięcie w kafelek
         tile.querySelector('.semen-delete-btn').addEventListener('click', (e) => {
             e.stopPropagation(); 
             deleteSemenItem(item.id, item.nazwa);
         });
 
-        // Logika kliknięcia w cały kafelek (zmiana statusu)
         tile.addEventListener('click', () => {
             toggleSemenStatus(item.id);
         });
@@ -26932,13 +26938,15 @@ function renderSemenGrid() {
     });
 }
 
+// ✅ ZMIANA CYKLU STATUSÓW: ok -> low -> empty -> ordered -> ok
 async function toggleSemenStatus(itemId) {
     const item = currentSemenData.pozycje.find(p => p.id === itemId);
     if (!item) return;
 
     if (item.status === 'ok') item.status = 'low';
     else if (item.status === 'low') item.status = 'empty';
-    else item.status = 'ok';
+    else if (item.status === 'empty') item.status = 'ordered'; // Przejście na ZIELONY
+    else item.status = 'ok'; // Powrót na BIAŁY
 
     await saveSemenDataToDB();
 }
@@ -26948,7 +26956,6 @@ async function addNewSemen() {
     const name = input.value.trim();
     if (!name) return alert("Wpisz nazwę nasienia (buhaja).");
 
-    // Sprawdzenie czy taki byk już istnieje (aby uniknąć duplikatów)
     const exists = currentSemenData.pozycje.find(p => p.nazwa.toLowerCase() === name.toLowerCase());
     if (exists) return alert("Ten buhaj jest już wpisany do magazynu!");
 
@@ -26979,6 +26986,7 @@ async function saveSemenPhone() {
     if (typeof showToast === 'function') showToast("Zapisano numer telefonu do zamówień", "success");
 }
 
+// Ten przycisk resetuje wszystko (niezależnie czy czerwone czy zielone) z powrotem na BIAŁE (OK)
 async function resetAllSemenStatus() {
     if (currentSemenData.pozycje.length === 0) return;
     if (!confirm("Czy wszystkie stany zostały uzupełnione? Zmienię kolory wszystkich kafelków na białe (Stan OK).")) return;
@@ -26988,7 +26996,8 @@ async function resetAllSemenStatus() {
     if (typeof showToast === 'function') showToast("Wszystkie braki zostały uzupełnione!", "success");
 }
 
-function sendSemenOrderSMS() {
+// ✅ AUTOMATYCZNA ZMIANA STATUSU PO WYSŁANIU SMS
+async function sendSemenOrderSMS() {
     let phone = currentSemenData.telefon;
     if (!phone) {
         alert("Najpierw wpisz i zapisz numer telefonu na samej górze!");
@@ -26999,8 +27008,8 @@ function sendSemenOrderSMS() {
     const braki = currentSemenData.pozycje.filter(p => p.status === 'empty');
     const koncowki = currentSemenData.pozycje.filter(p => p.status === 'low');
 
-if (braki.length === 0 && koncowki.length === 0) {
-        alert("Wszystkie stany są OK (na biało). Nie ma czego zamawiać.");
+    if (braki.length === 0 && koncowki.length === 0) {
+        alert("Wszystkie stany są OK (na biało) lub Oczekują na dostawę (na zielono). Nie ma czego zamawiać.");
         return;
     }
 
@@ -27021,6 +27030,21 @@ if (braki.length === 0 && koncowki.length === 0) {
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
     const separator = isIOS ? '&' : '?';
 
+    // Oznacz jako "Zamówione" (Zielone) wszystkie wysyłane pozycje
+    let zaktualizowano = false;
+    currentSemenData.pozycje.forEach(p => {
+        if (p.status === 'empty' || p.status === 'low') {
+            p.status = 'ordered'; 
+            zaktualizowano = true;
+        }
+    });
+
+    if (zaktualizowano) {
+        await saveSemenDataToDB();
+        if (typeof showToast === 'function') showToast("Braki zostały automatycznie oznaczone jako Zamówione!", "success");
+    }
+
+    // Otwórz aplikację SMS
     window.location.href = `sms:${phone}${separator}body=${encodedBody}`;
 }
 
