@@ -3123,12 +3123,13 @@ background-color: #eef;
   <button id="menuKalkulatorBtn" class="menu-btn">🧮 Kalkulator wizyty</button>
 
   <button id="menuBazaBtn" class="menu-btn">🗃️ Baza</button>
-  <div id="bazaSubMenu" style="display: none; width: 90%; max-width: 400px; margin-top: -10px; margin-bottom: 10px;">
-    <button id="menuBazaKlientowBtn" class="submenu-btn">👥 Baza klientów</button>
-    <button id="menuBazaProduktowBtn" class="submenu-btn">📦 Baza produktów</button>
-    <button id="menuSchematyLeczeniaBtn" class="submenu-btn">⚕️ Baza leczenia (Schematy)</button>
+<div id="bazaSubMenu" style="display: none; width: 90%; max-width: 400px; margin-top: -10px; margin-bottom: 10px;">
+    <button id="menuBazaKlientowBtn" class="submenu-btn">👥 Baza klientów</button>
+    <button id="menuBazaProduktowBtn" class="submenu-btn">📦 Baza produktów</button>
+    <button id="menuSchematyLeczeniaBtn" class="submenu-btn">⚕️ Baza leczenia (Schematy)</button>
     <button id="menuMojMagazynBtn" class="submenu-btn">📦 Mój Magazyn</button>
-  </div>
+    <button id="menuMagazynNasieniaBtn" class="submenu-btn">🧬 Magazyn Nasienia</button>
+  </div>
   <button id="menuRaportyBtn" class="menu-btn">📊 Raporty</button>
   <button id="menuAnalizaBtn" class="menu-btn" style="background-color: #f0f4c3; border-color: #dce775;">📈 Analiza i Statystyki</button>
   <button id="menuArchiwumBtn" class="menu-btn">🗄️ Archiwum</button>
@@ -3187,6 +3188,7 @@ background-color: #eef;
 <button id="tabBazaProduktowBtn" class="btn">📦 Produkty</button>
 <button id="tabSchematyLeczeniaBtn" class="btn">⚕️ Schematy</button>
 <button id="tabMojMagazynBtn" class="btn">📦 Mój Magazyn</button>
+<button id="tabMagazynNasieniaBtn" class="btn">🧬 Nasienie</button>
 <button id="logoutBtn" class="btn warn small" style="font-size: 16px; margin-left: auto;">Wyloguj ➡️</button>
 </div> <div id="kartaLeczeniaSection" style="display: none;">
 <h2>KARTA LECZENIA ZWIERZĄT GOSPODARSKICH ORAZ ZWIERZĄT, Z KTÓRYCH POZYSKANE TKANKI LUB PRODUKTY SĄ PRZEZNACZONE DO SPOŻYCIA PRZEZ LUDZI / EWIDENCJA LECZENIA ZWIERZĄT</h2>
@@ -4814,12 +4816,57 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
                 </thead>
                 <tbody id="zarzadzanieMagazynLogTableBody">
                     </tbody>
-            </table>
+</table>
         </div>
 
     </div>
 </div>
-    <div id="archiveCardViewerModal" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.5); display: none; z-index: 10001; justify-content: center; align-items: center;">
+
+<div id="magazynNasieniaSection" style="display: none; padding: 0 15px 80px 15px;">
+    <h2>🧬 Magazyn Nasienia</h2>
+
+    <div class="form-card" style="background:#f8f9fa; padding:15px; border-radius:10px; margin-bottom:20px; border:1px solid #dee2e6; width: auto; max-width: 100%;">
+        <div style="display:flex; gap:15px; flex-wrap:wrap;">
+            
+            <div style="flex:1; min-width:250px;">
+                <label style="font-size:12px; font-weight:bold; color:#555;">Dodaj nowe nasienie (Buhaj)</label>
+                <div style="display:flex; gap:5px;">
+                    <input type="text" id="newSemenName" placeholder="Wpisz nazwę..." style="flex:1; padding:8px; border:1px solid #ccc; border-radius:6px; font-size: 14px;">
+                    <button class="btn primary" onclick="addNewSemen()" style="background:#27ae60; padding:8px 15px; margin:0;">➕ Dodaj</button>
+                </div>
+            </div>
+
+            <div style="flex:1; min-width:250px;">
+                <label style="font-size:12px; font-weight:bold; color:#555;">Nr telefonu do zamówień SMS</label>
+                <div style="display:flex; gap:5px;">
+                    <input type="tel" id="semenPhoneInput" placeholder="np. 500 600 700" style="flex:1; padding:8px; border:1px solid #ccc; border-radius:6px; font-size: 14px;">
+                    <button class="btn" onclick="saveSemenPhone()" style="background:#34495e; color:white; padding:8px 15px; margin:0;">💾 Zapisz</button>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <div style="display:flex; gap:15px; margin-bottom:15px; font-size:13px; justify-content:center; flex-wrap:wrap; background: #fff; padding: 10px; border-radius: 8px; border: 1px solid #eee;">
+        <span style="display:flex; align-items:center; gap:5px;"><div style="width:15px; height:15px; background:#ffffff; border:2px solid #bdc3c7; border-radius:3px;"></div> Stan OK</span>
+        <span style="display:flex; align-items:center; gap:5px;"><div style="width:15px; height:15px; background:#f39c12; border:2px solid #e67e22; border-radius:3px;"></div> Kończy się</span>
+        <span style="display:flex; align-items:center; gap:5px;"><div style="width:15px; height:15px; background:#e74c3c; border:2px solid #c0392b; border-radius:3px;"></div> Brak (Zamów)</span>
+    </div>
+
+    <div id="semenGridContainer" class="semen-grid-layout">
+        <div style="text-align:center; width:100%; color:#999; padding: 20px;">Ładowanie magazynu...</div>
+    </div>
+
+    <div style="display:flex; gap:10px; margin-top:25px; flex-wrap:wrap;">
+        <button class="btn" onclick="resetAllSemenStatus()" style="flex:1; min-width:200px; background:#2ecc71; color:white; font-size:15px; padding:12px; font-weight:bold; margin:0; border: none;">
+            ✅ Uzupełniono wszystkie
+        </button>
+        <button class="btn" onclick="sendSemenOrderSMS()" style="flex:1; min-width:200px; background:#2980b9; color:white; font-size:15px; padding:12px; font-weight:bold; margin:0; border: none;">
+            📨 Wyślij zamówienie SMS
+        </button>
+    </div>
+</div>
+<div id="archiveCardViewerModal" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.5); display: none; z-index: 10001; justify-content: center; align-items: center;">
  <div style="width: 100%; height: 100%; background: white; border-radius: 0; box-shadow: none; display: flex; flex-direction: column;">
 
   <div style="padding: 10px 15px; border-bottom: 1px solid #ccc; display: flex; justify-content: space-between; align-items: center;">
@@ -7625,6 +7672,8 @@ if (kalendarzWizytSection) kalendarzWizytSection.style.display = 'none'; // ✅ 
 if (bazaSchematowSection) bazaSchematowSection.style.display = 'none'; // <-- ✅ DODAJ TĘ LINIĘ
 if (mojMagazynSection) mojMagazynSection.style.display = 'none'; // ✅ MODUŁ 4: Dodaj tę linię
 if (zarzadzanieMagazynamiSection) zarzadzanieMagazynamiSection.style.display = 'none';
+const magazynNasieniaSection = document.getElementById('magazynNasieniaSection');
+if (magazynNasieniaSection) magazynNasieniaSection.style.display = 'none';;
 if (typeof analizaSection !== 'undefined') analizaSection.style.display = 'none';
 // Odznacz wszystkie przyciski
   if (tabKartaBtn) tabKartaBtn.classList.remove('primary');
@@ -7633,8 +7682,10 @@ if (typeof analizaSection !== 'undefined') analizaSection.style.display = 'none'
   if (tabBazaProduktowBtn) tabBazaProduktowBtn.classList.remove('primary'); 
   if (tabKalendarzBtn) tabKalendarzBtn.classList.remove('primary'); // ✅ DODANA LINIA
   if (tabSchematyLeczeniaBtn) tabSchematyLeczeniaBtn.classList.remove('primary'); // <-- ✅ DODAJ TĘ LINIĘ
-  if (tabMojMagazynBtn) tabMojMagazynBtn.classList.remove('primary'); // ✅ MODUŁ 4: Dodaj tę linię
+if (tabMojMagazynBtn) tabMojMagazynBtn.classList.remove('primary'); // ✅ MODUŁ 4: Dodaj tę linię
   if (tabZarzadzanieMagazynamiBtn) tabZarzadzanieMagazynamiBtn.classList.remove('primary');
+  const tabMagazynNasieniaBtn = document.getElementById('tabMagazynNasieniaBtn');
+  if (tabMagazynNasieniaBtn) tabMagazynNasieniaBtn.classList.remove('primary');
 // (Nie musimy odznaczać tabKonfiguracjaBtn ani tabArchiwumBtn, bo je usunęliśmy)
 
  if (sectionToShow === 'karta' && kartaSection) {
@@ -7784,7 +7835,6 @@ loadArchiveReceiptUsers();
   }
     // ✅ KONIEC MODUŁU 4
 
-  // ✅ POCZĄTEK MODUŁU 6: Dodaj ten blok
  // ✅ POCZĄTEK MODUŁU 6 (Poprawka): Logika dla 'zarzadzanieMagazynami'
   else if (sectionToShow === 'zarzadzanieMagazynami' && zarzadzanieMagazynamiSection) {
       zarzadzanieMagazynamiSection.style.display = 'block';
@@ -7792,6 +7842,13 @@ loadArchiveReceiptUsers();
       if (tabMojMagazynBtn) tabMojMagazynBtn.classList.add('primary'); 
       onShowZarzadzanieMagazynami(); // Wywołaj funkcję startową
   }
+  // ✅ LOGIKA DLA MAGAZYNU NASIENIA
+  else if (sectionToShow === 'magazynNasienia' && document.getElementById('magazynNasieniaSection')) {
+      document.getElementById('magazynNasieniaSection').style.display = 'block';
+      const tabMagazynNasieniaBtn = document.getElementById('tabMagazynNasieniaBtn');
+      if (tabMagazynNasieniaBtn) tabMagazynNasieniaBtn.classList.add('primary');
+      if (typeof loadSemenData === 'function') loadSemenData();
+  }
   // ✅ KONIEC MODUŁU 6
 }
 
@@ -7875,6 +7932,20 @@ if (menuBazaProduktowBtn) {
 menuBazaProduktowBtn.addEventListener('click', () => {
 showSection('produkty');
 });
+}
+// --- Przycisk Podmenu: Magazyn Nasienia ---
+const menuMagazynNasieniaBtn = document.getElementById('menuMagazynNasieniaBtn');
+if (menuMagazynNasieniaBtn) {
+    menuMagazynNasieniaBtn.addEventListener('click', () => {
+        showSection('magazynNasienia');
+    });
+}
+const tabMagazynNasieniaBtn2 = document.getElementById('tabMagazynNasieniaBtn');
+if (tabMagazynNasieniaBtn2) {
+    tabMagazynNasieniaBtn2.addEventListener('click', () => {
+        if (typeof confirmOnTabChange === 'function' && !confirmOnTabChange()) return;
+        showSection('magazynNasienia');
+    });
 }
     /* ✅ POCZĄTEK: DODAJ TE LISTENERY (Pkt 6, 8) */
 
@@ -11867,7 +11938,8 @@ const navButtonsToCheck = [
     backToMenuBtn, logoutBtn, menuLogoutBtn, // Przyciski paska i menu
     menuKalkulatorBtn, menuBazaKlientowBtn, menuBazaProduktowBtn, // Przyciski podmenu
     menuRaportyBtn, menuArchiwumKartyBtn, menuArchiwumParagonyBtn, menuKonfiguracjaBtn, // Przyciski menu
-    openCalculatorBtn // Przycisk na karcie
+    openCalculatorBtn, // Przycisk na karcie
+    document.getElementById('tabMagazynNasieniaBtn'), document.getElementById('menuMagazynNasieniaBtn')
 ]; // <-- Koniec tablicy. Usunęliśmy przyciski z modala.
 
 navButtonsToCheck.forEach(btn => {
@@ -26719,7 +26791,251 @@ if (btnSmsToDoctor) {
             }
         };
     }
+    /* ======================================================== */
+/* ✅ MODUŁ: MAGAZYN NASIENIA (Logika + Dynamiczne Style CSS) */
+/* ======================================================== */
+
+// Dodanie niezbędnych stylów CSS w locie (żeby nie szukać tagu <style>)
+const semenStyles = document.createElement('style');
+semenStyles.innerHTML = `
+.semen-grid-layout {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 15px;
+    margin-bottom: 20px;
+}
+.semen-tile {
+    position: relative;
+    padding: 15px 10px;
+    border-radius: 8px;
+    text-align: center;
+    font-weight: bold;
+    font-size: 15px;
+    cursor: pointer;
+    user-select: none;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    transition: transform 0.1s, background-color 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 80px;
+    word-break: break-word;
+}
+.semen-tile:active {
+    transform: scale(0.95);
+}
+.semen-tile.status-ok {
+    background-color: #ffffff;
+    border: 3px solid #bdc3c7;
+    color: #2c3e50;
+}
+.semen-tile.status-low {
+    background-color: #f39c12;
+    border: 3px solid #e67e22;
+    color: #ffffff;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+}
+.semen-tile.status-empty {
+    background-color: #e74c3c;
+    border: 3px solid #c0392b;
+    color: #ffffff;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+}
+.semen-delete-btn {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    background: #333;
+    color: white;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    border: 2px solid #fff;
+    opacity: 0.8;
+}
+.semen-delete-btn:hover { background: #000; opacity: 1; }
+`;
+document.head.appendChild(semenStyles);
+
+// --- Zmienne Magazynu Nasienia ---
+let currentSemenData = { telefon: "", pozycje: [] };
+let unsubscribeSemen = null;
+
+function loadSemenData() {
+    const clinicId = currentUserProfile ? currentUserProfile['ID lecznicy'] : null;
     
+    if (!clinicId) {
+        console.warn("Brak ID lecznicy, nie mogę załadować magazynu nasienia.");
+        document.getElementById('semenGridContainer').innerHTML = '<div style="color:red;">Błąd: Brak ID lecznicy. Zaloguj się ponownie.</div>';
+        return;
+    }
+
+    if (unsubscribeSemen) unsubscribeSemen(); 
+
+    unsubscribeSemen = db.collection('nasienie_magazyn').doc(clinicId).onSnapshot(doc => {
+        if (doc.exists) {
+            currentSemenData = doc.data();
+            if (!currentSemenData.pozycje) currentSemenData.pozycje = [];
+        } else {
+            currentSemenData = { telefon: "", pozycje: [] };
+        }
+        
+        const phoneInput = document.getElementById('semenPhoneInput');
+        if (phoneInput && document.activeElement !== phoneInput) {
+            phoneInput.value = currentSemenData.telefon || "";
+        }
+        
+        renderSemenGrid();
+    }, error => {
+        console.error("Błąd ładowania magazynu nasienia:", error);
+    });
+}
+
+function renderSemenGrid() {
+    const grid = document.getElementById('semenGridContainer');
+    if (!grid) return;
+    grid.innerHTML = '';
+
+    if (currentSemenData.pozycje.length === 0) {
+        grid.innerHTML = '<div style="grid-column: 1 / -1; text-align:center; padding: 20px; color:#7f8c8d;">Brak nasienia. Dodaj pierwszego buhaja u góry.</div>';
+        return;
+    }
+
+    const sorted = [...currentSemenData.pozycje].sort((a,b) => a.nazwa.localeCompare(b.nazwa));
+
+    sorted.forEach(item => {
+        const tile = document.createElement('div');
+        tile.className = `semen-tile status-${item.status}`;
+        
+        tile.innerHTML = `
+            ${item.nazwa}
+            <div class="semen-delete-btn" title="Usuń buhaja">✕</div>
+        `;
+        
+        // Logika kliknięcia w krzyżyk (usuwanie) - MUSI zatrzymać kliknięcie w kafelek
+        tile.querySelector('.semen-delete-btn').addEventListener('click', (e) => {
+            e.stopPropagation(); 
+            deleteSemenItem(item.id, item.nazwa);
+        });
+
+        // Logika kliknięcia w cały kafelek (zmiana statusu)
+        tile.addEventListener('click', () => {
+            toggleSemenStatus(item.id);
+        });
+        
+        grid.appendChild(tile);
+    });
+}
+
+async function toggleSemenStatus(itemId) {
+    const item = currentSemenData.pozycje.find(p => p.id === itemId);
+    if (!item) return;
+
+    if (item.status === 'ok') item.status = 'low';
+    else if (item.status === 'low') item.status = 'empty';
+    else item.status = 'ok';
+
+    await saveSemenDataToDB();
+}
+
+async function addNewSemen() {
+    const input = document.getElementById('newSemenName');
+    const name = input.value.trim();
+    if (!name) return alert("Wpisz nazwę nasienia (buhaja).");
+
+    // Sprawdzenie czy taki byk już istnieje (aby uniknąć duplikatów)
+    const exists = currentSemenData.pozycje.find(p => p.nazwa.toLowerCase() === name.toLowerCase());
+    if (exists) return alert("Ten buhaj jest już wpisany do magazynu!");
+
+    const newItem = {
+        id: 'sem_' + Date.now(),
+        nazwa: name,
+        status: 'ok' 
+    };
+
+    currentSemenData.pozycje.push(newItem);
+    input.value = ''; 
+
+    await saveSemenDataToDB();
+    if (typeof showToast === 'function') showToast("Dodano nowe nasienie", "success");
+}
+
+async function deleteSemenItem(itemId, itemName) {
+    if (!confirm(`Czy na pewno usunąć "${itemName}" z magazynu?`)) return;
+
+    currentSemenData.pozycje = currentSemenData.pozycje.filter(p => p.id !== itemId);
+    await saveSemenDataToDB();
+}
+
+async function saveSemenPhone() {
+    const phone = document.getElementById('semenPhoneInput').value.trim();
+    currentSemenData.telefon = phone;
+    await saveSemenDataToDB();
+    if (typeof showToast === 'function') showToast("Zapisano numer telefonu do zamówień", "success");
+}
+
+async function resetAllSemenStatus() {
+    if (currentSemenData.pozycje.length === 0) return;
+    if (!confirm("Czy wszystkie stany zostały uzupełnione? Zmienię kolory wszystkich kafelków na białe (Stan OK).")) return;
+
+    currentSemenData.pozycje.forEach(p => p.status = 'ok');
+    await saveSemenDataToDB();
+    if (typeof showToast === 'function') showToast("Wszystkie braki zostały uzupełnione!", "success");
+}
+
+function sendSemenOrderSMS() {
+    let phone = currentSemenData.telefon;
+    if (!phone) {
+        alert("Najpierw wpisz i zapisz numer telefonu na samej górze!");
+        return;
+    }
+    phone = phone.replace(/[^0-9+]/g, '');
+
+    const braki = currentSemenData.pozycje.filter(p => p.status === 'empty');
+    const koncowki = currentSemenData.pozycje.filter(p => p.status === 'low');
+
+    if (braki.length === 0 && koncowki.length === 0) {
+        alert("Wszystkie stany są OK (na biało). Nie ma czego zamawiać.");
+        return;
+    }
+
+    const clinicName = currentUserProfile ? currentUserProfile['Nazwa lecznicy'] : 'Lecznica';
+    let smsBody = `ZAMÓWIENIE NASIENIA - ${clinicName}\n\n`;
+
+    if (braki.length > 0) {
+        smsBody += `🔴 BRAKI (DO ZAMÓWIENIA):\n`;
+        braki.forEach(b => { smsBody += `- ${b.nazwa}\n`; });
+        smsBody += `\n`;
+    }
+
+    if (koncowki.length > 0) {
+        smsBody += `🟠 KOŃCÓWKI (UZUPEŁNIĆ):\n`;
+        koncowki.forEach(k => { smsBody += `- ${k.nazwa}\n`; });
+    }
+
+    const encodedBody = encodeURIComponent(smsBody);
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    const separator = isIOS ? '&' : '?';
+
+    window.location.href = `sms:${phone}${separator}body=${encodedBody}`;
+}
+
+async function saveSemenDataToDB() {
+    const clinicId = currentUserProfile ? currentUserProfile['ID lecznicy'] : null;
+    if (!clinicId) return;
+
+    try {
+        await db.collection('nasienie_magazyn').doc(clinicId).set(currentSemenData);
+    } catch (e) {
+        console.error("Błąd zapisu magazynu nasienia: ", e);
+        if (typeof showToast === 'function') showToast("Wystąpił błąd podczas zapisywania danych w chmurze.", "error");
+    }
+}
 </script>
 </body>
 </html>
