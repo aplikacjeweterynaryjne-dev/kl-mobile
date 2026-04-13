@@ -2500,6 +2500,27 @@ tr.filled-row td {
     background-color: #f0f0f0;
     transform: scale(0.98);
 }
+    /* --- STYLE DLA MINI-KALENDARZA W RAPORTACH --- */
+.mini-day-cell {
+    min-height: 35px;
+    background: #fff;
+    border: 1px solid #eee;
+    padding: 2px;
+    font-size: 12px;
+    font-weight: bold;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.mini-day-cell.other-month { background: #fcfcfc; color: #ccc; font-weight: normal; }
+.mini-day-cell.is-today { background: #EBF5E6; border: 2px solid #6A994E; }
+.mini-day-cell.is-settled { background-color: #d4edda !important; border: 1px solid #155724 !important; }
+.mini-day-cell.is-settled::after { content: '✔'; position: absolute; top: 0px; right: 2px; font-size: 11px; color: #155724; font-weight: 900;}
+.mini-day-cell.is-settled-other { background-color: #fce4ec !important; border: 1px solid #f48fb1 !important; }
+.mini-day-cell.is-settled-other::after { content: '✔'; position: absolute; top: 0px; right: 2px; font-size: 11px; color: #d81b60; font-weight: 900;}
+.mini-day-cell.is-day-off { background-color: #36454F !important; color: #fff !important; border: 1px solid #2C3E50 !important; }
+.mini-day-cell.is-day-off::after { content: '🏖️'; position: absolute; top: 0px; right: 2px; font-size: 10px; }
 </style>
     <div id="calcProductSearchModal" class="product-search-modal" style="display: none; z-index: 10003;">
     <div class="product-search-card">
@@ -4243,9 +4264,33 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
 <div id="raportySection" style="display: none; padding: 0 20px;">
     <h2>📊 Raporty</h2>
 
-    <div id="lastSettlementInfo" style="display: none; background-color: #e8f5e9; border: 1px solid #27ae60; color: #1e8449; padding: 10px; border-radius: 8px; margin-bottom: 15px; font-size: 15px; text-align: center;">
+<div id="lastSettlementInfo" style="display: none; background-color: #e8f5e9; border: 1px solid #27ae60; color: #1e8449; padding: 10px; border-radius: 8px; margin-bottom: 15px; font-size: 15px; text-align: center;">
         <span id="lastSettlementText">Ładowanie informacji o rozliczeniach...</span>
     </div>
+
+    <details id="reportCalendarDetails" style="display: none; background: #fff; padding: 10px; border-radius: 8px; border: 1px solid #e0e0e0; margin-bottom: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
+        <summary style="font-weight: bold; cursor: pointer; color: #27ae60; font-size: 15px; list-style: none; display: flex; align-items: center; gap: 5px; outline: none;">
+            📅 Podgląd kalendarza rozliczeń pracownika (kliknij, aby rozwinąć)
+        </summary>
+        <div style="margin-top: 15px; border-top: 1px dashed #ccc; padding-top: 15px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <button id="btnRepCalPrev" class="btn small ghost" style="padding: 4px 10px;">◀</button>
+                <h4 id="repCalMonthTitle" style="margin: 0; font-size: 15px; color: #333;">...</h4>
+                <button id="btnRepCalNext" class="btn small ghost" style="padding: 4px 10px;">▶</button>
+            </div>
+            <div class="calendar-grid" style="gap: 2px;">
+                <div style="text-align: center; font-size: 11px; font-weight: bold; color: #777;">Pn</div>
+                <div style="text-align: center; font-size: 11px; font-weight: bold; color: #777;">Wt</div>
+                <div style="text-align: center; font-size: 11px; font-weight: bold; color: #777;">Śr</div>
+                <div style="text-align: center; font-size: 11px; font-weight: bold; color: #777;">Cz</div>
+                <div style="text-align: center; font-size: 11px; font-weight: bold; color: #777;">Pt</div>
+                <div style="text-align: center; font-size: 11px; font-weight: bold; color: #777;">Sb</div>
+                <div style="text-align: center; font-size: 11px; font-weight: bold; color: #777;">Nd</div>
+            </div>
+            <div id="repCalGridBody" class="calendar-grid" style="gap: 2px; margin-top: 2px;"></div>
+        </div>
+    </details>
+
     <div class="report-controls">
         <div class="form-row">
             <label for="reportTypeSelect">1. Wybierz typ raportu:</label>
@@ -14193,7 +14238,7 @@ function generateWizytyReport(allReceipts, filters) {
             statusColor = "green"; 
         }
 
-        // Zużycia (produkty)
+// Zużycia (produkty)
         let zuzyciaHtml = '';
         if (receipt.pozycje && receipt.pozycje.length > 0) {
             const produkty = receipt.pozycje.filter(p => p.name.toLowerCase() !== 'wyrównanie');
@@ -14208,13 +14253,25 @@ function generateWizytyReport(allReceipts, filters) {
         
         const sumaDisplay = formatPrice(suma); 
 
+        // ✅ NOWOŚĆ: Wykrywanie Spłaty Długu i dodawanie etykiety "SPŁATA DŁUGU !"
+        const isDebtRepayment = receipt.notatka && receipt.notatka.includes('Spłata długu z dnia:');
+        let czynnosciDisplay = receipt.czynnosci || '';
+        let zuzyciaDisplay = zuzyciaHtml;
+
+        if (isDebtRepayment) {
+            // Czerwony, zwracający uwagę badge z wykrzyknikiem
+            const badgeHtml = '<div style="color: #c0392b; font-weight: 900; font-size: 13px; margin-bottom: 4px; text-transform: uppercase; background: #fdf2e9; border: 1px solid #e67e22; border-radius: 4px; padding: 2px 4px; display: inline-block;">⚠️ SPŁATA DŁUGU !</div><br>';
+            czynnosciDisplay = badgeHtml + czynnosciDisplay;
+            zuzyciaDisplay = badgeHtml + (zuzyciaDisplay || '<span style="color:#999; font-size:11px; font-style:italic;">Brak wpisanych produktów</span>');
+        }
+
         // ✅ POPRAWKA: status z 'white-space: pre-wrap' obsługuje \n (nową linię)
         tableHtml += `
             <tr style="${rowStyle}" data-klient="${receipt.klient}" data-data="${receipt.data}">
                 <td>${receipt.klient}</td>
                 <td>${receipt.data}</td>
-                <td>${receipt.czynnosci || ''}</td>
-                <td class="col-zuzycia">${zuzyciaHtml}</td>
+                <td>${czynnosciDisplay}</td>
+                <td class="col-zuzycia">${zuzyciaDisplay}</td>
                 <td style="text-align: right; color: ${sumaColor}; font-weight: bold;">${sumaDisplay}</td>
                 <td style="color: ${statusColor}; font-weight: bold; white-space: pre-wrap;">${receipt.status || 'Brak'}</td>
                 <td style="white-space: normal; word-break: break-word; min-width: 150px;">${receipt.notatka || ''}</td>
@@ -27058,6 +27115,145 @@ async function saveSemenDataToDB() {
         console.error("Błąd zapisu magazynu nasienia: ", e);
         if (typeof showToast === 'function') showToast("Wystąpił błąd podczas zapisywania danych w chmurze.", "error");
     }
+}
+    /* ======================================================== */
+/* ✅ MODUŁ: MINI KALENDARZ ROZLICZEŃ W RAPORTACH           */
+/* ======================================================== */
+let repCalDate = new Date();
+
+async function renderReportMiniCalendar(targetUid = null) {
+    const detailsContainer = document.getElementById('reportCalendarDetails');
+    const gridBody = document.getElementById('repCalGridBody');
+    const title = document.getElementById('repCalMonthTitle');
+    const userSelect = document.getElementById('reportUserSelect');
+    const typeSelect = document.getElementById('reportTypeSelect');
+
+    if (!detailsContainer || !gridBody || !title) return;
+
+    // Pobierz UID (jeśli nie podano, weź z filtra)
+    if (!targetUid) {
+        targetUid = userSelect ? userSelect.value : (currentUserProfile ? currentUserProfile.uid : null);
+    }
+    
+    // Pokazuj kalendarz TYLKO przy raporcie gotówkowym i gdy nie wybrano "WSZYSCY"
+    if (!targetUid || targetUid === 'ALL' || !typeSelect || typeSelect.value !== 'gotowka') {
+        detailsContainer.style.display = 'none';
+        return;
+    }
+
+    detailsContainer.style.display = 'block';
+
+    const year = repCalDate.getFullYear();
+    const month = repCalDate.getMonth();
+    title.textContent = repCalDate.toLocaleDateString('pl-PL', { month: 'long', year: 'numeric' });
+    const monthStr = `${year}-${String(month + 1).padStart(2, '0')}`;
+
+    gridBody.innerHTML = '<div style="grid-column:1/-1; text-align:center; font-size:12px; color:#999; padding:10px;">Ładowanie kalendarza... ⏳</div>';
+
+    try {
+        const q = db.collection("kalendarz_rozliczenia")
+                    .where("uid", "==", targetUid)
+                    .where("miesiac", "==", monthStr);
+        const snap = await q.get();
+        
+        const statusMap = new Map();
+        snap.forEach(doc => {
+            const d = doc.data();
+            if (!statusMap.has(d.data)) {
+                statusMap.set(d.data, { rozliczony: false, wolny: false, oznaczyl_uid: null });
+            }
+            const obj = statusMap.get(d.data);
+            if (d.typ === 'wolny') obj.wolny = true;
+            else if (d.typ === 'rozliczony' || !d.typ) {
+                obj.rozliczony = true;
+                obj.oznaczyl_uid = d.oznaczyl_uid;
+            }
+        });
+
+        // Rysowanie komórek
+        gridBody.innerHTML = '';
+        const firstDay = new Date(year, month, 1).getDay(); 
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        const startOffset = (firstDay === 0) ? 6 : firstDay - 1; 
+
+        // Puste dni z poprzedniego miesiąca
+        for (let i = 0; i < startOffset; i++) {
+            const cell = document.createElement('div');
+            cell.className = 'mini-day-cell other-month';
+            gridBody.appendChild(cell);
+        }
+
+        const todayISO = new Date().toISOString().split('T')[0];
+
+        // Rysuj dni
+        for (let day = 1; day <= daysInMonth; day++) {
+            const cell = document.createElement('div');
+            cell.className = 'mini-day-cell';
+            const dayString = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+            
+            cell.textContent = day;
+
+            if (dayString === todayISO) cell.classList.add('is-today');
+
+            const dayInfo = statusMap.get(dayString);
+            if (dayInfo) {
+                if (dayInfo.wolny) {
+                    cell.classList.add('is-day-off');
+                } else if (dayInfo.rozliczony) {
+                    if (dayInfo.oznaczyl_uid && dayInfo.oznaczyl_uid !== targetUid) {
+                        cell.classList.add('is-settled-other');
+                    } else {
+                        cell.classList.add('is-settled');
+                    }
+                }
+            }
+            gridBody.appendChild(cell);
+        }
+    } catch(e) {
+        console.error("Błąd ładowania mini kalendarza:", e);
+        gridBody.innerHTML = '<div style="grid-column:1/-1; text-align:center; font-size:12px; color:red; padding:10px;">Błąd komunikacji z bazą.</div>';
+    }
+}
+
+// 1. Podpięcie przycisków "Poprzedni/Następny miesiąc" w mini kalendarzu
+document.getElementById('btnRepCalPrev')?.addEventListener('click', () => {
+    repCalDate.setMonth(repCalDate.getMonth() - 1);
+    renderReportMiniCalendar();
+});
+document.getElementById('btnRepCalNext')?.addEventListener('click', () => {
+    repCalDate.setMonth(repCalDate.getMonth() + 1);
+    renderReportMiniCalendar();
+});
+
+// 2. Podpięcie pod zmianę typu raportu (np. na Gotówka)
+document.getElementById('reportTypeSelect')?.addEventListener('change', () => {
+    if (typeof renderReportMiniCalendar === 'function') renderReportMiniCalendar();
+});
+
+// 3. Podpięcie pod odświeżenie danych u nowego pracownika (wewnątrz checkLastSettlement)
+const originalCheckLastSettlement = window.checkLastSettlement;
+window.checkLastSettlement = async function(targetUid) {
+    if (originalCheckLastSettlement) await originalCheckLastSettlement(targetUid);
+    
+    // Dodajemy wywołanie odświeżające mini kalendarz dla nowego pracownika
+    if (typeof renderReportMiniCalendar === 'function') {
+        const activeUid = targetUid || document.getElementById('reportUserSelect')?.value;
+        renderReportMiniCalendar(activeUid); 
+    }
+};
+
+// 4. Podpięcie pod zatwierdzenie (Gdy zrobisz "Rozlicz", niech kalendarz odświeży się do zielonego!)
+const rozliczBtnRef = document.getElementById('settleReportBtn');
+if (rozliczBtnRef) {
+    // Nasłuchuj na kliknięcie i sprawdź kiedy przycisk dostanie zielony status (czyli poszło bez błędów)
+    rozliczBtnRef.addEventListener('click', () => {
+        setTimeout(() => {
+            if (rozliczBtnRef.textContent.includes("✔️")) {
+                const targetUserId = rozliczBtnRef.dataset.userId;
+                renderReportMiniCalendar(targetUserId); 
+            }
+        }, 1500); // Małe opóźnienie, by dać czas na zapis w bazie (z batcha Firebase)
+    });
 }
 </script>
 </body>
