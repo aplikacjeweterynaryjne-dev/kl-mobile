@@ -5361,23 +5361,45 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
 
 <div id="archiwumSwiadectwaSection" style="display: none; padding: 0 20px 80px 20px;">
     <h2>📜 Archiwum Świadectw</h2>
-    <div style="margin-bottom: 15px;">
-        <input type="text" id="arcSwiSearchInput" placeholder="Szukaj (klient, kolczyk, data)..." style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ccc;">
+    
+    <div style="margin-bottom: 20px; border-bottom: 1px solid #eee; padding-bottom: 15px;">
+        <div class="form-row">
+            <label for="archiveSwiUserSelect">Wybierz użytkownika:</label>
+            <select id="archiveSwiUserSelect" style="width:100%; padding:8px; font-size:16px;">
+                <option value="">Najpierw wczytaj użytkowników...</option>
+            </select>
+        </div>
+        <div style="display:flex; gap:5px; margin-top:10px; flex-wrap:wrap;">
+             <button id="loadArchiveSwiUsersBtn" class="btn primary small" style="flex:1;">👥 Załaduj Listę</button>
+        </div>
+        <div id="archiveSwiActionButtons" style="display:none; gap:5px; margin-top:10px; flex-wrap:wrap;">
+             <button class="btn small" style="background:#34495e; color:white; flex:1;" onclick="loadSwiadectwaForUser(document.getElementById('archiveSwiUserSelect').value, '180days')">📅 Ost. 180 dni</button>
+             <button class="btn small" style="background:#c0392b; color:white; flex:1;" onclick="loadSwiadectwaForUser(document.getElementById('archiveSwiUserSelect').value, 'all')">📂 Wszystkie</button>
+        </div>
     </div>
+
+    <div id="archiveSwiFilterControls" class="archive-filter-controls" style="display: none;">
+        <input type="date" id="arcSwiDateStart" title="Data od">
+        <input type="date" id="arcSwiDateEnd" title="Data do">
+        <input type="text" id="arcSwiClient" placeholder="Filtruj klienta...">
+        <input type="text" id="arcSwiDoc" placeholder="Filtruj nr dok...">
+        <button id="btnFilterSwi" class="btn primary" style="grid-column: 1 / -1;" onclick="loadSwiadectwaForUser(document.getElementById('archiveSwiUserSelect').value, 'filter')">🔍 Filtruj Wyniki</button>
+    </div>
+
     <div class="table-container">
         <table class="sortable-table">
             <thead>
                 <tr>
-                    <th>Data Zabiegu</th>
-                    <th>Nr Świadectwa</th>
-                    <th>Klient</th>
-                    <th>Krowa (Kolczyk)</th>
+                    <th data-sort-key="dataZabiegu">Data Zabiegu</th>
+                    <th data-sort-key="nrDokumentu">Nr Świadectwa</th>
+                    <th data-sort-key="klient">Klient</th>
+                    <th data-sort-key="krowaKolczyk">Krowa (Kolczyk)</th>
                     <th>Buhaj</th>
                     <th class="col-akcje">Akcje</th>
                 </tr>
             </thead>
             <tbody id="arcSwiTableBody">
-                <tr><td colspan="6" style="text-align: center; padding: 20px;">Ładowanie...</td></tr>
+                <tr><td colspan="6" style="text-align: center; padding: 20px;">Wybierz użytkownika, aby wczytać dane.</td></tr>
             </tbody>
         </table>
     </div>
@@ -27435,19 +27457,30 @@ async function generateSwiNumber() {
     currentSwiData.initials = currentUserProfile.Inicjaly || 'NN';
 
     try {
+        // Usuwamy "orderBy" i "limit(1)", żeby obejść restrykcje indeksowania Firebase
         const q = db.collection("archiwumSwiadectwa")
             .where("lekarz_uid", "==", currentUserProfile.uid)
             .where("rok", "==", currentSwiData.currentYear)
-            .where("miesiac", "==", currentSwiData.currentMonth)
-            .orderBy("counter", "desc").limit(1);
+            .where("miesiac", "==", currentSwiData.currentMonth);
 
         const snapshot = await q.get();
-        if (snapshot.empty) currentSwiData.nextCounter = 1;
-        else currentSwiData.nextCounter = snapshot.docs[0].data().counter + 1;
+        let maxCounter = 0;
+        
+        // Szukamy najwyższego licznika w JavaScript
+        snapshot.docs.forEach(doc => {
+            const c = parseInt(doc.data().counter, 10);
+            if (!isNaN(c) && c > maxCounter) {
+                maxCounter = c;
+            }
+        });
+        
+        currentSwiData.nextCounter = maxCounter + 1;
 
         const nr = `SWI-${currentSwiData.nextCounter}/${currentSwiData.currentMonth}/${currentSwiData.currentYear}/${currentSwiData.initials}`;
         document.getElementById('swiNrDokumentuDisplay').textContent = nr;
+
     } catch(e) {
+        console.error("Błąd numeracji:", e);
         document.getElementById('swiNrDokumentuDisplay').textContent = `SWI-X/${currentSwiData.currentMonth}/${currentSwiData.currentYear}`;
     }
 }
@@ -27563,32 +27596,150 @@ function previewSwiadectwo() {
     printWindow.document.close();
 }
 
+// --- NOWE ARCHIWUM ŚWIADECTW (Z FILTRAMI) ---
+
 async function loadArchiwumSwiadectw() {
-    const tbody = document.getElementById('arcSwiTableBody');
-    tbody.innerHTML = '<tr><td colspan="6" style="text-align: center;">Ładowanie...</td></tr>';
+    const sel = document.getElementById('archiveSwiUserSelect');
+    // Jeśli lista nie jest wczytana, wczytaj automatycznie przy otwarciu zakładki
+    if (sel && sel.options.length <= 1) {
+        loadArchiveSwiUsers();
+    }
+}
+
+async function loadArchiveSwiUsers() {
+    const selectEl = document.getElementById('archiveSwiUserSelect');
+    const btnEl = document.getElementById('loadArchiveSwiUsersBtn');
+    if (!selectEl || !btnEl || !currentUserProfile) return;
     
+    // AUTO-CZYSZCZENIE STARYCH ŚWIADECTW (starsze niż 180 dni) wykonujemy cicho w tle
     const cutoffD = new Date();
     cutoffD.setDate(cutoffD.getDate() - 180);
     const cutoffStr = cutoffD.toISOString().split('T')[0];
+    db.collection("archiwumSwiadectwa").where("dataZabiegu", "<", cutoffStr).get().then(snap => {
+        if (!snap.empty) {
+            const batch = db.batch();
+            snap.forEach(d => batch.delete(d.ref));
+            batch.commit();
+        }
+    });
+
+    let query;
+    if (currentUserProfile.Rola === 'administrator') {
+        query = db.collection("konfiguracja").orderBy("Nazwisko");
+    } else {
+        const userClinicId = currentUserProfile['ID lecznicy'];
+        if (!userClinicId) return;
+        query = db.collection("konfiguracja").where("ID lecznicy", "==", userClinicId).orderBy("Nazwisko");
+    }
+    
+    btnEl.disabled = true;
+    btnEl.textContent = 'Ładowanie...';
+    selectEl.innerHTML = '<option value="">Ładowanie...</option>';
 
     try {
-        const qClean = db.collection("archiwumSwiadectwa").where("dataZabiegu", "<", cutoffStr);
-        const snapClean = await qClean.get();
-        if(!snapClean.empty) {
-            const batch = db.batch();
-            snapClean.docs.forEach(d => batch.delete(d.ref));
-            await batch.commit();
+        const snapshot = await query.get();
+        selectEl.innerHTML = ''; 
+        selectEl.add(new Option("--- Wybierz użytkownika ---", ""));
+        selectEl.add(new Option("Wszyscy", "ALL"));
+        
+        snapshot.docs.forEach(doc => {
+            const user = doc.data();
+            const optionText = `${user.Imie} ${user.Nazwisko}`;
+            selectEl.add(new Option(optionText, user.uid)); 
+        });
+        
+        // Zaznacz siebie domyślnie
+        if (currentUserProfile.uid) {
+            selectEl.value = currentUserProfile.uid;
+            if (selectEl.value === currentUserProfile.uid) {
+                loadSwiadectwaForUser(currentUserProfile.uid, '180days');
+                document.getElementById('archiveSwiActionButtons').style.display = 'flex';
+            }
+        }
+    } catch (error) {
+        console.error("Błąd wczytywania użytkowników (Świadectwa):", error);
+        selectEl.innerHTML = '<option value="">Błąd ładowania</option>';
+    } finally {
+        btnEl.style.display = 'none'; 
+    }
+}
+
+if (document.getElementById('loadArchiveSwiUsersBtn')) {
+    document.getElementById('loadArchiveSwiUsersBtn').addEventListener('click', loadArchiveSwiUsers);
+}
+
+if (document.getElementById('archiveSwiUserSelect')) {
+    document.getElementById('archiveSwiUserSelect').addEventListener('change', (e) => {
+        const btns = document.getElementById('archiveSwiActionButtons');
+        if (btns) btns.style.display = 'flex';
+        if (e.target.value) loadSwiadectwaForUser(e.target.value, '180days');
+    });
+}
+
+async function loadSwiadectwaForUser(lekarz_uid, mode = '180days') {
+    const tableBody = document.getElementById('arcSwiTableBody');
+    const filterControls = document.getElementById('archiveSwiFilterControls');
+    
+    if (!lekarz_uid) return;
+    tableBody.innerHTML = '<tr><td colspan="6" style="text-align: center;">Ładowanie świadectw... ⏳</td></tr>';
+
+    let q = db.collection("archiwumSwiadectwa");
+
+    // Filtr Lekarza
+    if (lekarz_uid === "ALL") {
+        if (currentUserProfile.Rola !== 'administrator') {
+            q = q.where("id_lecznicy", "==", currentUserProfile['ID lecznicy']);
+        }
+    } else {
+        q = q.where("lekarz_uid", "==", lekarz_uid);
+    }
+
+    // Czyszczenie pól tekstowych
+    if (mode === '180days' || mode === 'all') {
+        document.getElementById('arcSwiDateStart').value = '';
+        document.getElementById('arcSwiDateEnd').value = '';
+        document.getElementById('arcSwiClient').value = '';
+        document.getElementById('arcSwiDoc').value = '';
+    }
+
+    // Tryby zapytania
+    if (mode === '180days') {
+        const d = new Date();
+        d.setDate(d.getDate() - 180);
+        q = q.where("dataZabiegu", ">=", d.toISOString().split('T')[0]);
+        q = q.orderBy("dataZabiegu", "desc");
+        filterControls.style.display = 'grid';
+    } else if (mode === 'filter') {
+        const dStart = document.getElementById('arcSwiDateStart').value;
+        const dEnd = document.getElementById('arcSwiDateEnd').value;
+        if (dStart) q = q.where("dataZabiegu", ">=", dStart);
+        if (dEnd) q = q.where("dataZabiegu", "<=", dEnd);
+        q = q.orderBy("dataZabiegu", "desc");
+        filterControls.style.display = 'grid';
+    } else if (mode === 'all') {
+        q = q.orderBy("dataZabiegu", "desc").limit(500);
+        filterControls.style.display = 'grid';
+    }
+
+    try {
+        const snapshot = await q.get();
+        tableBody.innerHTML = '';
+        
+        if(snapshot.empty) {
+            tableBody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #999;">Brak świadectw dla wybranych kryteriów.</td></tr>';
+            return;
         }
 
-        const qLoad = db.collection("archiwumSwiadectwa").where("lekarz_uid", "==", currentUserProfile.uid).orderBy("dataZabiegu", "desc").limit(50);
-        const snapLoad = await qLoad.get();
-        
-        tbody.innerHTML = '';
-        if(snapLoad.empty) return tbody.innerHTML = '<tr><td colspan="6" style="text-align: center;">Brak świadectw w archiwum (ost. 180 dni).</td></tr>';
-
-        snapLoad.forEach(doc => {
+        snapshot.forEach(doc => {
             const d = doc.data();
             const tr = document.createElement('tr');
+            
+            // Atrybuty do lokalnego filtra tekstowego
+            tr.dataset.dataZabiegu = d.dataZabiegu || '';
+            tr.dataset.nrDokumentu = d.nrDokumentu || '';
+            tr.dataset.klient = (d.klient || '').toLowerCase();
+            tr.dataset.krowaKolczyk = (d.krowaKolczyk || '').toLowerCase();
+            
             tr.innerHTML = `
                 <td>${d.dataZabiegu}</td>
                 <td style="font-weight:bold; color:#2980b9;">${d.nrDokumentu}</td>
@@ -27599,21 +27750,42 @@ async function loadArchiwumSwiadectw() {
                     <button class="btn warn small" onclick="deleteSwiadectwo('${doc.id}')">Usuń</button>
                 </td>
             `;
-            tbody.appendChild(tr);
+            tableBody.appendChild(tr);
         });
 
-        document.getElementById('arcSwiSearchInput').oninput = (e) => {
-            const f = e.target.value.toLowerCase();
-            Array.from(tbody.rows).forEach(r => { r.style.display = r.textContent.toLowerCase().includes(f) ? '' : 'none'; });
-        };
-    } catch(e) { console.error(e); }
+        // Po załadowaniu danych nakładamy na nie filtry tekstowe
+        if (mode === 'filter') applySwiFilters();
+
+    } catch(e) { 
+        console.error("Błąd ładowania świadectw:", e); 
+        tableBody.innerHTML = '<tr><td colspan="6" style="text-align: center; color:red;">Błąd ładowania. Sprawdź indeksy Firebase.</td></tr>';
+    }
+}
+
+function applySwiFilters() {
+    const tableBody = document.getElementById('arcSwiTableBody');
+    if (!tableBody) return;
+    const client = document.getElementById('arcSwiClient').value.toLowerCase().trim();
+    const docNum = document.getElementById('arcSwiDoc').value.toLowerCase().trim();
+
+    for (const row of tableBody.rows) {
+        let isVisible = true;
+        if (client && !row.dataset.klient.includes(client)) isVisible = false;
+        if (isVisible && docNum && !row.dataset.nrDokumentu.toLowerCase().includes(docNum)) isVisible = false;
+        row.style.display = isVisible ? '' : 'none';
+    }
 }
 
 window.deleteSwiadectwo = async function(id) {
     if(!confirm("Czy na pewno usunąć to świadectwo?")) return;
     await db.collection("archiwumSwiadectwa").doc(id).delete();
-    if(typeof showToast === 'function') showToast("Usunięto.", "info");
-    loadArchiwumSwiadectw();
+    if(typeof showToast === 'function') showToast("Usunięto pomyślnie.", "success");
+    
+    // Odśwież obecny widok dla wybranego użytkownika
+    const sel = document.getElementById('archiveSwiUserSelect');
+    if (sel && sel.value) {
+        loadSwiadectwaForUser(sel.value, '180days'); 
+    }
 };
 </script>
 </body>
