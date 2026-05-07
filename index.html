@@ -3419,13 +3419,13 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
             </div>
             <small style="color:#666;">Automat szuka kryć tej krowy (ost. 180 dni).</small>
         </div>
-        <div class="form-row">
-            <label>Inseminacja:</label>
-            <select id="swiInseminacjaSelect" style="width:100%; padding:8px; font-size:16px;">
-                <option value="Nie" selected>Nie</option>
-                <option value="Tak">Tak</option>
-            </select>
-        </div>
+      <div class="form-row">
+                <label>Reinseminacja:</label>
+                <select id="swiInseminacjaSelect" style="width:100%; padding:8px; font-size:16px;">
+                    <option value="Nie" selected>Nie</option>
+                    <option value="Tak">Tak</option>
+                </select>
+            </div>
         
         <hr style="margin: 15px 0;">
         <h4 style="margin:0 0 10px 0; color:#2e7d32;">Prognozy:</h4>
@@ -18305,7 +18305,7 @@ function populateAndFilterUniversalList() {
          uniClientSearchList.appendChild(emptyInfo);
     }
 }
-    // 5. GŁÓWNA FUNKCJA WYBORU (Routing logiki)
+   // 5. GŁÓWNA FUNKCJA WYBORU (Routing logiki)
     function selectUniversalClient(clientName) {
         if (!activeClientInputTrigger) return;
         
@@ -18314,6 +18314,9 @@ function populateAndFilterUniversalList() {
         
         // B. Zamknij modal
         closeUniversalClientModal();
+
+        // ✅ FIX 3: Wymuś powiadomienie systemu, że pole się zmieniło (Aktywuje to listę krów)
+        activeClientInputTrigger.dispatchEvent(new Event('input', { bubbles: true }));
 
         // C. LOGIKA SPECYFICZNA DLA KONKRETNYCH PÓL
         const triggerId = activeClientInputTrigger.id;
@@ -27129,14 +27132,38 @@ async function toggleSemenStatus(itemId) {
 async function addNewSemen() {
     const input = document.getElementById('newSemenName');
     const name = input.value.trim();
-    if (!name) return alert("Wpisz nazwę nasienia.");
-    if (currentSemenData.pozycje.find(p => p.nazwa.toLowerCase() === name.toLowerCase())) return alert("Ten buhaj jest już wpisany!");
+    if (!name) return alert("Wpisz nazwę nasienia (buhaja).");
 
-    const newItem = { id: 'sem_' + Date.now(), nazwa: name, status: 'ok' };
+    const exists = currentSemenData.pozycje.find(p => p.nazwa.toLowerCase() === name.toLowerCase());
+    if (exists) return alert("Ten buhaj jest już wpisany do magazynu!");
+
+    const newItemId = 'sem_' + Date.now();
+    const newItem = {
+        id: newItemId,
+        nazwa: name,
+        status: 'ok' 
+    };
+
     currentSemenData.pozycje.push(newItem);
     input.value = ''; 
-    await saveSemenDataToDB();
-    if(confirm(`Czy chcesz teraz dodać dane szczegółowe dla buhaja ${name}?`)) openSemenEditModal(newItem.id, newItem.nazwa);
+
+    // ✅ FIX 2: Zapisujemy w tle, bez blokowania ekranu, aby UI pozostał responsywny
+    saveSemenDataToDB(); 
+    if (typeof showToast === 'function') showToast("Dodano nowe nasienie", "success");
+    
+    // ✅ Zapytanie z lekkim opóźnieniem (rozwiązuje problem "wygasania" okna modalnego)
+    setTimeout(() => {
+        if(confirm(`Czy chcesz teraz dodać dane szczegółowe dla buhaja ${name}?`)) {
+            // Bezpośrednio wpisujemy dane do pól modala, aby mieć 100% pewności, że się pojawi
+            document.getElementById('semenEditId').value = newItemId;
+            document.getElementById('semenEditNazwa').value = name;
+            document.getElementById('semenEditNrIdent').value = '';
+            document.getElementById('semenEditNrWet').value = '';
+            document.getElementById('semenEditDataProd').value = '';
+            document.getElementById('semenEditDostawca').value = '';
+            document.getElementById('semenDetailsModal').style.display = 'flex';
+        }
+    }, 150);
 }
 
 async function deleteSemenItem(itemId, itemName) {
@@ -27241,9 +27268,20 @@ let currentSwiData = { nextCounter: 1, currentMonth: 1, currentYear: 2026, initi
 function initSwiadectwoWizard() {
     goToSwiStep(1);
     
-    // Ustaw dzisiejszą datę
-    const today = (typeof getLocalDateString === 'function') ? getLocalDateString() : new Date().toISOString().split('T')[0];
-    document.getElementById('swiDataZabieguInput').value = today;
+    // ✅ FIX 1: Wymuś załadowanie bazy nasienia, jeśli kreator otworzono jako pierwszy
+    if (!currentSemenData || currentSemenData.pozycje.length === 0) {
+        if (typeof loadSemenData === 'function') loadSemenData();
+    }
+
+    // ✅ FIX 4: Zawsze wstawiaj idealnie dzisiejszą datę
+    const dateInput = document.getElementById('swiDataZabieguInput');
+    if (dateInput) {
+        const dzisiaj = new Date();
+        const y = dzisiaj.getFullYear();
+        const m = String(dzisiaj.getMonth() + 1).padStart(2, '0');
+        const d = String(dzisiaj.getDate()).padStart(2, '0');
+        dateInput.value = `${y}-${m}-${d}`;
+    }
     calcSwiDates();
 
     // Wyczyść i podepnij klienta
@@ -27270,8 +27308,9 @@ function initSwiadectwoWizard() {
             }
             populateSwiCowList(val);
         });
-    }
-    refreshSwiSemenList();
+ }
+    // ✅ FIX 1: Małe opóźnienie, by Firebase zdążył załadować buhaje z bazy
+    setTimeout(refreshSwiSemenList, 400); 
 }
 
 // Funkcja pomocnicza: odświeża <select> z buhajami
