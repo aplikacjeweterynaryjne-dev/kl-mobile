@@ -27556,32 +27556,57 @@ function previewSwiadectwo() {
 }
 
 // ✅ NOWA FUNKCJA UNIWERSALNA: Renderuje okno druku 110mm dla dowolnego obiektu danych
+// ✅ FUNKCJA UNIWERSALNA: Renderuje okno druku 110mm z poprawionymi etykietami i datami prognozowanymi
 function renderDirectSwiPrint(d) {
+    // Obliczanie dat prognozowanych na podstawie daty zabiegu
+    const baseD = new Date(d.dataZabiegu);
+    const addDays = (days) => {
+        const nd = new Date(baseD);
+        nd.setDate(nd.getDate() + days);
+        return nd.toLocaleDateString('pl-PL');
+    };
+
+    const progUsg = addDays(35);
+    const progZasuszenie = addDays(225);
+    const progWycielenie = addDays(281);
+
     const html = `
         <h2 style="font-size: 11pt !important; text-align: center; margin-bottom: 5px;">ZAŚWIADCZENIE UNASIENNIANIA KROWY</h2>
         <div style="font-size: 9pt; text-align: center; border-bottom: 2px solid #000; padding-bottom: 5px; margin-bottom: 10px;">NR: <strong>${d.nrDokumentu}</strong></div>
+        
         <h3 style="font-size: 9pt; background: #eee; padding: 3px; border-bottom: 1px solid #000;">POSIADACZ SAMICY</h3>
-        <p style="font-size: 8pt; margin: 2px 0;"><strong>Nazwa:</strong> ${d.klient}</p>
-        <p style="font-size: 8pt; margin: 2px 0;"><strong>Adres:</strong> ${d.klientAdres}</p>
+        <p style="font-size: 8pt; margin: 2px 0;"><strong>Posiadacz samicy:</strong> ${d.klient}</p>
+        <p style="font-size: 8pt; margin: 2px 0;"><strong>Adres gospodarstwa:</strong> ${d.klientAdres}</p>
         <p style="font-size: 8pt; margin: 2px 0;"><strong>Nr stada:</strong> ${d.klientStado}</p>
-        <h3 style="font-size: 9pt; background: #eee; padding: 3px; border-bottom: 1px solid #000; margin-top: 10px;">KROWA</h3>
+        
+        <h3 style="font-size: 9pt; background: #eee; padding: 3px; border-bottom: 1px solid #000; margin-top: 10px;">KROWA (${d.krowaKolczyk})</h3>
+        <p style="font-size: 8pt; margin: 2px 0;"><strong>Nazwa krowy, rasa:</strong> ${d.krowaRasa}</p>
         <p style="font-size: 8pt; margin: 2px 0;"><strong>Nr identyfikacyjny:</strong> ${d.krowaKolczyk}</p>
-        <p style="font-size: 8pt; margin: 2px 0;"><strong>Nazwa, rasa:</strong> ${d.krowaRasa}</p>
         <p style="font-size: 8pt; margin: 2px 0;"><strong>Data ost. wycielenia:</strong> ${d.krowaWycielenie}</p>
+        
         <h3 style="font-size: 9pt; background: #eee; padding: 3px; border-bottom: 1px solid #000; margin-top: 10px;">BUHAJ</h3>
-        <p style="font-size: 8pt; margin: 2px 0;"><strong>Nazwa, rasa:</strong> ${d.buhajNazwa}</p>
-        <p style="font-size: 8pt; margin: 2px 0;"><strong>Nr identyfikacyjny:</strong> ${d.buhajNrIdent}</p>
-        <p style="font-size: 8pt; margin: 2px 0;"><strong>Nr weterynaryjny:</strong> ${d.buhajNrWet}</p>
-        <p style="font-size: 8pt; margin: 2px 0;"><strong>Data produkcji:</strong> ${d.buhajDataProd}</p>
-        <p style="font-size: 8pt; margin: 2px 0;"><strong>Dostawca:</strong> ${d.buhajDostawca}</p>
-        <h3 style="font-size: 9pt; background: #eee; padding: 3px; border-bottom: 1px solid #000; margin-top: 10px;">ZABIEG</h3>
-        <p style="font-size: 8pt; margin: 2px 0;"><strong>Data zabiegu:</strong> ${d.dataZabiegu}</p>
+        <p style="font-size: 8pt; margin: 2px 0;"><strong>Nazwa buhaja, rasa:</strong> ${d.buhajNazwa}</p>
+        <p style="font-size: 8pt; margin: 2px 0;"><strong>Nr identyfikacyjny buhaja:</strong> ${d.buhajNrIdent}</p>
+        <p style="font-size: 8pt; margin: 2px 0;"><strong>Nr weterynaryjny producenta:</strong> ${d.buhajNrWet}</p>
+        <p style="font-size: 8pt; margin: 2px 0;"><strong>Data produkcji nasienia:</strong> ${d.buhajDataProd}</p>
+        <p style="font-size: 8pt; margin: 2px 0;"><strong>Dostawca nasienia:</strong> ${d.buhajDostawca}</p>
+        
+        <h3 style="font-size: 9pt; background: #eee; padding: 3px; border-bottom: 1px solid #000; margin-top: 10px;">ZABIEG (${d.dataZabiegu})</h3>
         <p style="font-size: 8pt; margin: 2px 0;"><strong>Numer zabiegu:</strong> ${d.nrZabiegu}</p>
         <p style="font-size: 8pt; margin: 2px 0;"><strong>Reinseminacja:</strong> ${d.inseminacja}</p>
+        
+        <div style="margin-top: 8px; padding: 5px; border: 1px dashed #999; font-size: 8pt; line-height: 1.4;">
+            <strong>PROGNOZY:</strong><br>
+            🔍 Zalecane USG (+35 dni): <strong>${progUsg}</strong><br>
+            ❄️ Zasuszenie (+225 dni): <strong>${progZasuszenie}</strong><br>
+            🍼 Wycielenie (+281 dni): <strong>${progWycielenie}</strong>
+        </div>
+
         <h3 style="font-size: 9pt; background: #eee; padding: 3px; border-bottom: 1px solid #000; margin-top: 10px;">INSEMINATOR / LEKARZ</h3>
         <p style="font-size: 8pt; margin: 2px 0;"><strong>Wystawił:</strong> ${d.vetNazwisko}</p>
         <p style="font-size: 8pt; margin: 2px 0;"><strong>Lecznica:</strong> ${d.vetLecznica}</p>
         <p style="font-size: 8pt; margin: 2px 0;"><strong>Telefon:</strong> ${d.vetTel}</p>
+        
         <div style="margin-top: 30px; text-align: right; border-top: 1px dotted #000; padding-top: 5px;">
             <p style="font-size: 7pt; font-style: italic;">Podpis Lekarza/Inseminatora</p>
         </div>
@@ -27596,7 +27621,7 @@ function renderDirectSwiPrint(d) {
         .receipt-page { width: 80mm; max-width:80mm; padding: 2mm; box-sizing: border-box; }
         @media print { body { display: block !important; } .print-controls { display: none !important; } .receipt-page { width: 80mm !important; } @page { size: 110mm auto; margin: 0; } }
         </style></head><body>
-        <div class="print-controls"><button onclick="window.print()">🖨️ Drukuj (80/110mm)</button></div>
+        <div class="print-controls"><button onclick="window.print()">🖨️ Drukuj (110mm)</button></div>
         <div class="receipt-page">${html}</div>
         </body></html>
     `);
