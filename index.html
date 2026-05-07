@@ -3141,7 +3141,8 @@ background-color: #eef;
   <h2 style="font-size: 24px; color: #333; margin-bottom: 25px;">Menu Główne</h2>
   <button id="menuKalendarzBtn" class="menu-btn">🗓️ Kalendarz wizyt</button>
   <button id="menuKartaBtn" class="menu-btn">📝 Generator kart leczenia</button>
-  <button id="menuKalkulatorBtn" class="menu-btn">🧮 Kalkulator wizyty</button>
+<button id="menuKalkulatorBtn" class="menu-btn">🧮 Kalkulator wizyty</button>
+  <button id="menuSwiadectwoBtn" class="menu-btn">🐮 Świadectwo inseminacji</button>
 
   <button id="menuBazaBtn" class="menu-btn">🗃️ Baza</button>
 <div id="bazaSubMenu" style="display: none; width: 90%; max-width: 400px; margin-top: -10px; margin-bottom: 10px;">
@@ -3154,9 +3155,10 @@ background-color: #eef;
   <button id="menuRaportyBtn" class="menu-btn">📊 Raporty</button>
   <button id="menuAnalizaBtn" class="menu-btn" style="background-color: #f0f4c3; border-color: #dce775;">📈 Analiza i Statystyki</button>
   <button id="menuArchiwumBtn" class="menu-btn">🗄️ Archiwum</button>
-  <div id="archiwumSubMenu" style="display: none; width: 90%; max-width: 400px; margin-top: -10px; margin-bottom: 10px;">
+ <div id="archiwumSubMenu" style="display: none; width: 90%; max-width: 400px; margin-top: -10px; margin-bottom: 10px;">
     <button id="menuArchiwumKartyBtn" class="submenu-btn">📄 Karty leczenia</button>
     <button id="menuArchiwumParagonyBtn" class="submenu-btn">🧾 Paragony</button>
+    <button id="menuArchiwumSwiadectwaBtn" class="submenu-btn">📜 Świadectwa inseminacji</button>
   </div>
   <button id="menuKonfiguracjaBtn" class="menu-btn">⚙️ Konfiguracja programu</button>
   <button id="menuSpolecznoscBtn" class="menu-btn" style="background-color: #e3f2fd; border-color: #bbdefb;">💬 Komunikator & Baza Wiedzy</button>
@@ -3205,6 +3207,7 @@ background-color: #eef;
 <button id="tabKalendarzBtn" class="btn">🗓️ Kalendarz</button>
 <button id="tabKartaBtn" class="btn primary">📝 Karta</button>
 <button id="tabKalkulatorBtn" class="btn">🧮 Kalkulator</button>
+<button id="tabSwiadectwoBtn" class="btn">🐮 Świadectwo</button>
 <button id="tabBazaKlientowBtn" class="btn">👥 Klienci</button>
 <button id="tabBazaProduktowBtn" class="btn">📦 Produkty</button>
 <button id="tabSchematyLeczeniaBtn" class="btn">⚕️ Schematy</button>
@@ -3305,7 +3308,158 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
 <button id="correctionModeBtn" class="btn warn" style="background-color: #f39c12; border-color: #e67e22; color: white;">🛠️ Tryb Korekty</button>
 <button id="printBtn" class="btn">Drukuj / Zapisz PDF</button>
 </div>
+<div class="form-row">
+        <label>1. Nazwa buhaja, rasa</label>
+        <input type="text" id="semenEditNazwa" placeholder="np. MAX (HO)">
+    </div>
+    <div class="form-row">
+        <label>2. Numer identyfikacyjny buhaja</label>
+        <input type="text" id="semenEditNrIdent" placeholder="np. PL123456789">
+    </div>
+    <div class="form-row">
+        <label>3. Numer weterynaryjny producenta</label>
+        <input type="text" id="semenEditNrWet" placeholder="np. PL123456789WE">
+    </div>
+    <div class="form-row">
+        <label>4. Data produkcji nasienia</label>
+        <input type="date" id="semenEditDataProd">
+    </div>
+    <div class="form-row">
+        <label>5. Dostawca nasienia</label>
+        <input type="text" id="semenEditDostawca" placeholder="np. SHiUZ Bydgoszcz">
+    </div>
 
+    <div class="form-actions" style="margin-top: 20px; justify-content: space-between;">
+        <button class="btn ghost" onclick="document.getElementById('semenDetailsModal').style.display='none'">Anuluj</button>
+        <button class="btn primary" onclick="saveSemenDetails()">💾 Zapisz dane</button>
+    </div>
+</div>
+<div class="calc-steps-nav">
+    <div class="step-indicator active" id="indSwi1">1. Posiadacz</div>
+    <div class="step-indicator" id="indSwi2">2. Krowa</div>
+    <div class="step-indicator" id="indSwi3">3. Buhaj</div>
+    <div class="step-indicator" id="indSwi4">4. Zabieg</div>
+    <div class="step-indicator" id="indSwi5">5. Finał</div>
+</div>
+
+<div id="swiStep1" class="calc-step active">
+    <div style="background: #f7f7f7; padding: 15px; border-radius: 8px; border: 1px solid #eee;">
+        <div class="form-row">
+            <label>Klient (Posiadacz samicy):</label>
+            <input type="text" id="swiKlientInput" list="klientList" placeholder="Kliknij, aby wybrać..." readonly style="cursor: pointer; background: #fff;">
+        </div>
+        <div style="font-size: 14px; color: #555; margin-top: 10px;">
+            Adres: <b id="swiKlientAdres">...</b><br>
+            Nr stada: <b id="swiKlientStado">...</b>
+        </div>
+    </div>
+    <div class="step-actions" style="text-align: right; margin-top: 20px;">
+        <button class="btn primary" onclick="goToSwiStep(2)">Dalej ➜</button>
+    </div>
+</div>
+
+<div id="swiStep2" class="calc-step">
+    <div style="background: #f0f8ff; padding: 15px; border-radius: 8px; border: 1px solid #bcd;">
+        <div class="form-row">
+            <label>Nr kolczyka krowy:</label>
+            <input type="text" id="swiKolczykInput" list="swiKolczykiList" placeholder="Wybierz z listy lub wpisz...">
+            <datalist id="swiKolczykiList"></datalist>
+        </div>
+        <div class="form-row">
+            <label>Nazwa krowy, rasa:</label>
+            <input type="text" id="swiNazwaRasaInput" placeholder="np. Krasula (HO)">
+        </div>
+        <div class="form-row">
+            <label>Data ostatniego wycielenia:</label>
+            <input type="date" id="swiOstWycielenieInput">
+        </div>
+    </div>
+    <div class="step-actions" style="display: flex; justify-content: space-between; margin-top: 20px;">
+        <button class="btn ghost" onclick="goToSwiStep(1)">⬅ Wróć</button>
+        <button class="btn primary" onclick="goToSwiStep(3)">Dalej ➜</button>
+    </div>
+</div>
+
+<div id="swiStep3" class="calc-step">
+    <div style="background: #fff3e0; padding: 15px; border-radius: 8px; border: 1px solid #ffe0b2;">
+        <div class="form-row">
+            <label>Wybierz nasienie z magazynu:</label>
+            <select id="swiBuhajSelect" style="width:100%; padding:8px; font-size:16px;">
+                <option value="">-- Wybierz buhaja --</option>
+            </select>
+        </div>
+        <hr style="margin: 15px 0;">
+        <div class="form-row"><label>Nazwa buhaja, rasa</label><input type="text" id="swiBuhajNazwa"></div>
+        <div class="form-row"><label>Numer identyfikacyjny</label><input type="text" id="swiBuhajNrIdent"></div>
+        <div class="form-row"><label>Numer weterynaryjny prod.</label><input type="text" id="swiBuhajNrWet"></div>
+        <div class="form-row"><label>Data produkcji nasienia</label><input type="date" id="swiBuhajDataProd"></div>
+        <div class="form-row"><label>Dostawca nasienia</label><input type="text" id="swiBuhajDostawca"></div>
+    </div>
+    <div class="step-actions" style="display: flex; justify-content: space-between; margin-top: 20px;">
+        <button class="btn ghost" onclick="goToSwiStep(2)">⬅ Wróć</button>
+        <button class="btn primary" onclick="goToSwiStep(4)">Dalej ➜</button>
+    </div>
+</div>
+
+<div id="swiStep4" class="calc-step">
+    <div style="background: #e8f5e9; padding: 15px; border-radius: 8px; border: 1px solid #c8e6c9;">
+        <div class="form-row">
+            <label>Data zabiegu:</label>
+            <input type="date" id="swiDataZabieguInput" onchange="calcSwiDates()">
+        </div>
+        <div class="form-row">
+            <label>Numer zabiegu:</label>
+            <div style="display: flex; gap: 10px; align-items: center;">
+                <select id="swiNrZabieguSelect" style="flex:1; padding:8px; font-size:16px; font-weight:bold;">
+                    <option value="1">1</option>
+                    <option value="2">2</option>
+                    <option value="3">3 i kolejne</option>
+                </select>
+                <button class="btn small" onclick="autoCalcZabieg()" title="Oblicz na podst. archiwum" style="background:#27ae60; color:white;">🔄 Automat</button>
+            </div>
+            <small style="color:#666;">Automat szuka kryć tej krowy (ost. 180 dni).</small>
+        </div>
+        <div class="form-row">
+            <label>Inseminacja:</label>
+            <select id="swiInseminacjaSelect" style="width:100%; padding:8px; font-size:16px;">
+                <option value="Nie" selected>Nie</option>
+                <option value="Tak">Tak</option>
+            </select>
+        </div>
+        
+        <hr style="margin: 15px 0;">
+        <h4 style="margin:0 0 10px 0; color:#2e7d32;">Prognozy:</h4>
+        <div style="font-size: 15px; line-height: 1.6;">
+            🔍 USG (+35 dni): <b id="swiProgUsg">...</b><br>
+            ❄️ Zasuszenie (+225 dni): <b id="swiProgZasuszenie">...</b><br>
+            🍼 Wycielenie (+281 dni): <b id="swiProgWycielenie">...</b>
+        </div>
+    </div>
+    <div class="step-actions" style="display: flex; justify-content: space-between; margin-top: 20px;">
+        <button class="btn ghost" onclick="goToSwiStep(3)">⬅ Wróć</button>
+        <button class="btn primary" onclick="goToSwiStep(5)">Podsumowanie ➜</button>
+    </div>
+</div>
+
+<div id="swiStep5" class="calc-step">
+    <h3 style="text-align: center;">Podsumowanie</h3>
+    <div style="background: #fdfdfd; padding: 15px; border-radius: 8px; border: 1px solid #ccc; text-align: center;">
+        <div style="font-size: 14px; color: #555;">Nr Zaświadczenia:</div>
+        <div id="swiNrDokumentuDisplay" style="font-size: 22px; font-weight: 800; color: #2c3e50; margin: 10px 0;">GENEROWANIE...</div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 20px;">
+        <button class="btn" style="width: 100%; background: #dcdcdc; font-size: 18px; padding: 10px;" onclick="previewSwiadectwo()">
+            🧾 Podgląd (Wydruk 110mm)
+        </button>
+        <button class="btn primary" style="width: 100%; font-size: 22px; padding: 15px;" onclick="saveSwiadectwo()">
+            💾 ZAPISZ W ARCHIWUM
+        </button>
+    </div>
+    <div class="step-actions" style="text-align: left; margin-top: 20px;">
+        <button class="btn ghost" onclick="goToSwiStep(4)">⬅ Wróć do edycji</button>
+    </div>
+</div>
 <!-- fullscreen overlay for signature -->
 <div class="fullscreen-overlay" id="fullscreenOverlay">
 <canvas id="fullscreenCanvas" class="fullscreen-canvas"></canvas>
@@ -7452,6 +7606,11 @@ const mainTabBar = document.getElementById('mainTabBar');
 
 const menuKartaBtn = document.getElementById('menuKartaBtn');
 const menuKalkulatorBtn = document.getElementById('menuKalkulatorBtn');
+const menuSwiadectwoBtn = document.getElementById('menuSwiadectwoBtn');
+const tabSwiadectwoBtn = document.getElementById('tabSwiadectwoBtn');
+const swiadectwoSection = document.getElementById('swiadectwoSection');
+const menuArchiwumSwiadectwaBtn = document.getElementById('menuArchiwumSwiadectwaBtn');
+const archiwumSwiadectwaSection = document.getElementById('archiwumSwiadectwaSection');
 const menuBazaBtn = document.getElementById('menuBazaBtn');
 const bazaSubMenu = document.getElementById('bazaSubMenu');
 const menuBazaKlientowBtn = document.getElementById('menuBazaKlientowBtn');
@@ -7713,6 +7872,8 @@ if (mainTabBar) mainTabBar.style.display = 'flex'; // Używamy flex dla poprawne
 if (konfiguracjaSection) konfiguracjaSection.style.display = 'none';
 if (archiwumKartySection) archiwumKartySection.style.display = 'none'; // ✅ DODANE
 if (archiwumParagonySection) archiwumParagonySection.style.display = 'none'; // ✅ DODANE
+if (swiadectwoSection) swiadectwoSection.style.display = 'none';
+if (archiwumSwiadectwaSection) archiwumSwiadectwaSection.style.display = 'none';
 if (raportySection) raportySection.style.display = 'none';
 if (kalendarzWizytSection) kalendarzWizytSection.style.display = 'none'; // ✅ DODANA LINIA
 if (bazaSchematowSection) bazaSchematowSection.style.display = 'none'; // <-- ✅ DODAJ TĘ LINIĘ
@@ -7725,8 +7886,9 @@ if (typeof analizaSection !== 'undefined') analizaSection.style.display = 'none'
   if (tabKartaBtn) tabKartaBtn.classList.remove('primary');
   if (tabKalkulatorBtn) tabKalkulatorBtn.classList.remove('primary');
   if (tabBazaKlientowBtn) tabBazaKlientowBtn.classList.remove('primary'); 
-  if (tabBazaProduktowBtn) tabBazaProduktowBtn.classList.remove('primary'); 
+ if (tabBazaProduktowBtn) tabBazaProduktowBtn.classList.remove('primary'); 
   if (tabKalendarzBtn) tabKalendarzBtn.classList.remove('primary'); // ✅ DODANA LINIA
+  if (tabSwiadectwoBtn) tabSwiadectwoBtn.classList.remove('primary');
   if (tabSchematyLeczeniaBtn) tabSchematyLeczeniaBtn.classList.remove('primary'); // <-- ✅ DODAJ TĘ LINIĘ
 if (tabMojMagazynBtn) tabMojMagazynBtn.classList.remove('primary'); // ✅ MODUŁ 4: Dodaj tę linię
   if (tabZarzadzanieMagazynamiBtn) tabZarzadzanieMagazynamiBtn.classList.remove('primary');
@@ -7846,6 +8008,15 @@ loadArchiveReceiptUsers();
       // (nie ma zakładki do podświetlenia)
       onShowRaporty(); // Wywołaj funkcję inicjującą
   }
+      else if (sectionToShow === 'swiadectwo' && swiadectwoSection) {
+      swiadectwoSection.style.display = 'block';
+      if (tabSwiadectwoBtn) tabSwiadectwoBtn.classList.add('primary');
+      if (typeof initSwiadectwoWizard === 'function') initSwiadectwoWizard();
+  }
+  else if (sectionToShow === 'archiwumSwiadectwa' && archiwumSwiadectwaSection) {
+      archiwumSwiadectwaSection.style.display = 'block';
+      if (typeof loadArchiwumSwiadectw === 'function') loadArchiwumSwiadectw();
+  }
 // ✅ NOWA LOGIKA DLA ANALIZY
   else if (sectionToShow === 'analiza' && typeof analizaSection !== 'undefined') {
       analizaSection.style.display = 'block';
@@ -7945,7 +8116,19 @@ menuKalkulatorBtn.addEventListener('click', () => {
 showSection('kalkulator');
 });
 }
-
+// --- Przycisk Menu: Świadectwo ---
+if (menuSwiadectwoBtn) {
+    menuSwiadectwoBtn.addEventListener('click', () => showSection('swiadectwo'));
+}
+if (tabSwiadectwoBtn) {
+    tabSwiadectwoBtn.addEventListener('click', () => {
+        if (typeof confirmOnTabChange === 'function' && !confirmOnTabChange()) return;
+        showSection('swiadectwo');
+    });
+}
+if (menuArchiwumSwiadectwaBtn) {
+    menuArchiwumSwiadectwaBtn.addEventListener('click', () => showSection('archiwumSwiadectwa'));
+}
 // --- Przycisk Menu: Baza (pokazuje podmenu) ---
 if (menuBazaBtn) {
 menuBazaBtn.addEventListener('click', () => {
@@ -27277,6 +27460,551 @@ if (rozliczBtnRef) {
         }, 1500); // Małe opóźnienie, by dać czas na zapis w bazie (z batcha Firebase)
     });
 }
+    /* ======================================================== */
+/* ✅ MODUŁ: MAGAZYN NASIENIA + KARTA NASIENIA              */
+/* ======================================================== */
+
+// Jeśli nie masz jeszcze w kodzie stylów magazynu, wstrzykujemy je
+const semenStyles = document.createElement('style');
+semenStyles.innerHTML = `
+.semen-grid-layout { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 15px; margin-bottom: 20px; }
+.semen-tile { position: relative; padding: 15px 10px; border-radius: 8px; text-align: center; font-weight: bold; font-size: 15px; cursor: pointer; user-select: none; box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: transform 0.1s; display: flex; align-items: center; justify-content: center; min-height: 80px; word-break: break-word; }
+.semen-tile:active { transform: scale(0.95); }
+.semen-tile.status-ok { background-color: #ffffff; border: 3px solid #bdc3c7; color: #2c3e50; }
+.semen-tile.status-low { background-color: #f39c12; border: 3px solid #e67e22; color: #ffffff; }
+.semen-tile.status-empty { background-color: #e74c3c; border: 3px solid #c0392b; color: #ffffff; }
+.semen-tile.status-ordered { background-color: #2ecc71; border: 3px solid #27ae60; color: #ffffff; }
+.semen-delete-btn { position: absolute; top: -8px; right: -8px; background: #333; color: white; border-radius: 50%; width: 24px; height: 24px; font-size: 12px; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 2px solid #fff; }
+`;
+document.head.appendChild(semenStyles);
+
+let currentSemenData = { telefon: "", pozycje: [] };
+let unsubscribeSemen = null;
+
+// WAŻNE: Funkcja loadSemenData musi być wywołana, gdy wchodzisz w Magazyn Nasienia
+// Upewnij się, że w showSection podpiąłeś uruchamianie tej funkcji.
+function loadSemenData() {
+    const clinicId = currentUserProfile ? currentUserProfile['ID lecznicy'] : null;
+    if (!clinicId) return;
+    if (unsubscribeSemen) unsubscribeSemen(); 
+
+    unsubscribeSemen = db.collection('nasienie_magazyn').doc(clinicId).onSnapshot(doc => {
+        if (doc.exists) {
+            currentSemenData = doc.data();
+            if (!currentSemenData.pozycje) currentSemenData.pozycje = [];
+        } else {
+            currentSemenData = { telefon: "", pozycje: [] };
+        }
+        const phoneInput = document.getElementById('semenPhoneInput');
+        if (phoneInput && document.activeElement !== phoneInput) phoneInput.value = currentSemenData.telefon || "";
+        renderSemenGrid();
+        
+        // Odśwież też selecta w Świadectwach, jeśli jest otwarty
+        if(document.getElementById('swiBuhajSelect')) refreshSwiSemenList();
+    });
+}
+
+function renderSemenGrid() {
+    const grid = document.getElementById('semenGridContainer');
+    if (!grid) return;
+    grid.innerHTML = '';
+    if (currentSemenData.pozycje.length === 0) return grid.innerHTML = '<div style="grid-column: 1 / -1; text-align:center; padding: 20px; color:#7f8c8d;">Brak nasienia. Dodaj pierwszego buhaja u góry.</div>';
+
+    const sorted = [...currentSemenData.pozycje].sort((a,b) => a.nazwa.localeCompare(b.nazwa));
+    sorted.forEach(item => {
+        const tile = document.createElement('div');
+        tile.className = `semen-tile status-${item.status}`;
+        tile.innerHTML = `${item.nazwa}<div class="semen-delete-btn" title="Usuń buhaja">✕</div>`;
+        
+        tile.querySelector('.semen-delete-btn').addEventListener('click', (e) => { e.stopPropagation(); deleteSemenItem(item.id, item.nazwa); });
+        tile.addEventListener('click', () => { toggleSemenStatus(item.id); });
+        grid.appendChild(tile);
+    });
+}
+
+async function toggleSemenStatus(itemId) {
+    const item = currentSemenData.pozycje.find(p => p.id === itemId);
+    if (!item) return;
+    if (item.status === 'ok') item.status = 'low';
+    else if (item.status === 'low') item.status = 'empty';
+    else if (item.status === 'empty') item.status = 'ordered';
+    else item.status = 'ok';
+    await saveSemenDataToDB();
+}
+
+async function addNewSemen() {
+    const input = document.getElementById('newSemenName');
+    const name = input.value.trim();
+    if (!name) return alert("Wpisz nazwę nasienia.");
+    if (currentSemenData.pozycje.find(p => p.nazwa.toLowerCase() === name.toLowerCase())) return alert("Ten buhaj jest już wpisany!");
+
+    const newItem = { id: 'sem_' + Date.now(), nazwa: name, status: 'ok' };
+    currentSemenData.pozycje.push(newItem);
+    input.value = ''; 
+    await saveSemenDataToDB();
+    if(confirm(`Czy chcesz teraz dodać dane szczegółowe dla buhaja ${name}?`)) openSemenEditModal(newItem.id, newItem.nazwa);
+}
+
+async function deleteSemenItem(itemId, itemName) {
+    if (!confirm(`Czy na pewno usunąć "${itemName}" z magazynu?`)) return;
+    currentSemenData.pozycje = currentSemenData.pozycje.filter(p => p.id !== itemId);
+    await saveSemenDataToDB();
+}
+
+async function saveSemenPhone() {
+    currentSemenData.telefon = document.getElementById('semenPhoneInput').value.trim();
+    await saveSemenDataToDB();
+}
+
+async function resetAllSemenStatus() {
+    if (currentSemenData.pozycje.length === 0) return;
+    if (!confirm("Czy wszystkie stany zostały uzupełnione? Zmienię kolory wszystkich na białe.")) return;
+    currentSemenData.pozycje.forEach(p => p.status = 'ok');
+    await saveSemenDataToDB();
+}
+
+async function sendSemenOrderSMS() {
+    let phone = currentSemenData.telefon;
+    if (!phone) return alert("Najpierw wpisz i zapisz numer telefonu na samej górze!");
+    phone = phone.replace(/[^0-9+]/g, '');
+
+    const braki = currentSemenData.pozycje.filter(p => p.status === 'empty');
+    const koncowki = currentSemenData.pozycje.filter(p => p.status === 'low');
+    if (braki.length === 0 && koncowki.length === 0) return alert("Nie ma czego zamawiać.");
+
+    let smsBody = `Zamówienie nasienia\n\n`;
+    if (braki.length > 0) {
+        smsBody += `🔴 BRAKI:\n`;
+        braki.forEach(b => { smsBody += `- ${b.nazwa}\n`; });
+    }
+    if (koncowki.length > 0) {
+        smsBody += `\n🟠 KOŃCÓWKI:\n`;
+        koncowki.forEach(k => { smsBody += `- ${k.nazwa}\n`; });
+    }
+
+    let zaktualizowano = false;
+    currentSemenData.pozycje.forEach(p => {
+        if (p.status === 'empty' || p.status === 'low') { p.status = 'ordered'; zaktualizowano = true; }
+    });
+    if (zaktualizowano) await saveSemenDataToDB();
+
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    window.location.href = `sms:${phone}${isIOS ? '&' : '?'}body=${encodeURIComponent(smsBody)}`;
+}
+
+async function saveSemenDataToDB() {
+    const clinicId = currentUserProfile ? currentUserProfile['ID lecznicy'] : null;
+    if (!clinicId) return;
+    try { await db.collection('nasienie_magazyn').doc(clinicId).set(currentSemenData); } 
+    catch (e) { console.error(e); }
+}
+
+// Karta Edycji Nasienia (Wywoływane guzikiem "Edytuj dane nasienia" z HTML)
+function openSemenDetailsList() {
+    if (currentSemenData.pozycje.length === 0) return alert("Brak nasienia w bazie.");
+    let text = "Wpisz NUMER buhaja do edycji:\n\n";
+    currentSemenData.pozycje.forEach((p, idx) => { text += `${idx + 1}. ${p.nazwa}\n`; });
+    const choice = prompt(text);
+    if (!choice) return;
+    const idx = parseInt(choice) - 1;
+    if (idx >= 0 && idx < currentSemenData.pozycje.length) openSemenEditModal(currentSemenData.pozycje[idx].id, currentSemenData.pozycje[idx].nazwa);
+    else alert("Niepoprawny numer.");
+}
+
+function openSemenEditModal(id, nazwa) {
+    const item = currentSemenData.pozycje.find(p => p.id === id);
+    if(!item) return;
+    document.getElementById('semenEditId').value = id;
+    document.getElementById('semenEditNazwa').value = item.rasa_nazwa || nazwa;
+    document.getElementById('semenEditNrIdent').value = item.nr_ident || '';
+    document.getElementById('semenEditNrWet').value = item.nr_wet || '';
+    document.getElementById('semenEditDataProd').value = item.data_prod || '';
+    document.getElementById('semenEditDostawca').value = item.dostawca || '';
+    document.getElementById('semenDetailsModal').style.display = 'flex';
+}
+
+async function saveSemenDetails() {
+    const id = document.getElementById('semenEditId').value;
+    const item = currentSemenData.pozycje.find(p => p.id === id);
+    if(!item) return;
+    item.rasa_nazwa = document.getElementById('semenEditNazwa').value.trim();
+    item.nr_ident = document.getElementById('semenEditNrIdent').value.trim();
+    item.nr_wet = document.getElementById('semenEditNrWet').value.trim();
+    item.data_prod = document.getElementById('semenEditDataProd').value;
+    item.dostawca = document.getElementById('semenEditDostawca').value.trim();
+    await saveSemenDataToDB();
+    document.getElementById('semenDetailsModal').style.display = 'none';
+    showToast("Dane zapisane.", "success");
+}
+
+
+/* ======================================================== */
+/* ✅ MODUŁ: ŚWIADECTWA INSEMINACJI (WIZARD + ARCHIWUM)     */
+/* ======================================================== */
+
+let currentSwiData = { nextCounter: 1, currentMonth: 1, currentYear: 2026, initials: "" };
+
+function initSwiadectwoWizard() {
+    goToSwiStep(1);
+    
+    // Ustaw dzisiejszą datę
+    const today = (typeof getLocalDateString === 'function') ? getLocalDateString() : new Date().toISOString().split('T')[0];
+    document.getElementById('swiDataZabieguInput').value = today;
+    calcSwiDates();
+
+    // Wyczyść i podepnij klienta
+    const klientInp = document.getElementById('swiKlientInput');
+    if(klientInp) {
+        klientInp.value = '';
+        document.getElementById('swiKlientAdres').textContent = "...";
+        document.getElementById('swiKlientStado').textContent = "...";
+
+        // Używamy globalnego modala klientów z Karty Leczenia
+        klientInp.onclick = (e) => { e.preventDefault(); openUniversalClientModal(klientInp); };
+        
+        // Nasłuchiwanie na zmianę klienta (żeby załadować listę kolczyków)
+        klientInp.addEventListener('input', () => {
+            const val = klientInp.value;
+            // Zaciągnij adres i nr stada z opcji (podobnie jak w Kalkulatorze)
+            const dlist = document.getElementById('klientList');
+            if(dlist) {
+                const opt = Array.from(dlist.options).find(o => o.value === val);
+                if(opt) {
+                    document.getElementById('swiKlientAdres').textContent = opt.dataset.adres || 'Brak';
+                    document.getElementById('swiKlientStado').textContent = opt.dataset.nrstada || 'Brak';
+                }
+            }
+            populateSwiCowList(val);
+        });
+    }
+    refreshSwiSemenList();
+}
+
+// Funkcja pomocnicza: odświeża <select> z buhajami
+function refreshSwiSemenList() {
+    const buhajSelect = document.getElementById('swiBuhajSelect');
+    if(!buhajSelect) return;
+    buhajSelect.innerHTML = '<option value="">-- Wybierz buhaja z magazynu --</option>';
+    if (currentSemenData && currentSemenData.pozycje) {
+        currentSemenData.pozycje.forEach(p => {
+            buhajSelect.add(new Option(p.nazwa, p.id));
+        });
+    }
+    buhajSelect.onchange = () => {
+        const item = currentSemenData.pozycje.find(x => x.id === buhajSelect.value);
+        if(item) {
+            document.getElementById('swiBuhajNazwa').value = item.rasa_nazwa || item.nazwa;
+            document.getElementById('swiBuhajNrIdent').value = item.nr_ident || '';
+            document.getElementById('swiBuhajNrWet').value = item.nr_wet || '';
+            document.getElementById('swiBuhajDataProd').value = item.data_prod || '';
+            document.getElementById('swiBuhajDostawca').value = item.dostawca || '';
+        }
+    };
+}
+
+function goToSwiStep(stepNum) {
+    for(let i=1; i<=5; i++) {
+        document.getElementById('swiStep'+i).classList.remove('active');
+        document.getElementById('indSwi'+i).classList.remove('active');
+    }
+    document.getElementById('swiStep'+stepNum).classList.add('active');
+    document.getElementById('indSwi'+stepNum).classList.add('active');
+
+    if(stepNum === 5) generateSwiNumber();
+}
+
+async function populateSwiCowList(clientName) {
+    const dataList = document.getElementById('swiKolczykiList');
+    dataList.innerHTML = '';
+    if(!clientName) return;
+
+    try {
+        // Pobieramy kolczyki z archiwalnych kart (z kolumny "Opis")
+        const q = db.collection("archiwumKarty").where("klient_nazwa", "==", clientName).orderBy("dataWykonania", "desc").limit(30);
+        const snap = await q.get();
+        const tags = new Set();
+        snap.docs.forEach(doc => {
+            const d = doc.data();
+            if(d.table) {
+                d.table.forEach(r => {
+                    const opis = r.opis || '';
+                    if(opis && opis !== '---') tags.add(opis); 
+                });
+            }
+        });
+        tags.forEach(t => { dataList.appendChild(new Option(t, t)); });
+    } catch(e) { console.error("Błąd pobierania kolczyków:", e); }
+}
+
+function calcSwiDates() {
+    const dStr = document.getElementById('swiDataZabieguInput').value;
+    if(!dStr) return;
+    const baseD = new Date(dStr);
+    
+    const addD = (days) => {
+        const nd = new Date(baseD);
+        nd.setDate(nd.getDate() + days);
+        return nd.toLocaleDateString('pl-PL');
+    };
+
+    document.getElementById('swiProgUsg').textContent = addD(35);
+    document.getElementById('swiProgZasuszenie').textContent = addD(225);
+    document.getElementById('swiProgWycielenie').textContent = addD(281);
+}
+
+// 🔄 Automat Obliczający Nr Zabiegu (Zależnie od historii w Archiwum Świadectw)
+async function autoCalcZabieg() {
+    const kolczyk = document.getElementById('swiKolczykInput').value.trim();
+    if(!kolczyk) return alert("Wpisz najpierw numer kolczyka krowy w kroku 2!");
+
+    const dStr = document.getElementById('swiDataZabieguInput').value;
+    const baseD = new Date(dStr);
+    baseD.setDate(baseD.getDate() - 180); 
+    const limitDateStr = baseD.toISOString().split('T')[0];
+
+    try {
+        const q = db.collection("archiwumSwiadectwa")
+                    .where("krowaKolczyk", "==", kolczyk)
+                    .where("dataZabiegu", ">=", limitDateStr);
+        
+        const snap = await q.get();
+        const count = snap.size; 
+        
+        const select = document.getElementById('swiNrZabieguSelect');
+        if(count === 0) select.value = "1";
+        else if (count === 1) select.value = "2";
+        else select.value = "3";
+        
+        showToast(`Znaleziono ${count} zabiegów w ost. 180 dniach. Ustawiono nr zabiegu na ${select.value}.`, "success");
+    } catch(e) {
+        console.error(e);
+        showToast("Błąd bazy danych przy wyszukiwaniu.", "error");
+    }
+}
+
+async function generateSwiNumber() {
+    const d = new Date();
+    currentSwiData.currentMonth = d.getMonth() + 1;
+    currentSwiData.currentYear = d.getFullYear();
+    currentSwiData.initials = currentUserProfile.Inicjaly || 'NN';
+
+    try {
+        const q = db.collection("archiwumSwiadectwa")
+            .where("lekarz_uid", "==", currentUserProfile.uid)
+            .where("rok", "==", currentSwiData.currentYear)
+            .where("miesiac", "==", currentSwiData.currentMonth)
+            .orderBy("counter", "desc").limit(1);
+
+        const snapshot = await q.get();
+        if (snapshot.empty) currentSwiData.nextCounter = 1;
+        else currentSwiData.nextCounter = snapshot.docs[0].data().counter + 1;
+
+        const nr = `SWI-${currentSwiData.nextCounter}/${currentSwiData.currentMonth}/${currentSwiData.currentYear}/${currentSwiData.initials}`;
+        document.getElementById('swiNrDokumentuDisplay').textContent = nr;
+
+    } catch(e) {
+        document.getElementById('swiNrDokumentuDisplay').textContent = `SWI-X/${currentSwiData.currentMonth}/${currentSwiData.currentYear}`;
+        console.warn("Brak indeksu dla archiwumSwiadectwa (lekarz_uid, rok, miesiac, counter)");
+    }
+}
+
+async function saveSwiadectwo() {
+    const nrDok = document.getElementById('swiNrDokumentuDisplay').textContent;
+    if(nrDok.includes("X") || nrDok.includes("GENEROWANIE")) return alert("Błąd numeru, nie można zapisać.");
+
+    const dataObj = {
+        nrDokumentu: nrDok,
+        lekarz_uid: currentUserProfile.uid,
+        lekarz_nazwisko: `${currentUserProfile.Imie} ${currentUserProfile.Nazwisko}`,
+        id_lecznicy: currentUserProfile['ID lecznicy'],
+        rok: currentSwiData.currentYear,
+        miesiac: currentSwiData.currentMonth,
+        counter: currentSwiData.nextCounter,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        
+        klient: document.getElementById('swiKlientInput').value,
+        klientAdres: document.getElementById('swiKlientAdres').textContent,
+        klientStado: document.getElementById('swiKlientStado').textContent,
+        
+        krowaKolczyk: document.getElementById('swiKolczykInput').value,
+        krowaRasa: document.getElementById('swiNazwaRasaInput').value,
+        krowaWycielenie: document.getElementById('swiOstWycielenieInput').value,
+        
+        buhajNazwa: document.getElementById('swiBuhajNazwa').value,
+        buhajNrIdent: document.getElementById('swiBuhajNrIdent').value,
+        buhajNrWet: document.getElementById('swiBuhajNrWet').value,
+        buhajDataProd: document.getElementById('swiBuhajDataProd').value,
+        buhajDostawca: document.getElementById('swiBuhajDostawca').value,
+
+        nrZabiegu: document.getElementById('swiNrZabieguSelect').value,
+        dataZabiegu: document.getElementById('swiDataZabieguInput').value,
+        inseminacjaTakNie: document.getElementById('swiInseminacjaSelect').value
+    };
+
+    try {
+        await db.collection("archiwumSwiadectwa").add(dataObj);
+        showToast("Świadectwo zapisane pomyślnie!", "success");
+        initSwiadectwoWizard(); // Reset po sukcesie
+    } catch(e) {
+        alert("Błąd zapisu! Sprawdź reguły Firebase.");
+        console.error(e);
+    }
+}
+
+// 🖨️ DRUKOWANIE ŚWIADECTWA (Stylizowane na Paragon Termiczny)
+function previewSwiadectwo() {
+    const d = {
+        nrDokumentu: document.getElementById('swiNrDokumentuDisplay').textContent,
+        klient: document.getElementById('swiKlientInput').value,
+        klientAdres: document.getElementById('swiKlientAdres').textContent,
+        klientStado: document.getElementById('swiKlientStado').textContent,
+        
+        krowaKolczyk: document.getElementById('swiKolczykInput').value,
+        krowaRasa: document.getElementById('swiNazwaRasaInput').value,
+        krowaWycielenie: document.getElementById('swiOstWycielenieInput').value,
+        
+        buhajNazwa: document.getElementById('swiBuhajNazwa').value,
+        buhajNrIdent: document.getElementById('swiBuhajNrIdent').value,
+        buhajNrWet: document.getElementById('swiBuhajNrWet').value,
+        buhajDataProd: document.getElementById('swiBuhajDataProd').value,
+        buhajDostawca: document.getElementById('swiBuhajDostawca').value,
+
+        nrZabiegu: document.getElementById('swiNrZabieguSelect').value,
+        dataZabiegu: document.getElementById('swiDataZabieguInput').value,
+        inseminacja: document.getElementById('swiInseminacjaSelect').value,
+        
+        vetNazwisko: `${currentUserProfile.Imie} ${currentUserProfile.Nazwisko}`,
+        vetLecznica: currentUserProfile['Nazwa lecznicy'],
+        vetTel: currentUserProfile['Nr telefonu'] || ''
+    };
+
+    const html = `
+        <h2 style="font-size: 11pt !important; text-align: center; margin-bottom: 5px;">ZAŚWIADCZENIE UNASIENNIANIA KROWY</h2>
+        <div style="font-size: 9pt; text-align: center; border-bottom: 2px solid #000; padding-bottom: 5px; margin-bottom: 10px;">NR: <strong>${d.nrDokumentu}</strong></div>
+
+        <h3 style="font-size: 9pt; background: #eee; padding: 3px; border-bottom: 1px solid #000;">POSIADACZ SAMICY</h3>
+        <p style="font-size: 8pt; margin: 2px 0;"><strong>Nazwa:</strong> ${d.klient}</p>
+        <p style="font-size: 8pt; margin: 2px 0;"><strong>Adres:</strong> ${d.klientAdres}</p>
+        <p style="font-size: 8pt; margin: 2px 0;"><strong>Nr stada:</strong> ${d.klientStado}</p>
+
+        <h3 style="font-size: 9pt; background: #eee; padding: 3px; border-bottom: 1px solid #000; margin-top: 10px;">KROWA</h3>
+        <p style="font-size: 8pt; margin: 2px 0;"><strong>Nr identyfikacyjny:</strong> ${d.krowaKolczyk}</p>
+        <p style="font-size: 8pt; margin: 2px 0;"><strong>Nazwa, rasa:</strong> ${d.krowaRasa}</p>
+        <p style="font-size: 8pt; margin: 2px 0;"><strong>Data ost. wycielenia:</strong> ${d.krowaWycielenie}</p>
+
+        <h3 style="font-size: 9pt; background: #eee; padding: 3px; border-bottom: 1px solid #000; margin-top: 10px;">BUHAJ</h3>
+        <p style="font-size: 8pt; margin: 2px 0;"><strong>Nazwa, rasa:</strong> ${d.buhajNazwa}</p>
+        <p style="font-size: 8pt; margin: 2px 0;"><strong>Nr identyfikacyjny:</strong> ${d.buhajNrIdent}</p>
+        <p style="font-size: 8pt; margin: 2px 0;"><strong>Nr weterynaryjny:</strong> ${d.buhajNrWet}</p>
+        <p style="font-size: 8pt; margin: 2px 0;"><strong>Data produkcji:</strong> ${d.buhajDataProd}</p>
+        <p style="font-size: 8pt; margin: 2px 0;"><strong>Dostawca:</strong> ${d.buhajDostawca}</p>
+
+        <h3 style="font-size: 9pt; background: #eee; padding: 3px; border-bottom: 1px solid #000; margin-top: 10px;">ZABIEG</h3>
+        <p style="font-size: 8pt; margin: 2px 0;"><strong>Data zabiegu:</strong> ${d.dataZabiegu}</p>
+        <p style="font-size: 8pt; margin: 2px 0;"><strong>Numer zabiegu:</strong> ${d.nrZabiegu}</p>
+        <p style="font-size: 8pt; margin: 2px 0;"><strong>Inseminacja:</strong> ${d.inseminacja}</p>
+
+        <h3 style="font-size: 9pt; background: #eee; padding: 3px; border-bottom: 1px solid #000; margin-top: 10px;">INSEMINATOR / LEKARZ</h3>
+        <p style="font-size: 8pt; margin: 2px 0;"><strong>Wystawił:</strong> ${d.vetNazwisko}</p>
+        <p style="font-size: 8pt; margin: 2px 0;"><strong>Lecznica:</strong> ${d.vetLecznica}</p>
+        <p style="font-size: 8pt; margin: 2px 0;"><strong>Telefon:</strong> ${d.vetTel}</p>
+        
+        <div style="margin-top: 30px; text-align: right; border-top: 1px dotted #000; padding-top: 5px;">
+            <p style="font-size: 7pt; font-style: italic;">Podpis Lekarza/Inseminatora</p>
+        </div>
+    `;
+
+    const printWindow = window.open('', '_blank', 'width=450,height=700,scrollbars=yes,resizable=yes');
+    printWindow.document.write(`
+        <!DOCTYPE html>
+        <html><head>
+            <meta charset="utf-8">
+            <style>
+                body { font-family: 'Courier New', Courier, monospace; color: #000; font-size: 8pt; margin:0; padding:0; display:flex; flex-direction:column; align-items:center;}
+                .print-controls { width:100%; background:#333; padding:10px; text-align:center; position:sticky; top:0; }
+                .print-controls button { padding:8px 15px; background:#4CAF50; color:white; border:none; border-radius:4px; font-weight:bold; cursor:pointer;}
+                .receipt-page { width: 80mm; max-width:80mm; padding: 2mm; box-sizing: border-box; }
+                @media print { 
+                    body { display: block !important; }
+                    .print-controls { display: none !important; }
+                    .receipt-page { width: 80mm !important; }
+                    @page { size: 110mm auto; margin: 0; }
+                }
+            </style>
+        </head><body>
+            <div class="print-controls"><button onclick="window.print()">🖨️ Drukuj (110mm)</button></div>
+            <div class="receipt-page">${html}</div>
+        </body></html>
+    `);
+    printWindow.document.close();
+}
+
+// --- ARCHIWUM I CZYSZCZENIE (Ostatnie 180 dni) ---
+async function loadArchiwumSwiadectw() {
+    const tbody = document.getElementById('arcSwiTableBody');
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align: center;">Ładowanie...</td></tr>';
+    
+    // Auto-cleanup starszych niż 180 dni
+    const cutoffD = new Date();
+    cutoffD.setDate(cutoffD.getDate() - 180);
+    const cutoffStr = cutoffD.toISOString().split('T')[0];
+
+    try {
+        // Usuwanie
+        const qClean = db.collection("archiwumSwiadectwa").where("dataZabiegu", "<", cutoffStr);
+        const snapClean = await qClean.get();
+        if(!snapClean.empty) {
+            const batch = db.batch();
+            snapClean.docs.forEach(d => batch.delete(d.ref));
+            await batch.commit();
+            console.log("Usunięto stare świadectwa.");
+        }
+
+        // Pobierz aktualne dla lekarza
+        const qLoad = db.collection("archiwumSwiadectwa").where("lekarz_uid", "==", currentUserProfile.uid).orderBy("dataZabiegu", "desc").limit(50);
+        const snapLoad = await qLoad.get();
+        
+        tbody.innerHTML = '';
+        if(snapLoad.empty) {
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align: center;">Brak świadectw w archiwum (ost. 180 dni).</td></tr>';
+            return;
+        }
+
+        snapLoad.forEach(doc => {
+            const d = doc.data();
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${d.dataZabiegu}</td>
+                <td style="font-weight:bold; color:#2980b9;">${d.nrDokumentu}</td>
+                <td>${d.klient}</td>
+                <td><strong style="color:#27ae60;">${d.krowaKolczyk}</strong></td>
+                <td>${d.buhajNazwa}</td>
+                <td class="col-akcje">
+                    <button class="btn warn small" onclick="deleteSwiadectwo('${doc.id}')">Usuń</button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+
+        // Prosta Wyszukiwarka tekstowa
+        document.getElementById('arcSwiSearchInput').oninput = (e) => {
+            const f = e.target.value.toLowerCase();
+            Array.from(tbody.rows).forEach(r => {
+                r.style.display = r.textContent.toLowerCase().includes(f) ? '' : 'none';
+            });
+        };
+    } catch(e) {
+        console.error(e);
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color:red;">Błąd ładowania lub brak indeksu Firestore (dataZabiegu).</td></tr>';
+    }
+}
+
+window.deleteSwiadectwo = async function(id) {
+    if(!confirm("Czy na pewno usunąć to świadectwo?")) return;
+    await db.collection("archiwumSwiadectwa").doc(id).delete();
+    showToast("Usunięto.", "info");
+    loadArchiwumSwiadectw();
+};
 </script>
 </body>
 </html>
