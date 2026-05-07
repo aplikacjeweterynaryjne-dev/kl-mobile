@@ -27392,20 +27392,22 @@ async function populateSwiCowList(clientName) {
     if(!clientName) return;
 
     try {
-        const q = db.collection("archiwumKarty").where("klient_nazwa", "==", clientName).orderBy("dataWykonania", "desc").limit(30);
+        // ✅ ZMIANA: Szukamy w archiwumSwiadectwa po polu 'klient' 
+        const q = db.collection("archiwumSwiadectwa")
+                    .where("klient", "==", clientName)
+                    .orderBy("dataZabiegu", "desc")
+                    .limit(100);
+
         const snap = await q.get();
         const tags = new Set();
         snap.docs.forEach(doc => {
             const d = doc.data();
-            if(d.table) {
-                d.table.forEach(r => {
-                    const opis = r.opis || '';
-                    if(opis && opis !== '---') tags.add(opis); 
-                });
-            }
+            // ✅ ZMIANA: Pobieramy numer z pola 'krowaKolczyk' 
+            if(d.krowaKolczyk) tags.add(d.krowaKolczyk); 
         });
         tags.forEach(t => { dataList.appendChild(new Option(t, t)); });
-    } catch(e) { console.error("Błąd pobierania kolczyków:", e); }
+        console.log(`Pobrano ${tags.size} unikalnych kolczyków z historii świadectw.`);
+    } catch(e) { console.error("Błąd pobierania kolczyków z archiwum świadectw:", e); }
 }
 
 function calcSwiDates() {
@@ -27528,8 +27530,9 @@ async function saveSwiadectwo() {
     }
 }
 
+// ✅ MODYFIKACJA: Funkcja pobiera dane z pól i przekazuje do uniwersalnego druku
 function previewSwiadectwo() {
-    const d = {
+    const data = {
         nrDokumentu: document.getElementById('swiNrDokumentuDisplay').textContent,
         klient: document.getElementById('swiKlientInput').value,
         klientAdres: document.getElementById('swiKlientAdres').textContent,
@@ -27549,7 +27552,11 @@ function previewSwiadectwo() {
         vetLecznica: currentUserProfile['Nazwa lecznicy'],
         vetTel: currentUserProfile['Nr telefonu'] || ''
     };
+    renderDirectSwiPrint(data);
+}
 
+// ✅ NOWA FUNKCJA UNIWERSALNA: Renderuje okno druku 110mm dla dowolnego obiektu danych
+function renderDirectSwiPrint(d) {
     const html = `
         <h2 style="font-size: 11pt !important; text-align: center; margin-bottom: 5px;">ZAŚWIADCZENIE UNASIENNIANIA KROWY</h2>
         <div style="font-size: 9pt; text-align: center; border-bottom: 2px solid #000; padding-bottom: 5px; margin-bottom: 10px;">NR: <strong>${d.nrDokumentu}</strong></div>
@@ -27598,9 +27605,10 @@ function previewSwiadectwo() {
 
 // --- NOWE ARCHIWUM ŚWIADECTW (Z FILTRAMI) ---
 
+// --- NOWE ARCHIWUM ŚWIADECTW (DRUK + CZYSZCZENIE 365 DNI) ---
+
 async function loadArchiwumSwiadectw() {
     const sel = document.getElementById('archiveSwiUserSelect');
-    // Jeśli lista nie jest wczytana, wczytaj automatycznie przy otwarciu zakładki
     if (sel && sel.options.length <= 1) {
         loadArchiveSwiUsers();
     }
@@ -27611,15 +27619,16 @@ async function loadArchiveSwiUsers() {
     const btnEl = document.getElementById('loadArchiveSwiUsersBtn');
     if (!selectEl || !btnEl || !currentUserProfile) return;
     
-    // AUTO-CZYSZCZENIE STARYCH ŚWIADECTW (starsze niż 180 dni) wykonujemy cicho w tle
+    // ✅ AUTO-CZYSZCZENIE: Zmiana limitu z 180 na 365 dni
     const cutoffD = new Date();
-    cutoffD.setDate(cutoffD.getDate() - 180);
+    cutoffD.setDate(cutoffD.getDate() - 365);
     const cutoffStr = cutoffD.toISOString().split('T')[0];
     db.collection("archiwumSwiadectwa").where("dataZabiegu", "<", cutoffStr).get().then(snap => {
         if (!snap.empty) {
             const batch = db.batch();
             snap.forEach(d => batch.delete(d.ref));
             batch.commit();
+            console.log("Usunięto świadectwa starsze niż rok.");
         }
     });
 
@@ -27634,7 +27643,6 @@ async function loadArchiveSwiUsers() {
     
     btnEl.disabled = true;
     btnEl.textContent = 'Ładowanie...';
-    selectEl.innerHTML = '<option value="">Ładowanie...</option>';
 
     try {
         const snapshot = await query.get();
@@ -27644,11 +27652,9 @@ async function loadArchiveSwiUsers() {
         
         snapshot.docs.forEach(doc => {
             const user = doc.data();
-            const optionText = `${user.Imie} ${user.Nazwisko}`;
-            selectEl.add(new Option(optionText, user.uid)); 
+            selectEl.add(new Option(`${user.Imie} ${user.Nazwisko}`, user.uid)); 
         });
         
-        // Zaznacz siebie domyślnie
         if (currentUserProfile.uid) {
             selectEl.value = currentUserProfile.uid;
             if (selectEl.value === currentUserProfile.uid) {
@@ -27657,23 +27663,52 @@ async function loadArchiveSwiUsers() {
             }
         }
     } catch (error) {
-        console.error("Błąd wczytywania użytkowników (Świadectwa):", error);
-        selectEl.innerHTML = '<option value="">Błąd ładowania</option>';
+        console.error("Błąd wczytywania użytkowników:", error);
     } finally {
         btnEl.style.display = 'none'; 
     }
 }
 
-if (document.getElementById('loadArchiveSwiUsersBtn')) {
-    document.getElementById('loadArchiveSwiUsersBtn').addEventListener('click', loadArchiveSwiUsers);
-}
+// ✅ NOWA FUNKCJA: Drukowanie świadectwa bezpośrednio z Archiwum
+async function printSwiadectwoById(docId) {
+    showToast("Pobieranie danych do druku...", "info");
+    try {
+        const doc = await db.collection("archiwumSwiadectwa").doc(docId).get();
+        if (!doc.exists) return alert("Nie znaleziono dokumentu.");
+        
+        const d = doc.data();
+        
+        // Przygotowujemy dane do formatu, który rozumie funkcja drukująca [cite: 1631]
+        // Musimy zasymulować strukturę, którą funkcja pobiera z pól formularza
+        const printData = {
+            nrDokumentu: d.nrDokumentu,
+            klient: d.klient,
+            klientAdres: d.klientAdres || '',
+            klientStado: d.klientStado || '',
+            krowaKolczyk: d.krowaKolczyk,
+            krowaRasa: d.krowaRasa || '',
+            krowaWycielenie: d.krowaWycielenie || '',
+            buhajNazwa: d.buhajNazwa,
+            buhajNrIdent: d.buhajNrIdent || '',
+            buhajNrWet: d.buhajNrWet || '',
+            buhajDataProd: d.buhajDataProd || '',
+            buhajDostawca: d.buhajDostawca || '',
+            nrZabiegu: d.nrZabiegu,
+            dataZabiegu: d.dataZabiegu,
+            inseminacja: d.inseminacjaTakNie || 'Nie',
+            vetNazwisko: d.lekarz_nazwisko,
+            // Pobieramy dane lecznicy z profilu, jeśli brakuje ich w dokumencie
+            vetLecznica: currentUserProfile['Nazwa lecznicy'],
+            vetTel: currentUserProfile['Nr telefonu'] || ''
+        };
 
-if (document.getElementById('archiveSwiUserSelect')) {
-    document.getElementById('archiveSwiUserSelect').addEventListener('change', (e) => {
-        const btns = document.getElementById('archiveSwiActionButtons');
-        if (btns) btns.style.display = 'flex';
-        if (e.target.value) loadSwiadectwaForUser(e.target.value, '180days');
-    });
+        // Wywołujemy zmodyfikowany skrypt druku (patrz KROK 3 niżej)
+        renderDirectSwiPrint(printData);
+
+    } catch (e) {
+        console.error(e);
+        alert("Błąd pobierania danych.");
+    }
 }
 
 async function loadSwiadectwaForUser(lekarz_uid, mode = '180days') {
@@ -27685,7 +27720,6 @@ async function loadSwiadectwaForUser(lekarz_uid, mode = '180days') {
 
     let q = db.collection("archiwumSwiadectwa");
 
-    // Filtr Lekarza
     if (lekarz_uid === "ALL") {
         if (currentUserProfile.Rola !== 'administrator') {
             q = q.where("id_lecznicy", "==", currentUserProfile['ID lecznicy']);
@@ -27694,7 +27728,6 @@ async function loadSwiadectwaForUser(lekarz_uid, mode = '180days') {
         q = q.where("lekarz_uid", "==", lekarz_uid);
     }
 
-    // Czyszczenie pól tekstowych
     if (mode === '180days' || mode === 'all') {
         document.getElementById('arcSwiDateStart').value = '';
         document.getElementById('arcSwiDateEnd').value = '';
@@ -27702,7 +27735,6 @@ async function loadSwiadectwaForUser(lekarz_uid, mode = '180days') {
         document.getElementById('arcSwiDoc').value = '';
     }
 
-    // Tryby zapytania
     if (mode === '180days') {
         const d = new Date();
         d.setDate(d.getDate() - 180);
@@ -27726,19 +27758,15 @@ async function loadSwiadectwaForUser(lekarz_uid, mode = '180days') {
         tableBody.innerHTML = '';
         
         if(snapshot.empty) {
-            tableBody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #999;">Brak świadectw dla wybranych kryteriów.</td></tr>';
+            tableBody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #999;">Brak świadectw.</td></tr>';
             return;
         }
 
         snapshot.forEach(doc => {
             const d = doc.data();
             const tr = document.createElement('tr');
-            
-            // Atrybuty do lokalnego filtra tekstowego
-            tr.dataset.dataZabiegu = d.dataZabiegu || '';
-            tr.dataset.nrDokumentu = d.nrDokumentu || '';
             tr.dataset.klient = (d.klient || '').toLowerCase();
-            tr.dataset.krowaKolczyk = (d.krowaKolczyk || '').toLowerCase();
+            tr.dataset.nrDokumentu = d.nrDokumentu || '';
             
             tr.innerHTML = `
                 <td>${d.dataZabiegu}</td>
@@ -27747,45 +27775,27 @@ async function loadSwiadectwaForUser(lekarz_uid, mode = '180days') {
                 <td><strong style="color:#27ae60;">${d.krowaKolczyk}</strong></td>
                 <td>${d.buhajNazwa}</td>
                 <td class="col-akcje">
-                    <button class="btn warn small" onclick="deleteSwiadectwo('${doc.id}')">Usuń</button>
+                    <button class="btn primary small" onclick="printSwiadectwoById('${doc.id}')" title="Drukuj">📄</button>
+                    <button class="btn warn small" onclick="deleteSwiadectwo('${doc.id}')" style="margin-left:5px;" title="Usuń">🗑</button>
                 </td>
             `;
             tableBody.appendChild(tr);
         });
 
-        // Po załadowaniu danych nakładamy na nie filtry tekstowe
         if (mode === 'filter') applySwiFilters();
 
     } catch(e) { 
         console.error("Błąd ładowania świadectw:", e); 
-        tableBody.innerHTML = '<tr><td colspan="6" style="text-align: center; color:red;">Błąd ładowania. Sprawdź indeksy Firebase.</td></tr>';
-    }
-}
-
-function applySwiFilters() {
-    const tableBody = document.getElementById('arcSwiTableBody');
-    if (!tableBody) return;
-    const client = document.getElementById('arcSwiClient').value.toLowerCase().trim();
-    const docNum = document.getElementById('arcSwiDoc').value.toLowerCase().trim();
-
-    for (const row of tableBody.rows) {
-        let isVisible = true;
-        if (client && !row.dataset.klient.includes(client)) isVisible = false;
-        if (isVisible && docNum && !row.dataset.nrDokumentu.toLowerCase().includes(docNum)) isVisible = false;
-        row.style.display = isVisible ? '' : 'none';
+        tableBody.innerHTML = '<tr><td colspan="6" style="text-align: center; color:red;">Błąd ładowania. Sprawdź indeksy.</td></tr>';
     }
 }
 
 window.deleteSwiadectwo = async function(id) {
     if(!confirm("Czy na pewno usunąć to świadectwo?")) return;
     await db.collection("archiwumSwiadectwa").doc(id).delete();
-    if(typeof showToast === 'function') showToast("Usunięto pomyślnie.", "success");
-    
-    // Odśwież obecny widok dla wybranego użytkownika
+    showToast("Usunięto.", "info");
     const sel = document.getElementById('archiveSwiUserSelect');
-    if (sel && sel.value) {
-        loadSwiadectwaForUser(sel.value, '180days'); 
-    }
+    if (sel && sel.value) loadSwiadectwaForUser(sel.value, '180days');
 };
 </script>
 </body>
