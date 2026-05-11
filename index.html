@@ -5196,7 +5196,7 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
     </div>
 </div>
     <div id="semenDetailsModal" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.6); display: none; z-index: 10050; justify-content: center; align-items: center;">
-    <div class="form-card" style="width: 95%; max-width: 450px; background: white; padding: 20px; border-radius: 12px; height: auto;">
+    <div class="form-card" style="width: 95%; max-width: 450px; background: white; padding: 20px; border-radius: 12px; max-height: 95vh; overflow-y: auto;">
         <h3 style="margin-top: 0; color: #2980b9;">Szczegóły nasienia</h3>
         <input type="hidden" id="semenEditId">
         
@@ -5219,6 +5219,30 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
         <div class="form-row">
             <label>5. Dostawca nasienia</label>
             <input type="text" id="semenEditDostawca" placeholder="np. SHiUZ Bydgoszcz">
+        </div>
+
+        <div class="form-row" style="margin-top: 15px; border-top: 2px dashed #eee; padding-top: 15px;">
+            <label style="display: flex; align-items: center; gap: 8px; font-weight: bold; cursor: pointer; color: #27ae60;">
+                <input type="checkbox" id="semenTrackStockCb" style="width: 20px; height: 20px; accent-color: #27ae60;">
+                Włącz stany magazynowe dla tego nasienia
+            </label>
+        </div>
+        
+        <div id="semenStockContainer" style="display: none; background: #f4fcf6; padding: 12px; border-radius: 8px; border: 1px solid #c8e6c9; margin-bottom: 10px;">
+            <h4 style="margin: 0 0 10px 0; font-size: 14px; color: #2e7d32;">Stan Główny (Baza Lecznicy)</h4>
+            <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 15px; background: #fff; padding: 8px; border-radius: 6px; border: 1px solid #ddd;">
+                <span style="font-size: 20px;">🏢</span>
+                <input type="number" id="semenMainStock" placeholder="0" min="0" style="width: 80px; font-size: 16px; font-weight: bold; text-align: center; border: 1px solid #ccc; border-radius: 4px; padding: 4px;">
+                <span style="font-size: 14px; font-weight: bold;">szt.</span>
+            </div>
+            
+            <h4 style="margin: 0 0 10px 0; font-size: 14px; color: #2e7d32;">Stany Pracowników (W terenie)</h4>
+            <div id="semenEmployeeStockList" style="display: flex; flex-direction: column; gap: 8px;">
+                </div>
+            <p style="font-size: 11px; color: #666; margin-top: 10px; line-height: 1.3;">
+                💡 <b>Jak to działa?</b> Wpisz ilość nasienia, która przyszła do lecznicy w "Stanie Głównym". 
+                Przesuwaj sztuki między lecznicą a pracownikami według potrzeb.
+            </p>
         </div>
 
         <div class="form-actions" style="margin-top: 20px; justify-content: space-between;">
@@ -27281,15 +27305,65 @@ async function saveSemenDataToDB() {
     catch (e) { console.error(e); }
 }
 
-function openSemenEditModal(id, nazwa) {
+// ✅ ZAKTUALIZOWANE FUNKCJE: Obsługa stanów magazynowych nasienia
+async function openSemenEditModal(id, nazwa) {
     const item = currentSemenData.pozycje.find(p => p.id === id);
     if(!item) return;
+    
     document.getElementById('semenEditId').value = id;
     document.getElementById('semenEditNazwa').value = item.rasa_nazwa || nazwa;
     document.getElementById('semenEditNrIdent').value = item.nr_ident || '';
     document.getElementById('semenEditNrWet').value = item.nr_wet || '';
     document.getElementById('semenEditDataProd').value = item.data_prod || '';
     document.getElementById('semenEditDostawca').value = item.dostawca || '';
+
+    // LOGIKA MAGAZYNU NASIENIA
+    const trackCb = document.getElementById('semenTrackStockCb');
+    const stockContainer = document.getElementById('semenStockContainer');
+    const mainStock = document.getElementById('semenMainStock');
+    const empList = document.getElementById('semenEmployeeStockList');
+
+    trackCb.checked = item.trackStock || false;
+    mainStock.value = item.stanGlowny || 0;
+    stockContainer.style.display = trackCb.checked ? 'block' : 'none';
+
+    trackCb.onchange = () => {
+        stockContainer.style.display = trackCb.checked ? 'block' : 'none';
+    };
+
+    empList.innerHTML = '<div style="color:#999; font-size:12px; text-align:center;">Pobieranie listy lekarzy... ⏳</div>';
+    
+    try {
+        const clinicId = currentUserProfile['ID lecznicy'];
+        const snap = await db.collection("konfiguracja").where("ID lecznicy", "==", clinicId).get();
+        empList.innerHTML = '';
+        
+        const personalStocks = item.stanyOsobiste || {};
+        
+        snap.forEach(doc => {
+            const u = doc.data();
+            if (u.Rola === 'klient' || u.Rola === 'administrator') return; // Pomijamy klientów i globalnych adminów
+            
+            const uid = u.uid;
+            const name = `${u.Imie} ${u.Nazwisko}`;
+            const currentStock = personalStocks[uid] || 0;
+            
+            const div = document.createElement('div');
+            div.style.cssText = "display:flex; justify-content:space-between; align-items:center; background:#fff; padding:8px 10px; border:1px solid #ddd; border-radius:6px;";
+            div.innerHTML = `
+                <span style="font-size:14px; font-weight:600; color:#333;">🚗 ${name}</span>
+                <div style="display:flex; align-items:center; gap:5px;">
+                    <input type="number" class="semen-emp-stock-input" data-uid="${uid}" value="${currentStock}" min="0" style="width:60px; text-align:center; padding:6px; font-size:15px; font-weight:bold; border:1px solid #ccc; border-radius:4px;">
+                    <span style="font-size:12px; color:#555;">szt.</span>
+                </div>
+            `;
+            empList.appendChild(div);
+        });
+    } catch(e) {
+        console.error("Błąd ładowania lekarzy:", e);
+        empList.innerHTML = '<div style="color:red; font-size:12px;">Błąd pobierania bazy pracowników.</div>';
+    }
+
     document.getElementById('semenDetailsModal').style.display = 'flex';
 }
 
@@ -27297,14 +27371,31 @@ async function saveSemenDetails() {
     const id = document.getElementById('semenEditId').value;
     const item = currentSemenData.pozycje.find(p => p.id === id);
     if(!item) return;
+    
     item.rasa_nazwa = document.getElementById('semenEditNazwa').value.trim();
     item.nr_ident = document.getElementById('semenEditNrIdent').value.trim();
     item.nr_wet = document.getElementById('semenEditNrWet').value.trim();
     item.data_prod = document.getElementById('semenEditDataProd').value;
     item.dostawca = document.getElementById('semenEditDostawca').value.trim();
+
+    // ZAPIS STANÓW MAGAZYNU NASIENIA
+    item.trackStock = document.getElementById('semenTrackStockCb').checked;
+    item.stanGlowny = parseInt(document.getElementById('semenMainStock').value) || 0;
+    
+    const personalStocks = {};
+    document.querySelectorAll('.semen-emp-stock-input').forEach(inp => {
+        const uid = inp.dataset.uid;
+        const val = parseInt(inp.value) || 0;
+        personalStocks[uid] = val;
+    });
+    item.stanyOsobiste = personalStocks;
+
     await saveSemenDataToDB();
     document.getElementById('semenDetailsModal').style.display = 'none';
     if(typeof showToast === 'function') showToast("Dane zapisane.", "success");
+    
+    // Odśwież listę w kreatorze, by pokazać nowe stany
+    if(document.getElementById('swiBuhajSelect')) refreshSwiSemenList();
 }
 
 /* ======================================================== */
@@ -27354,13 +27445,20 @@ function initSwiadectwoWizard() {
     setTimeout(refreshSwiSemenList, 400);
 }
 
+// ✅ POKAZYWANIE STANU W LIŚCIE ROZWIJANEJ W ŚWIADECTWACH
 function refreshSwiSemenList() {
     const buhajSelect = document.getElementById('swiBuhajSelect');
     if(!buhajSelect) return;
     buhajSelect.innerHTML = '<option value="">-- Wybierz buhaja z magazynu --</option>';
     if (currentSemenData && currentSemenData.pozycje) {
         currentSemenData.pozycje.forEach(p => {
-            buhajSelect.add(new Option(p.nazwa, p.id));
+            let stockInfo = "";
+            // Pokazujemy stan magazynowy w nawiasie (jeśli włączono opcję)
+            if (p.trackStock) {
+                const myStock = (p.stanyOsobiste && p.stanyOsobiste[currentUserProfile.uid]) ? p.stanyOsobiste[currentUserProfile.uid] : 0;
+                stockInfo = ` (Stan: ${myStock} szt.)`;
+            }
+            buhajSelect.add(new Option(p.nazwa + stockInfo, p.id));
         });
     }
     buhajSelect.onchange = () => {
@@ -27487,9 +27585,28 @@ async function generateSwiNumber() {
     }
 }
 
+// ✅ ZAPIS ŚWIADECTWA Z AUTOMATYCZNYM POBRANIEM Z MAGAZYNU NASIENIA
 async function saveSwiadectwo() {
     const nrDok = document.getElementById('swiNrDokumentuDisplay').textContent;
     if(nrDok.includes("X") || nrDok.includes("GENEROWANIE")) return alert("Błąd numeru, nie można zapisać.");
+
+    // 1. WALIDACJA STANU MAGAZYNOWEGO NASIENIA (Przed zapisem)
+    const buhajSelectId = document.getElementById('swiBuhajSelect').value;
+    let selectedSemenItem = null;
+    
+    if (buhajSelectId && currentSemenData && currentSemenData.pozycje) {
+        selectedSemenItem = currentSemenData.pozycje.find(p => p.id === buhajSelectId);
+    }
+
+    if (selectedSemenItem && selectedSemenItem.trackStock) {
+        const myUid = currentUserProfile.uid;
+        const myStock = (selectedSemenItem.stanyOsobiste && selectedSemenItem.stanyOsobiste[myUid]) ? selectedSemenItem.stanyOsobiste[myUid] : 0;
+        
+        if (myStock <= 0) {
+            alert(`❌ BŁĄD MAGAZYNU NASIENIA!\n\nBrak nasienia "${selectedSemenItem.nazwa}" na Twoim koncie (Twój stan: 0 szt.).\n\nWejdź w Magazyn Nasienia -> Edytuj dane nasienia i przesuń porcję z bazy lecznicy na siebie, zanim wystawisz zaświadczenie.`);
+            return; // Blokada zapisu!
+        }
+    }
 
     const dataObj = {
         nrDokumentu: nrDok,
@@ -27521,8 +27638,26 @@ async function saveSwiadectwo() {
     };
 
     try {
-        await db.collection("archiwumSwiadectwa").add(dataObj);
-        if(typeof showToast === 'function') showToast("Świadectwo zapisane pomyślnie!", "success");
+        const batch = db.batch();
+        
+        // 2. Zapis dokumentu świadectwa
+        const newDocRef = db.collection("archiwumSwiadectwa").doc();
+        batch.set(newDocRef, dataObj);
+
+        // 3. Pobranie sztuki nasienia z bazy danych
+        if (selectedSemenItem && selectedSemenItem.trackStock) {
+            // Zdejmujemy 1 sztukę z konta użytkownika w obiekcie JS
+            selectedSemenItem.stanyOsobiste[currentUserProfile.uid] -= 1; 
+            
+            // Nadpisujemy cały dokument magazynu nasienia w Firebase
+            const clinicId = currentUserProfile['ID lecznicy'];
+            const semenMagRef = db.collection('nasienie_magazyn').doc(clinicId);
+            batch.set(semenMagRef, currentSemenData); 
+        }
+
+        await batch.commit();
+
+        if(typeof showToast === 'function') showToast("Świadectwo zapisane i pobrano nasienie z magazynu!", "success");
         initSwiadectwoWizard(); 
     } catch(e) {
         alert("Błąd zapisu! Sprawdź reguły Firebase.");
