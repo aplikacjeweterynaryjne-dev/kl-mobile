@@ -27188,6 +27188,7 @@ function loadSemenData() {
     });
 }
 
+// ✅ ZMODYFIKOWANA FUNKCJA: Renderuje kafelki z ostrzeżeniem "!" przy niskim stanie całkowitym
 function renderSemenGrid() {
     const grid = document.getElementById('semenGridContainer');
     if (!grid) return;
@@ -27199,8 +27200,23 @@ function renderSemenGrid() {
         const tile = document.createElement('div');
         tile.className = `semen-tile status-${item.status}`;
         
+        // --- LOGIKA OSTRZEŻENIA "!" ---
+        let warningHtml = "";
+        if (item.trackStock) {
+            // Obliczamy całkowitą sumę nasienia w lecznicy i u wszystkich pracowników
+            const mainStock = parseInt(item.stanGlowny) || 0;
+            const employeeStocks = Object.values(item.stanyOsobiste || {}).reduce((a, b) => (parseInt(a) || 0) + (parseInt(b) || 0), 0);
+            const totalStock = mainStock + employeeStocks;
+
+            // Jeśli suma < 10, dodajemy wykrzyknik
+            if (totalStock < 10) {
+                warningHtml = `<div style="position:absolute; top:2px; left:50%; transform:translateX(-50%); color:#e74c3c; font-size:22px; font-weight:900; text-shadow: 1px 1px 0 #fff;">⚠️</div>`;
+            }
+        }
+
         tile.innerHTML = `
-            ${item.nazwa}
+            ${warningHtml}
+            <div style="margin-top:10px;">${item.nazwa}</div>
             <div class="semen-edit-btn" title="Edytuj dane">✏️</div>
             <div class="semen-delete-btn" title="Usuń buhaja">✕</div>
         `;
@@ -27211,7 +27227,6 @@ function renderSemenGrid() {
         grid.appendChild(tile);
     });
 }
-
 async function toggleSemenStatus(itemId) {
     const item = currentSemenData.pozycje.find(p => p.id === itemId);
     if (!item) return;
@@ -27305,7 +27320,7 @@ async function saveSemenDataToDB() {
     catch (e) { console.error(e); }
 }
 
-// ✅ ZAKTUALIZOWANE FUNKCJE: Obsługa stanów magazynowych nasienia
+// ✅ ZAKTUALIZOWANA FUNKCJA: Dodaje guzik "Pobierz z lecznicy" dla pracowników
 async function openSemenEditModal(id, nazwa) {
     const item = currentSemenData.pozycje.find(p => p.id === id);
     if(!item) return;
@@ -27317,14 +27332,13 @@ async function openSemenEditModal(id, nazwa) {
     document.getElementById('semenEditDataProd').value = item.data_prod || '';
     document.getElementById('semenEditDostawca').value = item.dostawca || '';
 
-    // LOGIKA MAGAZYNU NASIENIA
     const trackCb = document.getElementById('semenTrackStockCb');
     const stockContainer = document.getElementById('semenStockContainer');
-    const mainStock = document.getElementById('semenMainStock');
+    const mainStockInp = document.getElementById('semenMainStock');
     const empList = document.getElementById('semenEmployeeStockList');
 
     trackCb.checked = item.trackStock || false;
-    mainStock.value = item.stanGlowny || 0;
+    mainStockInp.value = item.stanGlowny || 0;
     stockContainer.style.display = trackCb.checked ? 'block' : 'none';
 
     trackCb.onchange = () => {
@@ -27337,34 +27351,64 @@ async function openSemenEditModal(id, nazwa) {
         const clinicId = currentUserProfile['ID lecznicy'];
         const snap = await db.collection("konfiguracja").where("ID lecznicy", "==", clinicId).get();
         empList.innerHTML = '';
-        
         const personalStocks = item.stanyOsobiste || {};
         
         snap.forEach(doc => {
             const u = doc.data();
-            if (u.Rola === 'klient' || u.Rola === 'administrator') return; // Pomijamy klientów i globalnych adminów
+            if (u.Rola === 'klient' || u.Rola === 'administrator') return;
             
             const uid = u.uid;
-            const name = `${u.Imie} ${u.Nazwisko}`;
             const currentStock = personalStocks[uid] || 0;
             
             const div = document.createElement('div');
-            div.style.cssText = "display:flex; justify-content:space-between; align-items:center; background:#fff; padding:8px 10px; border:1px solid #ddd; border-radius:6px;";
+            div.style.cssText = "display:flex; flex-direction:column; gap:5px; background:#fff; padding:10px; border:1px solid #ddd; border-radius:8px;";
             div.innerHTML = `
-                <span style="font-size:14px; font-weight:600; color:#333;">🚗 ${name}</span>
-                <div style="display:flex; align-items:center; gap:5px;">
-                    <input type="number" class="semen-emp-stock-input" data-uid="${uid}" value="${currentStock}" min="0" style="width:60px; text-align:center; padding:6px; font-size:15px; font-weight:bold; border:1px solid #ccc; border-radius:4px;">
-                    <span style="font-size:12px; color:#555;">szt.</span>
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <span style="font-size:14px; font-weight:600; color:#333;">🚗 ${u.Imie} ${u.Nazwisko}</span>
+                    <div style="display:flex; align-items:center; gap:5px;">
+                        <input type="number" class="semen-emp-stock-input" id="inp-stock-${uid}" data-uid="${uid}" value="${currentStock}" min="0" style="width:60px; text-align:center; padding:6px; font-size:15px; font-weight:bold; border:1px solid #ccc; border-radius:4px;">
+                        <span style="font-size:12px; color:#555;">szt.</span>
+                    </div>
                 </div>
+                <button class="btn small" style="width:100%; margin:0; font-size:11px; background:#e8f5e9; border:1px solid #27ae60; color:#2e7d32;" 
+                        onclick="transferSemenFromClinic('${uid}')">
+                    ⬇️ Pobierz z lecznicy na stan pracownika
+                </button>
             `;
             empList.appendChild(div);
         });
     } catch(e) {
-        console.error("Błąd ładowania lekarzy:", e);
-        empList.innerHTML = '<div style="color:red; font-size:12px;">Błąd pobierania bazy pracowników.</div>';
+        empList.innerHTML = '<div style="color:red; font-size:12px;">Błąd pobierania bazy.</div>';
     }
 
     document.getElementById('semenDetailsModal').style.display = 'flex';
+}
+
+// ✅ NOWA FUNKCJA: Automatyczne przesuwanie sztuk między lecznicą a pracownikiem
+window.transferSemenFromClinic = function(empUid) {
+    const mainInp = document.getElementById('semenMainStock');
+    const empInp = document.getElementById(`inp-stock-${empUid}`);
+    const available = parseInt(mainInp.value) || 0;
+
+    if (available <= 0) {
+        alert("Błąd: Brak nasienia w Stanie Głównym lecznicy!");
+        return;
+    }
+
+    const moveAmount = prompt(`Ile sztuk przesunąć z lecznicy na stan pracownika?\n(Dostępne w lecznicy: ${available} szt.)`, "1");
+    const amount = parseInt(moveAmount);
+
+    if (isNaN(amount) || amount <= 0) return;
+    if (amount > available) {
+        alert("Błąd: Nie możesz przesunąć więcej niż jest w lecznicy!");
+        return;
+    }
+
+    // Aktualizacja wizualna w formularzu
+    mainInp.value = available - amount;
+    empInp.value = (parseInt(empInp.value) || 0) + amount;
+    
+    showToast(`Przesunięto ${amount} szt. Stan lecznicy został pomniejszony.`, "success");
 }
 
 async function saveSemenDetails() {
