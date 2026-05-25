@@ -2759,7 +2759,46 @@ tr.filled-row td {
         </div>
     </div>
 </div>
+<div id="productHistoryModal" class="product-search-modal" style="display: none; z-index: 10050;">
+    <div class="form-card" style="width: 95%; max-width: 700px; height: 90vh; display: flex; flex-direction: column;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <h3 id="productHistoryTitle" style="margin: 0; color: #2980b9;">Historia: ...</h3>
+            <button id="closeProductHistoryBtn" class="btn ghost small" style="padding: 4px 10px; font-size: 16px;">✕</button>
+        </div>
+        
+        <p style="font-size: 12px; color: #e67e22; text-align: center; margin-top: 0; margin-bottom: 15px;">Historia operacji magazynowych jest przechowywana automatycznie przez maksymalnie 180 dni.</p>
 
+        <div class="archive-filter-controls" style="display: grid; margin-bottom: 15px;">
+            <input type="date" id="phFilterDateFrom" title="Data od">
+            <input type="date" id="phFilterDateTo" title="Data do">
+            <select id="phFilterType" style="grid-column: 1 / -1;">
+                <option value="">Wszystkie operacje</option>
+                <option value="doładowanie">Doładowanie (Dostawa)</option>
+                <option value="wydanie_karta">Rozchód (Karta leczenia)</option>
+                <option value="inwentaryzacja">Inwentaryzacja</option>
+                <option value="zwrot_korekta">Zwrot (Korekta karty)</option>
+                <option value="zwrot_usuniecie">Zwrot (Usunięcie karty)</option>
+                <option value="wycofanie">Wycofanie doładowania</option>
+            </select>
+        </div>
+
+        <div class="table-container" style="flex: 1; overflow-y: auto;">
+            <table class="sortable-table" style="font-size: 13px;">
+                <thead style="position: sticky; top: 0; background: #f2f2f2; z-index: 1;">
+                    <tr>
+                        <th style="width: 20%;">Data</th>
+                        <th style="width: 25%;">Typ operacji</th>
+                        <th style="width: 20%;">Kto</th>
+                        <th style="width: 15%; text-align: center;">Zmiana</th>
+                        <th style="width: 20%; text-align: center;">Stan po</th>
+                    </tr>
+                </thead>
+                <tbody id="productHistoryTableBody">
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
@@ -19795,8 +19834,8 @@ function renderMagazynTable() {
         tr.dataset.ilosc = iloscOperacji;
         tr.dataset.typ = typOperacji;
         
-        tr.innerHTML = `
-            <td>${nazwa}</td>
+       tr.innerHTML = `
+            <td style="color: #2980b9; cursor: pointer; text-decoration: underline;" onclick="openProductHistory('${productId}', '${nazwa}', 'me')" title="Kliknij, aby zobaczyć historię dla tego produktu">${nazwa}</td>
             <td style="text-align: center; font-weight: bold;">${aktualnyStan}</td>
 
             <td class="col-topup" style="text-align: center;">
@@ -20413,9 +20452,9 @@ function renderZarzadzanieMagazynTable() {
         tr.dataset.ilosc = iloscOperacji;
         tr.dataset.typ = typOperacji;
 
-        // ✅ TUTAJ BYŁA ZMIANA: Usunięto <td> z inputem
+    // ✅ TUTAJ BYŁA ZMIANA: Usunięto <td> z inputem
         tr.innerHTML = `
-            <td>${nazwa}</td>
+            <td style="color: #2980b9; cursor: pointer; text-decoration: underline;" onclick="openProductHistory('${productId}', '${nazwa}', 'admin')" title="Kliknij, aby zobaczyć historię dla tego produktu">${nazwa}</td>
             <td style="text-align: center; font-weight: bold;">${aktualnyStan}</td>
             
             <td class="col-log">${dataOperacji}</td>
@@ -20634,10 +20673,14 @@ async function handleAdminUndoTopUp() {
 /**
  * Automatycznie czyści logi starsze niż 14 dni dla danego użytkownika.
  */
+/**
+ * Automatycznie czyści logi starsze niż 180 dni dla danego użytkownika.
+ */
 async function runAutoCleanupLogs(userDocId) {
     if (!userDocId) return;
 
-    const cutoffDate = new Date().getTime() - (14 * 24 * 60 * 60 * 1000); // 14 dni temu
+    // ✅ ZMIANA Z 14 NA 180 DNI
+    const cutoffDate = new Date().getTime() - (180 * 24 * 60 * 60 * 1000); 
     const cutoffTimestamp = firebase.firestore.Timestamp.fromMillis(cutoffDate);
 
     try {
@@ -20646,7 +20689,7 @@ async function runAutoCleanupLogs(userDocId) {
         const snapshot = await q.get();
 
         if (snapshot.empty) {
-            console.log(`Moduł 6 (Auto-Czyszczenie): Brak logów starszych niż 14 dni dla ${userDocId}.`);
+            console.log(`Moduł 6 (Auto-Czyszczenie): Brak logów starszych niż 180 dni dla ${userDocId}.`);
             return;
         }
 
@@ -20658,16 +20701,129 @@ async function runAutoCleanupLogs(userDocId) {
         });
         await batch.commit();
 
-        showToast(`Wyczyszczono ${snapshot.size} starych logów (starszych niż 14 dni).`, "info");
+        showToast(`Wyczyszczono ${snapshot.size} starych logów (starszych niż 180 dni).`, "info");
 
     } catch (error) {
         console.error("Błąd automatycznego czyszczenia logów:", error);
         if (error.code === 'failed-precondition') {
-             // To się może zdarzyć, jeśli admin nigdy nie otworzy magazynu
              console.warn("Moduł 6: Wymagany indeks do auto-czyszczenia logów: [data(ASC)] dla `magazynOsobistyLog`");
         }
     }
 }
+
+/* ======================================================== */
+/* ✅ NOWY MODUŁ: HISTORIA SZCZEGÓŁOWA PRODUKTU             */
+/* ======================================================== */
+
+let currentPhData = []; // Bufor dla logów wybranego produktu
+
+// Otwieranie Modala
+window.openProductHistory = function(productId, productName, source) {
+    const titleEl = document.getElementById('productHistoryTitle');
+    const tbody = document.getElementById('productHistoryTableBody');
+    const modal = document.getElementById('productHistoryModal');
+
+    if (!modal) return;
+
+    titleEl.textContent = `Historia: ${productName}`;
+    tbody.innerHTML = '';
+    
+    // Czyszczenie filtrów
+    document.getElementById('phFilterDateFrom').value = '';
+    document.getElementById('phFilterDateTo').value = '';
+    document.getElementById('phFilterType').value = '';
+
+    // Określenie, z którego cache pobieramy dane
+    let logsSource = [];
+    if (source === 'me') {
+        logsSource = magazynLogCache || [];
+    } else if (source === 'admin') {
+        logsSource = zarzadzanieMagazynLogCache || [];
+    }
+
+    currentPhData = [];
+
+    // Przetwarzanie logów, aby wyciągnąć tylko wpisy dla danego produktu
+    logsSource.forEach(log => {
+        if (!log.zmiany) return;
+        
+        const zmiana = log.zmiany.find(z => z.id_produktu === productId);
+        if (zmiana) {
+            currentPhData.push({
+                dataStr: log.data.toDate().toLocaleString('pl-PL', {day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'}),
+                dataMs: log.data.toMillis(),
+                typ: log.typ,
+                kto: log.kto_nazwa || 'Nieznany',
+                zmiana_ilosc: zmiana.ilosc,
+                stan_po: zmiana.stan_po
+            });
+        }
+    });
+
+    renderProductHistoryList();
+    modal.style.display = 'flex';
+};
+
+// Renderowanie i Filtrowanie w Modalu
+function renderProductHistoryList() {
+    const tbody = document.getElementById('productHistoryTableBody');
+    const dateFrom = document.getElementById('phFilterDateFrom').value;
+    const dateTo = document.getElementById('phFilterDateTo').value;
+    const filterType = document.getElementById('phFilterType').value;
+
+    const timeFrom = dateFrom ? new Date(dateFrom).setHours(0,0,0,0) : 0;
+    const timeTo = dateTo ? new Date(dateTo).setHours(23,59,59,999) : Infinity;
+
+    tbody.innerHTML = '';
+
+    let visibleCount = 0;
+
+    currentPhData.forEach(item => {
+        // Filtrowanie dacie
+        if (item.dataMs < timeFrom || item.dataMs > timeTo) return;
+        
+        // Filtrowanie po typie
+        if (filterType !== '' && item.typ !== filterType) return;
+
+        visibleCount++;
+
+        const tr = document.createElement('tr');
+        
+        // Kolorowanie typu operacji dla czytelności
+        let typStyle = "";
+        let typWyswietlany = item.typ;
+        if (item.typ === 'doładowanie') { typStyle = "color: #27ae60; font-weight: bold;"; typWyswietlany = "Doładowanie"; }
+        else if (item.typ.includes('wydanie')) { typStyle = "color: #c0392b; font-weight: bold;"; typWyswietlany = "Rozchód"; }
+        else if (item.typ === 'inwentaryzacja') { typStyle = "color: #d35400; font-weight: bold;"; typWyswietlany = "Inwentaryzacja"; }
+        else if (item.typ.includes('zwrot')) { typStyle = "color: #2980b9; font-weight: bold;"; typWyswietlany = "Zwrot"; }
+        else if (item.typ === 'wycofanie') { typStyle = "color: #8e44ad; font-weight: bold;"; typWyswietlany = "Wycofanie"; }
+
+        // Znak i kolor dla ilości
+        const zmianaWyswietlana = item.zmiana_ilosc > 0 ? `+${item.zmiana_ilosc}` : item.zmiana_ilosc;
+        const zmianaKolor = item.zmiana_ilosc > 0 ? '#27ae60' : (item.zmiana_ilosc < 0 ? '#c0392b' : '#7f8c8d');
+
+        tr.innerHTML = `
+            <td>${item.dataStr}</td>
+            <td style="${typStyle}">${typWyswietlany}</td>
+            <td>${item.kto}</td>
+            <td style="text-align: center; font-weight: bold; font-size: 15px; color: ${zmianaKolor};">${zmianaWyswietlana}</td>
+            <td style="text-align: center; font-weight: bold; color: #333;">${item.stan_po}</td>
+        `;
+        tbody.appendChild(tr);
+    });
+
+    if (visibleCount === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 20px; color: #999;">Brak operacji spełniających podane kryteria.</td></tr>';
+    }
+}
+
+// Podpięcie Listenerów dla nowego Modala
+document.getElementById('phFilterDateFrom')?.addEventListener('input', renderProductHistoryList);
+document.getElementById('phFilterDateTo')?.addEventListener('input', renderProductHistoryList);
+document.getElementById('phFilterType')?.addEventListener('change', renderProductHistoryList);
+document.getElementById('closeProductHistoryBtn')?.addEventListener('click', () => {
+    document.getElementById('productHistoryModal').style.display = 'none';
+});
 
 /**
  * Ręcznie czyści WSZYSTKIE logi dla wybranego użytkownika.
