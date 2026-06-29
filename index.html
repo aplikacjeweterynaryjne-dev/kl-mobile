@@ -23956,28 +23956,24 @@ checkSharedLink();
 /* ✅ BRAKUJĄCE FUNKCJE: Obsługa Długu w Kalkulatorze       */
 /* (Wklej to na samym końcu skryptu, aby były dostępne)     */
 /* ======================================================== */
-
 // Sprawdza dług klienta i wyświetla go pod polem wyboru w Kalkulatorze
 async function checkAndShowClientDebt(clientName) {
-    // 1. Znajdź lub stwórz kontener na informację o długu
     let debtContainer = document.getElementById('calcClientDebtContainer');
     
-    // Jeśli kontenera nie ma, stwórz go dynamicznie pod inputem klienta
     if (!debtContainer) {
         const inputElement = document.getElementById('calcKlientInput');
         if (inputElement && inputElement.parentNode) {
             debtContainer = document.createElement('div');
             debtContainer.id = 'calcClientDebtContainer';
             debtContainer.style.marginTop = '5px';
-            debtContainer.style.fontSize = '15px'; // Wyraźna czcionka
+            debtContainer.style.fontSize = '15px'; 
             debtContainer.style.fontWeight = '600';
             inputElement.parentNode.appendChild(debtContainer);
         } else {
-            return; // Nie ma gdzie wyświetlić
+            return; 
         }
     }
     
-    // Resetuj widok (pokazuje, że coś się dzieje)
     debtContainer.innerHTML = '<span style="color: #777;">Sprawdzanie salda...</span>';
 
     if (!currentUserProfile || !currentUserProfile['ID lecznicy']) {
@@ -23986,24 +23982,26 @@ async function checkAndShowClientDebt(clientName) {
     }
 
     try {
-        // 2. Pobierz długi z Archiwum (status = "Dług", ten klient, ta lecznica)
+        // ✅ POPRAWKA 1: Usuwamy puste spacje z nazwy klienta dla pewności
+        const safeClientName = clientName.trim();
+        
         const q = db.collection("archiwumParagony")
             .where("id_lecznicy", "==", currentUserProfile['ID lecznicy'])
-            .where("klient", "==", clientName)
+            .where("klient", "==", safeClientName)
             .where("status", "==", "Dług");
 
         const snapshot = await q.get();
         
         let totalDebt = 0;
         snapshot.forEach(doc => {
-            totalDebt += parseFloat(doc.data().suma) || 0;
+            // ✅ POPRAWKA 2: Zabezpieczenie przed ucinaniem kwot po przecinku
+            const sumaString = String(doc.data().suma || "0").replace(',', '.');
+            totalDebt += parseFloat(sumaString) || 0;
         });
 
         if (totalDebt > 0) {
-            // Używamy formatPrice jeśli dostępna
-            const debtText = (typeof formatPrice === 'function') ? formatPrice(totalDebt) : totalDebt + " zł";
+            const debtText = (typeof formatPrice === 'function') ? formatPrice(totalDebt) : totalDebt.toFixed(2) + " zł";
             
-            // Wyświetl na czerwono z linkiem
             debtContainer.innerHTML = `
                 <span style="color: #c0392b;">
                     ⚠️ Zadłużenie: 
@@ -24011,20 +24009,17 @@ async function checkAndShowClientDebt(clientName) {
                     <span style="font-size: 12px; color: #555; margin-left: 5px;">(Kliknij, aby zobaczyć)</span>
                 </span>`;
             
-            // Dodaj listener kliknięcia (ważne: robimy to po wstawieniu HTML)
             setTimeout(() => {
                 const link = document.getElementById('debtLink');
                 if (link) {
                     link.addEventListener('click', () => {
-                        goToArchiveDebtView(clientName);
+                        goToArchiveDebtView(safeClientName);
                     });
                 }
             }, 100);
             
         } else {
-            // Brak długu - na zielono
             debtContainer.innerHTML = '<span style="color: #27ae60;">✔️ Brak zaległości.</span>';
-            // Ukryj po 4 sekundach
             setTimeout(() => { debtContainer.innerHTML = ''; }, 4000);
         }
 
@@ -24034,9 +24029,8 @@ async function checkAndShowClientDebt(clientName) {
     }
 }
 
-// Przenosi do Archiwum z ustawionymi filtrami (Wersja Poprawiona - z czekaniem na listę userów)
+// Przenosi do Archiwum z ustawionymi filtrami 
 async function goToArchiveDebtView(clientName) {
-    // 1. Przełącz sekcję na Archiwum Paragonów
     if (typeof showSection === 'function') {
         showSection('archiwumParagony');
     }
@@ -24047,15 +24041,12 @@ async function goToArchiveDebtView(clientName) {
 
     if (!userSelect) return;
 
-    // 2. ⚠️ WAŻNE: Sprawdź, czy lista użytkowników jest załadowana. Jeśli nie - załaduj ją.
     if (userSelect.options.length <= 1) {
-        console.log("Link Długu: Lista użytkowników pusta. Wymuszam ładowanie...");
         if (typeof loadArchiveReceiptUsers === 'function') {
-            await loadArchiveReceiptUsers(); // Czekamy aż się załaduje!
+            await loadArchiveReceiptUsers(); 
         }
     }
     
-    // 3. Logika wyboru "Wszyscy" w selectcie lekarzy
     let hasAllOption = false;
     for (let i=0; i<userSelect.options.length; i++) {
         if (userSelect.options[i].value === "ALL") hasAllOption = true;
@@ -24068,25 +24059,27 @@ async function goToArchiveDebtView(clientName) {
          targetUserValue = currentUserProfile.uid;
     }
     
-    // Ustaw wartość w selectcie
     userSelect.value = targetUserValue;
     
-    // 4. Wymuś załadowanie danych paragonów dla wybranego usera
     if (typeof loadReceiptsForUser === 'function') {
-        // Czekamy na pobranie danych z bazy (używamy await zamiast .then)
-        await loadReceiptsForUser(targetUserValue);
         
-        // 5. Dopiero TERAZ ustawiamy filtry tekstowe i filtrujemy widok
+        // ✅ POPRAWKA 3: Ustawiamy filtry PRZED pobraniem, a daty czyścimy całkowicie
+        document.getElementById('arcReceiptDateStart').value = '';
+        document.getElementById('arcReceiptDateEnd').value = '';
+        
         if (clientInput) clientInput.value = clientName;
         if (statusSelect) statusSelect.value = "Dług";
         
-        if (typeof applyReceiptFilters === 'function') {
-            applyReceiptFilters();
-            if (typeof showToast === 'function') showToast(`Filtruję zadłużenie dla: ${clientName}`, "info");
+        // ✅ POPRAWKA 4: Wywołujemy z trybem 'filter'. 
+        // To każe systemowi pobrać PEŁNĄ historię z bazy danych (a nie tylko 30 dni)
+        await loadReceiptsForUser(targetUserValue, 'filter');
+        
+        if (typeof showToast === 'function') {
+             showToast(`Filtruję pełną historię zadłużenia dla: ${clientName}`, "info");
         }
     }
 }
-/* ======================================================== */
+
 /* ======================================================== */
 /* ✅ MODUŁ: Wyświetlanie stanu w Formularzu (Wklej na końcu) */
 /* ======================================================== */
