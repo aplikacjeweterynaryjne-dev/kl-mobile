@@ -23982,21 +23982,31 @@ async function checkAndShowClientDebt(clientName) {
     }
 
     try {
-        // ✅ POPRAWKA 1: Usuwamy puste spacje z nazwy klienta dla pewności
-        const safeClientName = clientName.trim();
+        // ✅ POPRAWKA 1: Zamieniamy na małe litery do elastycznego szukania (Case-Insensitive)
+        const safeClientNameLower = clientName.trim().toLowerCase();
         
-        const q = db.collection("archiwumParagony")
-            .where("id_lecznicy", "==", currentUserProfile['ID lecznicy'])
-            .where("klient", "==", safeClientName)
-            .where("status", "==", "Dług");
+        // ✅ POPRAWKA 2: Pobieramy WSZYSTKIE długi dla lecznicy/lekarza i filtrujemy je w JavaScript, 
+        // tak jak robi to Archiwum. Dzięki temu nie omijamy różnic w wielkości liter!
+        let q = db.collection("archiwumParagony").where("status", "==", "Dług");
+
+        if (currentUserProfile.Rola === 'administrator' || currentUserProfile.Rola === 'właściciel') {
+            q = q.where("id_lecznicy", "==", currentUserProfile['ID lecznicy']);
+        } else {
+            q = q.where("lekarz_uid", "==", currentUserProfile.uid);
+        }
 
         const snapshot = await q.get();
         
         let totalDebt = 0;
         snapshot.forEach(doc => {
-            // ✅ POPRAWKA 2: Zabezpieczenie przed ucinaniem kwot po przecinku
-            const sumaString = String(doc.data().suma || "0").replace(',', '.');
-            totalDebt += parseFloat(sumaString) || 0;
+            const data = doc.data();
+            const docClientName = (data.klient || "").toLowerCase();
+            
+            // ✅ POPRAWKA 3: Zliczamy TYLKO jeśli nazwa z bazy zawiera wpisaną nazwę
+            if (docClientName.includes(safeClientNameLower)) {
+                const sumaString = String(data.suma || "0").replace(',', '.');
+                totalDebt += parseFloat(sumaString) || 0;
+            }
         });
 
         if (totalDebt > 0) {
@@ -24013,7 +24023,7 @@ async function checkAndShowClientDebt(clientName) {
                 const link = document.getElementById('debtLink');
                 if (link) {
                     link.addEventListener('click', () => {
-                        goToArchiveDebtView(safeClientName);
+                        goToArchiveDebtView(clientName.trim());
                     });
                 }
             }, 100);
@@ -24063,15 +24073,12 @@ async function goToArchiveDebtView(clientName) {
     
     if (typeof loadReceiptsForUser === 'function') {
         
-        // ✅ POPRAWKA 3: Ustawiamy filtry PRZED pobraniem, a daty czyścimy całkowicie
         document.getElementById('arcReceiptDateStart').value = '';
         document.getElementById('arcReceiptDateEnd').value = '';
         
         if (clientInput) clientInput.value = clientName;
         if (statusSelect) statusSelect.value = "Dług";
         
-        // ✅ POPRAWKA 4: Wywołujemy z trybem 'filter'. 
-        // To każe systemowi pobrać PEŁNĄ historię z bazy danych (a nie tylko 30 dni)
         await loadReceiptsForUser(targetUserValue, 'filter');
         
         if (typeof showToast === 'function') {
