@@ -4217,14 +4217,18 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
         </div>
     </div>
 
-    <div id="archiveCardFilterControls" class="archive-filter-controls" style="display: none;">
-    <input type="date" id="arcCardDateStart" title="Data od">
-    <input type="date" id="arcCardDateEnd" title="Data do">
-    <input type="text" id="arcCardClient" placeholder="Filtruj klienta...">
-    <input type="text" id="arcCardDoc" placeholder="Filtruj nr dok...">
-    <button id="btnFilterCards" class="btn primary" style="grid-column: 1 / -1;" onclick="loadCardsForUser(archiveUserSelect.value, 'filter')">🔍 Filtruj Wyniki</button>
-    <button id="printSelectedCardsBtn" class="btn" style="background-color: #34495e; color: white; grid-column: 1 / -1;">🖨️ Drukuj Zaznaczone (0)</button>
-</div>
+  <div id="archiveCardFilterControls" class="archive-filter-controls" style="display: none;">
+        <input type="date" id="arcCardDateStart" title="Data od">
+        <input type="date" id="arcCardDateEnd" title="Data do">
+        <input type="text" id="arcCardClient" placeholder="Filtruj klienta...">
+        <input type="text" id="arcCardDoc" placeholder="Filtruj nr dok...">
+        <button id="btnFilterCards" class="btn primary" style="grid-column: 1 / -1;" onclick="loadCardsForUser(archiveUserSelect.value, 'filter')">🔍 Filtruj Wyniki</button>
+        
+        <div style="grid-column: 1 / -1; display: flex; gap: 10px;">
+            <button id="printSelectedCardsBtn" class="btn" style="background-color: #34495e; color: white; flex: 1;">🖨️ Drukuj (0)</button>
+            <button id="emailSelectedCardsBtn" class="btn" style="background-color: #2980b9; color: white; flex: 1;" onclick="emailSelectedArchiveCards()">📧 Wyślij E-mail</button>
+        </div>
+    </div>
     <div class="table-container">
         <table id="archiveCardTable" class="sortable-table">
      <thead>
@@ -6848,6 +6852,12 @@ if (drukujBtn && printFormatModal) {
     drukujBtn.removeAttribute('onclick');
     
     drukujBtn.addEventListener('click', () => {
+        
+        // ✅ NOWA WALIDACJA ILOŚCI PRODUKTÓW
+        if (typeof validateProductsQuantity === 'function' && !validateProductsQuantity()) {
+            return; // Zatrzymuje otwieranie modala druku
+        }
+
         // ✅ NOWA WALIDACJA: Blokada druku przed zapisem (tylko dla magazynierów)
         if (currentUserProfile && currentUserProfile.uzywaStanowMagazynowych === true) {
             if (!isCurrentCardSaved) {
@@ -7358,10 +7368,14 @@ const saveCardToArchiveBtn = document.getElementById('saveCardToArchiveBtn');
  * Pkt 4: Listener dla przycisku "Zapisz w Archiwum"
  */
 /* ✅ MODUŁ 8 (OFFLINE-PROOF): Zapis Karty z wymuszeniem odblokowania */
-/* ✅ MODUŁ 8 + KOREKTY: Zapis Karty (Kompletna logika) */
 if (saveCardToArchiveBtn) {
     saveCardToArchiveBtn.addEventListener('click', async () => {
         
+        // ✅ NOWA WALIDACJA ILOŚCI PRODUKTÓW
+        if (typeof validateProductsQuantity === 'function' && !validateProductsQuantity()) {
+            return; // Zatrzymuje zapis, jeśli brakuje ilości
+        }
+
         // 1. Walidacja podstawowa
         if (!currentUserProfile || !currentUserProfile.uid) {
             alert("Nie można zapisać. Brak danych zalogowanego użytkownika.");
@@ -28202,6 +28216,204 @@ window.deleteSwiadectwo = async function(id) {
     const sel = document.getElementById('archiveSwiUserSelect');
     if (sel && sel.value) loadSwiadectwaForUser(sel.value, '180days');
 };
+    // ✅ NOWA FUNKCJA: Walidacja braku ilości przy wybranym produkcie
+function validateProductsQuantity() {
+    const rows = typeof rowsEditable === 'function' ? rowsEditable() : [];
+    for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        if (row.cells.length < 8) continue; // Pomiń wiersze specjalne
+
+        const lekInput = row.cells[4].querySelector('input');
+        const iloscInput = row.cells[6].querySelector('input[type="number"]');
+        
+        const lekName = lekInput ? lekInput.value.trim() : '';
+        const quantity = iloscInput ? parseFloat(iloscInput.value) : 0;
+
+        // Sprawdzamy, czy wybrano lek, ale ilość jest pusta, wynosi 0 lub jest NaN
+        if (lekName && (!quantity || quantity <= 0 || isNaN(quantity))) {
+            // Oznaczamy komórkę na czerwono
+            if (iloscInput) {
+                iloscInput.style.border = '2px solid red';
+                iloscInput.style.backgroundColor = '#fdf2f2';
+                setTimeout(() => {
+                    iloscInput.style.border = '';
+                    iloscInput.style.backgroundColor = '';
+                }, 4000);
+            }
+            
+            // Logika wyliczająca poprawny numer wiersza dla komunikatu
+            const nrWiersza = i > 8 ? i - 8 : i + 1;
+            const sekcja = i > 8 ? "Produkty pozostawione" : "Leczenie na miejscu";
+            
+            alert(`❌ BŁĄD!\n\nSekcja: ${sekcja} (Wiersz nr ${nrWiersza}):\nWybrano produkt "${lekName}", ale nie wpisano jego ILOŚCI.\n\nUzupełnij ilość przed zapisaniem lub wydrukowaniem karty!`);
+            return false; // Blokuje dalsze działanie
+        }
+    }
+    return true; // Wszystko OK
+}
+    // ✅ NOWA FUNKCJA: Generowanie i wysyłka zbiorczego PDF z zaznaczonych kart w archiwum
+async function emailSelectedArchiveCards() {
+    // 1. Zbieranie zaznaczonych ID z tabeli (zakładamy użycie klasy .archive-card-checkbox)
+    // Szukamy checkboxów, które nie są głównym zaznaczającym ("selectAll")
+    const checkboxes = document.querySelectorAll('#archiveCardTableBody input[type="checkbox"]:checked:not(#archiveSelectAllCheckbox)');
+    
+    if (checkboxes.length === 0) {
+        alert("Najpierw zaznacz na liście karty, które chcesz wysłać.");
+        return;
+    }
+
+    const ids = Array.from(checkboxes).map(cb => cb.dataset.id || cb.value).filter(id => id && id !== 'on');
+    if (ids.length === 0) {
+         alert("Błąd: Nie można odczytać identyfikatorów zaznaczonych kart.");
+         return;
+    }
+
+    const btn = document.getElementById('emailSelectedCardsBtn');
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '⏳ Generowanie PDF...';
+    btn.disabled = true;
+
+    if (typeof showToast === 'function') showToast("Pobieranie kart... to może chwilę potrwać.", "info");
+
+    try {
+        // 2. Tworzymy tymczasowy, ukryty kontener na układ A4 w poziomie (Landscape)
+        const printContainer = document.createElement('div');
+        printContainer.style.width = '297mm'; 
+        printContainer.style.padding = '10mm';
+        printContainer.style.background = 'white';
+        printContainer.style.color = 'black';
+        printContainer.style.position = 'absolute';
+        printContainer.style.left = '-9999px';
+        document.body.appendChild(printContainer);
+
+        // 3. Pętla pobierająca dokumenty z bazy
+        for (let i = 0; i < ids.length; i++) {
+            const docSnap = await db.collection("archiwumKarty").doc(ids[i]).get();
+            if (!docSnap.exists) continue;
+            
+            const data = docSnap.data();
+            
+            // 4. Budujemy HTML na podstawie danych z bazy 
+            let tbodyHtml = '';
+            (data.table || []).forEach((row) => {
+                const lp = row.logicalIndex > 8 ? row.logicalIndex - 8 : row.logicalIndex + 1;
+                tbodyHtml += `
+                    <tr>
+                        <td style="border: 1px solid #000; padding: 4px; text-align: center;">${lp}.</td>
+                        <td style="border: 1px solid #000; padding: 4px;">${row.opis || ''}</td>
+                        <td style="border: 1px solid #000; padding: 4px; text-align: center;">${row.liczba || ''}</td>
+                        <td style="border: 1px solid #000; padding: 4px;">${row.rozpoznanie || ''}</td>
+                        <td style="border: 1px solid #000; padding: 4px;">${row.lek || ''}</td>
+                        <td style="border: 1px solid #000; padding: 4px;">${row.seria || ''}</td>
+                        <td style="border: 1px solid #000; padding: 4px;">${row.iloscDawka || ''}</td>
+                        <td style="border: 1px solid #000; padding: 4px;">${row.karencja || ''}</td>
+                    </tr>
+                `;
+            });
+
+            const cardHtml = `
+                <div style="font-family: 'Nunito', sans-serif; font-size: 11px; color: #000;">
+                    <h2 style="text-align: center; font-size: 13px; font-weight: bold; margin-bottom: 10px;">KARTA LECZENIA ZWIERZĄT GOSPODARSKICH ORAZ ZWIERZĄT, Z KTÓRYCH POZYSKANE TKANKI LUB PRODUKTY SĄ PRZEZNACZONE DO SPOŻYCIA PRZEZ LUDZI / EWIDENCJA LECZENIA ZWIERZĄT</h2>
+                    
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 15px; font-size: 12px;">
+                        <div style="width: 33%;">
+                            <b>Nazwa i adres zakładu leczniczego:</b><br>${data.header.nazwaLecznicy || ''}<br>
+                            <b>Data wykonania:</b> ${data.header.dataWykonania || ''}<br>
+                            <b>Nr stada:</b> ${data.header.nrStada || ''}
+                        </div>
+                        <div style="width: 33%;">
+                            <b>Posiadacz zwierzęcia:</b><br>${data.header.klient || ''}<br>${data.header.adresKlienta || ''}
+                        </div>
+                        <div style="width: 33%;">
+                            <b>Data zgłoszenia:</b> ${data.header.dataZgloszenia || ''}<br>
+                            <b>Nr dokumentu:</b> ${data.header.nrDokumentu || ''}
+                        </div>
+                    </div>
+
+                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 15px; font-size: 10px;">
+                        <thead>
+                            <tr style="background: #EBF5E6;">
+                                <th style="border: 1px solid #000; padding: 4px;">Lp.</th>
+                                <th style="border: 1px solid #000; padding: 4px;">Opis zwierzęcia</th>
+                                <th style="border: 1px solid #000; padding: 4px;">Liczba</th>
+                                <th style="border: 1px solid #000; padding: 4px;">Rozpoznanie</th>
+                                <th style="border: 1px solid #000; padding: 4px;">Produkt leczniczy</th>
+                                <th style="border: 1px solid #000; padding: 4px;">Nr serii</th>
+                                <th style="border: 1px solid #000; padding: 4px;">Ilość / Dawkowanie</th>
+                                <th style="border: 1px solid #000; padding: 4px;">Karencja / Uwagi</th>
+                            </tr>
+                        </thead>
+                        <tbody>${tbodyHtml}</tbody>
+                    </table>
+
+                    <div style="display: flex; justify-content: space-between; margin-top: 30px;">
+                        <div style="text-align: center; width: 45%;">
+                            <b>Lekarz weterynarii</b><br>
+                            <img src="${data.header.podpisLekarzaImg || ''}" style="height: 50px; max-width: 200px; object-fit: contain; margin: 5px 0;"><br>
+                            ${data.header.podpisLekarzaLinia || ''}
+                        </div>
+                        <div style="text-align: center; width: 45%;">
+                            <b>Podpis posiadacza zwierzęcia</b><br>
+                            <img src="${data.podpisPosiadacza || ''}" style="height: 50px; max-width: 200px; object-fit: contain; margin: 5px 0;">
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            const cardDiv = document.createElement('div');
+            cardDiv.innerHTML = cardHtml;
+            
+            // Jeśli to nie jest ostatnia karta, wymuś podział strony
+            if (i < ids.length - 1) {
+                cardDiv.style.pageBreakAfter = 'always';
+                cardDiv.style.marginBottom = '15mm';
+            }
+            
+            printContainer.appendChild(cardDiv);
+        }
+
+        // 5. Ustawienia dla html2pdf (PDF poziomy, A4)
+        const opt = {
+            margin:       5,
+            filename:     'Karty_Leczenia_Zbiorcze.pdf',
+            image:        { type: 'jpeg', quality: 0.98 },
+            html2canvas:  { scale: 2, useCORS: true },
+            jsPDF:        { unit: 'mm', format: 'a4', orientation: 'landscape' }
+        };
+
+        // Generujemy blob z obiektem pliku
+        const pdfBlob = await html2pdf().set(opt).from(printContainer).output('blob');
+        document.body.removeChild(printContainer); // Sprzątanie DOM
+
+        // 6. Uruchomienie wysyłki/udostępniania
+        if (navigator.canShare && navigator.canShare({ files: [new File([pdfBlob], opt.filename, { type: 'application/pdf' })] })) {
+            const file = new File([pdfBlob], opt.filename, { type: 'application/pdf' });
+            await navigator.share({
+                title: 'Zestaw Kart Leczenia',
+                text: 'W załączniku przesyłam zbiorcze karty leczenia.',
+                files: [file]
+            });
+            if (typeof showToast === 'function') showToast("Gotowe!", "success");
+        } else {
+            // Fallback dla komputerów (PC) bez interfejsu Web Share
+            const fileURL = URL.createObjectURL(pdfBlob);
+            const a = document.createElement('a');
+            a.href = fileURL;
+            a.download = opt.filename;
+            a.click();
+            URL.revokeObjectURL(fileURL);
+            
+            alert("Plik PDF ze wszystkimi wybranymi kartami został pobrany na urządzenie. Możesz go teraz załączyć do dowolnej wiadomości e-mail.");
+        }
+
+    } catch (error) {
+        console.error("Błąd podczas generowania/wysyłania PDF:", error);
+        alert("Wystąpił błąd podczas generowania PDF z kartami.");
+    } finally {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    }
+}
 </script>
 </body>
 </html>
