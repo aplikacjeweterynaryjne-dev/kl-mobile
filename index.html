@@ -28251,21 +28251,16 @@ function validateProductsQuantity() {
     }
     return true; // Wszystko OK
 }
-   // ✅ NOWA FUNKCJA: Generowanie i wysyłka zbiorczego PDF z zaznaczonych kart w archiwum
+  // ✅ NOWA FUNKCJA: Wysyłka zbiorczej wiadomości z linkami do zaznaczonych kart
 async function emailSelectedArchiveCards() {
     const checkboxes = document.querySelectorAll('#archiveCardTableBody input[type="checkbox"]:checked:not(#archiveSelectAllCheckbox)');
     
     if (checkboxes.length === 0) {
-        alert("Najpierw zaznacz na liście karty, które chcesz wysłać.");
+        alert("Najpierw zaznacz na liście karty, które chcesz udostępnić.");
         return;
     }
 
-    // ✅ WALIDACJA LIMITU 5 KART
-    if (checkboxes.length > 5) {
-        alert("Ograniczenie systemowe: Możesz wysłać maksymalnie 5 kart jednorazowo.\nOdznacz kilka kart i spróbuj ponownie.");
-        return;
-    }
-
+    // Limit 5 kart ZNIESIONY!
     const ids = Array.from(checkboxes).map(cb => cb.dataset.id || cb.value).filter(id => id && id !== 'on');
     if (ids.length === 0) {
          alert("Błąd: Nie można odczytać identyfikatorów zaznaczonych kart.");
@@ -28274,165 +28269,46 @@ async function emailSelectedArchiveCards() {
 
     const btn = document.getElementById('emailSelectedCardsBtn');
     const originalText = btn.innerHTML;
-    btn.innerHTML = '⏳ Generowanie PDF...';
+    btn.innerHTML = '⏳ Przygotowywanie...';
     btn.disabled = true;
 
-    if (typeof showToast === 'function') showToast(`Pobieranie kart (${ids.length}/5)... to może chwilę potrwać.`, "info");
+    if (typeof showToast === 'function') showToast(`Przygotowywanie linków do ${ids.length} kart...`, "info");
 
     try {
-        // 2. Tworzymy tymczasowy kontener (ZMIANA: musi być w widocznym obszarze DOM, ale schowany "pod spodem")
-        const printContainer = document.createElement('div');
-        printContainer.id = "tempPdfContainer";
-        printContainer.style.width = '297mm'; 
-        printContainer.style.padding = '10mm';
-        printContainer.style.background = 'white';
-        printContainer.style.color = 'black';
-        printContainer.style.position = 'absolute';
-        printContainer.style.top = '0';
-        printContainer.style.left = '0';
-        printContainer.style.zIndex = '-9999'; // Schowane pod interfejsem aplikacji
-        document.body.appendChild(printContainer);
+        let messageText = "Przesyłam linki do wybranych kart leczenia:\n\n";
+        
+        // Pobieramy bazowy adres URL Twojej aplikacji
+        const baseUrl = window.location.origin + window.location.pathname;
 
-        // 3. Pętla pobierająca dokumenty z bazy
         for (let i = 0; i < ids.length; i++) {
             const docSnap = await db.collection("archiwumKarty").doc(ids[i]).get();
             if (!docSnap.exists) continue;
             
             const data = docSnap.data();
+            const nrDok = data.nrDokumentu || (data.header && data.header.nrDokumentu) || "Brak numeru";
             
-            // 4. Budujemy HTML
-            let tbodyHtml = '';
-            (data.table || []).forEach((row) => {
-                const lp = row.logicalIndex > 8 ? row.logicalIndex - 8 : row.logicalIndex + 1;
-                tbodyHtml += `
-                    <tr>
-                        <td style="border: 1px solid #000; padding: 4px; text-align: center;">${lp}.</td>
-                        <td style="border: 1px solid #000; padding: 4px;">${row.opis || ''}</td>
-                        <td style="border: 1px solid #000; padding: 4px; text-align: center;">${row.liczba || ''}</td>
-                        <td style="border: 1px solid #000; padding: 4px;">${row.rozpoznanie || ''}</td>
-                        <td style="border: 1px solid #000; padding: 4px;">${row.lek || ''}</td>
-                        <td style="border: 1px solid #000; padding: 4px;">${row.seria || ''}</td>
-                        <td style="border: 1px solid #000; padding: 4px;">${row.iloscDawka || ''}</td>
-                        <td style="border: 1px solid #000; padding: 4px;">${row.karencja || ''}</td>
-                    </tr>
-                `;
-            });
-
-            // Zabezpieczenie obrazków (obsługa ewentualnego braku podpisu, aby nie zepsuć PDF)
-            const docImg = data.header.podpisLekarzaImg ? `<img src="${data.header.podpisLekarzaImg}" style="height: 50px; max-width: 200px; object-fit: contain; margin: 5px 0;">` : '<div style="height: 50px;"></div>';
-            const clientImg = data.podpisPosiadacza ? `<img src="${data.podpisPosiadacza}" style="height: 50px; max-width: 200px; object-fit: contain; margin: 5px 0;">` : '<div style="height: 50px;"></div>';
-
-            const cardHtml = `
-                <div style="font-family: 'Nunito', Arial, sans-serif; font-size: 12px; color: #000; background: #fff; padding: 10px;">
-                    <h2 style="text-align: center; font-size: 14px; font-weight: bold; margin-bottom: 10px;">KARTA LECZENIA ZWIERZĄT GOSPODARSKICH ORAZ ZWIERZĄT, Z KTÓRYCH POZYSKANE TKANKI LUB PRODUKTY SĄ PRZEZNACZONE DO SPOŻYCIA PRZEZ LUDZI / EWIDENCJA LECZENIA ZWIERZĄT</h2>
-                    
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 15px; font-size: 13px;">
-                        <div style="width: 32%;">
-                            <b>Nazwa i adres zakładu leczniczego:</b><br>${data.header.nazwaLecznicy || ''}<br>
-                            <b>Data wykonania:</b> ${data.header.dataWykonania || ''}<br>
-                            <b>Nr stada:</b> ${data.header.nrStada || ''}
-                        </div>
-                        <div style="width: 32%;">
-                            <b>Posiadacz zwierzęcia:</b><br>${data.header.klient || ''}<br>${data.header.adresKlienta || ''}
-                        </div>
-                        <div style="width: 32%;">
-                            <b>Data zgłoszenia:</b> ${data.header.dataZgloszenia || ''}<br>
-                            <b>Nr dokumentu:</b> ${data.header.nrDokumentu || ''}
-                        </div>
-                    </div>
-
-                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 15px; font-size: 11px;">
-                        <thead>
-                            <tr style="background: #EBF5E6;">
-                                <th style="border: 1px solid #000; padding: 4px;">Lp.</th>
-                                <th style="border: 1px solid #000; padding: 4px;">Opis zwierzęcia</th>
-                                <th style="border: 1px solid #000; padding: 4px;">Liczba</th>
-                                <th style="border: 1px solid #000; padding: 4px;">Rozpoznanie</th>
-                                <th style="border: 1px solid #000; padding: 4px;">Produkt leczniczy</th>
-                                <th style="border: 1px solid #000; padding: 4px;">Nr serii</th>
-                                <th style="border: 1px solid #000; padding: 4px;">Ilość / Dawkowanie</th>
-                                <th style="border: 1px solid #000; padding: 4px;">Karencja / Uwagi</th>
-                            </tr>
-                        </thead>
-                        <tbody>${tbodyHtml}</tbody>
-                    </table>
-
-                    <div style="display: flex; justify-content: space-between; margin-top: 40px;">
-                        <div style="text-align: center; width: 45%;">
-                            <b>Lekarz weterynarii</b><br>
-                            ${docImg}<br>
-                            ${data.header.podpisLekarzaLinia || ''}
-                        </div>
-                        <div style="text-align: center; width: 45%;">
-                            <b>Podpis posiadacza zwierzęcia</b><br>
-                            ${clientImg}
-                        </div>
-                    </div>
-                </div>
-            `;
+            // Generujemy link do konkretnej karty (zakładając domyślny parametr ?id=)
+            const cardLink = `${baseUrl}?id=${ids[i]}`; 
             
-            const cardDiv = document.createElement('div');
-            cardDiv.innerHTML = cardHtml;
-            
-            // Wymuszenie łamania strony po każdej karcie (oprócz ostatniej) specjalną klasą html2pdf
-            if (i < ids.length - 1) {
-                cardDiv.style.pageBreakAfter = 'always';
-                const pageBreak = document.createElement('div');
-                pageBreak.className = 'html2pdf__page-break';
-                cardDiv.appendChild(pageBreak);
-            }
-            
-            printContainer.appendChild(cardDiv);
+            messageText += `Karta nr: ${nrDok}\nLink: ${cardLink}\n\n`;
         }
 
-        // ZMIANA: Dajemy przeglądarce 800ms na załadowanie i wyrenderowanie wszystkich obrazków (podpisów) w DOM, zanim uruchomimy "robienie zdjęcia"
-        await new Promise(resolve => setTimeout(resolve, 800));
-
-        // 5. Ustawienia dla html2pdf
-        const opt = {
-            margin:       [5, 5, 5, 5],
-            filename:     'Karty_Leczenia_Zbiorcze.pdf',
-            image:        { type: 'jpeg', quality: 0.98 },
-            html2canvas:  { scale: 2, useCORS: true, logging: false },
-            jsPDF:        { unit: 'mm', format: 'a4', orientation: 'landscape' },
-            pagebreak:    { mode: ['css', 'legacy'] }
-        };
-
-        // Generujemy blob z obiektem pliku
-        const pdfBlob = await html2pdf().set(opt).from(printContainer).output('blob');
-        
-        // Sprzątanie po wygenerowaniu
-        if (document.getElementById('tempPdfContainer')) {
-            document.body.removeChild(document.getElementById('tempPdfContainer'));
-        }
-
-        // 6. Uruchomienie udostępniania (mobile/share) lub pobierania (PC)
-        if (navigator.canShare && navigator.canShare({ files: [new File([pdfBlob], opt.filename, { type: 'application/pdf' })] })) {
-            const file = new File([pdfBlob], opt.filename, { type: 'application/pdf' });
+        // 6. Uruchomienie udostępniania (mobile/share) lub okna e-mail (PC)
+        if (navigator.canShare) {
             await navigator.share({
                 title: 'Zestaw Kart Leczenia',
-                text: 'W załączniku przesyłam zbiorcze karty leczenia.',
-                files: [file]
+                text: messageText
             });
             if (typeof showToast === 'function') showToast("Gotowe!", "success");
         } else {
-            // Fallback dla komputerów stacjonarnych i starszych urządzeń
-            const fileURL = URL.createObjectURL(pdfBlob);
-            const a = document.createElement('a');
-            a.href = fileURL;
-            a.download = opt.filename;
-            a.click();
-            URL.revokeObjectURL(fileURL);
-            
-            alert("Plik PDF ze wszystkimi wybranymi kartami został pobrany na urządzenie. Możesz go teraz załączyć do wiadomości e-mail.");
+            // Fallback dla komputerów (PC) - otwiera domyślnego klienta e-mail (np. Outlook/Gmail)
+            const mailtoLink = `mailto:?subject=${encodeURIComponent("Zestaw Kart Leczenia")}&body=${encodeURIComponent(messageText)}`;
+            window.location.href = mailtoLink;
         }
 
     } catch (error) {
-        console.error("Błąd podczas generowania/wysyłania PDF:", error);
-        alert("Wystąpił błąd podczas generowania PDF z kartami.");
-        if (document.getElementById('tempPdfContainer')) {
-            document.body.removeChild(document.getElementById('tempPdfContainer'));
-        }
+        console.error("Błąd podczas generowania linków:", error);
+        alert("Wystąpił błąd podczas przygotowywania linków.");
     } finally {
         btn.innerHTML = originalText;
         btn.disabled = false;
