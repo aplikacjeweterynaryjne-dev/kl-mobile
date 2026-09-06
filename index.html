@@ -7498,8 +7498,12 @@ if (saveCardToArchiveBtn) {
                     karencjaCzysta = anyInput ? anyInput.value : tr.cells[7].textContent.replace('📅', '').trim();
                 }
 
+           // Zczytujemy klasę wiersza, by wiedzieć, z jakiej był sekcji
+                const isPozostawione = tr.classList.contains('row-pozostawione');
+
                 const rowData = {
                     logicalIndex: logicalIndex,
+                    isPozostawione: isPozostawione, // <--- NOWA FLAGA
                     opis: tr.cells[1].querySelector('input') ? tr.cells[1].querySelector('input').value : tr.cells[1].textContent,
                     liczba: tr.cells[2].querySelector('input') ? tr.cells[2].querySelector('input').value : '',
                     rozpoznanie: tr.cells[3].querySelector('input') ? tr.cells[3].querySelector('input').value : '',
@@ -13096,6 +13100,10 @@ archiveCardTableBody.addEventListener('click', async (e) => {
  * - FIX: Wyświetla podpis klienta.
  * - FIX: Usuwa ikonę kalendarza z tekstu.
  */
+/**
+ * ✅ POPRAWIONA FUNKCJA: Buduje podgląd karty w modalu Archiwum.
+ * DYNAMICZNA WERSJA - dopasowuje się do rosnącej tabeli!
+ */
 function buildArchivedCardView(card) {
     const header = card.header;
 
@@ -13112,22 +13120,16 @@ function buildArchivedCardView(card) {
 
     const savedRows = card.table || [];
     
-    const findRowData = (logicalIndex) => {
-        return savedRows.find(r => r.logicalIndex === logicalIndex);
-    };
-    
     // Funkcja czyszcząca (usuwa HTML i ikonę kalendarza)
     const cleanContent = (content) => {
         if (!content) return '';
         let text = content;
-        // Jeśli to HTML z inputem
         if (content.includes('<')) {
             const tempDiv = document.createElement('div');
             tempDiv.innerHTML = content;
             const input = tempDiv.querySelector('input, textarea');
             text = input ? (input.value + ' ' + (tempDiv.textContent || '')) : tempDiv.textContent;
         }
-        // Usuń ikonę kalendarza
         return text.replace('📅', '').trim();
     };
     
@@ -13138,24 +13140,17 @@ function buildArchivedCardView(card) {
         return td;
     };
 
-    for (let i = 1; i <= 13; i++) {
+    // --- 1. Dzielimy wiersze na dwie grupy (po nowej fladze lub po starym indeksie) ---
+    const naMiejscuRows = savedRows.filter(r => r.hasOwnProperty('isPozostawione') ? !r.isPozostawione : r.logicalIndex < 9);
+    const pozostawioneRows = savedRows.filter(r => r.hasOwnProperty('isPozostawione') ? r.isPozostawione : r.logicalIndex >= 9);
+
+    // --- 2. Rysujemy "Leczenie na miejscu" (minimum 9 wierszy dla estetyki) ---
+    const targetNaMiejscu = Math.max(9, naMiejscuRows.length);
+    for (let i = 0; i < targetNaMiejscu; i++) {
         const tr = tbody.insertRow();
-        let logicalIndex = -1;
-        let displayLp = '';
+        const rowData = naMiejscuRows[i];
+        const displayLp = `${i + 1}.`;
 
-        if (i < 10) {
-            logicalIndex = i - 1; 
-            displayLp = `${i}.`;
-        } else if (i === 10) {
-            tr.innerHTML = `<td colspan="8" style="font-weight: bold; padding: 3px 2px;">Potwierdzenie nabycia produktu leczniczego weterynaryjnego/paszy leczniczej</td>`;
-            continue;
-        } else {
-            logicalIndex = i - 2; 
-            displayLp = `${i - 10}.`; 
-        }
-
-        const rowData = findRowData(logicalIndex);
-        
         if (rowData) {
             tr.appendChild(createCell(displayLp, true));
             tr.appendChild(createCell(rowData.opis));
@@ -13170,11 +13165,35 @@ function buildArchivedCardView(card) {
         }
     }
 
-    // 3. Wypełnij Podpisy
+    // --- 3. Wiersz rozdzielający ---
+    const sepTr = tbody.insertRow();
+    sepTr.innerHTML = `<td colspan="8" style="font-weight: bold; padding: 3px 2px;">Potwierdzenie nabycia produktu leczniczego weterynaryjnego/paszy leczniczej</td>`;
+
+    // --- 4. Rysujemy "Produkty pozostawione" (minimum 3 wiersze) ---
+    const targetPozostawione = Math.max(3, pozostawioneRows.length);
+    for (let i = 0; i < targetPozostawione; i++) {
+        const tr = tbody.insertRow();
+        const rowData = pozostawioneRows[i];
+        const displayLp = `${i + 1}.`;
+
+        if (rowData) {
+            tr.appendChild(createCell(displayLp, true));
+            tr.appendChild(createCell(rowData.opis));
+            tr.appendChild(createCell(rowData.liczba, true));
+            tr.appendChild(createCell(rowData.rozpoznanie)); 
+            tr.appendChild(createCell(rowData.lek));
+            tr.appendChild(createCell(rowData.seria, true));
+            tr.appendChild(createCell(rowData.iloscDawka));
+            tr.appendChild(createCell(rowData.karencja));
+        } else {
+            tr.innerHTML = `<td style="text-align: center;">${displayLp}</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>`;
+        }
+    }
+
+    // 5. Wypełnij Podpisy
     document.getElementById('archive_doctor-signature').src = header.podpisLekarzaImg || '';
     document.getElementById('archive_doctor-signature-name').textContent = header.podpisLekarzaLinia || '';
     
-    // ✅ FIX: Ustawienie podpisu posiadacza
     const imgPosiadacz = document.getElementById('archive_podpisPosiadacza');
     if (card.podpisPosiadacza && card.podpisPosiadacza.length > 100) {
         imgPosiadacz.src = card.podpisPosiadacza;
