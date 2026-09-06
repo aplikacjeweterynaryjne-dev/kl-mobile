@@ -13116,22 +13116,16 @@ function buildArchivedCardView(card) {
 
     const savedRows = card.table || [];
     
-    const findRowData = (logicalIndex) => {
-        return savedRows.find(r => r.logicalIndex === logicalIndex);
-    };
-    
-    // Funkcja czyszcząca (usuwa HTML i ikonę kalendarza)
+   // Funkcja czyszcząca (usuwa HTML i ikonę kalendarza)
     const cleanContent = (content) => {
         if (!content) return '';
         let text = content;
-        // Jeśli to HTML z inputem
         if (content.includes('<')) {
             const tempDiv = document.createElement('div');
             tempDiv.innerHTML = content;
             const input = tempDiv.querySelector('input, textarea');
             text = input ? (input.value + ' ' + (tempDiv.textContent || '')) : tempDiv.textContent;
         }
-        // Usuń ikonę kalendarza
         return text.replace('📅', '').trim();
     };
     
@@ -13142,19 +13136,50 @@ function buildArchivedCardView(card) {
         return td;
     };
 
-    // Dzielimy zapisane wiersze na dwie grupy przy użyciu zapisanej w bazie flagi
-    const naMiejscuRows = savedRows.filter(r => !r.isPozostawione);
-    const pozostawioneRows = savedRows.filter(r => r.isPozostawione);
+    // --- INTELIGENTNY PODZIAŁ WIERSZY (OBSŁUGA NOWYCH I STARYCH KART) ---
+    const naMiejscuRows = savedRows.filter(r => {
+        if (r.hasOwnProperty('isPozostawione')) return r.isPozostawione === false;
+        return r.logicalIndex < 9; // Ratunek dla starych kart w bazie
+    });
 
-    // Zapewniamy zachowanie formatu wizualnego (minimum 9 i 3 puste wiersze, lub więcej jeśli dodano dynamicznie)
+    const pozostawioneRows = savedRows.filter(r => {
+        if (r.hasOwnProperty('isPozostawione')) return r.isPozostawione === true;
+        return r.logicalIndex >= 9; // Ratunek dla starych kart w bazie
+    });
+
+    // Wymuszamy zachowanie formatu wizualnego (minimum 9 i 3 puste wiersze)
     const totalNaMiejscu = Math.max(9, naMiejscuRows.length);
     const totalPozostawione = Math.max(3, pozostawioneRows.length);
 
-    // 1. Renderowanie grupy: Leczenie na miejscu
+    // 1. Wypisywanie leczenia na miejscu
     for (let i = 0; i < totalNaMiejscu; i++) {
         const tr = tbody.insertRow();
         const displayLp = `${i + 1}.`;
         const rowData = naMiejscuRows[i];
+
+        if (rowData) {
+            tr.appendChild(createCell(displayLp, true));
+            tr.appendChild(createCell(rowData.opis));
+            tr.appendChild(createCell(rowData.liczba, true));
+            tr.appendChild(createCell(rowData.rozpoznanie)); 
+            tr.appendChild(createCell(rowData.lek));
+            tr.appendChild(createCell(rowData.seria, true));
+            tr.appendChild(createCell(rowData.iloscDawka));
+            tr.appendChild(createCell(rowData.karencja));
+        } else {
+            tr.innerHTML = `<td style="text-align: center;">${displayLp}</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>`;
+        }
+    }
+
+    // 2. Wypisywanie separatora
+    const sepTr = tbody.insertRow();
+    sepTr.innerHTML = `<td colspan="8" style="font-weight: bold; padding: 3px 2px; text-align: left;">Potwierdzenie nabycia produktu leczniczego weterynaryjnego/paszy leczniczej</td>`;
+
+    // 3. Wypisywanie produktów pozostawionych
+    for (let i = 0; i < totalPozostawione; i++) {
+        const tr = tbody.insertRow();
+        const displayLp = `${i + 1}.`;
+        const rowData = pozostawioneRows[i];
 
         if (rowData) {
             tr.appendChild(createCell(displayLp, true));
