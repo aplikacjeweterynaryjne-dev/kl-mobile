@@ -13146,6 +13146,16 @@ function buildArchivedCardView(card) {
         if (r.hasOwnProperty('isPozostawione')) return r.isPozostawione === true;
         return r.logicalIndex >= 9; // Ratunek dla starych kart w bazie
     });
+// --- INTELIGENTNY PODZIAŁ WIERSZY (OBSŁUGA NOWYCH I STARYCH KART) ---
+    const naMiejscuRows = savedRows.filter(r => {
+        if (r.isPozostawione !== undefined) return r.isPozostawione === false;
+        return r.logicalIndex < 9; // Ratunek dla starych kart w bazie
+    });
+
+    const pozostawioneRows = savedRows.filter(r => {
+        if (r.isPozostawione !== undefined) return r.isPozostawione === true;
+        return r.logicalIndex >= 9; // Ratunek dla starych kart w bazie
+    });
 
     // Wymuszamy zachowanie formatu wizualnego (minimum 9 i 3 puste wiersze)
     const totalNaMiejscu = Math.max(9, naMiejscuRows.length);
@@ -13171,35 +13181,11 @@ function buildArchivedCardView(card) {
         }
     }
 
-    // 2. Wypisywanie separatora
+    // 2. Wypisywanie separatora (TYLKO JEDEN RAZ!)
     const sepTr = tbody.insertRow();
     sepTr.innerHTML = `<td colspan="8" style="font-weight: bold; padding: 3px 2px; text-align: left;">Potwierdzenie nabycia produktu leczniczego weterynaryjnego/paszy leczniczej</td>`;
 
-    // 3. Wypisywanie produktów pozostawionych
-    for (let i = 0; i < totalPozostawione; i++) {
-        const tr = tbody.insertRow();
-        const displayLp = `${i + 1}.`;
-        const rowData = pozostawioneRows[i];
-
-        if (rowData) {
-            tr.appendChild(createCell(displayLp, true));
-            tr.appendChild(createCell(rowData.opis));
-            tr.appendChild(createCell(rowData.liczba, true));
-            tr.appendChild(createCell(rowData.rozpoznanie)); 
-            tr.appendChild(createCell(rowData.lek));
-            tr.appendChild(createCell(rowData.seria, true));
-            tr.appendChild(createCell(rowData.iloscDawka));
-            tr.appendChild(createCell(rowData.karencja));
-        } else {
-            tr.innerHTML = `<td style="text-align: center;">${displayLp}</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>`;
-        }
-    }
-
-    // 2. Renderowanie Separatora
-    const sepTr = tbody.insertRow();
-    sepTr.innerHTML = `<td colspan="8" style="font-weight: bold; padding: 3px 2px;">Potwierdzenie nabycia produktu leczniczego weterynaryjnego/paszy leczniczej</td>`;
-
-    // 3. Renderowanie grupy: Produkty pozostawione
+    // 3. Wypisywanie produktów pozostawionych (TYLKO JEDEN RAZ!)
     for (let i = 0; i < totalPozostawione; i++) {
         const tr = tbody.insertRow();
         const displayLp = `${i + 1}.`;
