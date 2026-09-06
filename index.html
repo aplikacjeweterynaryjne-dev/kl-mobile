@@ -13120,7 +13120,6 @@ function buildArchivedCardView(card) {
 
     const savedRows = card.table || [];
     
-    // Funkcja czyszcząca (usuwa HTML i ikonę kalendarza)
     const cleanContent = (content) => {
         if (!content) return '';
         let text = content;
@@ -13140,11 +13139,11 @@ function buildArchivedCardView(card) {
         return td;
     };
 
-    // --- 1. Dzielimy wiersze na dwie grupy (po nowej fladze lub po starym indeksie) ---
+    // 1. Podział na grupy (odczytuje nową flagę lub stary index dla wstecznej kompatybilności)
     const naMiejscuRows = savedRows.filter(r => r.hasOwnProperty('isPozostawione') ? !r.isPozostawione : r.logicalIndex < 9);
     const pozostawioneRows = savedRows.filter(r => r.hasOwnProperty('isPozostawione') ? r.isPozostawione : r.logicalIndex >= 9);
 
-    // --- 2. Rysujemy "Leczenie na miejscu" (minimum 9 wierszy dla estetyki) ---
+    // 2. Tabela Leczenie na miejscu (minimum 9 wierszy dla zachowania wyglądu)
     const targetNaMiejscu = Math.max(9, naMiejscuRows.length);
     for (let i = 0; i < targetNaMiejscu; i++) {
         const tr = tbody.insertRow();
@@ -13165,11 +13164,11 @@ function buildArchivedCardView(card) {
         }
     }
 
-    // --- 3. Wiersz rozdzielający ---
+    // 3. Wiersz Rozdzielający
     const sepTr = tbody.insertRow();
     sepTr.innerHTML = `<td colspan="8" style="font-weight: bold; padding: 3px 2px;">Potwierdzenie nabycia produktu leczniczego weterynaryjnego/paszy leczniczej</td>`;
 
-    // --- 4. Rysujemy "Produkty pozostawione" (minimum 3 wiersze) ---
+    // 4. Tabela Produkty pozostawione (minimum 3 wiersze)
     const targetPozostawione = Math.max(3, pozostawioneRows.length);
     for (let i = 0; i < targetPozostawione; i++) {
         const tr = tbody.insertRow();
@@ -13190,7 +13189,7 @@ function buildArchivedCardView(card) {
         }
     }
 
-    // 5. Wypełnij Podpisy
+    // Wypełnij Podpisy
     document.getElementById('archive_doctor-signature').src = header.podpisLekarzaImg || '';
     document.getElementById('archive_doctor-signature-name').textContent = header.podpisLekarzaLinia || '';
     
