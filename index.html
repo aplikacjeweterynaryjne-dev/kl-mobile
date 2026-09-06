@@ -348,16 +348,13 @@ max-height: 95vh;
 
 /* ======================================================== */
 
-/* ======================================================== */
 /* STYLE DLA WYDRUKU (aby zmieścić na A4)                   */
+
 /* ======================================================== */
+
 @media print {
 
-    /* Ukrywa puste, dynamiczne wiersze na wydruku A4 */
-    #karta tbody tr.hidden-dynamic-row,
-    #karta tbody tr[style*="display: none"] {
-        display: none !important;
-    }
+
 
 /* --- Ustawienia strony A4 --- */
 
@@ -3406,7 +3403,7 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
             <span class="nav-icon">📝</span>
             Na miejscu
         </button>
-        <button id="navProduktyPozostawione" class="btn small" data-target-index="30" data-nav-group="pozostawione">
+        <button id="navProduktyPozostawione" class="btn small" data-target-index="9" data-nav-group="pozostawione">
             <span class="nav-icon">📦</span>
             Pozostawione
         </button>
@@ -5620,12 +5617,11 @@ function generateRows(){
     const tbody = document.querySelector('#karta tbody');
     tbody.innerHTML = '';
     
-    // Zwiększamy pulę wierszy: 30 leczenie, 1 divider, 15 pozostawionych = 46
-    for (let i=1; i<=46; i++){
+    for (let i=1; i<=13; i++){
         const row = document.createElement('tr');
         
-        // Wiersz 31 - Rozdzielacz
-        if (i===31) {
+        // Wiersz 10 - Rozdzielacz (Bez zmian)
+        if (i===10) {
             const cell = document.createElement('td');
             cell.colSpan = 8;
             cell.style.textAlign = 'left';
@@ -5647,10 +5643,14 @@ function generateRows(){
             newCopyBtn.textContent = 'Przepisz dane z leczenia na miejscu';
             newCopyBtn.style.marginLeft = '10px';
             newCopyBtn.style.fontSize = '12px';
-            newCopyBtn.title = 'Kopiuje dane z pierwszych wierszy na dół';
+            newCopyBtn.title = 'Kopiuje dane z wierszy 1-3 do wierszy 10-12';
             newCopyBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
-                if (typeof copyRows123To101112 === 'function') copyRows123To101112();
+                if (typeof copyRows123To101112 === 'function') {
+                    copyRows123To101112();
+                } else {
+                    alert('Błąd: Funkcja kopiowania nie jest gotowa.');
+                }
             });
             mainContainer.appendChild(newCopyBtn);
 
@@ -5659,19 +5659,14 @@ function generateRows(){
             continue;
         }
 
-        // --- Logika ukrywania nadmiarowych wierszy ---
-        // Na start pokazujemy 9 wierszy leczenia (1-9) i 3 pozostawionych (32-34)
-        if ((i > 9 && i < 31) || (i > 34)) {
-            row.style.display = 'none';
-            row.classList.add('hidden-dynamic-row');
-        }
-
+        // Pozostałe wiersze
         for (let j=1; j<=8; j++){
             const cell = document.createElement('td');
             
+            // Kolumna 1: Lp. (Bez zmian)
             if (j===1) {
-                const logicalIndex = (i > 31) ? i - 2 : i - 1;
-                const rowNumText = (i > 31 ? i - 31 : i) + '.';
+                const logicalIndex = (i > 10) ? i - 2 : i - 1;
+                const rowNumText = (i > 10 ? i - 10 : i) + '.';
                 cell.textContent = rowNumText + ' '; 
                 const btn = document.createElement('button');
                 btn.textContent = '➡️';
@@ -5684,13 +5679,18 @@ function generateRows(){
                 cell.appendChild(btn);
             }
 
+            // Domyślne ustawienia (resetowane przez specyficzne kolumny)
+            // Ustawiamy contentEditable na false, bo teraz większość pól to inputy
             cell.contentEditable = false; 
+            
             if (j>=2 && j<=4) cell.classList.add('center-text');
 
-            if (j===2 && i!==31) {
+         // --- ✅ ZMIANA: Kolumna 2 (Opis zwierzęcia) otwiera Modal ---
+            if (j===2 && i!==10) {
                 cell.style.padding = '0';
                 const input = document.createElement('input');
                 input.type = 'text';
+                // input.setAttribute('list', 'listaOpisowZwierzat'); // ❌ USUWAMY TO
                 input.style.width = '100%';
                 input.style.height = '100%';
                 input.style.border = 'none';
@@ -5700,17 +5700,20 @@ function generateRows(){
                 input.style.fontSize = 'inherit';
                 input.style.background = 'transparent';
                 input.placeholder = 'Kliknij...';
-                input.readOnly = true; 
-                input.style.cursor = 'pointer'; 
+                input.readOnly = true; // ✅ Blokujemy pisanie bezpośrednie (wymuszamy modal na mobile)
+                input.style.cursor = 'pointer'; // Kursor łapki
 
+                // Kliknięcie otwiera modal
                 input.addEventListener('click', (e) => {
                     e.preventDefault();
-                    openAnimalDescModal(input); 
+                    openAnimalDescModal(input); // Otwórz modal dla tego pola
                 });
+
                 cell.appendChild(input);
             }
 
-            if (j===3 && i!==31){
+            // Kolumna 3: Input Liczby (Bez zmian)
+            if (j===3 && i!==10){
                 const input = document.createElement('input');
                 input.type = 'number';
                 input.inputMode = 'numeric';
@@ -5720,7 +5723,8 @@ function generateRows(){
                 cell.appendChild(input);
             }
 
-            if (j === 4 && i !== 31) {
+            // Kolumna 4: Input Rozpoznania (Bez zmian)
+            if (j === 4 && i !== 10) {
                 const input = document.createElement('input');
                 input.setAttribute('list', 'listaRozpoznan');
                 input.style.width = '95%';
@@ -5733,7 +5737,8 @@ function generateRows(){
                 cell.appendChild(input);
             }
 
-            if (j===5 && i!==31){
+            // Kolumna 5: Input Produktu (Bez zmian)
+            if (j===5 && i!==10){
                 const input = document.createElement('input');
                 input.setAttribute('list','listaLekow');
                 input.style.width = '95%';
@@ -5752,59 +5757,49 @@ function generateRows(){
                     iloscCell.innerHTML = `<input class="small-input" type="number" inputmode="numeric" pattern="[0-9]*" placeholder="ilość"> ${dawka||''}`;
                     
                     const smartInput = karCell.querySelector('input.karencja-input');
-                    if (smartInput) smartInput.value = kar;
-                    else karCell.textContent = kar;
+                    if (smartInput) {
+                        smartInput.value = kar;
+                    } else {
+                        karCell.textContent = kar;
+                    }
 
                     if (typeof validateCardStock === 'function') validateCardStock();
                 });
                 cell.appendChild(input);
             }
 
-            if (j === 8 && i > 31) {
+            // Kolumna 8 (Karencja/Uwagi) (Bez zmian)
+            if (j === 8 && i > 10) {
                 createSmartDosageCell(cell, row);
-            } else if (j === 8 && i <= 31) {
+            } else if (j === 8 && i <= 10) {
+                // Dla wierszy 1-9 to zwykła komórka edytowalna (chyba że chcesz input wszędzie)
+                // W poprzedniej wersji było contentEditable, tu zostawiamy input dla spójności
                  cell.contentEditable = true;
             }
             
-            if (j===6) cell.contentEditable = true;
-
-            // ✅ DETEKCJA WYPEŁNIANIA (Auto-Expand) - odkrywa nowe wiersze
-            if ([2,3,4,5,6,8].includes(j)) {
-                row.addEventListener('input', () => {
-                    checkAndExpandTable(row);
-                });
+            // Przywróć contentEditable dla kolumn 6 (Seria) i 7 (Ilość - tekstowa część) jeśli nie są inputami
+            if (j===6 || j===7) {
+                 // Uwaga: Kolumna 6 (nr serii) i 7 (ilość) są obsługiwane przez logikę produktu,
+                 // ale użytkownik może chcieć je ręcznie poprawić.
+                 // Tutaj zostawiamy domyślne (inputy są wstawiane dynamicznie po wyborze leku)
+                 // Jeśli nie ma leku, komórki są puste.
+                 // Aby umożliwić wpisanie serii ręcznie:
+                 if (j===6) cell.contentEditable = true;
             }
 
             row.appendChild(cell);
         }
         tbody.appendChild(row);
     }
-    populateRowSelect();
+   populateRowSelect();
     
-    if (typeof updateTablePlaceholders === 'function') updateTablePlaceholders();
-    if (typeof updateRowStyles === 'function') updateRowStyles();
-}
-
-// ✅ FUNKCJA DO ROZSZERZANIA TABELI (Wklej tuż pod generateRows)
-function checkAndExpandTable(currentRow) {
-    const tbody = document.querySelector('#karta tbody');
-    const logicalRows = rowsEditable();
-    const logicalIndex = logicalRows.indexOf(currentRow);
-    
-    let isSection1 = logicalIndex >= 0 && logicalIndex < 30;
-    let isSection2 = logicalIndex >= 30;
-    
-    let nextRow = null;
-    if (isSection1 && logicalIndex < 29) {
-        nextRow = logicalRows[logicalIndex + 1];
-    } else if (isSection2 && logicalIndex < logicalRows.length - 1) {
-        nextRow = logicalRows[logicalIndex + 1];
+    if (typeof updateTablePlaceholders === 'function') {
+        updateTablePlaceholders();
     }
 
-    if (nextRow && nextRow.style.display === 'none') {
-        nextRow.style.display = '';
-        nextRow.classList.remove('hidden-dynamic-row');
-        populateRowSelect(); 
+    // ✅ MODUŁ 3: Odśwież style wierszy przy generowaniu
+    if (typeof updateRowStyles === 'function') {
+        updateRowStyles();
     }
 }
 
@@ -5893,50 +5888,64 @@ document.getElementById('formNrStada').value = opt.dataset.nrstada || '';
 /* ---- Kopiowanie wierszy 1-3 do 10-12 (POPRAWIONA WERSJA - Obsługa Inputów) ---- */
 function copyRows123To101112() {
     const logicalRows = rowsEditable();
+    if (logicalRows.length < 12) {
+        alert('Błąd: Tabela nie ma wystarczającej liczby wierszy (wymagane 12).');
+        return;
+    }
 
+    // Wiersze 1-3 (indeksy 0, 1, 2)
     const sources = [logicalRows[0], logicalRows[1], logicalRows[2]];
-    const targets = [logicalRows[30], logicalRows[31], logicalRows[32]]; // Przesunięte indeksy docelowe
+    // Wiersze 10-12 (indeksy 9, 10, 11)
+    const targets = [logicalRows[9], logicalRows[10], logicalRows[11]];
 
     let copied = false;
     for (let i = 0; i < 3; i++) {
         const src = sources[i];
         const target = targets[i];
 
+        // Sprawdzamy, czy wiersz źródłowy ma jakiekolwiek dane
         if (typeof isRowEmpty === 'function' && !isRowEmpty(src)) {
-            // Odkrywamy docelowy wiersz, jeśli był schowany
-            target.style.display = '';
-            target.classList.remove('hidden-dynamic-row');
-
+            
+            // 1. Kopiuj Kolumnę 2 (Opis zwierzęcia) - ✅ POPRAWKA TUTAJ
             const srcOpisInput = src.cells[1].querySelector('input');
             const srcOpisValue = srcOpisInput ? srcOpisInput.value : src.cells[1].textContent;
             
             const tgtOpisInput = target.cells[1].querySelector('input');
-            if (tgtOpisInput) tgtOpisInput.value = srcOpisValue;
-            else target.cells[1].textContent = srcOpisValue;
+            if (tgtOpisInput) {
+                tgtOpisInput.value = srcOpisValue;
+            } else {
+                target.cells[1].textContent = srcOpisValue;
+            }
             
+            // 2. Kopiuj Kolumnę 3 (Liczba)
             const srcLiczbaInput = src.cells[2].querySelector('input');
             const tgtLiczbaInput = target.cells[2].querySelector('input');
-            if (srcLiczbaInput && tgtLiczbaInput) tgtLiczbaInput.value = srcLiczbaInput.value;
+            if (srcLiczbaInput && tgtLiczbaInput) {
+                tgtLiczbaInput.value = srcLiczbaInput.value;
+            }
             
+            // 3. Kopiuj Kolumnę 4 (Rozpoznanie)
             const srcRozpInput = src.cells[3].querySelector('input');
             const tgtRozpInput = target.cells[3].querySelector('input');
-            if (srcRozpInput && tgtRozpInput) tgtRozpInput.value = srcRozpInput.value;
+            if (srcRozpInput && tgtRozpInput) {
+                tgtRozpInput.value = srcRozpInput.value;
+            }
 
             copied = true;
         }
     }
 
     if (copied) {
-        populateRowSelect(); // Odśwież widoczność w selekcie formularza
+        // Podświetl i przewiń do pierwszego docelowego wiersza (Wiersz 10)
         const firstTarget = targets[0];
         firstTarget.scrollIntoView({ behavior: 'smooth', block: 'center' });
         targets.forEach(t => {
             t.classList.add('highlight-row');
             setTimeout(() => t.classList.remove('highlight-row'), 2000);
         });
-        showToast('Skopiowano dane z pierwszych wierszy.', 'success');
+        showToast('Skopiowano dane z wierszy 1-3 do 10-12.', 'success');
     } else {
-        showToast('Pierwsze wiersze są puste. Nic nie skopiowano.', 'info');
+        showToast('Wiersze 1-3 są puste. Nic nie skopiowano.', 'info');
     }
 }
 
@@ -6063,18 +6072,17 @@ document.getElementById('nrDokumentu').value = nrDok;
 
 /* ---- Row select: wypełnij select indeksami logicznych wierszy (1..13 bez wiersza 10) ---- */
 function populateRowSelect(){
-    const sel = formRowSelect;
-    sel.innerHTML = '';
-    const logical = rowsEditable();
-    logical.forEach((tr, idx) => {
-        // Dodawaj do selecta TYLKO wiersze, które nie są ukryte
-        if (tr.style.display !== 'none') {
-            const opt = document.createElement('option');
-            opt.value = idx; 
-            opt.textContent = tr.cells[0].textContent;
-            sel.appendChild(opt);
-        }
-    });
+const sel = formRowSelect;
+sel.innerHTML = '';
+const logical = rowsEditable();
+logical.forEach((tr, idx) => {
+// compute displayed row number -> use first cell (like "1." etc)
+const display = tr.cells[0].textContent || (idx+1)+'.';
+const opt = document.createElement('option');
+opt.value = idx; // index within logical array
+opt.textContent = (idx+1) + '.';
+sel.appendChild(opt);
+});
 }
 /* ✅ POCZĄTEK: Moduł 5 - Funkcje wielokrotnego użytku do nawigacji po wierszach */
 
@@ -6108,36 +6116,61 @@ function goToPrevRow() {
  * ✅ POPRAWKA UX: Dla Wiersza 1 i 10 wymusza najpierw otwarcie zakładki Produkt.
  */
 function goToNextRow() {
+    console.log("Moduł 5: goToNextRow (Smart Navigation)");
     const sel = formRowSelect;
-    const currentIdx = parseInt(sel.value, 10); 
+    const currentIdx = parseInt(sel.value, 10); // Pobierz aktualny indeks wiersza
 
-    // Index 30 to teraz pierwszy wiersz produktów pozostawionych
-    if (currentIdx === 0 || currentIdx === 30) {
+    // --- 1. SPECJALNA LOGIKA DLA WIERSZA 1 (Index 0) i WIERSZA 10 (Index 9) ---
+    // Zapobiega pominięciu wpisania produktu przez odruchowe kliknięcie strzałki
+    if (currentIdx === 0 || currentIdx === 9) {
+        
+        // Sprawdzamy, czy pole produktu jest puste
         const productValue = document.getElementById('formLek').value.trim();
+        // Sprawdzamy, czy jesteśmy na zakładce 'Dane' (czyli użytkownik jeszcze nie wszedł w produkt)
         const isTabDaneActive = document.getElementById('tabDane').classList.contains('active-tab');
 
+        // WARUNEK: Jeśli jesteśmy na zakładce "Dane" LUB nie wybrano produktu
         if (isTabDaneActive || productValue === "") {
+            
+            // A. Najpierw zapisz to co użytkownik wpisał w "Dane" (Opis, Liczba, Rozpoznanie)
             saveRow(currentIdx);
-            if (typeof switchRowTab === 'function') switchRowTab('produkt');
+
+            // B. Przełącz wizualnie na zakładkę "Produkt"
+            if (typeof switchRowTab === 'function') {
+                switchRowTab('produkt');
+            }
+
+            // C. Symuluj kliknięcie w pole produktu, aby otworzyć Modal Wyszukiwania
             const lekInput = document.getElementById('formLek');
             if (lekInput) {
                 showToast("Uzupełnij produkt dla tego wiersza.", "info", 2000);
                 setTimeout(() => {
-                    lekInput.click(); 
+                    lekInput.click(); // To otworzy modal produktów
                     lekInput.focus();
                 }, 50);
             }
+
+            // 🛑 STOP: Nie przechodzimy do następnego wiersza!
             return; 
         }
     }
+    // --- KONIEC SPECJALNEJ LOGIKI ---
 
+
+    // --- 2. STANDARDOWA NAWIGACJA (Dla reszty wierszy lub gdy produkt jest już wybrany) ---
     const prevIdx = parseInt(sel.dataset.prevIndex, 10);
-    if (!isNaN(prevIdx)) saveRow(prevIdx);
     
+    // Autozapis bieżącego wiersza
+    if (!isNaN(prevIdx)) {
+        saveRow(prevIdx);
+    }
+    
+    // Przejdź do następnego indeksu w liście
     if (sel.selectedIndex < sel.options.length - 1) {
         sel.selectedIndex++;
     }
     
+    // Wywołaj zdarzenie 'change', aby odświeżyć formularz i wczytać nowy wiersz
     sel.dispatchEvent(new Event('change'));
 }
 /* ✅ KONIEC: Moduł 5 - Funkcje */
@@ -6252,18 +6285,22 @@ function updateFormLivePreview() {
 function selectRowInForm(logicalIndex){
     updateFormLivePreview();
     
+    // Przycisk "Kopiuj poprzedni"
     const formCopyPrevRowBtnContainer = document.getElementById('formCopyPrevRowBtnContainer');
     if (formCopyPrevRowBtnContainer) {
-        // Wiersz 0 (leczenie) lub 30 (pozostawione)
-        if (logicalIndex === 0 || logicalIndex === 30) formCopyPrevRowBtnContainer.style.display = 'none';
-        else formCopyPrevRowBtnContainer.style.display = 'block';
+        if (logicalIndex === 0 || logicalIndex === 9) {
+            formCopyPrevRowBtnContainer.style.display = 'none';
+        } else {
+            formCopyPrevRowBtnContainer.style.display = 'block';
+        }
     }
 
     const logical = rowsEditable();
     const row = logical[logicalIndex];
     if (!row) return;
 
-    if (logicalIndex === 0 || logicalIndex === 30) {
+    // "Nowe Dane"
+    if (logicalIndex === 0 || logicalIndex === 9) {
         formNoweDaneContainer.style.display = 'none';
         formRowDetailsContainer.style.display = 'block';
     } else {
@@ -6271,13 +6308,18 @@ function selectRowInForm(logicalIndex){
         formRowDetailsContainer.style.display = 'none';
     }
 
+    // Przycisk "Przepisz dane"
     const copyBtnContainer = document.getElementById('formCopyBtnContainer');
     if (copyBtnContainer) { 
-        if (logicalIndex >= 30) copyBtnContainer.style.display = 'block';
-        else copyBtnContainer.style.display = 'none';
+        if (logicalIndex >= 9 && logicalIndex <= 11) { 
+            copyBtnContainer.style.display = 'block';
+        } else {
+            copyBtnContainer.style.display = 'none';
+        }
     }
 
-    if (logicalIndex >= 30) {
+    // --- POKAŻ/UKRYJ GENERATOR DAT (tylko dla wierszy 10-12) ---
+    if (logicalIndex >= 9 && logicalIndex <= 11) {
         formDosageDates.style.display = 'block';
         formDosageDateStart.value = '';
         formDosageDateEnd.value = '';
@@ -6285,6 +6327,7 @@ function selectRowInForm(logicalIndex){
         formDosageDates.style.display = 'none';
     }
 
+    // Pobieranie danych do formularza
     const formOpis = document.getElementById('formOpis');
     const formLiczba = document.getElementById('formLiczba');
     const formRozpoznanie = document.getElementById('formRozpoznanie');
@@ -6295,7 +6338,7 @@ function selectRowInForm(logicalIndex){
     const formKarencja = document.getElementById('formKarencja');
 
     const cell1Input = row.cells[1].querySelector('input');
-    if (formOpis) formOpis.value = cell1Input ? cell1Input.value : row.cells[1].textContent.trim();
+if (formOpis) formOpis.value = cell1Input ? cell1Input.value : row.cells[1].textContent.trim();
     
     const inpLiczba = row.cells[2].querySelector('input');
     if (formLiczba) formLiczba.value = inpLiczba ? inpLiczba.value : '';
@@ -6318,21 +6361,37 @@ function selectRowInForm(logicalIndex){
     }
     if (formDawkowanie) formDawkowanie.value = tekstDawkowania;
 
+    // Wczytaj karencję
     if (formKarencja) {
         const karencjaCellElement = row.cells[7].querySelector('.karencja-input');
-        if (karencjaCellElement) formKarencja.value = karencjaCellElement.value;
-        else formKarencja.value = row.cells[7].textContent.trim();
+        if (karencjaCellElement) {
+            formKarencja.value = karencjaCellElement.value;
+        } else {
+            formKarencja.value = row.cells[7].textContent.trim();
+        }
     }
 
-    if (typeof updateProductTabVisibility === 'function') updateProductTabVisibility();
+    if (typeof updateProductTabVisibility === 'function') {
+        updateProductTabVisibility();
+    }
 
-    const forceProductTab = (logicalIndex >= 1 && logicalIndex <= 29) || (logicalIndex >= 31);
+    // Automatyczne przełączanie na "Produkt"
+    // Wiersze 2-9 to indeksy 1-8.
+    // Wiersze 11-12 to indeksy 10-11.
+    const forceProductTab = (logicalIndex >= 1 && logicalIndex <= 8) || (logicalIndex >= 10 && logicalIndex <= 11);
 
     if (forceProductTab) {
         if (typeof switchRowTab === 'function') switchRowTab('produkt');
+        
+        // ✅ NOWOŚĆ: Automatyczne otwarcie listy produktów
+        // Jeśli pole jest puste (lub chcesz otwierać zawsze), symulujemy kliknięcie
         if (formLek) {
-            setTimeout(() => { formLek.focus(); formLek.click(); }, 100); 
+            setTimeout(() => {
+                formLek.focus(); // Ustaw focus
+                formLek.click(); // Wywołaj kliknięcie (otwiera modal)
+            }, 100); // Małe opóźnienie, by UI zdążyło się przerysować
         }
+
     } else {
         const hasProduct = lekValue.trim() !== '';
         if (hasProduct) {
@@ -6342,13 +6401,18 @@ function selectRowInForm(logicalIndex){
         }
     }
     
+    // Tytuł wiersza
     const titleEl = document.getElementById('formRowTitle');
     if (titleEl) {
         let titleText = '';
-        if (logicalIndex >= 0 && logicalIndex <= 29) {
+        if (logicalIndex >= 0 && logicalIndex <= 8) {
             titleText = `Jesteś w wierszu nr ${logicalIndex + 1}`;
-        } else {
-            titleText = `Jesteś w produktach pozostawionych wiersz nr ${logicalIndex - 29}`;
+        } else if (logicalIndex === 9) {
+            titleText = 'Jesteś w produktach pozostawionych wiersz nr 1';
+        } else if (logicalIndex === 10) {
+            titleText = 'Jesteś w produktach pozostawionych wiersz nr 2';
+        } else if (logicalIndex === 11) {
+            titleText = 'Jesteś w produktach pozostawionych wiersz nr 3';
         }
         titleEl.textContent = titleText;
     }
@@ -7079,8 +7143,8 @@ function generate110mmReceiptHTML() {
     const podpisKlientaImg = document.getElementById('canvasPosiadacz')?.toDataURL() || '';
 
     const logicalRows = rowsEditable();
-    const leczenieNaMiejscuRows = logicalRows.slice(0, 30);
-    const leczeniePozostawioneRows = logicalRows.slice(30);
+    const leczenieNaMiejscuRows = logicalRows.slice(0, 9);
+    const leczeniePozostawioneRows = logicalRows.slice(9);
     const leczenieGrupy = groupRows(leczenieNaMiejscuRows);
     const pozostawioneGrupy = groupRows(leczeniePozostawioneRows);
 
