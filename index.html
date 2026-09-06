@@ -2521,12 +2521,6 @@ tr.filled-row td {
 .mini-day-cell.is-settled-other::after { content: '✔'; position: absolute; top: 0px; right: 2px; font-size: 11px; color: #d81b60; font-weight: 900;}
 .mini-day-cell.is-day-off { background-color: #36454F !important; color: #fff !important; border: 1px solid #2C3E50 !important; }
 .mini-day-cell.is-day-off::after { content: '🏖️'; position: absolute; top: 0px; right: 2px; font-size: 10px; }
-/* ✅ Ukrywanie pustych, nieużywanych wierszy przy druku A4 */
-@media print {
-    #karta tbody tr.empty-row {
-        display: none !important;
-    }
-}
 </style>
     <div id="calcProductSearchModal" class="product-search-modal" style="display: none; z-index: 10003;">
     <div class="product-search-card">
@@ -5618,109 +5612,133 @@ generateRows();
 setupClientAutoFill();
 
     }
-/* ---- generowanie wierszy (DYNAMICZNE ROSNĄCA TABELA) ---- */
-function generateRows() {
+/* ---- generowanie wierszy (ZMODYFIKOWANA O HISTORIĘ OPISÓW) ---- */
+function generateRows(){
     const tbody = document.querySelector('#karta tbody');
     tbody.innerHTML = '';
     
-    const createDivider = () => {
+    for (let i=1; i<=13; i++){
         const row = document.createElement('tr');
-        row.id = 'divider-row';
-        const cell = document.createElement('td');
-        cell.colSpan = 8;
-        cell.style.textAlign = 'left';
         
-        const mainContainer = document.createElement('div');
-        mainContainer.style.display = 'flex';
-        mainContainer.style.alignItems = 'center';
-        mainContainer.style.justifyContent = 'space-between';
-        cell.appendChild(mainContainer);
-
-        const textDiv = document.createElement('div');
-        textDiv.textContent = 'Potwierdzenie nabycia produktu leczniczego weterynaryjnego/paszy leczniczej';
-        textDiv.style.fontWeight = 'bold';
-        mainContainer.appendChild(textDiv);
-
-        const newCopyBtn = document.createElement('button');
-        newCopyBtn.id = 'copyBtnTable';
-        newCopyBtn.className = 'btn small';
-        newCopyBtn.textContent = 'Przepisz dane z leczenia na miejscu';
-        newCopyBtn.style.marginLeft = '10px';
-        newCopyBtn.style.fontSize = '12px';
-        newCopyBtn.title = 'Kopiuje dane do produktów pozostawionych';
-        newCopyBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            if (typeof copyRows123To101112 === 'function') copyRows123To101112();
-        });
-        mainContainer.appendChild(newCopyBtn);
-
-        row.appendChild(cell);
-        return row;
-    };
-
-    const buildRow = (groupType) => {
-        const row = document.createElement('tr');
-        row.dataset.group = groupType; 
-        row.classList.add('empty-row'); 
-        
-        for (let j = 1; j <= 8; j++) {
+        // Wiersz 10 - Rozdzielacz (Bez zmian)
+        if (i===10) {
             const cell = document.createElement('td');
-            cell.contentEditable = false; 
+            cell.colSpan = 8;
+            cell.style.textAlign = 'left';
             
-            if (j === 1) {
+            const mainContainer = document.createElement('div');
+            mainContainer.style.display = 'flex';
+            mainContainer.style.alignItems = 'center';
+            mainContainer.style.justifyContent = 'space-between';
+            cell.appendChild(mainContainer);
+
+            const textDiv = document.createElement('div');
+            textDiv.textContent = 'Potwierdzenie nabycia produktu leczniczego weterynaryjnego/paszy leczniczej';
+            textDiv.style.fontWeight = 'bold';
+            mainContainer.appendChild(textDiv);
+
+            const newCopyBtn = document.createElement('button');
+            newCopyBtn.id = 'copyBtnTable';
+            newCopyBtn.className = 'btn small';
+            newCopyBtn.textContent = 'Przepisz dane z leczenia na miejscu';
+            newCopyBtn.style.marginLeft = '10px';
+            newCopyBtn.style.fontSize = '12px';
+            newCopyBtn.title = 'Kopiuje dane z wierszy 1-3 do wierszy 10-12';
+            newCopyBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (typeof copyRows123To101112 === 'function') {
+                    copyRows123To101112();
+                } else {
+                    alert('Błąd: Funkcja kopiowania nie jest gotowa.');
+                }
+            });
+            mainContainer.appendChild(newCopyBtn);
+
+            row.appendChild(cell);
+            tbody.appendChild(row);
+            continue;
+        }
+
+        // Pozostałe wiersze
+        for (let j=1; j<=8; j++){
+            const cell = document.createElement('td');
+            
+            // Kolumna 1: Lp. (Bez zmian)
+            if (j===1) {
+                const logicalIndex = (i > 10) ? i - 2 : i - 1;
+                const rowNumText = (i > 10 ? i - 10 : i) + '.';
+                cell.textContent = rowNumText + ' '; 
                 const btn = document.createElement('button');
                 btn.textContent = '➡️';
                 btn.className = 'btn-edit-row';
-                btn.title = 'Edytuj w formularzu';
+                btn.title = 'Edytuj ten wiersz w formularzu';
                 btn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    const logicalIndex = rowsEditable().indexOf(row);
+                    e.stopPropagation(); 
                     openFormAtRow(logicalIndex);
                 });
                 cell.appendChild(btn);
             }
-            if (j >= 2 && j <= 4) cell.classList.add('center-text');
 
-            if (j === 2) {
+            // Domyślne ustawienia (resetowane przez specyficzne kolumny)
+            // Ustawiamy contentEditable na false, bo teraz większość pól to inputy
+            cell.contentEditable = false; 
+            
+            if (j>=2 && j<=4) cell.classList.add('center-text');
+
+         // --- ✅ ZMIANA: Kolumna 2 (Opis zwierzęcia) otwiera Modal ---
+            if (j===2 && i!==10) {
                 cell.style.padding = '0';
                 const input = document.createElement('input');
                 input.type = 'text';
+                // input.setAttribute('list', 'listaOpisowZwierzat'); // ❌ USUWAMY TO
                 input.style.width = '100%';
                 input.style.height = '100%';
                 input.style.border = 'none';
                 input.style.padding = '4px';
                 input.style.boxSizing = 'border-box';
+                input.style.fontFamily = 'inherit';
+                input.style.fontSize = 'inherit';
                 input.style.background = 'transparent';
                 input.placeholder = 'Kliknij...';
-                input.readOnly = true;
-                input.style.cursor = 'pointer';
-                input.addEventListener('click', (e) => { e.preventDefault(); openAnimalDescModal(input); });
+                input.readOnly = true; // ✅ Blokujemy pisanie bezpośrednie (wymuszamy modal na mobile)
+                input.style.cursor = 'pointer'; // Kursor łapki
+
+                // Kliknięcie otwiera modal
+                input.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    openAnimalDescModal(input); // Otwórz modal dla tego pola
+                });
+
                 cell.appendChild(input);
             }
 
-            if (j === 3) {
+            // Kolumna 3: Input Liczby (Bez zmian)
+            if (j===3 && i!==10){
                 const input = document.createElement('input');
                 input.type = 'number';
+                input.inputMode = 'numeric';
+                input.pattern = '[0-9]*';
                 input.style.width = '60px';
                 input.style.textAlign = 'center';
                 cell.appendChild(input);
             }
 
-            if (j === 4) {
+            // Kolumna 4: Input Rozpoznania (Bez zmian)
+            if (j === 4 && i !== 10) {
                 const input = document.createElement('input');
                 input.setAttribute('list', 'listaRozpoznan');
                 input.style.width = '95%';
                 input.placeholder = 'Rozpoznanie...';
                 input.addEventListener('input', function(){
                     this.parentElement.dataset.printValue = this.value;
-                    checkAndAddRow(row); 
                 });
-                if (typeof applySchema === 'function') input.addEventListener('input', applySchema);
-                if (typeof openSchemaSearchModalIfNeeded === 'function') input.addEventListener('dblclick', openSchemaSearchModalIfNeeded);
+                input.addEventListener('input', applySchema);
+                input.addEventListener('dblclick', openSchemaSearchModalIfNeeded);
                 cell.appendChild(input);
             }
 
-            if (j === 5) {
+            // Kolumna 5: Input Produktu (Bez zmian)
+            if (j===5 && i!==10){
                 const input = document.createElement('input');
                 input.setAttribute('list','listaLekow');
                 input.style.width = '95%';
@@ -5728,89 +5746,63 @@ function generateRows() {
                     const nrCell = row.cells[5];
                     const iloscCell = row.cells[6];
                     const karCell = row.cells[7];
+                    
                     const nazwa = this.value;
                     this.parentElement.dataset.printValue = nazwa;
-                    
                     const nr = mapaSerii[nazwa] || '';
                     const dawka = mapaIlosci[nazwa] || '';
                     const kar = mapaKarencji[nazwa] || '';
                     
                     nrCell.textContent = nr;
-                    iloscCell.innerHTML = `<input class="small-input" type="number" placeholder="ilość"> ${dawka||''}`;
+                    iloscCell.innerHTML = `<input class="small-input" type="number" inputmode="numeric" pattern="[0-9]*" placeholder="ilość"> ${dawka||''}`;
                     
                     const smartInput = karCell.querySelector('input.karencja-input');
-                    if (smartInput) smartInput.value = kar;
-                    else karCell.textContent = kar;
+                    if (smartInput) {
+                        smartInput.value = kar;
+                    } else {
+                        karCell.textContent = kar;
+                    }
 
                     if (typeof validateCardStock === 'function') validateCardStock();
-                    checkAndAddRow(row); 
                 });
                 cell.appendChild(input);
             }
 
-            if (j === 8 && groupType === 'left') {
-                if (typeof createSmartDosageCell === 'function') createSmartDosageCell(cell, row);
-            } else if (j === 8 && groupType === 'used') {
-                cell.contentEditable = true;
+            // Kolumna 8 (Karencja/Uwagi) (Bez zmian)
+            if (j === 8 && i > 10) {
+                createSmartDosageCell(cell, row);
+            } else if (j === 8 && i <= 10) {
+                // Dla wierszy 1-9 to zwykła komórka edytowalna (chyba że chcesz input wszędzie)
+                // W poprzedniej wersji było contentEditable, tu zostawiamy input dla spójności
+                 cell.contentEditable = true;
             }
-            if (j === 6) cell.contentEditable = true;
-
-            cell.addEventListener('input', () => {
-                row.classList.remove('empty-row');
-                checkAndAddRow(row);
-            });
+            
+            // Przywróć contentEditable dla kolumn 6 (Seria) i 7 (Ilość - tekstowa część) jeśli nie są inputami
+            if (j===6 || j===7) {
+                 // Uwaga: Kolumna 6 (nr serii) i 7 (ilość) są obsługiwane przez logikę produktu,
+                 // ale użytkownik może chcieć je ręcznie poprawić.
+                 // Tutaj zostawiamy domyślne (inputy są wstawiane dynamicznie po wyborze leku)
+                 // Jeśli nie ma leku, komórki są puste.
+                 // Aby umożliwić wpisanie serii ręcznie:
+                 if (j===6) cell.contentEditable = true;
+            }
 
             row.appendChild(cell);
         }
-        return row;
-    };
-
-    const checkAndAddRow = (currentRow) => {
-        currentRow.classList.remove('empty-row');
-        const group = currentRow.dataset.group;
-        const allInGroup = Array.from(tbody.querySelectorAll(`tr[data-group="${group}"]`));
-        
-        if (allInGroup.indexOf(currentRow) === allInGroup.length - 1) {
-            const newRow = buildRow(group);
-            if (group === 'used') {
-                tbody.insertBefore(newRow, document.getElementById('divider-row'));
-            } else {
-                tbody.appendChild(newRow);
-            }
-            updateRowNumbers();
-            populateRowSelect();
-        }
-    };
-
-    // Generujemy domyślną wielkość z możliwością rozrastania się
-    for (let i = 0; i < 9; i++) tbody.appendChild(buildRow('used'));
-    tbody.appendChild(createDivider());
-    for (let i = 0; i < 3; i++) tbody.appendChild(buildRow('left'));
+        tbody.appendChild(row);
+    }
+   populateRowSelect();
     
-    updateRowNumbers();
-    populateRowSelect();
-    
-    if (typeof updateTablePlaceholders === 'function') updateTablePlaceholders();
-    if (typeof updateRowStyles === 'function') updateRowStyles();
+    if (typeof updateTablePlaceholders === 'function') {
+        updateTablePlaceholders();
+    }
+
+    // ✅ MODUŁ 3: Odśwież style wierszy przy generowaniu
+    if (typeof updateRowStyles === 'function') {
+        updateRowStyles();
+    }
 }
 
-function updateRowNumbers() {
-    const logical = rowsEditable();
-    let usedCounter = 1;
-    let leftCounter = 1;
-    
-    logical.forEach((tr) => {
-        const btn = tr.cells[0].querySelector('button');
-        if (tr.dataset.group === 'used') {
-            tr.cells[0].textContent = usedCounter + '. ';
-            usedCounter++;
-        } else {
-            tr.cells[0].textContent = leftCounter + '. ';
-            leftCounter++;
-        }
-        if (btn) tr.cells[0].appendChild(btn);
-    });
-}
 /* ✅ DODAJ TĘ NOWĄ FUNKCJĘ: ✅ */
 
 /* ---- NOWA FUNKCJA: Otwiera formularz na konkretnym wierszu ---- */
@@ -5893,51 +5885,70 @@ document.getElementById('formNrStada').value = opt.dataset.nrstada || '';
 }
 });
 
-/* ---- Kopiowanie wierszy z leczenia na miejscu do produktów pozostawionych (DYNAMICZNE) ---- */
+/* ---- Kopiowanie wierszy 1-3 do 10-12 (POPRAWIONA WERSJA - Obsługa Inputów) ---- */
 function copyRows123To101112() {
     const logicalRows = rowsEditable();
-    const usedRows = logicalRows.filter(r => r.dataset.group === 'used');
-    const leftRows = logicalRows.filter(r => r.dataset.group === 'left');
+    if (logicalRows.length < 12) {
+        alert('Błąd: Tabela nie ma wystarczającej liczby wierszy (wymagane 12).');
+        return;
+    }
+
+    // Wiersze 1-3 (indeksy 0, 1, 2)
+    const sources = [logicalRows[0], logicalRows[1], logicalRows[2]];
+    // Wiersze 10-12 (indeksy 9, 10, 11)
+    const targets = [logicalRows[9], logicalRows[10], logicalRows[11]];
 
     let copied = false;
-    let limit = Math.min(3, usedRows.length, leftRows.length);
-    
-    for (let i = 0; i < limit; i++) {
-        const src = usedRows[i];
-        const target = leftRows[i];
+    for (let i = 0; i < 3; i++) {
+        const src = sources[i];
+        const target = targets[i];
 
+        // Sprawdzamy, czy wiersz źródłowy ma jakiekolwiek dane
         if (typeof isRowEmpty === 'function' && !isRowEmpty(src)) {
+            
+            // 1. Kopiuj Kolumnę 2 (Opis zwierzęcia) - ✅ POPRAWKA TUTAJ
             const srcOpisInput = src.cells[1].querySelector('input');
-            const tgtOpisInput = target.cells[1].querySelector('input');
             const srcOpisValue = srcOpisInput ? srcOpisInput.value : src.cells[1].textContent;
             
-            if (tgtOpisInput) tgtOpisInput.value = srcOpisValue;
-            else target.cells[1].textContent = srcOpisValue;
+            const tgtOpisInput = target.cells[1].querySelector('input');
+            if (tgtOpisInput) {
+                tgtOpisInput.value = srcOpisValue;
+            } else {
+                target.cells[1].textContent = srcOpisValue;
+            }
             
+            // 2. Kopiuj Kolumnę 3 (Liczba)
             const srcLiczbaInput = src.cells[2].querySelector('input');
             const tgtLiczbaInput = target.cells[2].querySelector('input');
-            if (srcLiczbaInput && tgtLiczbaInput) tgtLiczbaInput.value = srcLiczbaInput.value;
+            if (srcLiczbaInput && tgtLiczbaInput) {
+                tgtLiczbaInput.value = srcLiczbaInput.value;
+            }
             
+            // 3. Kopiuj Kolumnę 4 (Rozpoznanie)
             const srcRozpInput = src.cells[3].querySelector('input');
             const tgtRozpInput = target.cells[3].querySelector('input');
-            if (srcRozpInput && tgtRozpInput) tgtRozpInput.value = srcRozpInput.value;
+            if (srcRozpInput && tgtRozpInput) {
+                tgtRozpInput.value = srcRozpInput.value;
+            }
 
-            target.classList.remove('empty-row');
             copied = true;
         }
     }
-    
+
     if (copied) {
-        leftRows[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
-        leftRows.forEach(t => {
+        // Podświetl i przewiń do pierwszego docelowego wiersza (Wiersz 10)
+        const firstTarget = targets[0];
+        firstTarget.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        targets.forEach(t => {
             t.classList.add('highlight-row');
             setTimeout(() => t.classList.remove('highlight-row'), 2000);
         });
-        showToast('Skopiowano dane do produktów pozostawionych.', 'success');
+        showToast('Skopiowano dane z wierszy 1-3 do 10-12.', 'success');
     } else {
-        showToast('Wiersze są puste. Nic nie skopiowano.', 'info');
+        showToast('Wiersze 1-3 są puste. Nic nie skopiowano.', 'info');
     }
 }
+
 /* helper: zwraca tabelę logicznych (edytowalnych) wierszy jako tablica */
 function rowsEditable(){
 return [...document.querySelectorAll('#karta tbody tr')].filter(tr=>tr.cells.length === 8);
@@ -6271,25 +6282,25 @@ function updateFormLivePreview() {
 
 /* Plik: index.html (ZASTĄP CAŁĄ FUNKCJĘ selectRowInForm) */
 /* Plik: index.html (ZASTĄP CAŁĄ FUNKCJĘ selectRowInForm) */
-/* Plik: index.html (ZASTĄP CAŁĄ FUNKCJĘ selectRowInForm) */
 function selectRowInForm(logicalIndex){
     updateFormLivePreview();
     
+    // Przycisk "Kopiuj poprzedni"
+    const formCopyPrevRowBtnContainer = document.getElementById('formCopyPrevRowBtnContainer');
+    if (formCopyPrevRowBtnContainer) {
+        if (logicalIndex === 0 || logicalIndex === 9) {
+            formCopyPrevRowBtnContainer.style.display = 'none';
+        } else {
+            formCopyPrevRowBtnContainer.style.display = 'block';
+        }
+    }
+
     const logical = rowsEditable();
     const row = logical[logicalIndex];
     if (!row) return;
 
-    const isLeftGroup = row.dataset.group === 'left';
-    const isFirstInGroup = (logicalIndex === 0) || (logical[logicalIndex - 1]?.dataset.group !== row.dataset.group);
-
-    // Przycisk "Kopiuj poprzedni"
-    const formCopyPrevRowBtnContainer = document.getElementById('formCopyPrevRowBtnContainer');
-    if (formCopyPrevRowBtnContainer) {
-        formCopyPrevRowBtnContainer.style.display = isFirstInGroup ? 'none' : 'block';
-    }
-
     // "Nowe Dane"
-    if (isFirstInGroup) {
+    if (logicalIndex === 0 || logicalIndex === 9) {
         formNoweDaneContainer.style.display = 'none';
         formRowDetailsContainer.style.display = 'block';
     } else {
@@ -6297,14 +6308,18 @@ function selectRowInForm(logicalIndex){
         formRowDetailsContainer.style.display = 'none';
     }
 
-    // Przycisk "Przepisz dane" (Pokaż tylko dla grupy 'pozostawione')
+    // Przycisk "Przepisz dane"
     const copyBtnContainer = document.getElementById('formCopyBtnContainer');
     if (copyBtnContainer) { 
-        copyBtnContainer.style.display = isLeftGroup ? 'block' : 'none';
+        if (logicalIndex >= 9 && logicalIndex <= 11) { 
+            copyBtnContainer.style.display = 'block';
+        } else {
+            copyBtnContainer.style.display = 'none';
+        }
     }
 
-    // --- POKAŻ/UKRYJ GENERATOR DAT ---
-    if (isLeftGroup) {
+    // --- POKAŻ/UKRYJ GENERATOR DAT (tylko dla wierszy 10-12) ---
+    if (logicalIndex >= 9 && logicalIndex <= 11) {
         formDosageDates.style.display = 'block';
         formDosageDateStart.value = '';
         formDosageDateEnd.value = '';
@@ -6323,7 +6338,7 @@ function selectRowInForm(logicalIndex){
     const formKarencja = document.getElementById('formKarencja');
 
     const cell1Input = row.cells[1].querySelector('input');
-    if (formOpis) formOpis.value = cell1Input ? cell1Input.value : row.cells[1].textContent.trim();
+if (formOpis) formOpis.value = cell1Input ? cell1Input.value : row.cells[1].textContent.trim();
     
     const inpLiczba = row.cells[2].querySelector('input');
     if (formLiczba) formLiczba.value = inpLiczba ? inpLiczba.value : '';
@@ -6346,25 +6361,35 @@ function selectRowInForm(logicalIndex){
     }
     if (formDawkowanie) formDawkowanie.value = tekstDawkowania;
 
+    // Wczytaj karencję
     if (formKarencja) {
         const karencjaCellElement = row.cells[7].querySelector('.karencja-input');
-        if (karencjaCellElement) formKarencja.value = karencjaCellElement.value;
-        else formKarencja.value = row.cells[7].textContent.trim();
+        if (karencjaCellElement) {
+            formKarencja.value = karencjaCellElement.value;
+        } else {
+            formKarencja.value = row.cells[7].textContent.trim();
+        }
     }
 
-    if (typeof updateProductTabVisibility === 'function') updateProductTabVisibility();
+    if (typeof updateProductTabVisibility === 'function') {
+        updateProductTabVisibility();
+    }
 
-    // Logika zakładek formularza pozostaje zgodna, bez sztywnych numerów wierszy
-    const forceProductTab = !isFirstInGroup;
+    // Automatyczne przełączanie na "Produkt"
+    // Wiersze 2-9 to indeksy 1-8.
+    // Wiersze 11-12 to indeksy 10-11.
+    const forceProductTab = (logicalIndex >= 1 && logicalIndex <= 8) || (logicalIndex >= 10 && logicalIndex <= 11);
 
     if (forceProductTab) {
         if (typeof switchRowTab === 'function') switchRowTab('produkt');
         
+        // ✅ NOWOŚĆ: Automatyczne otwarcie listy produktów
+        // Jeśli pole jest puste (lub chcesz otwierać zawsze), symulujemy kliknięcie
         if (formLek) {
             setTimeout(() => {
-                formLek.focus(); 
-                formLek.click(); 
-            }, 100); 
+                formLek.focus(); // Ustaw focus
+                formLek.click(); // Wywołaj kliknięcie (otwiera modal)
+            }, 100); // Małe opóźnienie, by UI zdążyło się przerysować
         }
 
     } else {
@@ -6379,11 +6404,17 @@ function selectRowInForm(logicalIndex){
     // Tytuł wiersza
     const titleEl = document.getElementById('formRowTitle');
     if (titleEl) {
-        // Zamiast polegać na logicznym indeksie (np. +9), pobieramy tekst prosto z lewej komórki wiersza
-        const displayNum = parseInt(row.cells[0].textContent, 10);
-        titleEl.textContent = isLeftGroup 
-            ? `Jesteś w produktach pozostawionych wiersz nr ${displayNum}` 
-            : `Jesteś w wierszu nr ${displayNum}`;
+        let titleText = '';
+        if (logicalIndex >= 0 && logicalIndex <= 8) {
+            titleText = `Jesteś w wierszu nr ${logicalIndex + 1}`;
+        } else if (logicalIndex === 9) {
+            titleText = 'Jesteś w produktach pozostawionych wiersz nr 1';
+        } else if (logicalIndex === 10) {
+            titleText = 'Jesteś w produktach pozostawionych wiersz nr 2';
+        } else if (logicalIndex === 11) {
+            titleText = 'Jesteś w produktach pozostawionych wiersz nr 3';
+        }
+        titleEl.textContent = titleText;
     }
 }
 /* ⬆️ KONIEC ZASTĘPOWANIA ⬆️ */
@@ -7508,9 +7539,8 @@ if (saveCardToArchiveBtn) {
                     karencjaCzysta = anyInput ? anyInput.value : tr.cells[7].textContent.replace('📅', '').trim();
                 }
 
-               const rowData = {
+                const rowData = {
                     logicalIndex: logicalIndex,
-                    group: tr.dataset.group || (logicalIndex < 9 ? 'used' : 'left'), // ✅ KLUCZOWE: Zapis do bazy grupy wiersza
                     opis: tr.cells[1].querySelector('input') ? tr.cells[1].querySelector('input').value : tr.cells[1].textContent,
                     liczba: tr.cells[2].querySelector('input') ? tr.cells[2].querySelector('input').value : '',
                     rozpoznanie: tr.cells[3].querySelector('input') ? tr.cells[3].querySelector('input').value : '',
@@ -13123,6 +13153,10 @@ function buildArchivedCardView(card) {
 
     const savedRows = card.table || [];
     
+    const findRowData = (logicalIndex) => {
+        return savedRows.find(r => r.logicalIndex === logicalIndex);
+    };
+    
     // Funkcja czyszcząca (usuwa HTML i ikonę kalendarza)
     const cleanContent = (content) => {
         if (!content) return '';
@@ -13145,51 +13179,36 @@ function buildArchivedCardView(card) {
         return td;
     };
 
-    // --- LOGIKA DYNAMICZNA WSTAWIANIA WIERSZY ---
-    let usedCounter = 1;
-    let leftCounter = 1;
-
-    // 1. Odtwarzamy wiersze "na miejscu" (used)
-    // Wsparcie wsteczne: jeśli brak 'group', traktujemy logicalIndex < 9 jako 'used'
-    const usedRows = savedRows.filter(r => r.group === 'used' || (!r.group && r.logicalIndex < 9));
-    
-    usedRows.forEach(rowData => {
+    for (let i = 1; i <= 13; i++) {
         const tr = tbody.insertRow();
-        tr.appendChild(createCell(`${usedCounter++}.`, true));
-        tr.appendChild(createCell(rowData.opis));
-        tr.appendChild(createCell(rowData.liczba, true));
-        tr.appendChild(createCell(rowData.rozpoznanie)); 
-        tr.appendChild(createCell(rowData.lek));
-        tr.appendChild(createCell(rowData.seria, true));
-        tr.appendChild(createCell(rowData.iloscDawka));
-        tr.appendChild(createCell(rowData.karencja));
-    });
+        let logicalIndex = -1;
+        let displayLp = '';
 
-    // 2. Dodajemy na sztywno separator
-    const divider = tbody.insertRow();
-    divider.innerHTML = `<td colspan="8" style="font-weight: bold; padding: 3px 2px; text-align: left; background-color: #f9f9f9;">Potwierdzenie nabycia produktu leczniczego weterynaryjnego/paszy leczniczej</td>`;
+        if (i < 10) {
+            logicalIndex = i - 1; 
+            displayLp = `${i}.`;
+        } else if (i === 10) {
+            tr.innerHTML = `<td colspan="8" style="font-weight: bold; padding: 3px 2px;">Potwierdzenie nabycia produktu leczniczego weterynaryjnego/paszy leczniczej</td>`;
+            continue;
+        } else {
+            logicalIndex = i - 2; 
+            displayLp = `${i - 10}.`; 
+        }
 
-    // 3. Odtwarzamy wiersze "pozostawione" (left)
-    // Wsparcie wsteczne: jeśli brak 'group', traktujemy logicalIndex >= 9 jako 'left'
-    const leftRows = savedRows.filter(r => r.group === 'left' || (!r.group && r.logicalIndex >= 9));
-    
-    leftRows.forEach(rowData => {
-        const tr = tbody.insertRow();
-        tr.appendChild(createCell(`${leftCounter++}.`, true));
-        tr.appendChild(createCell(rowData.opis));
-        tr.appendChild(createCell(rowData.liczba, true));
-        tr.appendChild(createCell(rowData.rozpoznanie)); 
-        tr.appendChild(createCell(rowData.lek));
-        tr.appendChild(createCell(rowData.seria, true));
-        tr.appendChild(createCell(rowData.iloscDawka));
-        tr.appendChild(createCell(rowData.karencja));
-    });
-
-    // Zabezpieczenie wizualne: jeśli w archiwum wcale nie było przypisanych leków "pozostawionych",
-    // dodajmy jeden pusty wiersz dla estetyki wydruku
-    if (leftRows.length === 0) {
-        const emptyTr = tbody.insertRow();
-        emptyTr.innerHTML = `<td style="text-align: center;">1.</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>`;
+        const rowData = findRowData(logicalIndex);
+        
+        if (rowData) {
+            tr.appendChild(createCell(displayLp, true));
+            tr.appendChild(createCell(rowData.opis));
+            tr.appendChild(createCell(rowData.liczba, true));
+            tr.appendChild(createCell(rowData.rozpoznanie)); 
+            tr.appendChild(createCell(rowData.lek));
+            tr.appendChild(createCell(rowData.seria, true));
+            tr.appendChild(createCell(rowData.iloscDawka));
+            tr.appendChild(createCell(rowData.karencja));
+        } else {
+            tr.innerHTML = `<td style="text-align: center;">${displayLp}</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>`;
+        }
     }
 
     // 3. Wypełnij Podpisy
@@ -13210,26 +13229,26 @@ function buildArchivedCardView(card) {
 
 // Listenery dla przycisków modala podglądu
 if(archiveCloseBtn) archiveCloseBtn.addEventListener('click', () => {
-    // 1. Ukryj modal
-    archiveCardViewerModal.style.display = 'none';
-    
-    // 2. Wyczyść *tylko* dynamiczną zawartość, zostawiając nagłówki
-    const tbody = document.querySelector('#archive_karta tbody');
-    if (tbody) {
-        tbody.innerHTML = ''; // Wyczyść tylko wiersze
-    }
-    
-    // 3. Wyczyść dane nagłówka i podpisy (dla pewności)
-    document.getElementById('archive_nazwaLecznicy').textContent = '';
-    document.getElementById('archive_klient').textContent = '';
-    document.getElementById('archive_nrDokumentu').textContent = '';
-    document.getElementById('archive_dataWykonania').textContent = '';
-    document.getElementById('archive_nrStada').textContent = '';
-    document.getElementById('archive_adresKlienta').textContent = '';
-    document.getElementById('archive_dataZgloszenia').textContent = '';
-    document.getElementById('archive_doctor-signature').src = '';
-    document.getElementById('archive_doctor-signature-name').textContent = '';
-    document.getElementById('archive_podpisPosiadacza').src = '';
+    // 1. Ukryj modal
+    archiveCardViewerModal.style.display = 'none';
+    
+    // 2. Wyczyść *tylko* dynamiczną zawartość, zostawiając nagłówki
+    const tbody = document.querySelector('#archive_karta tbody');
+    if (tbody) {
+        tbody.innerHTML = ''; // Wyczyść tylko wiersze
+    }
+    
+    // 3. Wyczyść dane nagłówka i podpisy (dla pewności)
+    document.getElementById('archive_nazwaLecznicy').textContent = '';
+    document.getElementById('archive_klient').textContent = '';
+    document.getElementById('archive_nrDokumentu').textContent = '';
+    document.getElementById('archive_dataWykonania').textContent = '';
+    document.getElementById('archive_nrStada').textContent = '';
+    document.getElementById('archive_adresKlienta').textContent = '';
+    document.getElementById('archive_dataZgloszenia').textContent = '';
+    document.getElementById('archive_doctor-signature').src = '';
+    document.getElementById('archive_doctor-signature-name').textContent = '';
+    document.getElementById('archive_podpisPosiadacza').src = '';
 });
 
 // Lepsza funkcja drukowania (bez przeładowania strony)
