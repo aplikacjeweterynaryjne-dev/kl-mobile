@@ -7508,8 +7508,9 @@ if (saveCardToArchiveBtn) {
                     karencjaCzysta = anyInput ? anyInput.value : tr.cells[7].textContent.replace('📅', '').trim();
                 }
 
-                const rowData = {
+               const rowData = {
                     logicalIndex: logicalIndex,
+                    group: tr.dataset.group, // <--- NOWE: Zapisujemy do jakiej sekcji należy wiersz
                     opis: tr.cells[1].querySelector('input') ? tr.cells[1].querySelector('input').value : tr.cells[1].textContent,
                     liczba: tr.cells[2].querySelector('input') ? tr.cells[2].querySelector('input').value : '',
                     rozpoznanie: tr.cells[3].querySelector('input') ? tr.cells[3].querySelector('input').value : '',
@@ -13122,10 +13123,6 @@ function buildArchivedCardView(card) {
 
     const savedRows = card.table || [];
     
-    const findRowData = (logicalIndex) => {
-        return savedRows.find(r => r.logicalIndex === logicalIndex);
-    };
-    
     // Funkcja czyszcząca (usuwa HTML i ikonę kalendarza)
     const cleanContent = (content) => {
         if (!content) return '';
@@ -13148,36 +13145,51 @@ function buildArchivedCardView(card) {
         return td;
     };
 
-    for (let i = 1; i <= 13; i++) {
+    // --- LOGIKA DYNAMICZNA WSTAWIANIA WIERSZY ---
+    let usedCounter = 1;
+    let leftCounter = 1;
+
+    // 1. Odtwarzamy wiersze "na miejscu" (used)
+    // Wsparcie wsteczne: jeśli brak 'group', traktujemy logicalIndex < 9 jako 'used'
+    const usedRows = savedRows.filter(r => r.group === 'used' || (!r.group && r.logicalIndex < 9));
+    
+    usedRows.forEach(rowData => {
         const tr = tbody.insertRow();
-        let logicalIndex = -1;
-        let displayLp = '';
+        tr.appendChild(createCell(`${usedCounter++}.`, true));
+        tr.appendChild(createCell(rowData.opis));
+        tr.appendChild(createCell(rowData.liczba, true));
+        tr.appendChild(createCell(rowData.rozpoznanie)); 
+        tr.appendChild(createCell(rowData.lek));
+        tr.appendChild(createCell(rowData.seria, true));
+        tr.appendChild(createCell(rowData.iloscDawka));
+        tr.appendChild(createCell(rowData.karencja));
+    });
 
-        if (i < 10) {
-            logicalIndex = i - 1; 
-            displayLp = `${i}.`;
-        } else if (i === 10) {
-            tr.innerHTML = `<td colspan="8" style="font-weight: bold; padding: 3px 2px;">Potwierdzenie nabycia produktu leczniczego weterynaryjnego/paszy leczniczej</td>`;
-            continue;
-        } else {
-            logicalIndex = i - 2; 
-            displayLp = `${i - 10}.`; 
-        }
+    // 2. Dodajemy na sztywno separator
+    const divider = tbody.insertRow();
+    divider.innerHTML = `<td colspan="8" style="font-weight: bold; padding: 3px 2px; text-align: left; background-color: #f9f9f9;">Potwierdzenie nabycia produktu leczniczego weterynaryjnego/paszy leczniczej</td>`;
 
-        const rowData = findRowData(logicalIndex);
-        
-        if (rowData) {
-            tr.appendChild(createCell(displayLp, true));
-            tr.appendChild(createCell(rowData.opis));
-            tr.appendChild(createCell(rowData.liczba, true));
-            tr.appendChild(createCell(rowData.rozpoznanie)); 
-            tr.appendChild(createCell(rowData.lek));
-            tr.appendChild(createCell(rowData.seria, true));
-            tr.appendChild(createCell(rowData.iloscDawka));
-            tr.appendChild(createCell(rowData.karencja));
-        } else {
-            tr.innerHTML = `<td style="text-align: center;">${displayLp}</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>`;
-        }
+    // 3. Odtwarzamy wiersze "pozostawione" (left)
+    // Wsparcie wsteczne: jeśli brak 'group', traktujemy logicalIndex >= 9 jako 'left'
+    const leftRows = savedRows.filter(r => r.group === 'left' || (!r.group && r.logicalIndex >= 9));
+    
+    leftRows.forEach(rowData => {
+        const tr = tbody.insertRow();
+        tr.appendChild(createCell(`${leftCounter++}.`, true));
+        tr.appendChild(createCell(rowData.opis));
+        tr.appendChild(createCell(rowData.liczba, true));
+        tr.appendChild(createCell(rowData.rozpoznanie)); 
+        tr.appendChild(createCell(rowData.lek));
+        tr.appendChild(createCell(rowData.seria, true));
+        tr.appendChild(createCell(rowData.iloscDawka));
+        tr.appendChild(createCell(rowData.karencja));
+    });
+
+    // Zabezpieczenie wizualne: jeśli w archiwum wcale nie było przypisanych leków "pozostawionych",
+    // dodajmy jeden pusty wiersz dla estetyki wydruku
+    if (leftRows.length === 0) {
+        const emptyTr = tbody.insertRow();
+        emptyTr.innerHTML = `<td style="text-align: center;">1.</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>`;
     }
 
     // 3. Wypełnij Podpisy
@@ -13198,26 +13210,26 @@ function buildArchivedCardView(card) {
 
 // Listenery dla przycisków modala podglądu
 if(archiveCloseBtn) archiveCloseBtn.addEventListener('click', () => {
-    // 1. Ukryj modal
-    archiveCardViewerModal.style.display = 'none';
-    
-    // 2. Wyczyść *tylko* dynamiczną zawartość, zostawiając nagłówki
-    const tbody = document.querySelector('#archive_karta tbody');
-    if (tbody) {
-        tbody.innerHTML = ''; // Wyczyść tylko wiersze
-    }
-    
-    // 3. Wyczyść dane nagłówka i podpisy (dla pewności)
-    document.getElementById('archive_nazwaLecznicy').textContent = '';
-    document.getElementById('archive_klient').textContent = '';
-    document.getElementById('archive_nrDokumentu').textContent = '';
-    document.getElementById('archive_dataWykonania').textContent = '';
-    document.getElementById('archive_nrStada').textContent = '';
-    document.getElementById('archive_adresKlienta').textContent = '';
-    document.getElementById('archive_dataZgloszenia').textContent = '';
-    document.getElementById('archive_doctor-signature').src = '';
-    document.getElementById('archive_doctor-signature-name').textContent = '';
-    document.getElementById('archive_podpisPosiadacza').src = '';
+    // 1. Ukryj modal
+    archiveCardViewerModal.style.display = 'none';
+    
+    // 2. Wyczyść *tylko* dynamiczną zawartość, zostawiając nagłówki
+    const tbody = document.querySelector('#archive_karta tbody');
+    if (tbody) {
+        tbody.innerHTML = ''; // Wyczyść tylko wiersze
+    }
+    
+    // 3. Wyczyść dane nagłówka i podpisy (dla pewności)
+    document.getElementById('archive_nazwaLecznicy').textContent = '';
+    document.getElementById('archive_klient').textContent = '';
+    document.getElementById('archive_nrDokumentu').textContent = '';
+    document.getElementById('archive_dataWykonania').textContent = '';
+    document.getElementById('archive_nrStada').textContent = '';
+    document.getElementById('archive_adresKlienta').textContent = '';
+    document.getElementById('archive_dataZgloszenia').textContent = '';
+    document.getElementById('archive_doctor-signature').src = '';
+    document.getElementById('archive_doctor-signature-name').textContent = '';
+    document.getElementById('archive_podpisPosiadacza').src = '';
 });
 
 // Lepsza funkcja drukowania (bez przeładowania strony)
