@@ -19985,6 +19985,11 @@ async function loadAndRenderMagazyn() {
  * Łączy dane z 'cachedProducts' (wszystkie produkty) i 'magazynCache' (stany).
  * ✅ POPRAWKA: Filtruje produkty tylko do ID Lecznicy użytkownika (nawet dla Admina).
  */
+/**
+ * Renderuje główną tabelę stanów magazynowych (MÓJ MAGAZYN).
+ * Łączy dane z 'cachedProducts' (wszystkie produkty) i 'magazynCache' (stany).
+ * ✅ POPRAWKA: Wirtualne FIFO i rozwijane partie (KROK 3).
+ */
 function renderMagazynTable() {
     magazynTableBody.innerHTML = ''; // Wyczyść
     
@@ -19996,40 +20001,30 @@ function renderMagazynTable() {
     const filterText = magazynSearchInput.value.toLowerCase().trim();
     const threeDaysAgo = new Date().getTime() - (3 * 24 * 60 * 60 * 1000);
     
-    // Pobierz wszystkie produkty z cache
     let productsToRender = [...cachedProducts]; 
 
-    // ✅ KLUCZOWA ZMIANA: FILTRACJA PO ID LECZNICY
-    // Nawet jeśli jesteś administratorem i masz pobraną całą bazę (wszystkie lecznice),
-    // w sekcji "Mój Magazyn" chcesz widzieć tylko produkty Twojej placówki.
+    // Filtracja po ID Lecznicy
     if (currentUserProfile && currentUserProfile['ID lecznicy']) {
         const myClinicId = currentUserProfile['ID lecznicy'];
         productsToRender = productsToRender.filter(p => p.id_lecznicy === myClinicId);
     }
     
-    // Sortowanie (A-Z domyślnie)
+    // Sortowanie (A-Z)
     productsToRender.sort((a, b) => (a.nazwa || '').localeCompare(b.nazwa || '', 'pl'));
+
+    // Czy mamy tryb zaawansowany?
+    const isAdv = currentUserProfile && currentUserProfile.zaawansowanyMagazyn;
 
     productsToRender.forEach(product => {
         const nazwa = product.nazwa || 'Brak Nazwy';
-        const productId = product.id; // ID produktu z kolekcji 'leki'
+        const productId = product.id; 
         
-        // Filtrowanie (wyszukiwarka)
-        if (filterText && !nazwa.toLowerCase().includes(filterText)) {
-            return; // Pomiń ten wiersz
-        }
+        if (filterText && !nazwa.toLowerCase().includes(filterText)) return; 
         
-        // Pobierz stan z cache (Moduł 3)
         const stanData = magazynCache.get(productId);
-        
         const aktualnyStan = stanData ? stanData.stan : 0;
-        let dataOperacji = '';
-        let ktoOperacji = '';
-        let iloscOperacji = '';
-        let typOperacji = '';
-        let highlightClass = '';
+        let dataOperacji = '', ktoOperacji = '', iloscOperacji = '', typOperacji = '', highlightClass = '';
 
-        // Znajdź ostatnią operację DLA TEGO PRODUKTU w logach
         const ostatniLogProduktu = magazynLogCache.find(log => 
             log.zmiany && log.zmiany.some(z => z.id_produktu === productId)
         );
@@ -20041,16 +20036,15 @@ function renderMagazynTable() {
             iloscOperacji = zmiana.ilosc > 0 ? `+${zmiana.ilosc}` : zmiana.ilosc;
             typOperacji = ostatniLogProduktu.typ;
             
-            // Kolorowanie wiersza
             if (ostatniLogProduktu.typ === 'doładowanie' && ostatniLogProduktu.data.toDate().getTime() > threeDaysAgo) {
                 highlightClass = 'highlight-recent';
             }
         }
         
+        // --- 1. GŁÓWNY WIERSZ PRODUKTU ---
         const tr = document.createElement('tr');
         tr.className = highlightClass;
         tr.dataset.productId = productId;
-        // Zapisujemy dane do sortowania
         tr.dataset.nazwa = nazwa;
         tr.dataset.stan = aktualnyStan;
         tr.dataset.data = ostatniLogProduktu ? ostatniLogProduktu.data.toMillis() : 0;
@@ -20058,17 +20052,20 @@ function renderMagazynTable() {
         tr.dataset.ilosc = iloscOperacji;
         tr.dataset.typ = typOperacji;
         
-       tr.innerHTML = `
-            <td style="color: #2980b9; cursor: pointer; text-decoration: underline;" onclick="openProductHistory('${productId}', '${nazwa}', 'me')" title="Kliknij, aby zobaczyć historię dla tego produktu">${nazwa}</td>
-            <td style="text-align: center; font-weight: bold;">${aktualnyStan}</td>
+        let expandBtn = '';
+        if (isAdv && aktualnyStan > 0) {
+            expandBtn = `<span onclick="toggleBatchesRow('${productId}', this)" style="cursor: pointer; display: inline-block; width: 25px; font-weight: bold; color: #27ae60; font-size: 16px;" title="Rozwiń partie">[+]</span>`;
+        }
+
+        tr.innerHTML = `
+            <td>
+                ${expandBtn}
+                <span style="color: #2980b9; cursor: pointer; text-decoration: underline;" onclick="openProductHistory('${productId}', '${nazwa}', 'me')" title="Kliknij, aby zobaczyć całą historię">${nazwa}</span>
+            </td>
+            <td style="text-align: center; font-weight: bold; font-size: 15px;">${aktualnyStan}</td>
 
             <td class="col-topup" style="text-align: center;">
-                <input type="number" 
-                       class="topup-input" 
-                       data-product-id="${productId}" 
-                       placeholder="0" 
-                       min="0" 
-                       step="1">
+                <input type="number" class="topup-input" data-product-id="${productId}" placeholder="0" min="0" step="1">
             </td>
 
             <td class="col-log">${dataOperacji}</td>
@@ -20077,14 +20074,51 @@ function renderMagazynTable() {
             <td class="col-log">${typOperacji}</td>
         `;
         magazynTableBody.appendChild(tr);
+
+        // --- 2. UKRYTY WIERSZ (Lista Partii / Wirtualne FIFO) ---
+        if (isAdv && aktualnyStan > 0) {
+            const activeBatches = calculateActiveBatches(productId, aktualnyStan, magazynLogCache);
+            
+            if (activeBatches.length > 0) {
+                const trBatches = document.createElement('tr');
+                trBatches.id = `batches-row-${productId}`;
+                trBatches.style.display = 'none'; // Domyślnie schowane
+                trBatches.style.backgroundColor = '#fdfdfd'; // Jasne tło
+                
+                let batchesHtml = `
+                    <td colspan="7" style="padding: 0;">
+                        <div style="margin: 4px 10px 10px 30px; border-left: 3px solid #27ae60; padding-left: 10px; background: #fff; box-shadow: inset 0 0 5px rgba(0,0,0,0.02);">
+                            <table style="width: 100%; font-size: 12px; border: none; margin: 0;">
+                                <tr style="color: #7f8c8d; border-bottom: 1px solid #eee;">
+                                    <th style="border: none; padding: 6px; text-align: left;">Numer Serii</th>
+                                    <th style="border: none; padding: 6px; text-align: left;">Data Zakupu</th>
+                                    <th style="border: none; padding: 6px; text-align: left;">Data Ważności</th>
+                                    <th style="border: none; padding: 6px; text-align: left;">Pozostało</th>
+                                </tr>
+                `;
+                
+                activeBatches.forEach(b => {
+                    batchesHtml += `
+                        <tr style="border-bottom: 1px dashed #f0f0f0;">
+                            <td style="border: none; padding: 6px; font-weight: bold; color: #34495e;">${b.nrSerii}</td>
+                            <td style="border: none; padding: 6px;">${b.dataZakupu}</td>
+                            <td style="border: none; padding: 6px; color: #e67e22;">${b.dataWaznosci}</td>
+                            <td style="border: none; padding: 6px; font-weight: bold; color: #27ae60; font-size: 14px;">${b.iloscAktualna}</td>
+                        </tr>
+                    `;
+                });
+                
+                batchesHtml += `</table></div></td>`;
+                trBatches.innerHTML = batchesHtml;
+                magazynTableBody.appendChild(trBatches);
+            }
+        }
     });
     
-    // Jeśli po filtracji lista jest pusta
     if (productsToRender.length === 0) {
         magazynTableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 20px;">Brak produktów przypisanych do Twojej lecznicy.</td></tr>';
     }
 }
-
 /**
  * Renderuje tabelę z pełnym dziennikiem zdarzeń (logów).
  */
@@ -28542,6 +28576,92 @@ async function emailSelectedArchiveCards() {
         btn.disabled = false;
     }
 }
+/* ======================================================== */
+/* ✅ NOWY MODUŁ: Wirtualne FIFO i Podgląd Partii           */
+/* ======================================================== */
+
+/**
+ * Oblicza, ile sztuk/ml zostało z konkretnych partii (serii) na podstawie historii logów.
+ * Działa na zasadzie FIFO (First-In, First-Out) od tyłu.
+ */
+function calculateActiveBatches(productId, currentStan, logsCache) {
+    if (currentStan <= 0) return [];
+    
+    // 1. Filtrujemy tylko DOŁADOWANIA dla tego produktu, które nie są wycofane
+    let topups = [];
+    logsCache.forEach(log => {
+        if (log.typ === 'doładowanie' && !log.wycofany && log.zmiany) {
+            const zmiana = log.zmiany.find(z => z.id_produktu === productId);
+            if (zmiana && zmiana.ilosc > 0) {
+                topups.push({
+                    dataOperacji: log.data.toMillis(),
+                    dataZakupu: zmiana.data_zakupu || 'Brak daty',
+                    nrSerii: zmiana.nr_serii || 'Brak serii',
+                    dataWaznosci: zmiana.data_waznosci || '-',
+                    iloscOryginalna: zmiana.ilosc
+                });
+            }
+        }
+    });
+
+    // 2. Sortujemy od NAJNOWSZEGO do NAJSTARSZEGO
+    topups.sort((a, b) => b.dataOperacji - a.dataOperacji);
+
+    let activeBatches = [];
+    let remainingToFulfill = currentStan;
+
+    // 3. Odejmujemy aktualny stan od najnowszych dostaw
+    for (let i = 0; i < topups.length; i++) {
+        if (remainingToFulfill <= 0) break;
+        
+        let batch = topups[i];
+        let availableInThisBatch = batch.iloscOryginalna;
+        
+        let qtyToTake = Math.min(remainingToFulfill, availableInThisBatch);
+        
+        // Zapisujemy, że z tej partii wciąż coś mamy na półce
+        activeBatches.push({
+            ...batch,
+            iloscAktualna: parseFloat(qtyToTake.toFixed(2)) // Zaokrąglamy ułamki
+        });
+        
+        remainingToFulfill -= qtyToTake;
+    }
+
+    // 4. Jeśli stan jest wyższy niż suma w logach (np. stare zapasy sprzed aktualizacji)
+    if (remainingToFulfill > 0) {
+        activeBatches.push({
+            dataOperacji: 0,
+            dataZakupu: 'Stare zapasy',
+            nrSerii: 'Sprzed systemu serii',
+            dataWaznosci: '-',
+            iloscAktualna: parseFloat(remainingToFulfill.toFixed(2))
+        });
+    }
+
+    // 5. Sortujemy z powrotem od NAJSTARSZEGO (bo te schodzą pierwsze)
+    activeBatches.sort((a, b) => a.dataOperacji - b.dataOperacji);
+    
+    return activeBatches;
+}
+
+/**
+ * Rozwija lub zwija ukryty wiersz z historią partii (na kliknięcie [+] / [-])
+ */
+window.toggleBatchesRow = function(productId, spanElement) {
+    const row = document.getElementById(`batches-row-${productId}`);
+    if (!row) return;
+
+    if (row.style.display === 'none') {
+        row.style.display = 'table-row';
+        spanElement.textContent = '[-]';
+        spanElement.style.color = '#c0392b'; // Zmień kolor na czerwony po otwarciu
+    } else {
+        row.style.display = 'none';
+        spanElement.textContent = '[+]';
+        spanElement.style.color = '#27ae60'; // Wróć do zielonego
+    }
+};
 </script>
 </body>
 </html>
