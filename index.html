@@ -2640,11 +2640,13 @@ tr.filled-row td {
             </div>
         </div>
 
-        <div style="flex: 1; overflow-y: auto; border: 1px solid #eee; border-radius: 6px; padding: 0;">
-            <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
-                <thead style="background: #f9f9f9; position: sticky; top: 0;">
+       <div style="flex: 1; overflow-y: auto; border: 1px solid #eee; border-radius: 6px; padding: 0;">
+            <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                <thead style="background: #f9f9f9; position: sticky; top: 0; z-index: 2;">
                     <tr>
                         <th style="padding: 8px; border-bottom: 1px solid #ddd; text-align: left;">Produkt</th>
+                        <!-- ✅ NOWA KOLUMNA (ukryta domyślnie) -->
+                        <th id="thTopUpSerie" style="padding: 8px; border-bottom: 1px solid #ddd; text-align: center; display: none;">Seria / Zakup</th>
                         <th style="padding: 8px; border-bottom: 1px solid #ddd; text-align: center;">Ilość</th>
                         <th style="padding: 8px; border-bottom: 1px solid #ddd; text-align: center;">Akcja</th>
                     </tr>
@@ -19473,8 +19475,8 @@ if (topUpAddBtn) {
         const name = topUpProductInput.value.trim();
         const qty = parseFloat(topUpQuantityInput.value);
 
-        if (!name) { showToast("Wybierz produkt z listy.", "error"); return; }
-        if (!qty || qty <= 0) { showToast("Podaj poprawną łączną ilość.", "error"); return; }
+        if (!name) { alert("Wybierz produkt z listy!"); return; }
+        if (!qty || qty <= 0) { alert("Błąd: Podaj poprawną łączną ilość!"); return; }
 
         let productId = null;
         if (typeof produktyGlowneCache !== 'undefined') productId = produktyGlowneCache.get(name);
@@ -19482,20 +19484,32 @@ if (topUpAddBtn) {
             const found = cachedProducts.find(p => p.nazwa === name);
             if (found) productId = found.id;
         }
-        if (!productId) { showToast("Nie znaleziono produktu w bazie. Sprawdź nazwę.", "error"); return; }
+        if (!productId) { alert("Błąd: Nie znaleziono produktu w bazie głównej. Sprawdź nazwę."); return; }
 
         // ✅ ZBIERZ ZAAWANSOWANE DANE
         let advData = {};
         if (currentUserProfile && currentUserProfile.zaawansowanyMagazyn) {
-            advData.dataZakupu = document.getElementById('topUpDataZakupu').value;
-            advData.nrSerii = document.getElementById('topUpNrSerii').value.trim();
-            advData.dataWaznosci = document.getElementById('topUpDataWaznosci').value; // Opcjonalne
-            advData.dostawca = document.getElementById('topUpDostawca').value.trim();
-            advData.liczbaOpakowan = parseFloat(document.getElementById('topUpLiczbaOpakowan').value) || null;
-            advData.pojemnoscOpakowania = parseFloat(document.getElementById('topUpPojemnoscOpakowania').value) || null;
+            const dataZakupuInput = document.getElementById('topUpDataZakupu');
+            const nrSeriiInput = document.getElementById('topUpNrSerii');
+            
+            advData.dataZakupu = dataZakupuInput ? dataZakupuInput.value : '';
+            advData.nrSerii = nrSeriiInput ? nrSeriiInput.value.trim() : '';
+            advData.dataWaznosci = document.getElementById('topUpDataWaznosci')?.value || ''; 
+            advData.dostawca = document.getElementById('topUpDostawca')?.value.trim() || '';
+            advData.liczbaOpakowan = parseFloat(document.getElementById('topUpLiczbaOpakowan')?.value) || null;
+            advData.pojemnoscOpakowania = parseFloat(document.getElementById('topUpPojemnoscOpakowania')?.value) || null;
 
-            if (!advData.dataZakupu) { showToast("Data zakupu jest wymagana.", "error"); return; }
-            if (!advData.nrSerii) { showToast("Numer serii jest wymagany.", "error"); return; }
+            // Używamy alert(), żeby wyskoczyło na środku ekranu i nie dało się go przeoczyć
+            if (!advData.dataZakupu) { 
+                alert("BŁĄD: Data zakupu jest wymagana!"); 
+                if (dataZakupuInput) dataZakupuInput.focus();
+                return; 
+            }
+            if (!advData.nrSerii) { 
+                alert("BŁĄD: Numer serii jest wymagany!"); 
+                if (nrSeriiInput) nrSeriiInput.focus();
+                return; 
+            }
         }
 
         // Zapisz do koszyka
@@ -19506,43 +19520,82 @@ if (topUpAddBtn) {
         topUpQuantityInput.value = '';
         topUpUnitDisplay.textContent = '';
         if (currentUserProfile && currentUserProfile.zaawansowanyMagazyn) {
-            document.getElementById('topUpNrSerii').value = '';
-            document.getElementById('topUpDataWaznosci').value = '';
-            document.getElementById('topUpLiczbaOpakowan').value = '';
-            // Datę zakupu i dostawcę oraz pojemność zostawiamy dla wygody wprowadzania kolejnych produktów z tej samej paczki!
+            const nrSeriiInput = document.getElementById('topUpNrSerii');
+            if (nrSeriiInput) nrSeriiInput.value = '';
+            
+            const dataWaznosciInput = document.getElementById('topUpDataWaznosci');
+            if (dataWaznosciInput) dataWaznosciInput.value = '';
+            
+            const liczbaOpakInput = document.getElementById('topUpLiczbaOpakowan');
+            if (liczbaOpakInput) liczbaOpakInput.value = '';
         }
         topUpProductInput.focus();
 
+        // Narysuj listę od nowa z nową pozycją
         renderTopUpList();
     });
 }
 
 // 4. Renderowanie listy w modalu
 function renderTopUpList() {
+    if (!topUpListBody) return;
     topUpListBody.innerHTML = '';
     
+    // Obsługa widoczności kolumny z serią
+    const thSerie = document.getElementById('thTopUpSerie');
+    const isAdv = currentUserProfile && currentUserProfile.zaawansowanyMagazyn;
+    if (thSerie) {
+        thSerie.style.display = isAdv ? 'table-cell' : 'none';
+    }
+
     if (topUpBasket.length === 0) {
-        topUpEmptyMsg.style.display = 'block';
-        topUpConfirmBtn.disabled = true;
-        topUpConfirmBtn.style.opacity = '0.5';
+        if(topUpEmptyMsg) topUpEmptyMsg.style.display = 'block';
+        if(topUpConfirmBtn) {
+            topUpConfirmBtn.disabled = true;
+            topUpConfirmBtn.style.opacity = '0.5';
+        }
     } else {
-        topUpEmptyMsg.style.display = 'none';
-        topUpConfirmBtn.disabled = false;
-        topUpConfirmBtn.style.opacity = '1';
+        if(topUpEmptyMsg) topUpEmptyMsg.style.display = 'none';
+        if(topUpConfirmBtn) {
+            topUpConfirmBtn.disabled = false;
+            topUpConfirmBtn.style.opacity = '1';
+        }
 
         topUpBasket.forEach((item, index) => {
             const tr = document.createElement('tr');
-            tr.innerHTML = `
+            
+            // Komórka: Nazwa
+            let htmlContent = `
                 <td style="padding:8px; border-bottom:1px solid #eee;">
                     <strong>${item.nazwa}</strong>
                 </td>
-                <td style="padding:8px; border-bottom:1px solid #eee; text-align:center; font-size:16px;">
+            `;
+            
+            // ✅ Komórka: Seria i Data (Tylko tryb zaawansowany)
+            if (isAdv) {
+                htmlContent += `
+                <td style="padding:8px; border-bottom:1px solid #eee; text-align:center; font-size:12px; color: #555;">
+                    Seria: <b style="color:#2980b9;">${item.nrSerii || '-'}</b><br>
+                    <span style="color:#888;">Zakup: ${item.dataZakupu || '-'}</span>
+                </td>
+                `;
+            }
+
+            // Komórka: Ilość
+            htmlContent += `
+                <td style="padding:8px; border-bottom:1px solid #eee; text-align:center; font-size:16px; font-weight:bold; color:#27ae60;">
                     ${item.ilosc}
                 </td>
+            `;
+
+            // Komórka: Akcje
+            htmlContent += `
                 <td style="padding:8px; border-bottom:1px solid #eee; text-align:center;">
                     <button class="btn warn small" onclick="removeTopUpItem(${index})" style="padding: 2px 6px;">🗑</button>
                 </td>
             `;
+
+            tr.innerHTML = htmlContent;
             topUpListBody.appendChild(tr);
         });
     }
