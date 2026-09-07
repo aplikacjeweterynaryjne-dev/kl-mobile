@@ -13102,6 +13102,10 @@ archiveCardTableBody.addEventListener('click', async (e) => {
  * ✅ POPRAWIONA FUNKCJA: Buduje podgląd karty w modalu Archiwum.
  * Wymusza sztywną strukturę 13 wierszy, identyczną jak w Generatorze i na wydrukach.
  */
+/**
+ * ✅ POPRAWIONA FUNKCJA: Buduje podgląd karty w modalu Archiwum.
+ * Uwzględnia dynamicznie dodane wiersze z użyciem podziału "group".
+ */
 function buildArchivedCardView(card) {
     const header = card.header || {};
 
@@ -13119,7 +13123,6 @@ function buildArchivedCardView(card) {
 
     const savedRows = card.table || [];
     
-    // Funkcja czyszcząca z inputów i znaczników
     const cleanContent = (content) => {
         if (!content) return '';
         let text = content;
@@ -13132,7 +13135,6 @@ function buildArchivedCardView(card) {
         return text.replace('📅', '').trim();
     };
     
-    // Tworzenie pojedynczej komórki
     const createCell = (htmlContent = '', isCenter = false) => {
         const td = document.createElement('td');
         td.textContent = cleanContent(htmlContent);
@@ -13140,35 +13142,37 @@ function buildArchivedCardView(card) {
         return td;
     };
 
-    const findRowData = (idx) => savedRows.find(r => r.logicalIndex === idx);
+    // --- KLUCZOWA ZMIANA: Rozdzielamy na podstawie grupy ('used'/'left') ---
+    const usedRows = savedRows.filter(r => r.group === 'used' || (!r.group && r.logicalIndex < 9));
+    const leftRows = savedRows.filter(r => r.group === 'left' || (!r.group && r.logicalIndex >= 9));
 
-    // --- NOWA LOGIKA: Sztywna struktura 13 wierszy (jak w Generatorze) ---
-    for (let i = 1; i <= 13; i++) {
+    // 1. Odtwarzamy leczenie na miejscu (MINIMUM 9 wierszy, ale może być więcej)
+    const totalUsed = Math.max(9, usedRows.length);
+    let usedCounter = 1;
+    for (let i = 0; i < totalUsed; i++) {
+        const rowData = usedRows[i];
         const tr = tbody.insertRow();
-        
-        // Wiersz nr 10 to na sztywno separator "Produkty Pozostawione"
-        if (i === 10) {
-            const td = document.createElement('td');
-            td.colSpan = 8;
-            td.style.fontWeight = 'bold';
-            td.style.padding = '3px 2px';
-            td.style.textAlign = 'left';
-            td.style.backgroundColor = '#f9f9f9';
-            td.textContent = 'Potwierdzenie nabycia produktu leczniczego weterynaryjnego/paszy leczniczej';
-            tr.appendChild(td);
-            continue; // Omijamy resztę pętli, przechodzimy do kolejnego wiersza
-        }
+        tr.appendChild(createCell(`${usedCounter++}.`, true));
+        tr.appendChild(createCell(rowData ? rowData.opis : ''));
+        tr.appendChild(createCell(rowData ? rowData.liczba : '', true));
+        tr.appendChild(createCell(rowData ? rowData.rozpoznanie : '', true)); 
+        tr.appendChild(createCell(rowData ? rowData.lek : ''));
+        tr.appendChild(createCell(rowData ? rowData.seria : '', true));
+        tr.appendChild(createCell(rowData ? rowData.iloscDawka : ''));
+        tr.appendChild(createCell(rowData ? rowData.karencja : ''));
+    }
 
-        // Kalkulacja logicznych indeksów (żeby dopasować do danych w Firebase)
-        // Wiersze 1-9 mają logicalIndex od 0 do 8
-        // Wiersze 11-13 mają logicalIndex od 9 do 11
-        let logicalIndex = (i < 10) ? i - 1 : i - 2;
-        let displayLp = (i < 10) ? `${i}.` : `${i - 10}.`;
-        
-        const rowData = findRowData(logicalIndex);
+    // 2. Separator
+    const divider = tbody.insertRow();
+    divider.innerHTML = `<td colspan="8" style="font-weight: bold; padding: 3px 2px; text-align: left; background-color: #f9f9f9; font-size: 9pt;">Potwierdzenie nabycia produktu leczniczego weterynaryjnego/paszy leczniczej</td>`;
 
-        // Tworzymy komórki (nawet jeśli rowData nie istnieje – wtedy komórki będą puste)
-        tr.appendChild(createCell(displayLp, true));
+    // 3. Odtwarzamy produkty pozostawione (MINIMUM 3 wiersze, ale może być więcej)
+    const totalLeft = Math.max(3, leftRows.length);
+    let leftCounter = 1;
+    for (let i = 0; i < totalLeft; i++) {
+        const rowData = leftRows[i];
+        const tr = tbody.insertRow();
+        tr.appendChild(createCell(`${leftCounter++}.`, true));
         tr.appendChild(createCell(rowData ? rowData.opis : ''));
         tr.appendChild(createCell(rowData ? rowData.liczba : '', true));
         tr.appendChild(createCell(rowData ? rowData.rozpoznanie : '', true)); 
@@ -21731,19 +21735,16 @@ document.getElementById('formCancelStep3Btn')?.addEventListener('click', handleF
  * - FIX: Czyści ikonę kalendarza z wydruku.
  * - FIX: Przekazuje podpis posiadacza do szablonu.
  */
+/**
+ * ✅ POPRAWIONA FUNKCJA: Druk z Archiwum A4 (Pojedyncza karta).
+ */
 function openDirectPrintWindow(card) {
     const header = card.header || {};
-    // Uzupełniamy header o podpis posiadacza z głównego obiektu karty
     header.podpisPosiadaczaImg = card.podpisPosiadacza || '';
     
     const savedRows = card.table || [];
     let rowsHTML = '';
     
-    const findRowData = (logicalIndex) => {
-        return savedRows.find(r => r.logicalIndex === logicalIndex);
-    };
-
-    // Funkcja czyszcząca
     const cleanContent = (content) => {
         if (!content) return '';
         let text = content;
@@ -21756,41 +21757,43 @@ function openDirectPrintWindow(card) {
         return text.replace('📅', '').trim();
     };
 
-    for (let i = 1; i <= 13; i++) {
-        let logicalIndex = -1;
-        let displayLp = '';
+    const usedRows = savedRows.filter(r => r.group === 'used' || (!r.group && r.logicalIndex < 9));
+    const leftRows = savedRows.filter(r => r.group === 'left' || (!r.group && r.logicalIndex >= 9));
 
-        if (i < 10) {
-            logicalIndex = i - 1; 
-            displayLp = `${i}.`;
-        } else if (i === 10) {
-            rowsHTML += `<tr><td colspan="8" style="text-align: left; font-weight: bold; padding: 2px 4px; background-color: #f9f9f9; font-size: 9pt;">Potwierdzenie nabycia produktu leczniczego weterynaryjnego/paszy leczniczej</td></tr>`;
-            continue; 
-        } else {
-            logicalIndex = i - 2; 
-            displayLp = `${i - 10}.`; 
-        }
-
-        const rowData = findRowData(logicalIndex);
-
-        const opis = rowData ? cleanContent(rowData.opis) : '';
-        const liczba = rowData ? cleanContent(rowData.liczba) : '';
-        const rozpoznanie = rowData ? cleanContent(rowData.rozpoznanie) : '';
-        const lek = rowData ? cleanContent(rowData.lek) : '';
-        const seria = rowData ? cleanContent(rowData.seria) : '';
-        const ilosc = rowData ? cleanContent(rowData.iloscDawka) : '';
-        const karencja = rowData ? cleanContent(rowData.karencja) : '';
-
+    const totalUsed = Math.max(9, usedRows.length);
+    let usedCounter = 1;
+    for (let i = 0; i < totalUsed; i++) {
+        const rd = usedRows[i];
         rowsHTML += `
             <tr>
-                <td style="text-align: center;">${displayLp}</td>
-                <td>${opis}</td>
-                <td style="text-align: center;">${liczba}</td>
-                <td style="text-align: center;">${rozpoznanie}</td>
-                <td>${lek}</td>
-                <td style="text-align: center;">${seria}</td>
-                <td>${ilosc}</td>
-                <td>${karencja}</td>
+                <td style="text-align: center;">${usedCounter++}.</td>
+                <td>${rd ? cleanContent(rd.opis) : ''}</td>
+                <td style="text-align: center;">${rd ? cleanContent(rd.liczba) : ''}</td>
+                <td style="text-align: center;">${rd ? cleanContent(rd.rozpoznanie) : ''}</td>
+                <td>${rd ? cleanContent(rd.lek) : ''}</td>
+                <td style="text-align: center;">${rd ? cleanContent(rd.seria) : ''}</td>
+                <td>${rd ? cleanContent(rd.iloscDawka) : ''}</td>
+                <td>${rd ? cleanContent(rd.karencja) : ''}</td>
+            </tr>
+        `;
+    }
+
+    rowsHTML += `<tr><td colspan="8" style="text-align: left; font-weight: bold; padding: 2px 4px; background-color: #f9f9f9; font-size: 10pt;">Potwierdzenie nabycia produktu leczniczego weterynaryjnego/paszy leczniczej</td></tr>`;
+
+    const totalLeft = Math.max(3, leftRows.length);
+    let leftCounter = 1;
+    for (let i = 0; i < totalLeft; i++) {
+        const rd = leftRows[i];
+        rowsHTML += `
+            <tr>
+                <td style="text-align: center;">${leftCounter++}.</td>
+                <td>${rd ? cleanContent(rd.opis) : ''}</td>
+                <td style="text-align: center;">${rd ? cleanContent(rd.liczba) : ''}</td>
+                <td style="text-align: center;">${rd ? cleanContent(rd.rozpoznanie) : ''}</td>
+                <td>${rd ? cleanContent(rd.lek) : ''}</td>
+                <td style="text-align: center;">${rd ? cleanContent(rd.seria) : ''}</td>
+                <td>${rd ? cleanContent(rd.iloscDawka) : ''}</td>
+                <td>${rd ? cleanContent(rd.karencja) : ''}</td>
             </tr>
         `;
     }
@@ -26364,46 +26367,66 @@ function get110mmStyles() {
 }
 // Helper: Generuje treść HTML dla pojedynczej karty A4
 /* ✅ 3. HTML A4 (Kopia struktury z openCurrentA4PrintWindow) */
+/* ✅ 3. HTML A4 (Dla wydruku masowego i generowania) */
 function getInnerCardHTML_A4(card) {
     const header = card.header || {};
-    // Uzupełnij podpisy
     const imgLekarz = header.podpisLekarzaImg || '';
     const imgPosiadacz = card.podpisPosiadacza || '';
 
-    // Generowanie wierszy tabeli (Identyczna pętla jak w pojedynczym widoku)
     let rowsHTML = '';
     const savedRows = card.table || [];
-    const findRowData = (idx) => savedRows.find(r => r.logicalIndex === idx);
-    const clean = (txt) => (txt || '').replace('📅', '').trim();
-
-    for (let i = 1; i <= 13; i++) {
-        let lIdx = (i < 10) ? i - 1 : i - 2;
-        if (i === 10) {
-            rowsHTML += `<tr><td colspan="8" style="text-align: left; font-weight: bold; padding: 2px 4px; background-color: #f9f9f9; font-size: 10pt;">Potwierdzenie nabycia produktu leczniczego weterynaryjnego/paszy leczniczej</td></tr>`;
-            continue;
+    
+    const cleanContent = (content) => {
+        if (!content) return '';
+        let text = content;
+        if (content.includes('<')) {
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = content;
+            const input = tempDiv.querySelector('input, textarea');
+            text = input ? (input.value + ' ' + (tempDiv.textContent || '')) : tempDiv.textContent;
         }
-        const rd = findRowData(lIdx);
-        const lp = (i < 10) ? `${i}.` : `${i-10}.`;
-        
-        const opis = rd ? clean(rd.opis) : '';
-        const liczba = rd ? clean(rd.liczba) : '';
-        const rozp = rd ? clean(rd.rozpoznanie) : '';
-        const lek = rd ? clean(rd.lek) : '';
-        const seria = rd ? clean(rd.seria) : '';
-        const ilosc = rd ? clean(rd.iloscDawka) : '';
-        const karencja = rd ? clean(rd.karencja) : '';
+        return text.replace('📅', '').trim();
+    };
 
+    const usedRows = savedRows.filter(r => r.group === 'used' || (!r.group && r.logicalIndex < 9));
+    const leftRows = savedRows.filter(r => r.group === 'left' || (!r.group && r.logicalIndex >= 9));
+
+    const totalUsed = Math.max(9, usedRows.length);
+    let usedCounter = 1;
+    for (let i = 0; i < totalUsed; i++) {
+        const rd = usedRows[i];
         rowsHTML += `
             <tr>
-                <td style="text-align: center;">${lp}</td>
-                <td>${opis}</td>
-                <td style="text-align: center;">${liczba}</td>
-                <td style="text-align: center;">${rozp}</td>
-                <td>${lek}</td>
-                <td style="text-align: center;">${seria}</td>
-                <td>${ilosc}</td>
-                <td>${karencja}</td>
-            </tr>`;
+                <td style="text-align: center;">${usedCounter++}.</td>
+                <td>${rd ? cleanContent(rd.opis) : ''}</td>
+                <td style="text-align: center;">${rd ? cleanContent(rd.liczba) : ''}</td>
+                <td style="text-align: center;">${rd ? cleanContent(rd.rozpoznanie) : ''}</td>
+                <td>${rd ? cleanContent(rd.lek) : ''}</td>
+                <td style="text-align: center;">${rd ? cleanContent(rd.seria) : ''}</td>
+                <td>${rd ? cleanContent(rd.iloscDawka) : ''}</td>
+                <td>${rd ? cleanContent(rd.karencja) : ''}</td>
+            </tr>
+        `;
+    }
+
+    rowsHTML += `<tr><td colspan="8" style="text-align: left; font-weight: bold; padding: 2px 4px; background-color: #f9f9f9; font-size: 10pt;">Potwierdzenie nabycia produktu leczniczego weterynaryjnego/paszy leczniczej</td></tr>`;
+
+    const totalLeft = Math.max(3, leftRows.length);
+    let leftCounter = 1;
+    for (let i = 0; i < totalLeft; i++) {
+        const rd = leftRows[i];
+        rowsHTML += `
+            <tr>
+                <td style="text-align: center;">${leftCounter++}.</td>
+                <td>${rd ? cleanContent(rd.opis) : ''}</td>
+                <td style="text-align: center;">${rd ? cleanContent(rd.liczba) : ''}</td>
+                <td style="text-align: center;">${rd ? cleanContent(rd.rozpoznanie) : ''}</td>
+                <td>${rd ? cleanContent(rd.lek) : ''}</td>
+                <td style="text-align: center;">${rd ? cleanContent(rd.seria) : ''}</td>
+                <td>${rd ? cleanContent(rd.iloscDawka) : ''}</td>
+                <td>${rd ? cleanContent(rd.karencja) : ''}</td>
+            </tr>
+        `;
     }
 
     // Zwracamy dokładnie tę samą strukturę co w getUnifiedPrintHTML
@@ -26478,7 +26501,6 @@ function getInnerCardHTML_A4(card) {
         <p style="margin-top: 5px; font-size: 8pt;"><b>Wyniki badań uzupełniających:</b><br>*W przypadku zwierząt znajdujących się w rejestrze zwierząt gospodarskich oznakowanych</p>
     `;
 }
-
 /* ✅ 4. HTML 110mm (Kopia logiki z openDirectPrintWindow110mm) */
 function getInnerCardHTML_110mm(card) {
     const header = card.header || {};
@@ -26490,8 +26512,8 @@ function getInnerCardHTML_110mm(card) {
     const imgPosiadacz = card.podpisPosiadacza || '';
 
     // Podział wierszy
-    const rowsSec1 = rows.filter(r => r.logicalIndex < 9).sort((a,b)=>a.logicalIndex-b.logicalIndex);
-    const rowsSec2 = rows.filter(r => r.logicalIndex >= 9).sort((a,b)=>a.logicalIndex-b.logicalIndex);
+    const rowsSec1 = rows.filter(r => r.group === 'used' || (!r.group && r.logicalIndex < 9)).sort((a,b)=>a.logicalIndex-b.logicalIndex);
+const rowsSec2 = rows.filter(r => r.group === 'left' || (!r.group && r.logicalIndex >= 9)).sort((a,b)=>a.logicalIndex-b.logicalIndex);
 
     // Generator sekcji (ten sam co w pojedynczym druku)
     const generateSection = (list) => {
