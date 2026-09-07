@@ -4079,6 +4079,35 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
   <input type="number" id="productFormStan" placeholder="0" step="1" min="0">
 </div>
 
+    <!-- ✅ NOWA SEKCJA: Szczegóły dla Karty Obrotu Detalicznego -->
+    <details id="productAdvancedDetails" style="margin-top: 15px; margin-bottom: 15px; background: #fdfdfd; border: 1px solid #ccc; border-radius: 6px; padding: 10px;">
+        <summary style="font-weight: bold; cursor: pointer; color: #2980b9; outline: none; list-style: none;">
+            [+] Pokaż dane szczegółowe (Karta Obrotu Detalicznego)
+        </summary>
+        <div style="margin-top: 15px; padding-top: 10px; border-top: 1px dashed #eee;">
+            <div class="form-row">
+                <label for="productFormPodmiot">Nazwa podmiotu odpowiedzialnego (Producent)</label>
+                <input type="text" id="productFormPodmiot" placeholder="Np. Zoetis, Krka...">
+            </div>
+            <div class="form-row">
+                <label for="productFormPostac">Postać farmaceutyczna</label>
+                <input type="text" id="productFormPostac" placeholder="Np. roztwór do wstrzykiwań">
+            </div>
+            <div class="form-row">
+                <label for="productFormOpakowanie">Rodzaj opakowania</label>
+                <input type="text" id="productFormOpakowanie" placeholder="Np. butelka szklana 100ml">
+            </div>
+            <div class="form-row">
+                <label for="productFormKatStosowania">Kategoria stosowania</label>
+                <input type="text" id="productFormKatStosowania" placeholder="Np. Bydło, Trzoda chlewna">
+            </div>
+            <div class="form-row">
+                <label for="productFormKatDostepnosci">Kategoria dostępności</label>
+                <input type="text" id="productFormKatDostepnosci" placeholder="Np. Rp, OTC">
+            </div>
+        </div>
+    </details>
+
     <div class="form-actions">
       <div class="left">
         <button id="cancelProductForm" class="btn ghost small" style="font-size: 19px;">Anuluj</button>
@@ -4166,6 +4195,13 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
     <label style="font-size: 16px; font-weight: 700; display: flex; align-items: center; gap: 8px; margin: 0;">
         <input type="checkbox" id="konfigFormMozeDoladowac" style="width: auto; height: 20px; flex-shrink: 0;">
         Pozwól użytkownikowi na doładowywanie własnego magazynu
+    </label>
+</div>
+<!-- ✅ NOWY PRZEŁĄCZNIK: Zaawansowany Magazyn (Karta Obrotu) -->
+<div class="form-row" style="background: #e8f5e9; padding: 10px; border-radius: 6px; margin-top: 5px; border: 1px solid #c8e6c9;">
+    <label style="font-size: 16px; font-weight: 700; display: flex; align-items: center; gap: 8px; margin: 0; color: #2e7d32;">
+        <input type="checkbox" id="konfigFormZaawansowanyMagazyn" style="width: auto; height: 20px; flex-shrink: 0;">
+        Włącz zaawansowany magazyn (Serie i Karta Obrotu Detalicznego)
     </label>
 </div>
     <div id="adminMessageFields" style="display: none; margin-top: 15px; padding-top: 15px; border-top: 2px dashed #ccc; background-color: #fff8e1; border-radius: 6px; padding: 10px;">
@@ -10559,13 +10595,27 @@ if (produktTableBody) {
                 productFormNazwa.value = data.nazwa || '';
                 productFormPlu.value = data.plu || '';
                 
-                // ✅ TU BYŁ BŁĄD: Teraz wczytujemy Nr Serii
+         // ✅ TU BYŁ BŁĄD: Teraz wczytujemy Nr Serii
                 productFormNrSerii.value = data.nrSerii || ''; 
 
                 productFormCena.value = data.cena !== undefined ? parseFloat(data.cena) : '';
                 productFormDawkowanie.value = data.dawkowanie || '';
                 productFormKarencja.value = data.karencja || '';
                 productFormStan.value = data.stanMagazynowy !== undefined ? parseInt(data.stanMagazynowy) : '';
+
+                // Wczytaj nowe pola
+                document.getElementById('productFormPodmiot').value = data.podmiot || '';
+                document.getElementById('productFormPostac').value = data.postac || '';
+                document.getElementById('productFormOpakowanie').value = data.opakowanie || '';
+                document.getElementById('productFormKatStosowania').value = data.katStosowania || '';
+                document.getElementById('productFormKatDostepnosci').value = data.katDostepnosci || '';
+                
+                // Jeśli którekolwiek z nowych pól ma wartość, automatycznie rozwiń sekcję
+                if (data.podmiot || data.postac || data.opakowanie) {
+                    document.getElementById('productAdvancedDetails').open = true;
+                } else {
+                    document.getElementById('productAdvancedDetails').open = false;
+                }
 
                 productFormModal.style.display = 'flex';
 
@@ -10713,7 +10763,7 @@ if (addNewProductBtn) {
         productFormTitle.textContent = 'Dodaj nowy produkt';
         productFormDocId.value = ''; // Wyczyść ID - tryb dodawania
         
-        // Resetowanie wszystkich pól
+// Resetowanie wszystkich pól
         productFormNazwa.value = '';
         productFormPlu.value = '';
         productFormNrSerii.value = ''; // ✅ DODANO CZYSZCZENIE
@@ -10721,6 +10771,14 @@ if (addNewProductBtn) {
         productFormDawkowanie.value = '';
         productFormKarencja.value = '';
         productFormStan.value = '';
+        
+        // Wyczyść nowe pola Karty Obrotu
+        document.getElementById('productFormPodmiot').value = '';
+        document.getElementById('productFormPostac').value = '';
+        document.getElementById('productFormOpakowanie').value = '';
+        document.getElementById('productFormKatStosowania').value = '';
+        document.getElementById('productFormKatDostepnosci').value = '';
+        document.getElementById('productAdvancedDetails').open = false; // Zwiń na start
         
         productFormModal.style.display = 'flex';
         productFormNazwa.focus();
@@ -10788,7 +10846,7 @@ console.log("Anulowano edycję/dodawanie produktu.");
  * ✅ POPRAWKA: Prawidłowo aktualizuje cache (w tym nr serii) po edycji.
  */
 if (saveProductBtn) {
-    saveProductBtn.addEventListener('click', async () => {
+saveProductBtn.addEventListener('click', async () => {
         const nazwa = productFormNazwa.value.trim();
         const plu = productFormPlu.value.trim();
         const nrSerii = productFormNrSerii.value.trim(); // ✅ Pobieramy Nr Serii
@@ -10797,6 +10855,13 @@ if (saveProductBtn) {
         const dawkowanie = productFormDawkowanie.value.trim();
         const karencja = productFormKarencja.value.trim();
         const stanMagazynowy = parseInt(productFormStan.value) || 0;
+
+        // Pobierz nowe pola
+        const podmiot = document.getElementById('productFormPodmiot').value.trim();
+        const postac = document.getElementById('productFormPostac').value.trim();
+        const opakowanie = document.getElementById('productFormOpakowanie').value.trim();
+        const katStosowania = document.getElementById('productFormKatStosowania').value.trim();
+        const katDostepnosci = document.getElementById('productFormKatDostepnosci').value.trim();
 
         const docId = productFormDocId.value; 
 
@@ -10817,11 +10882,16 @@ if (saveProductBtn) {
             id_lecznicy: userClinicId,
             nazwa: nazwa,
             plu: plu,
-            nrSerii: nrSerii, // ✅ Zapisujemy Nr Serii do obiektu
+            nrSerii: nrSerii, 
             cena: cena, 
             dawkowanie: dawkowanie,
             karencja: karencja,
-            stanMagazynowy: stanMagazynowy 
+            stanMagazynowy: stanMagazynowy,
+            podmiot: podmiot,
+            postac: postac,
+            opakowanie: opakowanie,
+            katStosowania: katStosowania,
+            katDostepnosci: katDostepnosci
         };
 
         saveProductBtn.disabled = true;
@@ -10954,7 +11024,8 @@ if (konfiguracjaTableBody) {
                     document.getElementById('konfigFormUzywaMagazynu').checked = data.uzywaStanowMagazynowych || false;
                 if(document.getElementById('konfigFormMozeDoladowac'))
                     document.getElementById('konfigFormMozeDoladowac').checked = data.mozeDoladowacWlasnyMagazyn || false;
-
+                if(document.getElementById('konfigFormZaawansowanyMagazyn'))
+                    document.getElementById('konfigFormZaawansowanyMagazyn').checked = data.zaawansowanyMagazyn || false;
                 // Logika Wiadomości Admina
                 if (currentUserProfile && currentUserProfile.Rola === 'administrator') {
                     if (adminMessageFields) {
@@ -11067,13 +11138,14 @@ if (saveKonfiguracjaBtn) {
       'ID lecznicy': konfiguracjaFormIdLecznicy.value.trim(),
       'Nazwa lecznicy': konfiguracjaFormNazwaLecznicy.value.trim(),
       'Rola': konfiguracjaFormRola.value,
-      // ✅ POCZĄTEK MODUŁU 1
-      // Odczytamy wartości z checkboxów, które dodamy w Module 2.
-      // (Jeśli checkbox nie istnieje, 'getElementById' zwróci null, a '?.checked' da 'undefined', co Firestore zignoruje przy aktualizacji,
-      // a przy tworzeniu (add) musimy zapewnić domyślne 'false')
-      uzywaStanowMagazynowych: document.getElementById('konfigFormUzywaMagazynu')?.checked || false,
-      mozeDoladowacWlasnyMagazyn: document.getElementById('konfigFormMozeDoladowac')?.checked || false,
-      // ✅ KONIEC MODUŁU 1
+// ✅ POCZĄTEK MODUŁU 1
+      // Odczytamy wartości z checkboxów, które dodamy w Module 2.
+      // (Jeśli checkbox nie istnieje, 'getElementById' zwróci null, a '?.checked' da 'undefined', co Firestore zignoruje przy aktualizacji,
+      // a przy tworzeniu (add) musimy zapewnić domyślne 'false')
+      uzywaStanowMagazynowych: document.getElementById('konfigFormUzywaMagazynu')?.checked || false,
+      mozeDoladowacWlasnyMagazyn: document.getElementById('konfigFormMozeDoladowac')?.checked || false,
+      zaawansowanyMagazyn: document.getElementById('konfigFormZaawansowanyMagazyn')?.checked || false,
+      // ✅ KONIEC MODUŁU 1
        // ✅ Pola wiadomości (tylko jeśli admin je widzi i edytuje)
         adminMessage: (currentUserProfile.Rola === 'administrator') ? document.getElementById('confMsgContent').value.trim() : (null),
         adminMessageStart: (currentUserProfile.Rola === 'administrator') ? document.getElementById('confMsgStart').value : (null),
