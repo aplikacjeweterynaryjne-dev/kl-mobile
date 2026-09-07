@@ -2589,20 +2589,53 @@ tr.filled-row td {
                 <input type="text" id="topUpProductInput" placeholder="Kliknij, aby wyszukać produkt..." readonly style="width: 100%; font-size: 16px; padding: 8px; cursor: pointer; background-color: #fff;">
             </div>
             
-           <div style="display: flex; gap: 15px; align-items: flex-end; margin-top: 15px;">
-                
+<!-- ✅ NOWA SEKCJA ZAAWANSOWANEGO DOŁADOWANIA -->
+           <div id="topUpAdvancedSection" style="display: none; margin-top: 15px; border-top: 1px dashed #ccc; padding-top: 15px;">
+                <div style="display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 10px;">
+                    <div style="flex: 1; min-width: 120px;">
+                        <label style="font-size: 12px; font-weight: bold; color: #2980b9;">Data zakupu *</label>
+                        <input type="date" id="topUpDataZakupu" style="width: 100%; padding: 6px; box-sizing: border-box;">
+                    </div>
+                    <div style="flex: 1; min-width: 120px;">
+                        <label style="font-size: 12px; font-weight: bold; color: #2980b9;">Nr Serii *</label>
+                        <input type="text" id="topUpNrSerii" placeholder="Wpisz serię" style="width: 100%; padding: 6px; box-sizing: border-box;">
+                    </div>
+                </div>
+                <div style="display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 10px;">
+                    <div style="flex: 1; min-width: 120px;">
+                        <label style="font-size: 12px; font-weight: bold;">Dostawca</label>
+                        <input type="text" id="topUpDostawca" placeholder="np. Hurtownia" style="width: 100%; padding: 6px; box-sizing: border-box;">
+                    </div>
+                    <div style="flex: 1; min-width: 120px;">
+                        <label style="font-size: 12px; font-weight: bold; color: #7f8c8d;">Data ważności (Opcj.)</label>
+                        <input type="date" id="topUpDataWaznosci" style="width: 100%; padding: 6px; box-sizing: border-box;">
+                    </div>
+                </div>
+                <div style="display: flex; flex-wrap: wrap; gap: 10px;">
+                    <div style="flex: 1; min-width: 120px;">
+                        <label style="font-size: 12px; font-weight: bold;">Liczba opakowań</label>
+                        <input type="number" id="topUpLiczbaOpakowan" placeholder="0" min="1" step="1" style="width: 100%; padding: 6px; box-sizing: border-box;">
+                    </div>
+                    <div style="flex: 1; min-width: 120px;">
+                        <label style="font-size: 12px; font-weight: bold;">Pojemność 1 opak.</label>
+                        <input type="number" id="topUpPojemnoscOpakowania" placeholder="0" min="0.01" step="any" style="width: 100%; padding: 6px; box-sizing: border-box;">
+                    </div>
+                </div>
+           </div>
+
+           <div style="display: flex; gap: 15px; align-items: flex-end; margin-top: 15px; background: #fdfdfd; padding: 10px; border-radius: 6px; border: 1px solid #ddd;">
                 <div style="width: 100px; flex-shrink: 0;">
-                    <label for="topUpQuantityInput" style="display: block; margin-bottom: 5px; font-weight: 600;">Ilość:</label>
+                    <label for="topUpQuantityInput" style="display: block; margin-bottom: 5px; font-weight: 600; color: #27ae60;">Łączna Ilość:</label>
                     <input type="number" id="topUpQuantityInput" placeholder="0" min="0.01" step="any" 
-                           style="width: 100%; font-size: 18px; padding: 8px; box-sizing: border-box;">
+                           style="width: 100%; font-size: 18px; padding: 8px; box-sizing: border-box; border: 2px solid #27ae60; border-radius: 4px;">
                 </div>
                 
                 <div style="padding-bottom: 12px; min-width: 40px;">
                     <span id="topUpUnitDisplay" style="font-weight: bold; color: #555; font-size: 16px;"></span>
                 </div>
                 
-                <div>
-                    <button id="topUpAddBtn" class="btn primary" style="padding: 10px 20px;">⬇ Dodaj</button>
+                <div style="flex-grow: 1; text-align: right;">
+                    <button id="topUpAddBtn" class="btn primary" style="padding: 10px 20px; width: 100%;">⬇ Dodaj do listy</button>
                 </div>
             </div>
         </div>
@@ -19355,28 +19388,84 @@ function openTopUpModal(targetUser) {
     topUpQuantityInput.value = '';
     topUpUnitDisplay.textContent = '';
 
+    // ✅ LOGIKA ZAAWANSOWANEGO MAGAZYNU
+    const advSection = document.getElementById('topUpAdvancedSection');
+    if (advSection) {
+        if (currentUserProfile && currentUserProfile.zaawansowanyMagazyn) {
+            advSection.style.display = 'block';
+            document.getElementById('topUpDataZakupu').value = getLocalDateString(); // Dziś
+            document.getElementById('topUpNrSerii').value = '';
+            document.getElementById('topUpDataWaznosci').value = '';
+            document.getElementById('topUpDostawca').value = '';
+            document.getElementById('topUpLiczbaOpakowan').value = '';
+            document.getElementById('topUpPojemnoscOpakowania').value = '';
+        } else {
+            advSection.style.display = 'none';
+        }
+    }
+
     topUpModal.style.display = 'flex';
     setTimeout(() => topUpProductInput.focus(), 50);
 }
 
-// 2. Obsługa wyboru produktu (wyświetlanie jednostki)
+// 2. Obsługa wyboru produktu (Wyświetlanie jedn. + Zaciąganie danych historycznych)
 if (topUpProductInput) {
     topUpProductInput.addEventListener('input', function() {
         const val = this.value;
-        // Używamy globalnej mapyIlosci (zdefiniowanej w kodzie głównym)
         if (typeof mapaIlosci !== 'undefined' && mapaIlosci[val]) {
-            // Wyciągnij jednostkę z "100 ml" -> "ml" (prosta heurystyka)
             const parts = mapaIlosci[val].split(' ');
-            if (parts.length > 1) {
-                topUpUnitDisplay.textContent = parts[1]; 
-            } else {
-                topUpUnitDisplay.textContent = mapaIlosci[val];
-            }
+            topUpUnitDisplay.textContent = parts.length > 1 ? parts[1] : mapaIlosci[val];
         } else {
             topUpUnitDisplay.textContent = '';
         }
+
+        // ✅ AUTO-UZUPEŁNIANIE PÓL (Tylko jeśli tryb włączony)
+        if (currentUserProfile && currentUserProfile.zaawansowanyMagazyn) {
+            let productId = null;
+            if (typeof produktyGlowneCache !== 'undefined') {
+                productId = produktyGlowneCache.get(val);
+            }
+
+            if (productId && cachedProducts) {
+                // 1. Zaciągnij aktualny numer serii z Głównej Bazy Produktów
+                const productData = cachedProducts.find(p => p.id === productId);
+                if (productData && productData.nrSerii) {
+                    document.getElementById('topUpNrSerii').value = productData.nrSerii;
+                } else {
+                    document.getElementById('topUpNrSerii').value = '';
+                }
+
+                // 2. Pobierz ostatniego dostawcę i gabaryt z logów (opcjonalne udogodnienie)
+                let lastLog = null;
+                if (topUpTargetUser.uid === currentUserProfile.uid && typeof magazynLogCache !== 'undefined') {
+                    lastLog = magazynLogCache.find(log => log.typ === 'doładowanie' && !log.wycofany && log.zmiany.some(z => z.id_produktu === productId));
+                } else if (typeof zarzadzanieMagazynLogCache !== 'undefined') {
+                    lastLog = zarzadzanieMagazynLogCache.find(log => log.typ === 'doładowanie' && !log.wycofany && log.zmiany.some(z => z.id_produktu === productId));
+                }
+
+                if (lastLog) {
+                    const zmiana = lastLog.zmiany.find(z => z.id_produktu === productId);
+                    if (zmiana) {
+                        if (zmiana.dostawca) document.getElementById('topUpDostawca').value = zmiana.dostawca;
+                        if (zmiana.liczba_opakowan) document.getElementById('topUpLiczbaOpakowan').value = zmiana.liczba_opakowan;
+                        if (zmiana.pojemnosc_opakowania) document.getElementById('topUpPojemnoscOpakowania').value = zmiana.pojemnosc_opakowania;
+                    }
+                }
+            }
+        }
     });
 }
+
+// ✅ Automatyczne przeliczanie łącznej ilości
+function autoCalculateTopUpTotal() {
+    const szt = parseFloat(document.getElementById('topUpLiczbaOpakowan').value) || 0;
+    const poj = parseFloat(document.getElementById('topUpPojemnoscOpakowania').value) || 0;
+    if (szt > 0 && poj > 0) {
+        document.getElementById('topUpQuantityInput').value = (szt * poj).toFixed(2);
+    }
+}
+document.getElementById('topUpLiczbaOpakowan')?.addEventListener('input', autoCalculateTopUpTotal);
+document.getElementById('topUpPojemnoscOpakowania')?.addEventListener('input', autoCalculateTopUpTotal);
 
 // 3. Dodawanie do listy (Koszyka)
 if (topUpAddBtn) {
@@ -19384,44 +19473,44 @@ if (topUpAddBtn) {
         const name = topUpProductInput.value.trim();
         const qty = parseFloat(topUpQuantityInput.value);
 
-        if (!name) {
-            showToast("Wybierz produkt z listy.", "error");
-            return;
-        }
-        if (!qty || qty <= 0) {
-            showToast("Podaj poprawną ilość.", "error");
-            return;
-        }
+        if (!name) { showToast("Wybierz produkt z listy.", "error"); return; }
+        if (!qty || qty <= 0) { showToast("Podaj poprawną łączną ilość.", "error"); return; }
 
-        // Znajdź ID produktu w globalnym cache
         let productId = null;
-        if (typeof produktyGlowneCache !== 'undefined') {
-            productId = produktyGlowneCache.get(name);
-        }
-
-        // Jeśli nie znaleziono ID po nazwie, spróbuj znaleźć w cachedProducts
+        if (typeof produktyGlowneCache !== 'undefined') productId = produktyGlowneCache.get(name);
         if (!productId && typeof cachedProducts !== 'undefined') {
             const found = cachedProducts.find(p => p.nazwa === name);
             if (found) productId = found.id;
         }
+        if (!productId) { showToast("Nie znaleziono produktu w bazie. Sprawdź nazwę.", "error"); return; }
 
-        if (!productId) {
-            showToast("Nie znaleziono produktu w bazie głównej. Sprawdź nazwę.", "error");
-            return;
+        // ✅ ZBIERZ ZAAWANSOWANE DANE
+        let advData = {};
+        if (currentUserProfile && currentUserProfile.zaawansowanyMagazyn) {
+            advData.dataZakupu = document.getElementById('topUpDataZakupu').value;
+            advData.nrSerii = document.getElementById('topUpNrSerii').value.trim();
+            advData.dataWaznosci = document.getElementById('topUpDataWaznosci').value; // Opcjonalne
+            advData.dostawca = document.getElementById('topUpDostawca').value.trim();
+            advData.liczbaOpakowan = parseFloat(document.getElementById('topUpLiczbaOpakowan').value) || null;
+            advData.pojemnoscOpakowania = parseFloat(document.getElementById('topUpPojemnoscOpakowania').value) || null;
+
+            if (!advData.dataZakupu) { showToast("Data zakupu jest wymagana.", "error"); return; }
+            if (!advData.nrSerii) { showToast("Numer serii jest wymagany.", "error"); return; }
         }
 
-        // Dodaj do koszyka (lub zaktualizuj jeśli już jest)
-        const existing = topUpBasket.find(x => x.id === productId);
-        if (existing) {
-            existing.ilosc += qty;
-        } else {
-            topUpBasket.push({ id: productId, nazwa: name, ilosc: qty });
-        }
+        // Zapisz do koszyka
+        topUpBasket.push({ id: productId, nazwa: name, ilosc: qty, ...advData });
 
         // Reset pól
         topUpProductInput.value = '';
         topUpQuantityInput.value = '';
         topUpUnitDisplay.textContent = '';
+        if (currentUserProfile && currentUserProfile.zaawansowanyMagazyn) {
+            document.getElementById('topUpNrSerii').value = '';
+            document.getElementById('topUpDataWaznosci').value = '';
+            document.getElementById('topUpLiczbaOpakowan').value = '';
+            // Datę zakupu i dostawcę oraz pojemność zostawiamy dla wygody wprowadzania kolejnych produktów z tej samej paczki!
+        }
         topUpProductInput.focus();
 
         renderTopUpList();
@@ -19524,15 +19613,39 @@ if (topUpConfirmBtn) {
                     produkt_nazwa: item.nazwa 
                 }, { merge: true });
 
-                // D. Dodaj do tablicy zmian dla logu
+// D. Dodaj do tablicy zmian dla logu
                 zmianyLog.push({
                     id_produktu: item.id,
                     nazwa_produktu: item.nazwa,
                     ilosc: item.ilosc,
                     stan_przed: stanPrzed,
-                    stan_po: stanPo
+                    stan_po: stanPo,
+                    // Nowe, zaawansowane pola (będą undefined jeśli wyłączone, Firestore to obsłuży jeśli usuniemy, ale dla bezpieczeństwa sprawdzamy)
+                    data_zakupu: item.dataZakupu || null,
+                    nr_serii: item.nrSerii || null,
+                    data_waznosci: item.dataWaznosci || null,
+                    dostawca: item.dostawca || null,
+                    liczba_opakowan: item.liczbaOpakowan || null,
+                    pojemnosc_opakowania: item.pojemnoscOpakowania || null
                 });
+
+                // ✅ AUTO-AKTUALIZACJA BAZY PRODUKTÓW (Szablonów)
+                if (currentUserProfile && currentUserProfile.zaawansowanyMagazyn && item.nrSerii) {
+                    const productData = cachedProducts.find(p => p.id === item.id);
+                    // Jeśli wpisana seria jest inna niż ta bazowa -> zaktualizuj globalnie!
+                    if (productData && productData.nrSerii !== item.nrSerii) {
+                        db.collection("leki").doc(item.id).update({ nrSerii: item.nrSerii }).catch(console.error);
+                        productData.nrSerii = item.nrSerii; // Zaktualizuj w pamięci
+                    }
+                }
             }
+
+            // Usuń wartości `null` z obiektów zmian, aby Firestore nie zgłaszał błędów
+            zmianyLog.forEach(zmiana => {
+                Object.keys(zmiana).forEach(key => {
+                    if (zmiana[key] === null) delete zmiana[key];
+                });
+            });
 
             // E. Utwórz wpis w logu (Dziennik operacji)
             const logData = {
