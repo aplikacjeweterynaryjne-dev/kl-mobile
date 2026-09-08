@@ -28646,20 +28646,31 @@ function calculateActiveBatches(productId, currentStan, logsCache) {
 }
 
 /**
+/**
  * Rozwija lub zwija ukryty wiersz z historią partii (na kliknięcie [+] / [-])
  */
 window.toggleBatchesRow = function(productId, spanElement) {
     const row = document.getElementById(`batches-row-${productId}`);
     if (!row) return;
 
-    if (row.style.display === 'none') {
-        row.style.display = 'table-row';
+    if (row.style.display === 'none' || row.style.display === '') {
+        // ✅ POPRAWKA: Zdejmujemy sztuczne ukrycie. Przeglądarka sama dobierze układ (flex/block/table-row)
+        row.style.display = ''; 
+        
+        // Zabezpieczenie, jeśli arkusz stylów aplikacji domyślnie chowa wiersze
+        if (window.getComputedStyle(row).display === 'none') {
+            row.style.display = 'table-row';
+        }
+        if (window.getComputedStyle(row).display === 'none') {
+            row.style.display = 'block'; 
+        }
+
         spanElement.textContent = '[-]';
-        spanElement.style.color = '#c0392b'; // Zmień kolor na czerwony po otwarciu
+        spanElement.style.color = '#c0392b'; 
     } else {
         row.style.display = 'none';
         spanElement.textContent = '[+]';
-        spanElement.style.color = '#27ae60'; // Wróć do zielonego
+        spanElement.style.color = '#27ae60'; 
     }
 };
 </script>
