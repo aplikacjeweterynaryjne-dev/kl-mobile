@@ -28859,8 +28859,8 @@ function generateKartaObrotuReport(logs, filters) {
     const productId = produktyGlowneCache.get(targetProduct);
     const baseProduct = (cachedProducts || []).find(p => p.id === productId) || {};
 
-    let tableHtml = '';
-    let finalStan = 0;
+    let tableRows = '';
+    let lp = 1;
 
     logs.forEach(log => {
         if (!log.zmiany) return;
@@ -28869,84 +28869,126 @@ function generateKartaObrotuReport(logs, filters) {
         const zmiana = log.zmiany.find(z => z.id_produktu === productId || z.nazwa_produktu === targetProduct);
         
         if (zmiana && zmiana.ilosc !== 0) {
-            const dataOperacji = log.data.toDate().toLocaleString('pl-PL', {day: '2-digit', month: '2-digit', year: 'numeric'});
-            
-            let przychod = '';
-            let rozchod = '';
-            let dostawcaNabywca = '';
-            let nrDokumentu = log.batch_id_powiazany || '-';
-            
-            // Odczyt z zaawansowanych pół magazynu (lub z bazy)
+            const dataLogu = log.data.toDate().toLocaleString('pl-PL', {day: '2-digit', month: '2-digit', year: 'numeric'});
             let nrSerii = zmiana.nr_serii || baseProduct.nrSerii || '-';
-            let dataWaznosci = zmiana.data_waznosci || '-';
+            
+            // Kolumny Przyjęcia
+            let dataZakupu = '-', dostawca = '-', liczbaOpak = '-', zawartoscOpak = '-', waznosc = '-';
+            // Kolumny Zużycia
+            let dataZuzycia = '-', iloscZuz = '-', nrDok = '-';
 
-            // Zrozumiałe formatowanie typu operacji
+            // Zrozumiałe formatowanie układu
             if (log.typ === 'doładowanie') {
-                przychod = zmiana.ilosc;
-                dostawcaNabywca = zmiana.dostawca || 'Zakup hurtowy';
-                if (zmiana.data_zakupu) nrDokumentu = `Faktura/Zakup z dn. ${zmiana.data_zakupu}`;
+                dataZakupu = zmiana.data_zakupu || dataLogu;
+                dostawca = zmiana.dostawca || 'Zakup hurtowy';
+                liczbaOpak = zmiana.liczba_opakowan || '-';
+                zawartoscOpak = zmiana.pojemnosc_opakowania || '-';
+                waznosc = zmiana.data_waznosci || '-';
             } else if (log.typ === 'wydanie_karta') {
-                rozchod = Math.abs(zmiana.ilosc);
-                dostawcaNabywca = `Rozchód pacjenta (Karta nr: ${nrDokumentu})`;
-            } else if (log.typ === 'inwentaryzacja') {
-                if (zmiana.ilosc > 0) przychod = zmiana.ilosc;
-                else rozchod = Math.abs(zmiana.ilosc);
-                dostawcaNabywca = 'Inwentaryzacja (Korekta Stanu)';
-            } else {
-                if (zmiana.ilosc > 0) przychod = zmiana.ilosc;
-                else rozchod = Math.abs(zmiana.ilosc);
-                dostawcaNabywca = log.typ;
+                dataZuzycia = dataLogu;
+                iloscZuz = Math.abs(zmiana.ilosc);
+                nrDok = `Karta: ${log.batch_id_powiazany || '-'}`;
+            } else if (log.typ === 'inwentaryzacja' || log.typ === 'wycofanie') {
+                dataZuzycia = dataLogu;
+                iloscZuz = zmiana.ilosc;
+                nrDok = `Korekta (${log.typ})`;
             }
 
-            finalStan = zmiana.stan_po; // Zapisujemy ostatni stan jako końcowy
-
-            tableHtml += `
+            tableRows += `
                 <tr>
-                    <td data-data="${log.data.toMillis()}">${dataOperacji}</td>
-                    <td data-przychod="${przychod}" style="color: #27ae60; font-weight: bold; text-align: center;">${przychod}</td>
-                    <td data-rozchod="${rozchod}" style="color: #c0392b; font-weight: bold; text-align: center;">${rozchod}</td>
-                    <td data-stan="${zmiana.stan_po}" style="font-weight: bold; text-align: center;">${zmiana.stan_po}</td>
-                    <td>${nrSerii}</td>
-                    <td>${dataWaznosci}</td>
-                    <td style="white-space: normal;">${nrDokumentu}<br><small style="color: #666;">${dostawcaNabywca}</small></td>
+                    <td style="text-align: center; border: 1px solid #000; padding: 4px;">${lp++}</td>
+                    
+                    <td style="text-align: center; border: 1px solid #000; padding: 4px;">${dataZakupu}</td>
+                    <td style="border: 1px solid #000; padding: 4px;">${dostawca}</td>
+                    <td style="text-align: center; border: 1px solid #000; padding: 4px;">${liczbaOpak}</td>
+                    <td style="text-align: center; border: 1px solid #000; padding: 4px;">${zawartoscOpak}</td>
+                    <td style="text-align: center; font-weight: bold; border: 1px solid #000; padding: 4px;">${nrSerii}</td>
+                    <td style="text-align: center; border: 1px solid #000; padding: 4px;">${waznosc}</td>
+                    
+                    <td style="text-align: center; border: 1px solid #000; padding: 4px;">${dataZuzycia}</td>
+                    <td style="text-align: center; font-weight: bold; border: 1px solid #000; padding: 4px;">${iloscZuz !== '-' ? iloscZuz : '-'}</td>
+                    <td style="border: 1px solid #000; padding: 4px;">${nrDok}</td>
                 </tr>
             `;
         }
     });
 
-    const tableBody = document.getElementById('reportKartaObrotuTableBody');
-    tableBody.innerHTML = tableHtml || '<tr><td colspan="7" style="text-align: center; padding: 20px;">Brak operacji obrotu dla tego leku w wybranym okresie.</td></tr>';
-
-    // Wyświetlanie zaawansowanych danych o podmiocie i postaci
-    const advInfoDiv = document.getElementById('kartaObrotuAdvancedInfo');
-    if (baseProduct.podmiot || baseProduct.postac || baseProduct.opakowanie) {
-        advInfoDiv.style.display = 'block';
-        advInfoDiv.innerHTML = `
-            <div style="font-size: 15px; color: #2e7d32; font-weight: 800; margin-bottom: 5px;">Rejestr obrotu szczegółowego</div>
-            <strong>Podmiot odp.:</strong> ${baseProduct.podmiot || '-'} | 
-            <strong>Postać farmaceutyczna:</strong> ${baseProduct.postac || '-'} <br>
-            <strong>Opakowanie:</strong> ${baseProduct.opakowanie || '-'} | 
-            <strong>Kat. stosowania:</strong> ${baseProduct.katStosowania || '-'} | 
-            <strong>Kategoria dostępności:</strong> ${baseProduct.katDostepnosci || '-'}
-        `;
-    } else {
-        advInfoDiv.style.display = 'none';
+    if (tableRows === '') {
+        tableRows = '<tr><td colspan="10" style="text-align: center; padding: 20px; border: 1px solid #000;">Brak operacji obrotu dla tego leku w wybranym okresie.</td></tr>';
     }
+
+    // 💡 TWORZYMY STRUKTURĘ ZGODNĄ Z OFICJALNYM WZOREM
+    const reportHTML = `
+        <div style="font-family: Arial, sans-serif; font-size: 11px; color: #000; width: 100%; overflow-x: auto; background: #fff; padding: 15px; border-radius: 8px;">
+            <h2 style="text-align: center; font-size: 14px; font-weight: bold; margin-bottom: 20px; text-transform: uppercase;">
+                Wzór<br>Dokumentacja Obrotu Detalicznego Produktami Leczniczymi Weterynaryjnymi
+            </h2>
+            
+            <div style="margin-bottom: 20px; border: 1px dashed #ccc; padding: 15px; width: 250px; text-align: center; color: #777;">
+                Pieczęć zakładu leczniczego dla zwierząt<br><br>
+                <strong style="color: #000; font-size: 12px;">${currentUserProfile['Nazwa lecznicy'] || '-'}</strong>
+            </div>
+
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 15px; font-size: 11px;">
+                <tr>
+                    <td style="border: 1px solid #000; padding: 6px; font-weight: bold; width: 40%;">Nazwa produktu leczniczego weterynaryjnego</td>
+                    <td style="border: 1px solid #000; padding: 6px; font-weight: bold; font-size: 12px;">${targetProduct}</td>
+                    <td style="border: 1px solid #000; padding: 6px; font-weight: bold; width: 15%;">Nr karty/rok</td>
+                    <td style="border: 1px solid #000; padding: 6px;">...... / ${new Date().getFullYear()}</td>
+                </tr>
+                <tr><td style="border: 1px solid #000; padding: 6px; font-weight: bold;">Nazwa podmiotu odpowiedzialnego</td><td colspan="3" style="border: 1px solid #000; padding: 6px;">${baseProduct.podmiot || '-'}</td></tr>
+                <tr><td style="border: 1px solid #000; padding: 6px; font-weight: bold;">Postać farmaceutyczna produktu leczniczego weterynaryjnego</td><td colspan="3" style="border: 1px solid #000; padding: 6px;">${baseProduct.postac || '-'}</td></tr>
+                <tr><td style="border: 1px solid #000; padding: 6px; font-weight: bold;">Rodzaj opakowania produktu leczniczego weterynaryjnego</td><td colspan="3" style="border: 1px solid #000; padding: 6px;">${baseProduct.opakowanie || '-'}</td></tr>
+                <tr><td style="border: 1px solid #000; padding: 6px; font-weight: bold;">Okres karencji produktu leczniczego weterynaryjnego</td><td colspan="3" style="border: 1px solid #000; padding: 6px;">${baseProduct.karencja || '-'}</td></tr>
+                <tr><td style="border: 1px solid #000; padding: 6px; font-weight: bold;">Kategoria stosowania produktu leczniczego weterynaryjnego</td><td colspan="3" style="border: 1px solid #000; padding: 6px;">${baseProduct.katStosowania || '-'}</td></tr>
+                <tr><td style="border: 1px solid #000; padding: 6px; font-weight: bold;">Kategoria dostępności produktu leczniczego weterynaryjnego</td><td colspan="3" style="border: 1px solid #000; padding: 6px;">${baseProduct.katDostepnosci || '-'}</td></tr>
+                <tr><td style="border: 1px solid #000; padding: 6px; font-weight: bold;">Czy wystawiono receptę</td><td colspan="3" style="border: 1px solid #000; padding: 6px;">NIE</td></tr>
+                <tr><td style="border: 1px solid #000; padding: 6px; font-weight: bold;">Miejsce realizacji recepty</td><td colspan="3" style="border: 1px solid #000; padding: 6px;">-</td></tr>
+            </table>
+
+            <table style="width: 100%; border-collapse: collapse; font-size: 10px; text-align: left; margin-bottom: 20px;">
+                <thead>
+                    <tr>
+                        <th rowspan="2" style="border: 1px solid #000; padding: 4px; text-align: center; background: #f9f9f9;">lp.</th>
+                        <th colspan="6" style="border: 1px solid #000; padding: 4px; text-align: center; background: #f9f9f9; text-transform: uppercase;">Przyjęcie produktu leczniczego weterynaryjnego</th>
+                        <th colspan="3" style="border: 1px solid #000; padding: 4px; text-align: center; background: #f9f9f9; text-transform: uppercase;">Zużycie produktu leczniczego weterynaryjnego</th>
+                    </tr>
+                    <tr>
+                        <th style="border: 1px solid #000; padding: 4px; text-align: center; background: #fdfdfd;">data zakupu</th>
+                        <th style="border: 1px solid #000; padding: 4px; text-align: center; background: #fdfdfd;">nazwa i adres dostawcy</th>
+                        <th style="border: 1px solid #000; padding: 4px; text-align: center; background: #fdfdfd;">liczba opakowań bezpośrednich</th>
+                        <th style="border: 1px solid #000; padding: 4px; text-align: center; background: #fdfdfd;">zawartość opakowania bezpośredniego - ilość</th>
+                        <th style="border: 1px solid #000; padding: 4px; text-align: center; background: #fdfdfd;">nr serii</th>
+                        <th style="border: 1px solid #000; padding: 4px; text-align: center; background: #fdfdfd;">okres ważności</th>
+                        <th style="border: 1px solid #000; padding: 4px; text-align: center; background: #fdfdfd;">data zużycia</th>
+                        <th style="border: 1px solid #000; padding: 4px; text-align: center; background: #fdfdfd;">ilość</th>
+                        <th style="border: 1px solid #000; padding: 4px; text-align: center; background: #fdfdfd;">numer pozycji w dokumentacji lekarsko-weterynaryjnej</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${tableRows}
+                </tbody>
+            </table>
+        </div>
+    `;
+
+    const tableContainer = document.getElementById('reportKartaObrotuTableContainer');
+    tableContainer.innerHTML = reportHTML;
 
     // Sterowanie widocznością tabel (Ukrywamy inne, pokazujemy naszą)
     document.getElementById('reportWizytyTableContainer').style.display = 'none';
     document.getElementById('reportZuzyciaTableContainer').style.display = 'none';
-    document.getElementById('reportKartaObrotuTableContainer').style.display = 'block';
+    tableContainer.style.display = 'block';
     
     if(document.getElementById('reportFuelSection')) document.getElementById('reportFuelSection').style.display = 'none'; 
     if(document.getElementById('reportNetSumContainer')) document.getElementById('reportNetSumContainer').style.display = 'none';
 
-    // Aktualizacja Nagłówków na ekranie
-    document.getElementById('reportMainTitle').textContent = `KARTA OBROTU DETALICZNEGO: ${targetProduct}`;
-    document.getElementById('reportDateDisplay').textContent = `Wygenerowano za okres: ${filters.dateStart} do ${filters.dateEnd}`;
-    document.getElementById('reportUserDisplay').textContent = `Dla magazynu pracownika: ${filters.userName}`;
-    document.getElementById('reportSumTitle').textContent = `Stan na koniec wybranego okresu:`;
-    document.getElementById('reportCalculatedSum').textContent = `${finalStan} szt. / j.m.`;
+    // Ukrywamy standardowe nagłówki raportu, bo wygenerowaliśmy oficjalne we wstawionym HTMLu
+    document.getElementById('reportMainTitle').style.display = 'none';
+    document.getElementById('reportDateDisplay').style.display = 'none';
+    document.getElementById('reportUserDisplay').style.display = 'none';
+    document.getElementById('reportSumTitle').style.display = 'none';
+    document.getElementById('reportCalculatedSum').style.display = 'none';
 }
 </script>
 </body>
