@@ -7542,7 +7542,7 @@ if (saveCardToArchiveBtn) {
             }
 
 
-            // --- C. PRZYGOTUJ NOWĄ KARTĘ (Zbieranie danych z ekranu) ---
+          // --- C. PRZYGOTUJ NOWĄ KARTĘ (Zbieranie danych z ekranu) ---
             const headerData = {
                 nazwaLecznicy: document.getElementById('nazwaLecznicy').textContent,
                 dataWykonania: document.getElementById('dataWykonania').value,
@@ -7558,6 +7558,16 @@ if (saveCardToArchiveBtn) {
             const tableRowsData = [];
             const productUsageMap = new Map(); // Mapa do odjęcia z magazynu
             const rows = rowsEditable();
+
+            // ✅ FIFO: Pobieramy logi jednorazowo dla całego zapisu, jeśli tryb zaawansowany jest włączony
+            let tempLogsCache = typeof magazynLogCache !== 'undefined' && magazynLogCache.length > 0 ? magazynLogCache : [];
+            if (useStock && currentUserProfile.zaawansowanyMagazyn && tempLogsCache.length === 0) {
+                const logsSnap = await db.collection("konfiguracja").doc(userDocId).collection("magazynOsobistyLog").get();
+                tempLogsCache = logsSnap.docs.map(d => ({id: d.id, ...d.data()}));
+            }
+            
+            // ✅ FIFO: Mapa do śledzenia stanu "napoczętych" butelek w trakcie analizy wielu wierszy
+            const productBatchesState = new Map();
 
             rows.forEach(tr => {
                 const logicalIndex = rows.indexOf(tr);
@@ -7583,7 +7593,7 @@ if (saveCardToArchiveBtn) {
 
                const rowData = {
                     logicalIndex: logicalIndex,
-                    group: tr.dataset.group || (logicalIndex < 9 ? 'used' : 'left'), // ✅ KLUCZOWE: Zapis do bazy grupy wiersza
+                    group: tr.dataset.group || (logicalIndex < 9 ? 'used' : 'left'),
                     opis: tr.cells[1].querySelector('input') ? tr.cells[1].querySelector('input').value : tr.cells[1].textContent,
                     liczba: tr.cells[2].querySelector('input') ? tr.cells[2].querySelector('input').value : '',
                     rozpoznanie: tr.cells[3].querySelector('input') ? tr.cells[3].querySelector('input').value : '',
@@ -7593,21 +7603,76 @@ if (saveCardToArchiveBtn) {
                     karencja: karencjaCzysta
                 };
 
+                const productName = rowData.lek.trim();
+                const quantity = parseFloat(iloscValue) || 0;
+
                 // Dodaj tylko wypełnione wiersze
                 if (rowData.opis || rowData.liczba || rowData.rozpoznanie || rowData.lek) {
-                    tableRowsData.push(rowData);
-                }
-
-                // Zliczanie do wydania (Magazyn)
-                if (useStock) {
-                    const productName = rowData.lek.trim();
-                    const quantity = parseFloat(iloscValue) || 0;
-                    if (productName && quantity > 0) {
+                    
+                    // ✅ MAGIA FIFO: Automatyczne rozbijanie wiersza (Auto-Split)
+                    if (useStock && currentUserProfile.zaawansowanyMagazyn && productName && quantity > 0) {
                         const productId = produktyGlowneCache.get(productName);
                         if (productId) {
-                            const current = productUsageMap.get(productId) || 0;
-                            productUsageMap.set(productId, current + quantity);
+                            
+                            // Inicjalizuj kolejkę wirtualnych butelek (partii) dla tego produktu
+                            if (!productBatchesState.has(productId)) {
+                                const currentStan = magazynCache.get(productId) ? magazynCache.get(productId).stan : 0;
+                                const activeBatches = calculateActiveBatches(productId, currentStan, tempLogsCache);
+                                productBatchesState.set(productId, activeBatches);
+                            }
+                            
+                            let batchesQueue = productBatchesState.get(productId);
+                            let amountToFulfill = quantity;
+                            
+                            // Pobieramy dane domyślnej serii z Bazy Produktów jako koło ratunkowe
+                            const baseProduct = cachedProducts ? cachedProducts.find(p => p.id === productId) : null;
+                            const domyslnaSeria = (baseProduct && baseProduct.nrSerii) ? baseProduct.nrSerii : 'Brak wpisanej serii';
+                            
+                            // Algorytm "odgryzania" płynu z najstarszych otwartych butelek
+                            while (amountToFulfill > 0 && batchesQueue.length > 0) {
+                                let batch = batchesQueue[0];
+                                let take = Math.min(amountToFulfill, batch.iloscAktualna);
+                                
+                                // Tworzymy klon wiersza dla tej konkretnej partii
+                                let splitRowData = { ...rowData };
+                                splitRowData.seria = batch.nrSerii || domyslnaSeria;
+                                // Zastępujemy starą wartość w HTML odgryzioną ilością z tej butelki
+                                splitRowData.iloscDawka = splitRowData.iloscDawka.replace(`value="${iloscValue}"`, `value="${take}"`);
+                                
+                                tableRowsData.push(splitRowData);
+                                
+                                amountToFulfill = parseFloat((amountToFulfill - take).toFixed(2));
+                                batch.iloscAktualna = parseFloat((batch.iloscAktualna - take).toFixed(2));
+                                
+                                // Jeśli butelka wyschła podczas tego zapisu, wyrzucamy ją z kolejki
+                                if (batch.iloscAktualna <= 0) {
+                                    batchesQueue.shift();
+                                }
+                            }
+                            
+                            // Jeśli brakuje nam towaru (np. stan spadł na minus), ratujemy się domyślną serią
+                            if (amountToFulfill > 0) {
+                                let splitRowData = { ...rowData };
+                                splitRowData.seria = domyslnaSeria; 
+                                splitRowData.iloscDawka = splitRowData.iloscDawka.replace(`value="${iloscValue}"`, `value="${amountToFulfill}"`);
+                                tableRowsData.push(splitRowData);
+                            }
+                        } else {
+                            // Produkt spoza bazy (własnoręcznie wpisany) - wrzucamy bez rozbijania
+                            tableRowsData.push(rowData);
                         }
+                    } else {
+                        // Standardowy zapis po staremu, jeśli Magazyn Zaawansowany jest wyłączony
+                        tableRowsData.push(rowData);
+                    }
+                }
+
+                // Zliczanie do globalnego wydania z magazynu
+                if (useStock && productName && quantity > 0) {
+                    const productId = produktyGlowneCache.get(productName);
+                    if (productId) {
+                        const current = productUsageMap.get(productId) || 0;
+                        productUsageMap.set(productId, current + quantity);
                     }
                 }
             });
