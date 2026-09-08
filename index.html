@@ -4425,9 +4425,9 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
                 <option value="ogolny">2. Raport ogólny (wszystkie wizyty)</option>
                 <option value="dluznicy">3. Raport dłużników</option>
                 <option value="zuzycia">4. Raport zużycia produktów</option>
+                <option value="karta_obrotu">5. Karta Obrotu Detalicznego (Wg produktu)</option>
             </select>
         </div>
-
         <div class="form-row">
             <label for="reportDateStart">2. Data od:</label>
             <input type="date" id="reportDateStart" title="Data od">
@@ -4507,7 +4507,7 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
             </table>
         </div>
 
-        <div id="reportZuzyciaTableContainer" class="table-container" style="margin-top: 15px; display: none;">
+<div id="reportZuzyciaTableContainer" class="table-container" style="margin-top: 15px; display: none;">
 <table id="reportZuzyciaTable" class="sortable-table">
     <thead>
         <tr>
@@ -4519,6 +4519,26 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
     <tbody id="reportZuzyciaTableBody">
     </tbody>
 </table>
+        </div>
+
+        <!-- ✅ NOWA TABELA: KARTA OBROTU DETALICZNEGO -->
+        <div id="reportKartaObrotuTableContainer" class="table-container" style="margin-top: 15px; display: none;">
+            <div id="kartaObrotuAdvancedInfo" style="margin-bottom: 15px; padding: 10px; background: #e8f5e9; border: 1px solid #c8e6c9; border-radius: 6px; font-size: 14px; display: none;"></div>
+            <table id="reportKartaObrotuTable" class="sortable-table">
+                <thead>
+                    <tr>
+                        <th data-sort-key="data">Data operacji</th>
+                        <th data-sort-key="przychod" data-sort-type="number">Przychód</th>
+                        <th data-sort-key="rozchod" data-sort-type="number">Rozchód</th>
+                        <th data-sort-key="stan" data-sort-type="number">Stan (Po)</th>
+                        <th>Nr Serii</th>
+                        <th>Data Ważności</th>
+                        <th>Nr Dok. (Dostawca/Nabywca)</th>
+                    </tr>
+                </thead>
+                <tbody id="reportKartaObrotuTableBody">
+                </tbody>
+            </table>
         </div>
 
     </div>
@@ -14583,10 +14603,14 @@ if (generateReportBtn) {
         reportResultArea.style.display = 'none';
 
         try {
-            // Pobieranie danych
+// Pobieranie danych
             if (filters.type === 'zuzycia') {
                 cachedReportData = await fetchCardsForReport(filters.dateStart, filters.dateEnd, filters.userId);
                 generateZuzyciaReportFromCards(cachedReportData, filters); 
+            } else if (filters.type === 'karta_obrotu') {
+                // ✅ Nowa funkcja pobierająca z logów magazynowych
+                const logs = await fetchLogsForKartaObrotu(filters.dateStart, filters.dateEnd, filters.userId);
+                generateKartaObrotuReport(logs, filters);
             } else {
                 cachedReportData = await fetchReceiptsForReport(filters.dateStart, filters.dateEnd, filters.userId);
                 generateWizytyReport(cachedReportData, filters);
@@ -15022,21 +15046,20 @@ if (reportTypeSelect) {
         const type = reportTypeSelect.value;
         const fuelSection = document.getElementById('reportFuelSection');
         const netSumContainer = document.getElementById('reportNetSumContainer');
-        const productFilterContainer = document.getElementById('reportProductFilterContainer'); // ✅ Nowy kontener
+        const productFilterContainer = document.getElementById('reportProductFilterContainer'); 
 
-        // 1. Obsługa pola produktu (Pokaż tylko dla zużycia)
+        // 1. Obsługa pola produktu (Pokaż dla zużycia oraz Karty Obrotu)
         if (productFilterContainer) {
-            if (type === 'zuzycia') {
-                productFilterContainer.style.display = 'flex'; // Pokaż dla zużycia
+            if (type === 'zuzycia' || type === 'karta_obrotu') {
+                productFilterContainer.style.display = 'flex'; 
             } else {
-                productFilterContainer.style.display = 'none'; // Ukryj dla innych
-                // Opcjonalnie wyczyść filtr przy zmianie typu
+                productFilterContainer.style.display = 'none'; 
                 const prodInput = document.getElementById('reportProductInput');
                 if(prodInput) prodInput.value = '';
             }
         }
 
-        // 2. Obsługa pola kosztów (tylko dla widoku wyników, jeśli jest już widoczny)
+        // 2. Obsługa pola kosztów i tytułów
         if (reportResultArea.style.display === 'block') {
              if (type === 'gotowka') {
                 if(fuelSection) fuelSection.style.display = 'flex';
@@ -15054,6 +15077,10 @@ if (reportTypeSelect) {
                 if(fuelSection) fuelSection.style.display = 'none';
                 if(netSumContainer) netSumContainer.style.display = 'none';
                 if(reportSumTitle) reportSumTitle.textContent = 'Łączna liczba unikalnych produktów:';
+            } else if (type === 'karta_obrotu') {
+                if(fuelSection) fuelSection.style.display = 'none';
+                if(netSumContainer) netSumContainer.style.display = 'none';
+                if(reportSumTitle) reportSumTitle.textContent = 'Stan końcowy w magazynie:';
             }
         }
     });
@@ -28788,6 +28815,139 @@ window.toggleBatchesRow = function(productId, spanElement) {
         spanElement.style.color = '#27ae60'; 
     }
 };
+    /* ======================================================== */
+/* ✅ NOWY MODUŁ: KARTA OBROTU DETALICZNEGO (Raport)        */
+/* ======================================================== */
+
+async function fetchLogsForKartaObrotu(dateStart, dateEnd, userId) {
+    if (userId === "ALL") {
+        alert("BŁĄD: Karta Obrotu jest prowadzona indywidualnie dla magazynu. Wybierz konkretnego pracownika w filtrze 'Pracownik'.");
+        throw new Error("Brak konkretnego użytkownika");
+    }
+    
+    // Znajdź ID dokumentu użytkownika w bazie 'konfiguracja'
+    const userDoc = cachedKonfiguracja ? cachedKonfiguracja.find(u => u.uid === userId) : null;
+    let userDocId = userDoc ? userDoc.id : currentUserProfile.id; // Ratunkowy fallback
+
+    const timeStart = new Date(dateStart).setHours(0,0,0,0);
+    const timeEnd = new Date(dateEnd).setHours(23,59,59,999);
+
+    // Pobieramy logi (historię operacji)
+    const q = db.collection("konfiguracja").doc(userDocId).collection("magazynOsobistyLog").orderBy("data", "asc");
+    const snap = await q.get();
+
+    let logs = snap.docs.map(d => ({id: d.id, ...d.data()}));
+    
+    // Filtrujemy lokalnie po dacie wybranej w kalendarzach
+    return logs.filter(l => {
+        if (!l.data) return false;
+        const ms = l.data.toMillis();
+        return ms >= timeStart && ms <= timeEnd;
+    });
+}
+
+function generateKartaObrotuReport(logs, filters) {
+    const productFilterInput = document.getElementById('reportProductInput');
+    const targetProduct = productFilterInput ? productFilterInput.value.trim() : "";
+
+    if (!targetProduct) {
+        alert("BŁĄD: Do wygenerowania Karty Obrotu Detalicznego musisz wybrać konkretny lek w filtrze 'Filtruj produkt'.");
+        throw new Error("Brak wybranego produktu.");
+    }
+
+    // Pobierz dodatkowe dane leku z bazy produktów
+    const productId = produktyGlowneCache.get(targetProduct);
+    const baseProduct = (cachedProducts || []).find(p => p.id === productId) || {};
+
+    let tableHtml = '';
+    let finalStan = 0;
+
+    logs.forEach(log => {
+        if (!log.zmiany) return;
+        
+        // Sprawdź czy ten log dotyczy naszego produktu
+        const zmiana = log.zmiany.find(z => z.id_produktu === productId || z.nazwa_produktu === targetProduct);
+        
+        if (zmiana && zmiana.ilosc !== 0) {
+            const dataOperacji = log.data.toDate().toLocaleString('pl-PL', {day: '2-digit', month: '2-digit', year: 'numeric'});
+            
+            let przychod = '';
+            let rozchod = '';
+            let dostawcaNabywca = '';
+            let nrDokumentu = log.batch_id_powiazany || '-';
+            
+            // Odczyt z zaawansowanych pół magazynu (lub z bazy)
+            let nrSerii = zmiana.nr_serii || baseProduct.nrSerii || '-';
+            let dataWaznosci = zmiana.data_waznosci || '-';
+
+            // Zrozumiałe formatowanie typu operacji
+            if (log.typ === 'doładowanie') {
+                przychod = zmiana.ilosc;
+                dostawcaNabywca = zmiana.dostawca || 'Zakup hurtowy';
+                if (zmiana.data_zakupu) nrDokumentu = `Faktura/Zakup z dn. ${zmiana.data_zakupu}`;
+            } else if (log.typ === 'wydanie_karta') {
+                rozchod = Math.abs(zmiana.ilosc);
+                dostawcaNabywca = `Rozchód pacjenta (Karta nr: ${nrDokumentu})`;
+            } else if (log.typ === 'inwentaryzacja') {
+                if (zmiana.ilosc > 0) przychod = zmiana.ilosc;
+                else rozchod = Math.abs(zmiana.ilosc);
+                dostawcaNabywca = 'Inwentaryzacja (Korekta Stanu)';
+            } else {
+                if (zmiana.ilosc > 0) przychod = zmiana.ilosc;
+                else rozchod = Math.abs(zmiana.ilosc);
+                dostawcaNabywca = log.typ;
+            }
+
+            finalStan = zmiana.stan_po; // Zapisujemy ostatni stan jako końcowy
+
+            tableHtml += `
+                <tr>
+                    <td data-data="${log.data.toMillis()}">${dataOperacji}</td>
+                    <td data-przychod="${przychod}" style="color: #27ae60; font-weight: bold; text-align: center;">${przychod}</td>
+                    <td data-rozchod="${rozchod}" style="color: #c0392b; font-weight: bold; text-align: center;">${rozchod}</td>
+                    <td data-stan="${zmiana.stan_po}" style="font-weight: bold; text-align: center;">${zmiana.stan_po}</td>
+                    <td>${nrSerii}</td>
+                    <td>${dataWaznosci}</td>
+                    <td style="white-space: normal;">${nrDokumentu}<br><small style="color: #666;">${dostawcaNabywca}</small></td>
+                </tr>
+            `;
+        }
+    });
+
+    const tableBody = document.getElementById('reportKartaObrotuTableBody');
+    tableBody.innerHTML = tableHtml || '<tr><td colspan="7" style="text-align: center; padding: 20px;">Brak operacji obrotu dla tego leku w wybranym okresie.</td></tr>';
+
+    // Wyświetlanie zaawansowanych danych o podmiocie i postaci
+    const advInfoDiv = document.getElementById('kartaObrotuAdvancedInfo');
+    if (baseProduct.podmiot || baseProduct.postac || baseProduct.opakowanie) {
+        advInfoDiv.style.display = 'block';
+        advInfoDiv.innerHTML = `
+            <div style="font-size: 15px; color: #2e7d32; font-weight: 800; margin-bottom: 5px;">Rejestr obrotu szczegółowego</div>
+            <strong>Podmiot odp.:</strong> ${baseProduct.podmiot || '-'} | 
+            <strong>Postać farmaceutyczna:</strong> ${baseProduct.postac || '-'} <br>
+            <strong>Opakowanie:</strong> ${baseProduct.opakowanie || '-'} | 
+            <strong>Kat. stosowania:</strong> ${baseProduct.katStosowania || '-'} | 
+            <strong>Kategoria dostępności:</strong> ${baseProduct.katDostepnosci || '-'}
+        `;
+    } else {
+        advInfoDiv.style.display = 'none';
+    }
+
+    // Sterowanie widocznością tabel (Ukrywamy inne, pokazujemy naszą)
+    document.getElementById('reportWizytyTableContainer').style.display = 'none';
+    document.getElementById('reportZuzyciaTableContainer').style.display = 'none';
+    document.getElementById('reportKartaObrotuTableContainer').style.display = 'block';
+    
+    if(document.getElementById('reportFuelSection')) document.getElementById('reportFuelSection').style.display = 'none'; 
+    if(document.getElementById('reportNetSumContainer')) document.getElementById('reportNetSumContainer').style.display = 'none';
+
+    // Aktualizacja Nagłówków na ekranie
+    document.getElementById('reportMainTitle').textContent = `KARTA OBROTU DETALICZNEGO: ${targetProduct}`;
+    document.getElementById('reportDateDisplay').textContent = `Wygenerowano za okres: ${filters.dateStart} do ${filters.dateEnd}`;
+    document.getElementById('reportUserDisplay').textContent = `Dla magazynu pracownika: ${filters.userName}`;
+    document.getElementById('reportSumTitle').textContent = `Stan na koniec wybranego okresu:`;
+    document.getElementById('reportCalculatedSum').textContent = `${finalStan} szt. / j.m.`;
+}
 </script>
 </body>
 </html>
