@@ -6920,43 +6920,66 @@ if (printFormatCancel) {
     });
 }
 
-// 3. Listener dla przycisku "A4" (uruchamia starą logikę)
-// 3. Listener dla przycisku "A4" (NOWA LOGIKA: Osobne okno podglądu)
+// 3. Listener dla przycisku "A4" (NOWA LOGIKA: Zaciąga rozbite wiersze z bazy)
 if (printFormatA4) {
-    printFormatA4.addEventListener('click', () => {
+    printFormatA4.addEventListener('click', async () => {
         
-        // Walidacja stanów (Moduł 7)
         if (typeof isCardStockValid !== 'undefined' && !isCardStockValid) {
             showToast("Nie można drukować karty. Wykryto błędy w stanach magazynowych (czerwone pola).", "error", 4000);
             printFormatModal.style.display = 'none';
             return;
         }
 
-        printFormatModal.style.display = 'none'; // Ukryj modal wyboru
+        printFormatModal.style.display = 'none'; 
         
-        // Wywołaj nową funkcję otwierającą podgląd
+        // ✅ NOWOŚĆ: Jeśli karta została już zapisana, wydrukuj jej IDEALNĄ kopię prosto z bazy
+        if (isCurrentCardSaved && lastSavedDocId) {
+            showToast('Pobieranie rozbitych wierszy z bazy...', 'info', 1500);
+            try {
+                const doc = await db.collection("archiwumKarty").doc(lastSavedDocId).get();
+                if (doc.exists) {
+                    openDirectPrintWindow(doc.data()); // Ta sama funkcja co w Archiwum!
+                    return; 
+                }
+            } catch (e) {
+                console.error("Błąd pobierania do druku:", e);
+            }
+        }
+
+        // Fallback: Jeśli ktoś drukuje bez zapisywania (tylko stary tryb)
         openCurrentA4PrintWindow();
     });
 }
 
-// ⬇️ ⬇️ ⬇️ WKLEJ TEN NOWY BLOK W MIEJSCE STAREGO ⬇️ ⬇️ ⬇️
-
-// 4. Listener dla przycisku "110mm" (WERSJA v14 - FINAL FIX 80mm)
+// 4. Listener dla przycisku "110mm" (NOWA LOGIKA: Zaciąga rozbite wiersze z bazy)
 if (printFormat110 && receiptPrintContainer) {
-    printFormat110.addEventListener('click', () => {
+    printFormat110.addEventListener('click', async () => {
         
-        // Walidacja stanów (Moduł 7)
         if (typeof isCardStockValid !== 'undefined' && !isCardStockValid) {
             showToast("Nie można drukować karty. Wykryto błędy w stanach magazynowych.", "error", 4000);
             printFormatModal.style.display = 'none';
             return;
         }
 
-        printFormatModal.style.display = 'none'; // Ukryj modal
+        printFormatModal.style.display = 'none'; 
+        
+        // ✅ NOWOŚĆ: Jeśli karta została już zapisana, wydrukuj jej IDEALNĄ kopię prosto z bazy
+        if (isCurrentCardSaved && lastSavedDocId) {
+            showToast('Pobieranie rozbitych wierszy z bazy...', 'info', 1500);
+            try {
+                const doc = await db.collection("archiwumKarty").doc(lastSavedDocId).get();
+                if (doc.exists) {
+                    openDirectPrintWindow110mm(doc.data()); // Ta sama funkcja co w Archiwum!
+                    return;
+                }
+            } catch (e) {
+                console.error("Błąd pobierania do druku 110mm:", e);
+            }
+        }
+
         showToast('Generowanie podglądu 110mm...', 'info', 1000);
 
         try {
-            // Używamy funkcji generującej treść (v12 - ta z pełnymi tytułami, jest OK)
             const receiptContentHTML = generate110mmReceiptHTML();
             
             const printWindow = window.open('', '_blank', 'width=550,height=700,scrollbars=yes,resizable=yes');
@@ -7609,7 +7632,7 @@ if (saveCardToArchiveBtn) {
                 // Dodaj tylko wypełnione wiersze
                 if (rowData.opis || rowData.liczba || rowData.rozpoznanie || rowData.lek) {
                     
-                    // ✅ MAGIA FIFO: Automatyczne rozbijanie wiersza (Auto-Split)
+                   // ✅ MAGIA FIFO: Automatyczne rozbijanie wiersza (Auto-Split)
                     if (useStock && currentUserProfile.zaawansowanyMagazyn && productName && quantity > 0) {
                         const productId = produktyGlowneCache.get(productName);
                         if (productId) {
@@ -7628,18 +7651,17 @@ if (saveCardToArchiveBtn) {
                             const baseProduct = cachedProducts ? cachedProducts.find(p => p.id === productId) : null;
                             const domyslnaSeria = (baseProduct && baseProduct.nrSerii) ? baseProduct.nrSerii : 'Brak wpisanej serii';
                             
+                            // 💡 NOWOŚĆ: Mapa do grupowania pobranych ilości po Numerze Serii
+                            const groupedBySeria = new Map();
+                            
                             // Algorytm "odgryzania" płynu z najstarszych otwartych butelek
                             while (amountToFulfill > 0 && batchesQueue.length > 0) {
                                 let batch = batchesQueue[0];
                                 let take = Math.min(amountToFulfill, batch.iloscAktualna);
+                                let seriaZButelki = batch.nrSerii || domyslnaSeria;
                                 
-                                // Tworzymy klon wiersza dla tej konkretnej partii
-                                let splitRowData = { ...rowData };
-                                splitRowData.seria = batch.nrSerii || domyslnaSeria;
-                                // Zastępujemy starą wartość w HTML odgryzioną ilością z tej butelki
-                                splitRowData.iloscDawka = splitRowData.iloscDawka.replace(`value="${iloscValue}"`, `value="${take}"`);
-                                
-                                tableRowsData.push(splitRowData);
+                                // Dodajemy odgryzioną ilość do grupy konkretnej Serii
+                                groupedBySeria.set(seriaZButelki, (groupedBySeria.get(seriaZButelki) || 0) + take);
                                 
                                 amountToFulfill = parseFloat((amountToFulfill - take).toFixed(2));
                                 batch.iloscAktualna = parseFloat((batch.iloscAktualna - take).toFixed(2));
@@ -7652,9 +7674,14 @@ if (saveCardToArchiveBtn) {
                             
                             // Jeśli brakuje nam towaru (np. stan spadł na minus), ratujemy się domyślną serią
                             if (amountToFulfill > 0) {
+                                groupedBySeria.set(domyslnaSeria, (groupedBySeria.get(domyslnaSeria) || 0) + amountToFulfill);
+                            }
+
+                            // 💡 NOWOŚĆ: Zapis do bazy zsumowanych, zgniecionych porcji
+                            for (const [seria, totalTake] of groupedBySeria.entries()) {
                                 let splitRowData = { ...rowData };
-                                splitRowData.seria = domyslnaSeria; 
-                                splitRowData.iloscDawka = splitRowData.iloscDawka.replace(`value="${iloscValue}"`, `value="${amountToFulfill}"`);
+                                splitRowData.seria = seria;
+                                splitRowData.iloscDawka = splitRowData.iloscDawka.replace(`value="${iloscValue}"`, `value="${totalTake}"`);
                                 tableRowsData.push(splitRowData);
                             }
                         } else {
@@ -7665,7 +7692,6 @@ if (saveCardToArchiveBtn) {
                         // Standardowy zapis po staremu, jeśli Magazyn Zaawansowany jest wyłączony
                         tableRowsData.push(rowData);
                     }
-                }
 
                 // Zliczanie do globalnego wydania z magazynu
                 if (useStock && productName && quantity > 0) {
