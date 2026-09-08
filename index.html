@@ -13981,9 +13981,13 @@ function applyReceiptFilters() {
  */
 function sortTable(table, th) {
     const tableBody = table.tBodies[0];
-    const rows = Array.from(tableBody.rows);
+    const allRows = Array.from(tableBody.rows);
+    
+    // ✅ POPRAWKA: Oddzielamy wiersze główne od ukrytych wierszy z partiami
+    const mainRows = allRows.filter(row => !row.id || !row.id.startsWith('batches-row-'));
+    
     const sortKey = th.dataset.sortKey;
-    const sortType = th.dataset.sortType || 'string'; // Domyślnie sortuj jako tekst
+    const sortType = th.dataset.sortType || 'string'; 
 
     // Sprawdź kierunek sortowania (zapisany w nagłówku)
     let dir = th.dataset.sortDir === 'asc' ? 'desc' : 'asc';
@@ -13998,8 +14002,8 @@ function sortTable(table, th) {
 
     const direction = dir === 'asc' ? 1 : -1;
 
-    // Sortuj tablicę wierszy
-    const sortedRows = rows.sort((a, b) => {
+    // Sortuj TYLKO GŁÓWNE wiersze
+    const sortedRows = mainRows.sort((a, b) => {
         let valA = a.dataset[sortKey] || '';
         let valB = b.dataset[sortKey] || '';
         
@@ -14025,9 +14029,21 @@ function sortTable(table, th) {
 
     // Wstaw posortowane wiersze z powrotem do tabeli
     tableBody.innerHTML = '';
-    tableBody.append(...sortedRows);
+    
+    // ✅ POPRAWKA: Sklejamy wiersz główny z jego wierszem szczegółowym w pary
+    sortedRows.forEach(row => {
+        tableBody.appendChild(row); // Najpierw wklej główny wiersz z produktem
+        
+        const productId = row.dataset.productId;
+        if (productId) {
+            // Sprawdź, czy ten produkt miał "dziecko" z partiami (w oryginalnej tablicy)
+            const childRow = allRows.find(r => r.id === `batches-row-${productId}`);
+            if (childRow) {
+                tableBody.appendChild(childRow); // Wklej je zaraz pod spodem!
+            }
+        }
+    });
 }
-
 
 /**
  * Podłącza wszystkie listenery do filtrów i sortowania
@@ -28584,10 +28600,18 @@ async function emailSelectedArchiveCards() {
  * Oblicza, ile sztuk/ml zostało z konkretnych partii (serii) na podstawie historii logów.
  * Działa na zasadzie FIFO (First-In, First-Out) od tyłu.
  */
+/**
+ * Oblicza, ile sztuk/ml zostało z konkretnych partii (serii) na podstawie historii logów.
+ * ✅ ULEPSZONA WERSJA: Pobiera brakujące serie z Głównej Bazy Produktów (Miękkie przejście).
+ */
 function calculateActiveBatches(productId, currentStan, logsCache) {
     if (currentStan <= 0) return [];
     
-    // 1. Filtrujemy tylko DOŁADOWANIA dla tego produktu, które nie są wycofane
+    // Pobieramy dane bazowe produktu z globalnej listy (żeby mieć dostęp do domyślnej serii)
+    const baseProduct = typeof cachedProducts !== 'undefined' ? cachedProducts.find(p => p.id === productId) : null;
+    const domyslnaSeria = (baseProduct && baseProduct.nrSerii) ? baseProduct.nrSerii : 'Brak wpisanej serii';
+
+    // 1. Filtrujemy tylko DOŁADOWANIA
     let topups = [];
     logsCache.forEach(log => {
         if (log.typ === 'doładowanie' && !log.wycofany && log.zmiany) {
@@ -28596,8 +28620,9 @@ function calculateActiveBatches(productId, currentStan, logsCache) {
                 topups.push({
                     dataOperacji: log.data.toMillis(),
                     dataZakupu: zmiana.data_zakupu || 'Brak daty',
-                    nrSerii: zmiana.nr_serii || 'Brak serii',
-                    dataWaznosci: zmiana.data_waznosci || '-',
+                    // ✅ Jeśli ktoś nie wpisał serii w nowym oknie, system użyje serii z Bazy Produktów
+                    nrSerii: zmiana.nr_serii || domyslnaSeria, 
+                    dataWaznosci: zmiana.data_waznosci || 'Brak',
                     iloscOryginalna: zmiana.ilosc
                 });
             }
@@ -28619,32 +28644,30 @@ function calculateActiveBatches(productId, currentStan, logsCache) {
         
         let qtyToTake = Math.min(remainingToFulfill, availableInThisBatch);
         
-        // Zapisujemy, że z tej partii wciąż coś mamy na półce
         activeBatches.push({
             ...batch,
-            iloscAktualna: parseFloat(qtyToTake.toFixed(2)) // Zaokrąglamy ułamki
+            iloscAktualna: parseFloat(qtyToTake.toFixed(2)) 
         });
         
         remainingToFulfill -= qtyToTake;
     }
 
-    // 4. Jeśli stan jest wyższy niż suma w logach (np. stare zapasy sprzed aktualizacji)
+    // 4. ✅ STARE ZAPASY (Stan początkowy przed aktualizacją magazynu)
     if (remainingToFulfill > 0) {
         activeBatches.push({
             dataOperacji: 0,
-            dataZakupu: 'Stare zapasy',
-            nrSerii: 'Sprzed systemu serii',
-            dataWaznosci: '-',
+            dataZakupu: 'Stan z Bazy (przed wdrożeniem serii)',
+            nrSerii: domyslnaSeria, // ✅ Zaciągnięto idealnie z Bazy Produktów
+            dataWaznosci: 'Zgodna z opakowaniem',
             iloscAktualna: parseFloat(remainingToFulfill.toFixed(2))
         });
     }
 
-    // 5. Sortujemy z powrotem od NAJSTARSZEGO (bo te schodzą pierwsze)
+    // 5. Sortujemy z powrotem od NAJSTARSZEGO
     activeBatches.sort((a, b) => a.dataOperacji - b.dataOperacji);
     
     return activeBatches;
 }
-
 /**
 /**
  * Rozwija lub zwija ukryty wiersz z historią partii (na kliknięcie [+] / [-])
