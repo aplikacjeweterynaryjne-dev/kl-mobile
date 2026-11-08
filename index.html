@@ -4731,14 +4731,9 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
 
     <div id="calendarViewContainer">
         
-      <div id="todayViewContainer">
-            <div id="todayViewContainer">
-            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #6A994E; padding-bottom: 5px; margin-bottom: 5px;">
-                <button id="btnPrevDay" class="btn small ghost" style="font-size: 18px; padding: 2px 10px;">◀</button>
-                <h3 id="todayViewTitle" style="margin: 0; text-align: center; flex: 1;">Dzisiaj</h3>
-                <button id="btnNextDay" class="btn small ghost" style="font-size: 18px; padding: 2px 10px;">▶</button>
-            </div>
-            <p id="todayViewSummary" style="text-align: center; font-size: 16px; font-weight: 600; color: #333; margin: 0 0 15px 0;"></p>
+    <div id="todayViewContainer">
+            <h3 id="todayViewTitle" style="text-align: center; border-bottom: 2px solid #6A994E; padding-bottom: 5px;">Dzisiaj (10 listopada 2025)</h3>
+            <p id="todayViewSummary" style="text-align: center; font-size: 16px; font-weight: 600; color: #333; margin: -5px 0 15px 0;"></p>
             <div id="todayVisitList">
                 <p style="text-align:center; color:#888; margin-top: 30px;">Brak wizyt do realizacji na dzisiaj.</p>
             </div>
@@ -4828,9 +4823,13 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
             </div>
         </div>
 
-        <div class="form-row">
+<div class="form-row">
             <label for="visitFormDate">Data wizyty</label>
-            <input type="date" id="visitFormDate">
+            <div style="display: flex; gap: 5px; align-items: center;">
+                <button type="button" id="btnVisitPrevDay" class="btn small ghost" style="font-size: 18px; padding: 4px 12px; height: 38px;">◀</button>
+                <input type="date" id="visitFormDate" style="flex: 1; margin: 0;">
+                <button type="button" id="btnVisitNextDay" class="btn small ghost" style="font-size: 18px; padding: 4px 12px; height: 38px;">▶</button>
+            </div>
         </div>
 
         <div class="form-row">
@@ -29001,36 +29000,30 @@ function generateKartaObrotuReport(logs, filters) {
     document.getElementById('reportSumTitle').style.display = 'none';
     document.getElementById('reportCalculatedSum').style.display = 'none';
 }
-    // ===================================================================
-// PAKIET AKTUALIZACJI: KROWY, KALKULATOR, KALENDARZ STRZAŁKI
+// ===================================================================
+// PAKIET AKTUALIZACJI: KROWY, KALKULATOR, KALENDARZ STRZAŁKI (NAPRAWIONY)
 // ===================================================================
 
 // 1. UZUPEŁNIANIE KRÓW (ŚWIADECTWO INSEMINACJI)
-const swiKlientInput = document.getElementById('swiKlientInput');
-const swiKolczykiList = document.getElementById('swiKolczykiList');
-
-if (swiKlientInput) {
-    swiKlientInput.addEventListener('input', async function() {
+if (document.getElementById('swiKlientInput')) {
+    document.getElementById('swiKlientInput').addEventListener('input', async function() {
         const klientName = this.value.trim();
-        if (!klientName) return;
+        if (!klientName || !currentUserProfile || !currentUserProfile['ID lecznicy']) return;
 
         try {
-            // Szukamy w bazie archiwalnych świadectw tego klienta
+            // Szukamy archiwalnych świadectw tego klienta
             const snap = await db.collection("archiwumSwiadectwa")
                                  .where("id_lecznicy", "==", currentUserProfile['ID lecznicy'])
                                  .where("klient", "==", klientName)
                                  .get();
 
-            // Zbieramy unikalne kolczyki i nazwy krów
             const krowyMap = new Map();
             snap.forEach(doc => {
                 const data = doc.data();
-                if (data.krowaKolczyk) {
-                    krowyMap.set(data.krowaKolczyk, data.krowaNazwa || '');
-                }
+                if (data.krowaKolczyk) krowyMap.set(data.krowaKolczyk, data.krowaNazwa || '');
             });
 
-            // Wypełniamy listę <datalist> (aby działała autouzupełniarka po kliknięciu pola)
+            const swiKolczykiList = document.getElementById('swiKolczykiList');
             if (swiKolczykiList) {
                 swiKolczykiList.innerHTML = '';
                 krowyMap.forEach((nazwa, kolczyk) => {
@@ -29041,80 +29034,57 @@ if (swiKlientInput) {
                 });
             }
         } catch (error) {
-            console.error("Błąd podczas pobierania historii krów klienta:", error);
+            console.error("Błąd pobierania historii krów:", error);
         }
     });
 }
 
 // 2. PRZEJŚCIE ZE ŚWIADECTWA DO KALKULATORA
-function goToCalcFromSwiadectwo() {
-    const klientName = document.getElementById('swiKlientInput').value.trim();
-    if (!klientName) {
-        showToast("Brak klienta w świadectwie.", "error");
+window.goToCalcFromSwiadectwo = function() {
+    const klientInput = document.getElementById('swiKlientInput');
+    if (!klientInput || !klientInput.value.trim()) {
+        if (typeof showToast === 'function') showToast("Brak klienta w świadectwie.", "error");
+        else alert("Brak klienta w świadectwie.");
         return;
     }
     
-    // Zmieniamy zakładkę na Kalkulator
-    showSection('kalkulator');
+    // Przełącz zakładkę
+    if (typeof showSection === 'function') showSection('kalkulator');
     
-    // Wpisujemy klienta do kalkulatora
     const calcKlientInput = document.getElementById('calcKlientInput');
     if (calcKlientInput) {
-        calcKlientInput.value = klientName;
-        // Wymuszamy event 'input', żeby kalkulator ściągnął historię np. długów klienta
+        calcKlientInput.value = klientInput.value.trim();
         calcKlientInput.dispatchEvent(new Event('input', { bubbles: true }));
     }
     
-    // Opcjonalnie wpisujemy w Notatnik, za co rachunek
     const notatkaInput = document.getElementById('calcNotatkaInput');
-    const kolczyk = document.getElementById('swiKolczykInput').value.trim();
+    const kolczyk = document.getElementById('swiKolczykInput') ? document.getElementById('swiKolczykInput').value.trim() : '';
     if (notatkaInput && kolczyk) {
         notatkaInput.value = `Unasiennianie krowy nr: ${kolczyk}`;
     }
-}
+};
 
-// 3. OBSŁUGA STRZAŁEK W WIDOKU "DZISIAJ" (KALENDARZ)
-let currentTodayViewDate = new Date(); // Zmienna pamiętająca jaką datę obecnie oglądamy
-
-const btnPrevDay = document.getElementById('btnPrevDay');
-const btnNextDay = document.getElementById('btnNextDay');
-
-if (btnPrevDay && btnNextDay) {
-    btnPrevDay.addEventListener('click', () => {
-        // Cofa o 1 dzień
-        currentTodayViewDate.setDate(currentTodayViewDate.getDate() - 1);
-        odswiezWidokDzis();
-    });
-
-    btnNextDay.addEventListener('click', () => {
-        // Do przodu o 1 dzień
-        currentTodayViewDate.setDate(currentTodayViewDate.getDate() + 1);
-        odswiezWidokDzis();
+// 3. STRZAŁKI W FORMULARZU NOWEJ WIZYTY
+if (document.getElementById('btnVisitPrevDay') && document.getElementById('visitFormDate')) {
+    document.getElementById('btnVisitPrevDay').addEventListener('click', () => {
+        const dateInput = document.getElementById('visitFormDate');
+        if (dateInput.value) {
+            let d = new Date(dateInput.value);
+            d.setDate(d.getDate() - 1);
+            dateInput.value = d.toISOString().split('T')[0];
+        }
     });
 }
 
-function odswiezWidokDzis() {
-    // Formatujemy datę do postaci rrrr-mm-dd
-    const year = currentTodayViewDate.getFullYear();
-    const month = String(currentTodayViewDate.getMonth() + 1).padStart(2, '0');
-    const day = String(currentTodayViewDate.getDate()).padStart(2, '0');
-    const formattedDate = `${year}-${month}-${day}`;
-    
-    // Ustawiamy tytuł
-    const titleEl = document.getElementById('todayViewTitle');
-    if (titleEl) {
-        titleEl.textContent = `Wizyty: ${formattedDate}`;
-    }
-
-    // Wywołujemy TWOJĄ główną funkcję pobierającą wizyty na ten dzień.
-    // UWAGA: Upewnij się, że w Twoim pliku funkcja renderująca dzień nazywa się "loadVisitsForToday" lub zmień tę nazwę poniżej!
-    if (typeof renderTodayVisits === 'function') {
-        renderTodayVisits(formattedDate);
-    } else if (typeof loadVisitsForDay === 'function') {
-        loadVisitsForDay(formattedDate);
-    } else {
-        console.warn("Skrypt strzałek kalendarza zadziałał, ale nie potrafił wywołać Twojej funkcji renderującej. Sprawdź nazwę funkcji generującej listę wizyt na ekranie Dzisiaj.");
-    }
+if (document.getElementById('btnVisitNextDay') && document.getElementById('visitFormDate')) {
+    document.getElementById('btnVisitNextDay').addEventListener('click', () => {
+        const dateInput = document.getElementById('visitFormDate');
+        if (dateInput.value) {
+            let d = new Date(dateInput.value);
+            d.setDate(d.getDate() + 1);
+            dateInput.value = d.toISOString().split('T')[0];
+        }
+    });
 }
 </script>
 </body>
