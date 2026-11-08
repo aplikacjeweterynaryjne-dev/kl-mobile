@@ -809,21 +809,28 @@
             }
         }
 
-        // Ta funkcja jest globalnym listenerem nasłuchującym na kliknięcia w krowy podczas audytu
+       // Wzmocniony listener kliknięć dla audytu
         document.getElementById('herdList').addEventListener('click', (e) => {
             if (!isAuditMode) return;
             
-            // Szukamy najbliższego elementu, który u Ciebie reprezentuje pojedynczą krowę 
-            // Zazwyczaj jest to karta klasy .sync-item-card lub wiersz
-            const animalCard = e.target.closest('.sync-item-card') || e.target.closest('.task-item'); // Dopasuj do klasy w swoim JS
+            // Łapiemy główny kafelek krowy, niezależnie od tego, jakiej używa klasy
+            const animalCard = e.target.closest('#herdList > div') || e.target.closest('.card'); 
             if (!animalCard) return;
 
-            // Przerywamy domyślne otwieranie modala detali!
+            // Priorytetowe przerwanie (nie otwiera się okno krowy!)
             e.stopPropagation();
             e.preventDefault();
 
-            // Pobieramy ID krowy z atrybutu (zakładam, że Twoja funkcja renderHerdList coś jej przypisuje)
-            const animalId = animalCard.dataset.id || animalCard.querySelector('strong').innerText.split(' ')[0]; // Prosty fallback do tekstu kolczyka
+            // Wyciągamy ID / Nr Kolczyka (z dataset, pogrubionego tekstu lub z pierwszej linijki kafelka)
+            let animalId = animalCard.dataset.id;
+            if (!animalId) {
+                const strongEl = animalCard.querySelector('strong, b');
+                if (strongEl) {
+                    animalId = strongEl.innerText.trim().split(' ')[0];
+                } else {
+                    animalId = animalCard.innerText.trim().split('\n')[0].trim();
+                }
+            }
 
             if (presentAnimals.has(animalId)) {
                 presentAnimals.delete(animalId);
@@ -832,8 +839,7 @@
                 presentAnimals.add(animalId);
                 animalCard.style.backgroundColor = "#d4edda"; // Na zielono
             }
-        });
-
+        }, true); // <-- Słowo 'true' (Capture) jest tu kluczem, przechwytuje kliknięcie jako pierwsze!
         function finishAudit() {
             // Tutaj masz listę obecnych: presentAnimals
             // Pobieramy Twoją główną tablicę ze wszystkimi zwierzętami (np. cachedHerd)
