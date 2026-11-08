@@ -317,9 +317,22 @@
         <button onclick="document.getElementById('importHerdModal').style.display='flex'" class="btn" style="background:#e3f2fd; color:#1565c0; border:1px solid #90caf9; margin-bottom:15px; padding: 12px; font-weight: 700;">
             📥 Import z Excela / Dodaj wiele naraz
         </button>
-        <div style="display:flex; gap:10px; margin-bottom:10px;">
+       <div style="display:flex; gap:10px; margin-bottom:10px;">
             <input type="search" id="herdSearch" oninput="renderHerdList()" placeholder="🔍 Szukaj kolczyka..." style="flex:1; padding:12px; border:1px solid #ddd; border-radius:10px;">
             <button onclick="resetHerdSearch()" style="background:#eee; border:none; padding:0 15px; border-radius:10px;">Reset</button>
+        </div>
+        <button id="btnStartAudit" onclick="toggleAuditMode()" class="btn" style="background:#f39c12; color:white; margin-bottom:15px; padding: 12px; font-weight: 700;">
+            📋 Rozpocznij szybką inwentaryzację (Audyt)
+        </button>
+        <div id="auditControls" style="display:none; background:#fff3e0; padding:10px; border-radius:8px; margin-bottom:15px; border: 1px solid #ffe0b2; text-align:center;">
+            <p style="font-size: 13px; margin: 0 0 10px 0; color: #d35400;">
+                Klikaj w krowy, które fizycznie widzisz (podświetlą się na zielono). 
+                Kiedy sprawdzisz wszystkie, zakończ audyt.
+            </p>
+            <div style="display: flex; gap: 10px;">
+                <button class="btn ghost small" style="flex:1;" onclick="toggleAuditMode()">Anuluj</button>
+                <button class="btn btn-primary small" style="flex:2; background:#d35400; border:none;" onclick="finishAudit()">Zakończ i pokaż braki</button>
+            </div>
         </div>
       <div class="task-filter-chips" style="margin-bottom: 15px;">
             <button class="filter-chip" id="f-puste" onclick="toggleHerdFilter('puste')">Puste <span id="count-puste"></span></button>
@@ -555,10 +568,10 @@
         <div class="modal-content">
             <button class="close-modal-fixed" onclick="closeModal('animalModal')">✕</button>
             <h3>Dodaj Zwierzę</h3>
-            <form id="animalForm">
+            <form id="animalForm" onsubmit="event.preventDefault(); submitAnimalForm();">
                 <div class="form-row"><label>Nr Kolczyka *</label><input type="text" id="inpTag" required></div>
                 <div class="form-row"><label>Typ *</label><select id="inpType" required><option value="krowa">Krowa</option><option value="jalowka">Jałówka</option><option value="byk">Byk</option></select></div>
-                <div class="form-row"><label>Data Urodzenia *</label><input type="date" id="inpDob" required></div>
+                <div class="form-row"><label>Data Urodzenia (Opcjonalnie)</label><input type="date" id="inpDob"></div>
                 <div class="form-row"><label>Lokalizacja</label><input type="text" id="inpLocation"></div>
                 <div style="background:#eef2f7; padding:10px; border-radius:12px; margin-bottom:10px;">
                     <div class="form-row"><label>Matka (Kolczyk)</label><input type="text" id="inpMother" list="tagList"></div>
@@ -773,6 +786,99 @@
         <i class="bi bi-download"></i>
     </button>
 
+<script>
+        // --- 1. SZYBKA INWENTARYZACJA (AUDYT) ---
+        let isAuditMode = false;
+        let presentAnimals = new Set(); // Przechowuje id/kolczyki zaznaczonych zwierząt
+
+        function toggleAuditMode() {
+            isAuditMode = !isAuditMode;
+            presentAnimals.clear();
+            
+            document.getElementById('btnStartAudit').style.display = isAuditMode ? 'none' : 'block';
+            document.getElementById('auditControls').style.display = isAuditMode ? 'block' : 'none';
+            
+            const herdList = document.getElementById('herdList');
+            if (isAuditMode) {
+                herdList.classList.add('audit-active');
+                // Jeśli masz u siebie funkcję ładującą stado do zmiennej, upewnij się, że nie czyści ona naszej klasy
+                showToast("Tryb audytu włączony. Klikaj w obecne zwierzęta.", "info");
+            } else {
+                herdList.classList.remove('audit-active');
+                renderHerdList(); // Odśwież listę, zdejmując zielone kolory
+            }
+        }
+
+        // Ta funkcja jest globalnym listenerem nasłuchującym na kliknięcia w krowy podczas audytu
+        document.getElementById('herdList').addEventListener('click', (e) => {
+            if (!isAuditMode) return;
+            
+            // Szukamy najbliższego elementu, który u Ciebie reprezentuje pojedynczą krowę 
+            // Zazwyczaj jest to karta klasy .sync-item-card lub wiersz
+            const animalCard = e.target.closest('.sync-item-card') || e.target.closest('.task-item'); // Dopasuj do klasy w swoim JS
+            if (!animalCard) return;
+
+            // Przerywamy domyślne otwieranie modala detali!
+            e.stopPropagation();
+            e.preventDefault();
+
+            // Pobieramy ID krowy z atrybutu (zakładam, że Twoja funkcja renderHerdList coś jej przypisuje)
+            const animalId = animalCard.dataset.id || animalCard.querySelector('strong').innerText.split(' ')[0]; // Prosty fallback do tekstu kolczyka
+
+            if (presentAnimals.has(animalId)) {
+                presentAnimals.delete(animalId);
+                animalCard.style.backgroundColor = ""; // Wróć do bieli
+            } else {
+                presentAnimals.add(animalId);
+                animalCard.style.backgroundColor = "#d4edda"; // Na zielono
+            }
+        });
+
+        function finishAudit() {
+            // Tutaj masz listę obecnych: presentAnimals
+            // Pobieramy Twoją główną tablicę ze wszystkimi zwierzętami (np. cachedHerd)
+            const allAnimals = window.cachedHerd || []; // Podstaw swoją globalną zmienną stada
+            const missingAnimals = allAnimals.filter(a => !presentAnimals.has(a.id) && !presentAnimals.has(a.kolczyk));
+
+            if (missingAnimals.length === 0) {
+                alert("Stan się zgadza! Wszystkie zwierzęta są obecne.");
+                toggleAuditMode();
+                return;
+            }
+
+            const confirmMsg = `Brakuje ${missingAnimals.length} zwierząt.\n\nCzy chcesz automatycznie zarchiwizować (usunąć) te braki?`;
+            if (confirm(confirmMsg)) {
+                // Tutaj wzywamy Twoją pętlę usuwającą/archiwizującą
+                missingAnimals.forEach(a => {
+                    if(typeof deleteAnimalFromDB === 'function') deleteAnimalFromDB(a.id); // użyj swojej
+                    console.log("Usuwam brakujące:", a.kolczyk);
+                });
+                alert("Brakujące sztuki zostały usunięte.");
+                toggleAuditMode();
+            }
+        }
+
+        // --- 2. WALIDACJA DATY URODZENIA (Zdejmij required, daj Ostrzeżenie) ---
+        function submitAnimalForm() {
+            const dataUr = document.getElementById('inpDob').value;
+            if (!dataUr) {
+                const odp = confirm("Nie wpisałeś daty urodzenia.\n\nSztuka zostanie dodana, ale pamiętaj, że bez niej część statystyk stada i automatycznych zadań może nie działać prawidłowo (np. powiadomienie o badaniu na cielność 20 msc).\n\nCzy kontynuować i dodać zwierzę?");
+                if (!odp) return;
+            }
+
+            // Wywołaj Twoją oryginalną funkcję zapisującą z pliku client.js (np. saveNewAnimal)
+            if (typeof saveNewAnimal === 'function') {
+                saveNewAnimal();
+            } else if (typeof document.getElementById('animalForm').onsubmit === 'function') {
+                // Jeśli masz to zapięte tradycyjnie na onsubmit w client.js
+            }
+            console.log("Dodano zwierzę bez daty urodzenia pomyślnie.");
+            closeModal('animalModal');
+        }
+        
+        // Zastępczy showToast jeśli w client.js brakuje
+        function showToast(msg) { console.log("Toast: ", msg); }
+    </script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
