@@ -789,62 +789,95 @@
 <script>
         // --- 1. SZYBKA INWENTARYZACJA (AUDYT) ---
         let isAuditMode = false;
-        let presentAnimals = new Set(); // Przechowuje id/kolczyki zaznaczonych zwierząt
+        let presentAnimals = new Set(); // Kliknięte (obecne)
+        let allAnimalsDuringAudit = new Set(); // Wszystkie na starcie
+
+        // Funkcja wyciągająca ID krowy z HTML-a
+        function getAnimalIdFromCard(card) {
+            if (card.dataset.id) return card.dataset.id;
+            const strongEl = card.querySelector('strong, b');
+            if (strongEl) return strongEl.innerText.trim().split(' ')[0];
+            return card.innerText.trim().split('\n')[0].trim();
+        }
 
         function toggleAuditMode() {
             isAuditMode = !isAuditMode;
             presentAnimals.clear();
+            allAnimalsDuringAudit.clear();
             
             document.getElementById('btnStartAudit').style.display = isAuditMode ? 'none' : 'block';
             document.getElementById('auditControls').style.display = isAuditMode ? 'block' : 'none';
             
             const herdList = document.getElementById('herdList');
+            const searchInput = document.getElementById('herdSearch');
+
             if (isAuditMode) {
-                herdList.classList.add('audit-active');
-                // Jeśli masz u siebie funkcję ładującą stado do zmiennej, upewnij się, że nie czyści ona naszej klasy
-                showToast("Tryb audytu włączony. Klikaj w obecne zwierzęta.", "info");
+                // Wymuszamy wyczyszczenie wyszukiwarki, żeby załadować WSZYSTKIE sztuki do sprawdzenia
+                if (searchInput) {
+                    searchInput.value = '';
+                    if (typeof renderHerdList === 'function') renderHerdList();
+                }
+
+                // Czekamy ułamek sekundy na odświeżenie HTML, po czym zapisujemy CAŁE STADO do pamięci
+                setTimeout(() => {
+                    herdList.classList.add('audit-active');
+                    const cards = herdList.querySelectorAll(':scope > div, .card, .sync-item-card, .task-item');
+                    cards.forEach(card => {
+                        let id = getAnimalIdFromCard(card);
+                        if (id) allAnimalsDuringAudit.add(id);
+                    });
+                    
+                    if (typeof showToast === 'function') showToast("Tryb audytu włączony. Klikaj w obecne zwierzęta.", "info");
+                    else alert("Tryb audytu włączony. Zaznacz sztuki obecne w oborze.");
+                }, 400);
+
             } else {
                 herdList.classList.remove('audit-active');
-                renderHerdList(); // Odśwież listę, zdejmując zielone kolory
+                if (typeof renderHerdList === 'function') renderHerdList(); 
             }
         }
 
-       // Wzmocniony listener kliknięć dla audytu
+        // MAGICZNY OBSERWATOR: Patrzy, czy wyszukiwarka przebudowuje listę. 
+        // Jeśli tak, natychmiast odtwarza zielone zaznaczenia na krowach.
+        const herdObserver = new MutationObserver(() => {
+            if (!isAuditMode) return;
+            const herdList = document.getElementById('herdList');
+            if (!herdList) return;
+            const cards = herdList.querySelectorAll(':scope > div, .card, .sync-item-card, .task-item');
+            cards.forEach(card => {
+                let id = getAnimalIdFromCard(card);
+                if (presentAnimals.has(id)) {
+                    card.style.backgroundColor = "#d4edda";
+                }
+            });
+        });
+        herdObserver.observe(document.getElementById('herdList'), { childList: true, subtree: true });
+
+        // Wzmocniony listener kliknięć dla audytu (Priorytetowy)
         document.getElementById('herdList').addEventListener('click', (e) => {
             if (!isAuditMode) return;
             
-            // Łapiemy główny kafelek krowy, niezależnie od tego, jakiej używa klasy
-            const animalCard = e.target.closest('#herdList > div') || e.target.closest('.card'); 
+            const animalCard = e.target.closest('#herdList > div') || e.target.closest('.card') || e.target.closest('.sync-item-card') || e.target.closest('.task-item'); 
             if (!animalCard) return;
 
-            // Priorytetowe przerwanie (nie otwiera się okno krowy!)
+            // Przerywamy akcję, by nie otworzyła się karta krowy
             e.stopPropagation();
             e.preventDefault();
 
-            // Wyciągamy ID / Nr Kolczyka (z dataset, pogrubionego tekstu lub z pierwszej linijki kafelka)
-            let animalId = animalCard.dataset.id;
-            if (!animalId) {
-                const strongEl = animalCard.querySelector('strong, b');
-                if (strongEl) {
-                    animalId = strongEl.innerText.trim().split(' ')[0];
-                } else {
-                    animalId = animalCard.innerText.trim().split('\n')[0].trim();
-                }
-            }
+            let animalId = getAnimalIdFromCard(animalCard);
 
             if (presentAnimals.has(animalId)) {
                 presentAnimals.delete(animalId);
-                animalCard.style.backgroundColor = ""; // Wróć do bieli
+                animalCard.style.backgroundColor = ""; // Odznacz
             } else {
                 presentAnimals.add(animalId);
-                animalCard.style.backgroundColor = "#d4edda"; // Na zielono
+                animalCard.style.backgroundColor = "#d4edda"; // Zaznacz
             }
-        }, true); // <-- Słowo 'true' (Capture) jest tu kluczem, przechwytuje kliknięcie jako pierwsze!
+        }, true);
+
         function finishAudit() {
-            // Tutaj masz listę obecnych: presentAnimals
-            // Pobieramy Twoją główną tablicę ze wszystkimi zwierzętami (np. cachedHerd)
-            const allAnimals = window.cachedHerd || []; // Podstaw swoją globalną zmienną stada
-            const missingAnimals = allAnimals.filter(a => !presentAnimals.has(a.id) && !presentAnimals.has(a.kolczyk));
+            // Szukamy braków: Odrzucamy ze 'Wszystkich' te, które zostały 'Kliknięte'
+            const missingAnimals = Array.from(allAnimalsDuringAudit).filter(id => !presentAnimals.has(id));
 
             if (missingAnimals.length === 0) {
                 alert("Stan się zgadza! Wszystkie zwierzęta są obecne.");
@@ -854,17 +887,19 @@
 
             const confirmMsg = `Brakuje ${missingAnimals.length} zwierząt.\n\nCzy chcesz automatycznie zarchiwizować (usunąć) te braki?`;
             if (confirm(confirmMsg)) {
-                // Tutaj wzywamy Twoją pętlę usuwającą/archiwizującą
-                missingAnimals.forEach(a => {
-                    if(typeof deleteAnimalFromDB === 'function') deleteAnimalFromDB(a.id); // użyj swojej
-                    console.log("Usuwam brakujące:", a.kolczyk);
+                missingAnimals.forEach(id => {
+                    // Wywołuje Twoją pętlę usuwającą z client.js
+                    if (typeof deleteAnimalFromDB === 'function') {
+                        deleteAnimalFromDB(id); 
+                    }
+                    console.log("Usuwam brakujące:", id);
                 });
                 alert("Brakujące sztuki zostały usunięte.");
                 toggleAuditMode();
             }
         }
-
-        // --- 2. WALIDACJA DATY URODZENIA (Zdejmij required, daj Ostrzeżenie) ---
+        
+        // --- 2. WALIDACJA DATY URODZENIA ---
         function submitAnimalForm() {
             const dataUr = document.getElementById('inpDob').value;
             if (!dataUr) {
@@ -872,18 +907,11 @@
                 if (!odp) return;
             }
 
-            // Wywołaj Twoją oryginalną funkcję zapisującą z pliku client.js (np. saveNewAnimal)
             if (typeof saveNewAnimal === 'function') {
                 saveNewAnimal();
-            } else if (typeof document.getElementById('animalForm').onsubmit === 'function') {
-                // Jeśli masz to zapięte tradycyjnie na onsubmit w client.js
             }
-            console.log("Dodano zwierzę bez daty urodzenia pomyślnie.");
             closeModal('animalModal');
         }
-        
-        // Zastępczy showToast jeśli w client.js brakuje
-        function showToast(msg) { console.log("Toast: ", msg); }
     </script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
