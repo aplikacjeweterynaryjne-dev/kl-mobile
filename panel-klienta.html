@@ -782,34 +782,57 @@
             </div>
         </div>
     </div>
-    <button id="installFloatingBtnKlient" title="Zainstaluj aplikację">
+<button id="installFloatingBtnKlient" title="Zainstaluj aplikację">
         <i class="bi bi-download"></i>
     </button>
 
-<script>
-        // --- 1. SZYBKA INWENTARYZACJA (AUDYT) ---
-        let isAuditMode = false;
-        let presentAnimals = new Set(); // Kliknięte (obecne ID)
-        let allAnimalsMap = new Map();  // Mapa przechowująca pary: [ID -> Czytelny Numer Kolczyka]
+    <!-- NOWY MODAL WYNIKU INWENTARYZACJI -->
+    <div id="auditResultModal" class="modal" style="z-index: 5000;">
+        <div class="modal-content" style="max-width: 500px;">
+            <h3 style="color:#d35400; margin-top:0;">Wynik Inwentaryzacji</h3>
+            <p id="auditResultText" style="font-size: 14px; color: #555;"></p>
+            
+            <div id="auditMissingList" style="max-height: 300px; overflow-y: auto; text-align: left; background: #f9f9f9; padding: 10px; border-radius: 8px; border: 1px solid #ddd; margin-bottom: 15px;">
+                <!-- Tu pojawią się krowy z checkboxami -->
+            </div>
+            
+            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                <button class="btn ghost" style="flex:1; background:#eee;" onclick="closeAuditModal()">Zostaw wszystkie (Anuluj)</button>
+                <button class="btn btn-danger" style="flex:1; background:#c0392b; color:white; border:none;" onclick="deleteSelectedMissingAnimals()">🗑️ Usuń zaznaczone</button>
+            </div>
+        </div>
+    </div>
 
-        // Funkcja wyciągająca ID i tekst z kafelka krowy
-        function getAnimalInfoFromCard(card) {
-            let id = card.dataset.id;
-            let text = "";
+<script>
+        // --- 1. SZYBKA INWENTARYZACJA (AUDYT) Z MODALEM I BEZPOŚREDNIM USUWANIEM ---
+        let isAuditMode = false;
+        let presentAnimals = new Set(); 
+        let allAnimalsDuringAudit = []; // Zapisze CAŁE stado prosto z pamięci
+
+        function getAnimalIdFromCard(card) {
+            if (card.dataset.id) return card.dataset.id;
             const strongEl = card.querySelector('strong, b');
-            if (strongEl) {
-                text = strongEl.textContent.trim();
-            } else {
-                text = card.textContent.trim().split('\n')[0].trim(); // textContent jest niezawodne
+            if (strongEl) return strongEl.textContent.trim().split(' ')[0];
+            return card.textContent.trim().split('\n')[0].trim();
+        }
+
+        // Sprytna funkcja szukająca globalnej tablicy ze stadem w pamięci JS (omija filtry HTML)
+        function findGlobalHerdArray() {
+            for (let key of Object.keys(window)) {
+                let val = window[key];
+                if (Array.isArray(val) && val.length > 0 && typeof val[0] === 'object') {
+                    if (val[0].hasOwnProperty('kolczyk') || val[0].hasOwnProperty('typ') || val[0].hasOwnProperty('nrKolczyka') || val[0].hasOwnProperty('tag')) {
+                        return val;
+                    }
+                }
             }
-            if (!id) id = text.split(' ')[0]; // Fallback
-            return { id: id, label: text };
+            return [];
         }
 
         function toggleAuditMode() {
             isAuditMode = !isAuditMode;
             presentAnimals.clear();
-            allAnimalsMap.clear();
+            allAnimalsDuringAudit = [];
             
             document.getElementById('btnStartAudit').style.display = isAuditMode ? 'none' : 'block';
             document.getElementById('auditControls').style.display = isAuditMode ? 'block' : 'none';
@@ -817,115 +840,146 @@
             const herdList = document.getElementById('herdList');
 
             if (isAuditMode) {
-                // 1. Reset lupy
-                if (typeof resetHerdSearch === 'function') resetHerdSearch();
-
-                // 2. Automatyczne odklikanie filtrów (żeby pokazało byki i jałówki)
-                const activeChips = document.querySelectorAll('.task-filter-chips .filter-chip.active');
-                activeChips.forEach(chip => chip.click()); // Symulujemy odkliknięcie filtru
+                // Szukamy stada w pamięci, zamiast czytać z ekranu
+                allAnimalsDuringAudit = findGlobalHerdArray();
                 
-                // Awaryjne wymuszenie czyszczenia filtrów
-                if (typeof window.currentHerdFilter !== 'undefined') window.currentHerdFilter = '';
+                // Odświeżamy ekran, by pokazać całe stado dla wygody klikania
+                if (typeof resetHerdSearch === 'function') resetHerdSearch();
+                const activeChips = document.querySelectorAll('.task-filter-chips .filter-chip.active');
+                activeChips.forEach(chip => chip.classList.remove('active'));
                 if (typeof renderHerdList === 'function') renderHerdList();
 
-                // 3. Czekamy 0.5s na załadowanie całego stada do DOM i zczytujemy wszystkie sztuki
                 setTimeout(() => {
                     herdList.classList.add('audit-active');
-                    const cards = herdList.querySelectorAll(':scope > div, .card, .sync-item-card, .task-item');
                     
-                    cards.forEach(card => {
-                        let info = getAnimalInfoFromCard(card);
-                        if (info.id) allAnimalsMap.set(info.id, info.label);
-                    });
+                    // Fallback: Gdyby jednak nie znalazło w pamięci, szukamy na siłę na ekranie
+                    if (allAnimalsDuringAudit.length === 0) {
+                        const cards = herdList.querySelectorAll(':scope > div, .card, .sync-item-card, .task-item');
+                        cards.forEach(card => {
+                            let id = getAnimalIdFromCard(card);
+                            let text = card.querySelector('strong, b') ? card.querySelector('strong, b').textContent : card.textContent.split('\n')[0];
+                            if (id) allAnimalsDuringAudit.push({ id: id, kolczyk: text, typ: 'Sztuka' });
+                        });
+                    }
                     
-                    const msg = `Tryb audytu. Wczytano całe stado: ${allAnimalsMap.size} sztuk. Klikaj w obecne zwierzęta.`;
-                    if (typeof showToast === 'function') showToast(msg, "info");
-                    else alert(msg);
-                    
+                    alert(`Tryb audytu. System załadował do sprawdzenia całe stado: ${allAnimalsDuringAudit.length} sztuk.\nZaznacz te, które SĄ obecnie w oborze.`);
                 }, 500);
-
             } else {
                 herdList.classList.remove('audit-active');
                 if (typeof renderHerdList === 'function') renderHerdList(); 
             }
         }
 
-        // Obserwator zmian (przywraca kolory po użyciu wyszukiwarki/filtrów w trakcie audytu)
+        // Obserwator zmian (lupa)
         const herdObserver = new MutationObserver(() => {
             if (!isAuditMode) return;
-            const herdList = document.getElementById('herdList');
-            if (!herdList) return;
-            const cards = herdList.querySelectorAll(':scope > div, .card, .sync-item-card, .task-item');
+            const hl = document.getElementById('herdList');
+            if (!hl) return;
+            const cards = hl.querySelectorAll(':scope > div, .card, .sync-item-card, .task-item');
             cards.forEach(card => {
-                let info = getAnimalInfoFromCard(card);
-                if (presentAnimals.has(info.id)) {
-                    card.style.backgroundColor = "#d4edda";
-                }
+                let id = getAnimalIdFromCard(card);
+                if (presentAnimals.has(id)) card.style.backgroundColor = "#d4edda";
             });
         });
-        if (document.getElementById('herdList')) {
-            herdObserver.observe(document.getElementById('herdList'), { childList: true, subtree: true });
-        }
+        if (document.getElementById('herdList')) herdObserver.observe(document.getElementById('herdList'), { childList: true, subtree: true });
 
-        // Wzmocniony listener kliknięć (działa na wszystkim)
+        // Wzmocniony listener kliknięć
         if (document.getElementById('herdList')) {
             document.getElementById('herdList').addEventListener('click', (e) => {
                 if (!isAuditMode) return;
-                
                 const animalCard = e.target.closest('#herdList > div') || e.target.closest('.card') || e.target.closest('.sync-item-card') || e.target.closest('.task-item'); 
                 if (!animalCard) return;
 
-                e.stopPropagation();
-                e.preventDefault();
+                e.stopPropagation(); e.preventDefault();
+                let id = getAnimalIdFromCard(animalCard);
 
-                let info = getAnimalInfoFromCard(animalCard);
-
-                if (presentAnimals.has(info.id)) {
-                    presentAnimals.delete(info.id);
+                if (presentAnimals.has(id)) {
+                    presentAnimals.delete(id);
                     animalCard.style.backgroundColor = ""; 
                 } else {
-                    presentAnimals.add(info.id);
+                    presentAnimals.add(id);
                     animalCard.style.backgroundColor = "#d4edda"; 
                 }
             }, true);
         }
 
-        // Funkcja kończąca - wyświetla listę braków
+        // --- OKNO WYNIKÓW I KASOWANIE ---
+        let missingAnimalsForDelete = [];
+
         function finishAudit() {
-            const missingIds = [];
-            const missingLabels = [];
+            // Filtrujemy braki
+            missingAnimalsForDelete = allAnimalsDuringAudit.filter(a => !presentAnimals.has(a.id) && !presentAnimals.has(a.kolczyk) && !presentAnimals.has(a.nrKolczyka) && !presentAnimals.has(a.tag));
 
-            // Sprawdzamy co zostało pominięte
-            allAnimalsMap.forEach((label, id) => {
-                if (!presentAnimals.has(id)) {
-                    missingIds.push(id);
-                    missingLabels.push(label);
-                }
-            });
-
-            if (missingIds.length === 0) {
+            if (missingAnimalsForDelete.length === 0) {
                 alert("Stan się zgadza! Wszystkie zwierzęta są obecne.");
                 toggleAuditMode();
                 return;
             }
 
-            // Budowanie czytelnej listy z enterami
-            const brakiTekst = missingLabels.join('\n- ');
-            const confirmMsg = `Brakuje ${missingIds.length} zwierząt. Są to:\n\n- ${brakiTekst}\n\nCzy chcesz automatycznie zarchiwizować (usunąć) te braki?`;
+            // Pokaż nowy modal
+            const modal = document.getElementById('auditResultModal');
+            const listDiv = document.getElementById('auditMissingList');
             
-            if (confirm(confirmMsg)) {
-                missingIds.forEach(id => {
-                    // Wywołuje Twoją funkcję usuwającą z client.js
-                    if (typeof deleteAnimalFromDB === 'function') {
-                        deleteAnimalFromDB(id); 
-                    }
-                    console.log("Usunięto:", id);
-                });
-                alert("Brakujące sztuki zostały usunięte z bazy.");
-                toggleAuditMode();
-            }
+            document.getElementById('auditResultText').innerHTML = `Wykryto <b>${missingAnimalsForDelete.length}</b> sztuk, których NIE ZAZNACZYŁEŚ.<br><br>Odznacz na liście te, które chcesz zachować w systemie, a resztę usuń:`;
+            listDiv.innerHTML = '';
+            
+            missingAnimalsForDelete.forEach(a => {
+                const displayTxt = a.kolczyk || a.nrKolczyka || a.tag || a.id;
+                const typTxt = a.typ ? `(${a.typ})` : '';
+                listDiv.innerHTML += `
+                    <label style="display:flex; align-items:center; gap:10px; margin-bottom:8px; cursor:pointer; padding:5px; border-bottom:1px solid #eee;">
+                        <input type="checkbox" class="missing-cb" value="${a.id || displayTxt}" checked style="width:20px; height:20px; accent-color:#c0392b;">
+                        <span style="font-size:15px; font-weight:bold;">${displayTxt} <span style="color:#777; font-weight:normal;">${typTxt}</span></span>
+                    </label>
+                `;
+            });
+            
+            modal.style.display = 'flex';
         }
-        
+
+        function closeAuditModal() {
+            document.getElementById('auditResultModal').style.display = 'none';
+            toggleAuditMode();
+        }
+
+        async function deleteSelectedMissingAnimals() {
+            const checkboxes = document.querySelectorAll('.missing-cb:checked');
+            if (checkboxes.length === 0) {
+                alert("Nie wybrano żadnych sztuk do usunięcia. Anuluję.");
+                closeAuditModal();
+                return;
+            }
+
+            if (!confirm(`UWAGA!\n\nCzy na pewno chcesz BEZPOWROTNIE usunąć ${checkboxes.length} zaznaczonych sztuk z bazy danych?`)) return;
+
+            let deletedCount = 0;
+            
+            // Bezpośrednie, siłowe kasowanie z bazy Firestore
+            for (let cb of checkboxes) {
+                let id = cb.value;
+                const collections = ["stado", "zwierzeta", "krowy", "animals"];
+                for (let col of collections) {
+                    try {
+                        let docRef = db.collection(col).doc(id);
+                        let doc = await docRef.get();
+                        if (doc.exists) {
+                            await docRef.delete();
+                            deletedCount++;
+                            break;
+                        }
+                    } catch(e) { }
+                }
+                
+                // Awaryjne wywołanie funkcji użytkownika
+                if (typeof deleteAnimalFromDB === 'function') {
+                    try { deleteAnimalFromDB(id); deletedCount++; } catch(e){}
+                }
+            }
+
+            alert(`Sukces. Usunięto ${checkboxes.length} sztuk. \n(Aplikacja zostanie odświeżona).`);
+            window.location.reload();
+        }
+
         // --- 2. WALIDACJA DATY URODZENIA ---
         function submitAnimalForm() {
             const dataUr = document.getElementById('inpDob').value;
@@ -934,10 +988,7 @@
                 if (!odp) return;
             }
 
-            // Odsyłamy do głównego skryptu zapisującego
-            if (typeof saveNewAnimal === 'function') {
-                saveNewAnimal();
-            }
+            if (typeof saveNewAnimal === 'function') saveNewAnimal();
             closeModal('animalModal');
         }
     </script>
