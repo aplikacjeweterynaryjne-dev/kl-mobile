@@ -1535,8 +1535,24 @@ table {
 .day-dot.dot-pilne { background-color: #c0392b; }
 .day-dot.dot-obojetne { background-color: #27ae60; }
 .day-dot.dot-standard { background-color: #333; }
-.day-dot.dot-szczepienie { background-color: #2980b9; } /* Niebieska kropka w kalendarzu */
-.visit-item[data-pora="Szczepienie"] { border-left-color: #2980b9; } /* Niebieski pasek na wizycie */
+
+/* --- STYLE DLA SZCZEPIEŃ --- */
+.visit-item.is-vaccine {
+    background-color: #e3f2fd !important; /* Delikatny błękit w tle */
+}
+.visit-item.is-vaccine .purpose::before {
+    content: '💉 '; /* Dodatkowa ikonka przy celu wizyty */
+}
+/* Dwukolorowe kropki w kalendarzu (Pół na pół) */
+.day-dot.dot-vaccine-pilne {
+    background: linear-gradient(90deg, #c0392b 50%, #2980b9 50%);
+}
+.day-dot.dot-vaccine-obojetne {
+    background: linear-gradient(90deg, #27ae60 50%, #2980b9 50%);
+}
+.day-dot.dot-vaccine-standard {
+    background-color: #2980b9; /* Zwykłe szczepienie = całe niebieskie */
+}
 
 /* ======================================================== */
 /* ✅ KONIEC: STYLE DLA KALENDARZA WIZYT                      */
@@ -4840,7 +4856,6 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
              <option value="15-20">15:00 - 20:00 (Standard)</option>
                 <option value="Obojętne">Obojętne (Zielony)</option>
                 <option value="Pilne">Pilne (Czerwony)</option>
-                <option value="Szczepienie">Szczepienie / Profilaktyka (Niebieski)</option>
             </select>
         </div>
 
@@ -16768,14 +16783,35 @@ function renderTodayView(visits, dateToShow) {
                 cellContent += `<div class="day-summary">${visitsToDo}</div>`;
             }
 
-            // Kropki (wskaźniki wizyt)
-            const pory = new Set(visitsForThisDay.map(v => v.poraDnia));
+      // Kropki (wskaźniki wizyt) ze sprawdzaniem szczepień
             let dotsHtml = '<div class="day-dots">';
-            if (pory.has('Pilne')) dotsHtml += '<div class="day-dot dot-pilne"></div>';
-            if (pory.has('Obojętne')) dotsHtml += '<div class="day-dot dot-obojetne"></div>';
-            if (pory.has('6-10') || pory.has('10-15') || pory.has('15-20')) {
-                dotsHtml += '<div class="day-dot dot-standard"></div>';
-            }
+            let maPilne = false, maObojetne = false, maStandard = false;
+            let maSzczepieniePilne = false, maSzczepienieObojetne = false, maSzczepienieStandard = false;
+
+            visitsForThisDay.forEach(v => {
+                const celWizyty = v.cel ? v.cel.toLowerCase() : '';
+                const czySzczepienie = celWizyty.includes('szczepieni') || celWizyty.includes('profilaktyka');
+
+                if (v.poraDnia === 'Pilne') {
+                    if (czySzczepienie) maSzczepieniePilne = true;
+                    else maPilne = true;
+                } else if (v.poraDnia === 'Obojętne') {
+                    if (czySzczepienie) maSzczepienieObojetne = true;
+                    else maObojetne = true;
+                } else {
+                    if (czySzczepienie) maSzczepienieStandard = true;
+                    else maStandard = true;
+                }
+            });
+
+            if (maPilne) dotsHtml += '<div class="day-dot dot-pilne"></div>';
+            if (maObojetne) dotsHtml += '<div class="day-dot dot-obojetne"></div>';
+            if (maStandard) dotsHtml += '<div class="day-dot dot-standard"></div>';
+            
+            if (maSzczepieniePilne) dotsHtml += '<div class="day-dot dot-vaccine-pilne"></div>';
+            if (maSzczepienieObojetne) dotsHtml += '<div class="day-dot dot-vaccine-obojetne"></div>';
+            if (maSzczepienieStandard) dotsHtml += '<div class="day-dot dot-vaccine-standard"></div>';
+            
             dotsHtml += '</div>';
             // --------------------------------------------------------------
 
@@ -29083,6 +29119,26 @@ if (document.getElementById('btnVisitNextDay') && document.getElementById('visit
             let d = new Date(dateInput.value);
             d.setDate(d.getDate() + 1);
             dateInput.value = d.toISOString().split('T')[0];
+        }
+    });
+}
+    // 4. STAŁE PODPOWIEDZI W CELACH WIZYTY (Zawsze na szczycie listy)
+const celInput = document.getElementById('visitFormCel');
+if (celInput) {
+    celInput.addEventListener('focus', function() {
+        const datalist = document.getElementById('listaCelowWizyt');
+        if (datalist) {
+            // Te słowa ZAWSZE będą gotowe do kliknięcia (możesz dopisać własne)
+            const staleCele = ["Szczepienie", "Profilaktyka", "Odrobaczanie", "Badanie USG", "Korekcja racic"];
+            
+            // Odwracamy i dodajemy, aby zachować kolejność na górze
+            staleCele.reverse().forEach(cel => {
+                if (!Array.from(datalist.options).some(opt => opt.value === cel)) {
+                    const option = document.createElement('option');
+                    option.value = cel;
+                    datalist.insertBefore(option, datalist.firstChild);
+                }
+            });
         }
     });
 }
