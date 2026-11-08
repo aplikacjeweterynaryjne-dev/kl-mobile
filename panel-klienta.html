@@ -798,9 +798,9 @@
             let text = "";
             const strongEl = card.querySelector('strong, b');
             if (strongEl) {
-                text = strongEl.innerText.trim();
+                text = strongEl.textContent.trim();
             } else {
-                text = card.innerText.trim().split('\n')[0].trim();
+                text = card.textContent.trim().split('\n')[0].trim(); // textContent jest niezawodne
             }
             if (!id) id = text.split(' ')[0]; // Fallback
             return { id: id, label: text };
@@ -817,28 +817,32 @@
             const herdList = document.getElementById('herdList');
 
             if (isAuditMode) {
-                // Wymuszamy pełny reset wyszukiwarki i filtrów, żeby pobrało CAŁE stado (byki, jałówki, krowy)
-                if (typeof resetHerdSearch === 'function') {
-                    resetHerdSearch();
-                }
+                // 1. Reset lupy
+                if (typeof resetHerdSearch === 'function') resetHerdSearch();
 
-                // Czekamy ułamek sekundy na przerysowanie pełnego stada
+                // 2. Automatyczne odklikanie filtrów (żeby pokazało byki i jałówki)
+                const activeChips = document.querySelectorAll('.task-filter-chips .filter-chip.active');
+                activeChips.forEach(chip => chip.click()); // Symulujemy odkliknięcie filtru
+                
+                // Awaryjne wymuszenie czyszczenia filtrów
+                if (typeof window.currentHerdFilter !== 'undefined') window.currentHerdFilter = '';
+                if (typeof renderHerdList === 'function') renderHerdList();
+
+                // 3. Czekamy 0.5s na załadowanie całego stada do DOM i zczytujemy wszystkie sztuki
                 setTimeout(() => {
                     herdList.classList.add('audit-active');
                     const cards = herdList.querySelectorAll(':scope > div, .card, .sync-item-card, .task-item');
                     
-                    // Zapisujemy wszystkie wyrenderowane sztuki do naszej Mapy
                     cards.forEach(card => {
                         let info = getAnimalInfoFromCard(card);
                         if (info.id) allAnimalsMap.set(info.id, info.label);
                     });
                     
-                    if (typeof showToast === 'function') {
-                        showToast("Tryb audytu włączony. Klikaj w obecne zwierzęta.", "info");
-                    } else {
-                        alert("Tryb audytu włączony. Zaznacz wszystkie sztuki obecne w oborze.");
-                    }
-                }, 400);
+                    const msg = `Tryb audytu. Wczytano całe stado: ${allAnimalsMap.size} sztuk. Klikaj w obecne zwierzęta.`;
+                    if (typeof showToast === 'function') showToast(msg, "info");
+                    else alert(msg);
+                    
+                }, 500);
 
             } else {
                 herdList.classList.remove('audit-active');
@@ -846,7 +850,7 @@
             }
         }
 
-        // Obserwator zmian (przywraca kolory po użyciu wyszukiwarki)
+        // Obserwator zmian (przywraca kolory po użyciu wyszukiwarki/filtrów w trakcie audytu)
         const herdObserver = new MutationObserver(() => {
             if (!isAuditMode) return;
             const herdList = document.getElementById('herdList');
@@ -863,7 +867,7 @@
             herdObserver.observe(document.getElementById('herdList'), { childList: true, subtree: true });
         }
 
-        // Wzmocniony listener kliknięć
+        // Wzmocniony listener kliknięć (działa na wszystkim)
         if (document.getElementById('herdList')) {
             document.getElementById('herdList').addEventListener('click', (e) => {
                 if (!isAuditMode) return;
@@ -886,12 +890,12 @@
             }, true);
         }
 
-        // Funkcja kończąca z listą brakujących sztuk
+        // Funkcja kończąca - wyświetla listę braków
         function finishAudit() {
             const missingIds = [];
             const missingLabels = [];
 
-            // Sprawdzamy każdą sztukę z mapy, czy została kliknięta
+            // Sprawdzamy co zostało pominięte
             allAnimalsMap.forEach((label, id) => {
                 if (!presentAnimals.has(id)) {
                     missingIds.push(id);
@@ -905,15 +909,17 @@
                 return;
             }
 
-            // Tworzymy czytelną listę do okienka
+            // Budowanie czytelnej listy z enterami
             const brakiTekst = missingLabels.join('\n- ');
             const confirmMsg = `Brakuje ${missingIds.length} zwierząt. Są to:\n\n- ${brakiTekst}\n\nCzy chcesz automatycznie zarchiwizować (usunąć) te braki?`;
             
             if (confirm(confirmMsg)) {
                 missingIds.forEach(id => {
+                    // Wywołuje Twoją funkcję usuwającą z client.js
                     if (typeof deleteAnimalFromDB === 'function') {
                         deleteAnimalFromDB(id); 
                     }
+                    console.log("Usunięto:", id);
                 });
                 alert("Brakujące sztuki zostały usunięte z bazy.");
                 toggleAuditMode();
@@ -928,13 +934,12 @@
                 if (!odp) return;
             }
 
+            // Odsyłamy do głównego skryptu zapisującego
             if (typeof saveNewAnimal === 'function') {
                 saveNewAnimal();
             }
             closeModal('animalModal');
         }
-    </script>
-       
     </script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
