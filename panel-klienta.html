@@ -317,23 +317,26 @@
         <button onclick="document.getElementById('importHerdModal').style.display='flex'" class="btn" style="background:#e3f2fd; color:#1565c0; border:1px solid #90caf9; margin-bottom:15px; padding: 12px; font-weight: 700;">
             📥 Import z Excela / Dodaj wiele naraz
         </button>
-       <div style="display:flex; gap:10px; margin-bottom:10px;">
+        <div style="display:flex; gap:10px; margin-bottom:10px;">
             <input type="search" id="herdSearch" oninput="renderHerdList()" placeholder="🔍 Szukaj kolczyka..." style="flex:1; padding:12px; border:1px solid #ddd; border-radius:10px;">
             <button onclick="resetHerdSearch()" style="background:#eee; border:none; padding:0 15px; border-radius:10px;">Reset</button>
         </div>
+        
+        <!-- NOWE PRZYCISKI AUDYTU -->
         <button id="btnStartAudit" onclick="toggleAuditMode()" class="btn" style="background:#f39c12; color:white; margin-bottom:15px; padding: 12px; font-weight: 700;">
-            📋 Rozpocznij szybką inwentaryzację (Audyt)
+            📋 Rozpocznij inwentaryzację stada
         </button>
         <div id="auditControls" style="display:none; background:#fff3e0; padding:10px; border-radius:8px; margin-bottom:15px; border: 1px solid #ffe0b2; text-align:center;">
             <p style="font-size: 13px; margin: 0 0 10px 0; color: #d35400;">
-                Klikaj w krowy, które fizycznie widzisz (podświetlą się na zielono). 
-                Kiedy sprawdzisz wszystkie, zakończ audyt.
+                Klikaj w karty zwierząt, które fizycznie widzisz w oborze (podświetlą się na zielono). 
             </p>
             <div style="display: flex; gap: 10px;">
                 <button class="btn ghost small" style="flex:1;" onclick="toggleAuditMode()">Anuluj</button>
-                <button class="btn btn-primary small" style="flex:2; background:#d35400; border:none;" onclick="finishAudit()">Zakończ i pokaż braki</button>
+                <button class="btn btn-primary small" style="flex:2; background:#d35400; border:none;" onclick="finishAudit()">Zakończ audyt</button>
             </div>
         </div>
+        <!-- KONIEC PRZYCISKÓW AUDYTU -->
+
       <div class="task-filter-chips" style="margin-bottom: 15px;">
             <button class="filter-chip" id="f-puste" onclick="toggleHerdFilter('puste')">Puste <span id="count-puste"></span></button>
             <button class="filter-chip" id="f-inne" onclick="toggleHerdFilter('inne')">Czeka na USG <span id="count-inne"></span></button>
@@ -568,7 +571,7 @@
         <div class="modal-content">
             <button class="close-modal-fixed" onclick="closeModal('animalModal')">✕</button>
             <h3>Dodaj Zwierzę</h3>
-            <form id="animalForm" onsubmit="event.preventDefault(); submitAnimalForm();">
+            <form id="animalForm">
                 <div class="form-row"><label>Nr Kolczyka *</label><input type="text" id="inpTag" required></div>
                 <div class="form-row"><label>Typ *</label><select id="inpType" required><option value="krowa">Krowa</option><option value="jalowka">Jałówka</option><option value="byk">Byk</option></select></div>
                 <div class="form-row"><label>Data Urodzenia (Opcjonalnie)</label><input type="date" id="inpDob"></div>
@@ -786,112 +789,110 @@
         <i class="bi bi-download"></i>
     </button>
 
-    <!-- NOWY MODAL WYNIKU INWENTARYZACJI -->
+    <!-- MODAL WYNIKU INWENTARYZACJI -->
     <div id="auditResultModal" class="modal" style="z-index: 5000;">
         <div class="modal-content" style="max-width: 500px;">
             <h3 style="color:#d35400; margin-top:0;">Wynik Inwentaryzacji</h3>
             <p id="auditResultText" style="font-size: 14px; color: #555;"></p>
             
             <div id="auditMissingList" style="max-height: 300px; overflow-y: auto; text-align: left; background: #f9f9f9; padding: 10px; border-radius: 8px; border: 1px solid #ddd; margin-bottom: 15px;">
-                <!-- Tu pojawią się krowy z checkboxami -->
+                <!-- Tu pojawią się braki z checkboxami -->
             </div>
             
             <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                <button class="btn ghost" style="flex:1; background:#eee;" onclick="closeAuditModal()">Zostaw wszystkie (Anuluj)</button>
+                <button class="btn ghost" style="flex:1; background:#eee;" onclick="closeAuditModal()">Anuluj (Nie usuwaj nic)</button>
                 <button class="btn btn-danger" style="flex:1; background:#c0392b; color:white; border:none;" onclick="deleteSelectedMissingAnimals()">🗑️ Usuń zaznaczone</button>
             </div>
         </div>
     </div>
 
-<script>
-        // --- 1. SZYBKA INWENTARYZACJA (AUDYT) Z MODALEM I BEZPOŚREDNIM USUWANIEM ---
-        let isAuditMode = false;
-        let presentAnimals = new Set(); 
-        let allAnimalsDuringAudit = []; // Zapisze CAŁE stado prosto z pamięci
-
-        function getAnimalIdFromCard(card) {
-            if (card.dataset.id) return card.dataset.id;
-            const strongEl = card.querySelector('strong, b');
-            if (strongEl) return strongEl.textContent.trim().split(' ')[0];
-            return card.textContent.trim().split('\n')[0].trim();
-        }
-
-        // Sprytna funkcja szukająca globalnej tablicy ze stadem w pamięci JS (omija filtry HTML)
-        function findGlobalHerdArray() {
-            for (let key of Object.keys(window)) {
-                let val = window[key];
-                if (Array.isArray(val) && val.length > 0 && typeof val[0] === 'object') {
-                    if (val[0].hasOwnProperty('kolczyk') || val[0].hasOwnProperty('typ') || val[0].hasOwnProperty('nrKolczyka') || val[0].hasOwnProperty('tag')) {
-                        return val;
+    <!-- SKRYPTY DODATKOWE -->
+    <script>
+        // --- 1. WALIDACJA DATY URODZENIA (Zatrzymuje kliknięcie submit) ---
+        document.addEventListener('DOMContentLoaded', () => {
+            const submitBtn = document.querySelector('#animalForm button[type="submit"]');
+            if (submitBtn) {
+                submitBtn.addEventListener('click', function(e) {
+                    const dataUr = document.getElementById('inpDob').value;
+                    if (!dataUr) {
+                        const odp = confirm("Nie wpisałeś daty urodzenia.\n\nSztuka zostanie dodana, ale pamiętaj, że bez niej część statystyk stada i automatycznych zadań może nie działać prawidłowo (np. powiadomienie o badaniu na cielność 20 msc).\n\nCzy na pewno chcesz kontynuować?");
+                        if (!odp) {
+                            e.preventDefault(); // Zatrzymuje wysyłanie formularza
+                        }
                     }
-                }
+                });
             }
-            return [];
-        }
+        });
+
+        // --- 2. SZYBKA INWENTARYZACJA (AUDYT) ---
+        let isAuditMode = false;
+        let presentAnimals = new Set();
+        let allAnimalsDuringAudit = []; 
 
         function toggleAuditMode() {
             isAuditMode = !isAuditMode;
             presentAnimals.clear();
             allAnimalsDuringAudit = [];
-            
+
             document.getElementById('btnStartAudit').style.display = isAuditMode ? 'none' : 'block';
             document.getElementById('auditControls').style.display = isAuditMode ? 'block' : 'none';
-            
             const herdList = document.getElementById('herdList');
 
             if (isAuditMode) {
-                // Szukamy stada w pamięci, zamiast czytać z ekranu
-                allAnimalsDuringAudit = findGlobalHerdArray();
-                
-                // Odświeżamy ekran, by pokazać całe stado dla wygody klikania
+                // Kopiujemy 100% stada prosto ze zmiennej systemowej myHerd!
+                if (typeof myHerd !== 'undefined') {
+                    allAnimalsDuringAudit = [...myHerd];
+                }
+
+                // Wymuszamy pełny widok poprzez reset interfejsu
                 if (typeof resetHerdSearch === 'function') resetHerdSearch();
                 const activeChips = document.querySelectorAll('.task-filter-chips .filter-chip.active');
                 activeChips.forEach(chip => chip.classList.remove('active'));
-                if (typeof renderHerdList === 'function') renderHerdList();
-
+                
                 setTimeout(() => {
                     herdList.classList.add('audit-active');
-                    
-                    // Fallback: Gdyby jednak nie znalazło w pamięci, szukamy na siłę na ekranie
-                    if (allAnimalsDuringAudit.length === 0) {
-                        const cards = herdList.querySelectorAll(':scope > div, .card, .sync-item-card, .task-item');
-                        cards.forEach(card => {
-                            let id = getAnimalIdFromCard(card);
-                            let text = card.querySelector('strong, b') ? card.querySelector('strong, b').textContent : card.textContent.split('\n')[0];
-                            if (id) allAnimalsDuringAudit.push({ id: id, kolczyk: text, typ: 'Sztuka' });
-                        });
+                    if (allAnimalsDuringAudit.length > 0) {
+                        alert(`Tryb audytu uruchomiony.\n\nSystem załadował całe Twoje stado: ${allAnimalsDuringAudit.length} sztuk.\n\nKlikaj w krowy na liście, aby oznaczać je na zielono (jako obecne w oborze).`);
+                    } else {
+                        alert("Tryb audytu. Załadowano puste stado.");
                     }
-                    
-                    alert(`Tryb audytu. System załadował do sprawdzenia całe stado: ${allAnimalsDuringAudit.length} sztuk.\nZaznacz te, które SĄ obecnie w oborze.`);
-                }, 500);
+                }, 300);
             } else {
                 herdList.classList.remove('audit-active');
-                if (typeof renderHerdList === 'function') renderHerdList(); 
+                if (typeof renderHerdList === 'function') renderHerdList();
             }
         }
 
-        // Obserwator zmian (lupa)
+        // Obserwator do przywracania zielonego koloru przy używaniu wyszukiwarki podczas audytu
         const herdObserver = new MutationObserver(() => {
             if (!isAuditMode) return;
             const hl = document.getElementById('herdList');
             if (!hl) return;
-            const cards = hl.querySelectorAll(':scope > div, .card, .sync-item-card, .task-item');
+            const cards = hl.querySelectorAll(':scope > .card');
             cards.forEach(card => {
-                let id = getAnimalIdFromCard(card);
-                if (presentAnimals.has(id)) card.style.backgroundColor = "#d4edda";
+                const cb = card.querySelector('.mass-animal-cb');
+                if (cb && presentAnimals.has(cb.value)) {
+                    card.style.backgroundColor = "#d4edda";
+                }
             });
         });
         if (document.getElementById('herdList')) herdObserver.observe(document.getElementById('herdList'), { childList: true, subtree: true });
 
-        // Wzmocniony listener kliknięć
+        // Niezawodny listener kliknięć w karty zwierząt (bezpośrednio chwyta ukryty checkbox)
         if (document.getElementById('herdList')) {
             document.getElementById('herdList').addEventListener('click', (e) => {
                 if (!isAuditMode) return;
-                const animalCard = e.target.closest('#herdList > div') || e.target.closest('.card') || e.target.closest('.sync-item-card') || e.target.closest('.task-item'); 
+                
+                const animalCard = e.target.closest('.card');
                 if (!animalCard) return;
 
+                // Przejmujemy kliknięcie - karta zwierzęcia się NIE otworzy
                 e.stopPropagation(); e.preventDefault();
-                let id = getAnimalIdFromCard(animalCard);
+                
+                // Szukamy ID w małym checkboxie w rogu karty
+                const cb = animalCard.querySelector('.mass-animal-cb');
+                if (!cb) return;
+                const id = cb.value;
 
                 if (presentAnimals.has(id)) {
                     presentAnimals.delete(id);
@@ -903,37 +904,30 @@
             }, true);
         }
 
-        // --- OKNO WYNIKÓW I KASOWANIE ---
-        let missingAnimalsForDelete = [];
-
         function finishAudit() {
-            // Filtrujemy braki
-            missingAnimalsForDelete = allAnimalsDuringAudit.filter(a => !presentAnimals.has(a.id) && !presentAnimals.has(a.kolczyk) && !presentAnimals.has(a.nrKolczyka) && !presentAnimals.has(a.tag));
+            const missingAnimals = allAnimalsDuringAudit.filter(a => !presentAnimals.has(a.id));
 
-            if (missingAnimalsForDelete.length === 0) {
-                alert("Stan się zgadza! Wszystkie zwierzęta są obecne.");
+            if (missingAnimals.length === 0) {
+                alert("Stan się zgadza! Wszystkie zwierzęta ze stada zostały zaznaczone jako obecne.");
                 toggleAuditMode();
                 return;
             }
 
-            // Pokaż nowy modal
             const modal = document.getElementById('auditResultModal');
             const listDiv = document.getElementById('auditMissingList');
-            
-            document.getElementById('auditResultText').innerHTML = `Wykryto <b>${missingAnimalsForDelete.length}</b> sztuk, których NIE ZAZNACZYŁEŚ.<br><br>Odznacz na liście te, które chcesz zachować w systemie, a resztę usuń:`;
+
+            document.getElementById('auditResultText').innerHTML = `Wykryto <b>${missingAnimals.length}</b> sztuk, których NIE ZAZNACZYŁEŚ.<br><br>Odznacz na poniższej liście te, które z jakiegoś powodu jednak są w stadzie, a resztę usuń bezpowrotnie:`;
             listDiv.innerHTML = '';
-            
-            missingAnimalsForDelete.forEach(a => {
-                const displayTxt = a.kolczyk || a.nrKolczyka || a.tag || a.id;
-                const typTxt = a.typ ? `(${a.typ})` : '';
+
+            missingAnimals.forEach(a => {
                 listDiv.innerHTML += `
                     <label style="display:flex; align-items:center; gap:10px; margin-bottom:8px; cursor:pointer; padding:5px; border-bottom:1px solid #eee;">
-                        <input type="checkbox" class="missing-cb" value="${a.id || displayTxt}" checked style="width:20px; height:20px; accent-color:#c0392b;">
-                        <span style="font-size:15px; font-weight:bold;">${displayTxt} <span style="color:#777; font-weight:normal;">${typTxt}</span></span>
+                        <input type="checkbox" class="missing-cb" value="${a.id}" checked style="width:20px; height:20px; accent-color:#c0392b;">
+                        <span style="font-size:15px; font-weight:bold;">${a.tag} <span style="color:#777; font-weight:normal;">(${a.type})</span></span>
                     </label>
                 `;
             });
-            
+
             modal.style.display = 'flex';
         }
 
@@ -945,53 +939,29 @@
         async function deleteSelectedMissingAnimals() {
             const checkboxes = document.querySelectorAll('.missing-cb:checked');
             if (checkboxes.length === 0) {
-                alert("Nie wybrano żadnych sztuk do usunięcia. Anuluję.");
+                alert("Nie wybrano żadnych sztuk. Anuluję.");
                 closeAuditModal();
                 return;
             }
 
-            if (!confirm(`UWAGA!\n\nCzy na pewno chcesz BEZPOWROTNIE usunąć ${checkboxes.length} zaznaczonych sztuk z bazy danych?`)) return;
+            if (!confirm(`UWAGA!\n\nCzy na pewno chcesz BEZPOWROTNIE usunąć ${checkboxes.length} zaznaczonych sztuk ze swojej bazy stada?`)) return;
 
-            let deletedCount = 0;
-            
-            // Bezpośrednie, siłowe kasowanie z bazy Firestore
-            for (let cb of checkboxes) {
-                let id = cb.value;
-                const collections = ["stado", "zwierzeta", "krowy", "animals"];
-                for (let col of collections) {
-                    try {
-                        let docRef = db.collection(col).doc(id);
-                        let doc = await docRef.get();
-                        if (doc.exists) {
-                            await docRef.delete();
-                            deletedCount++;
-                            break;
-                        }
-                    } catch(e) { }
-                }
-                
-                // Awaryjne wywołanie funkcji użytkownika
-                if (typeof deleteAnimalFromDB === 'function') {
-                    try { deleteAnimalFromDB(id); deletedCount++; } catch(e){}
-                }
+            const batch = db.batch();
+            checkboxes.forEach(cb => {
+                const ref = db.collection('animals').doc(cb.value);
+                batch.delete(ref);
+            });
+
+            try {
+                await batch.commit();
+                alert(`Sukces! Trwale usunięto ${checkboxes.length} sztuk ze stada.`);
+                closeAuditModal();
+            } catch (e) {
+                alert("Błąd podczas usuwania w chmurze: " + e.message);
             }
-
-            alert(`Sukces. Usunięto ${checkboxes.length} sztuk. \n(Aplikacja zostanie odświeżona).`);
-            window.location.reload();
-        }
-
-        // --- 2. WALIDACJA DATY URODZENIA ---
-        function submitAnimalForm() {
-            const dataUr = document.getElementById('inpDob').value;
-            if (!dataUr) {
-                const odp = confirm("Nie wpisałeś daty urodzenia.\n\nSztuka zostanie dodana, ale pamiętaj, że bez niej część statystyk stada i automatycznych zadań może nie działać prawidłowo (np. powiadomienie o badaniu na cielność 20 msc).\n\nCzy kontynuować i dodać zwierzę?");
-                if (!odp) return;
-            }
-
-            if (typeof saveNewAnimal === 'function') saveNewAnimal();
-            closeModal('animalModal');
         }
     </script>
+
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
