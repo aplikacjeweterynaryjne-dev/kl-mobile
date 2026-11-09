@@ -29276,45 +29276,73 @@ if (celInput) {
             alert(`Pomyślnie załadowano ${selectedProducts.length} produktów do Karty Leczenia.\n\nWybierz teraz klienta z listy u góry i uzupełnij brakujące ilości w tabeli.`);
         }, 300);
     }
-// ========================================================
+    
+    // ========================================================
     // STRZAŁKI W GŁÓWNYM WIDOKU KALENDARZA WIZYT
     // ========================================================
-    const btnMainPrev = document.getElementById('btnMainVisitPrevDay');
-    const btnMainNext = document.getElementById('btnMainVisitNextDay');
-    const mainDateInput = document.getElementById('mainVisitDateInput');
+    document.addEventListener("DOMContentLoaded", function() {
+        const btnMainPrev = document.getElementById('btnMainVisitPrevDay');
+        const btnMainNext = document.getElementById('btnMainVisitNextDay');
+        const mainDateInput = document.getElementById('mainVisitDateInput');
 
-    // Ustawia dzisiejszą datę na start
-    if (mainDateInput && !mainDateInput.value) {
-        mainDateInput.valueAsDate = new Date();
-    }
+        if (mainDateInput && !mainDateInput.value) {
+            mainDateInput.valueAsDate = new Date();
+        }
 
-    if (btnMainPrev && btnMainNext && mainDateInput) {
-        // Kliknięcie w lewo (wczoraj)
-        btnMainPrev.addEventListener('click', () => {
-            let d = mainDateInput.valueAsDate || new Date();
-            d.setDate(d.getDate() - 1);
-            mainDateInput.valueAsDate = d;
-            mainDateInput.dispatchEvent(new Event('change'));
-        });
-
-        // Kliknięcie w prawo (jutro)
-        btnMainNext.addEventListener('click', () => {
-            let d = mainDateInput.valueAsDate || new Date();
-            d.setDate(d.getDate() + 1);
-            mainDateInput.valueAsDate = d;
-            mainDateInput.dispatchEvent(new Event('change'));
-        });
-        
-        // Wykrycie zmiany daty (strzałką lub z kalendarzyka)
-        mainDateInput.addEventListener('change', () => {
-            const wybranaData = mainDateInput.valueAsDate;
+        // Funkcja ładująca wizyty po wybraniu daty
+        function loadVisitsForChangedDate() {
+            if (!mainDateInput) return;
+            const newDate = mainDateInput.valueAsDate || new Date();
             
-            // 🔴 TUTAJ WPISZ NAZWĘ SWOJEJ FUNKCJI Z CLIENT.JS 🔴
-            // Np: loadVisitsForDay(wybranaData);
-            // Albo: renderTodayVisits(wybranaData);
+            // Nadpisujemy zmienną z client.js
+            if (typeof currentCalendarDateViewed !== 'undefined') {
+                currentCalendarDateViewed = newDate;
+            }
+
+            console.log("Ładowanie wizyt na dzień:", newDate);
             
-        });
-    }
+            // Odpalamy całą maszynerię kalendarza jeszcze raz z poziomu JS (żeby zaciągnąć świeże z bazy)
+            // Używamy globalnej funkcji ładującej wizyty z klienta:
+            if (typeof loadVisitsForDay === 'function') {
+                // Jeśli masz taką globalną funkcję
+                loadVisitsForDay(newDate);
+            } else if (typeof allFetchedVisits !== 'undefined' && typeof renderTodayView === 'function') {
+                // Alternatywa: mamy już pobrane wizyty w pamięci z tego miesiąca
+                renderTodayView(allFetchedVisits, newDate);
+            } else {
+                 // Awaryjne, brutalne, ale w 100% pewne przeładowanie całej sekcji kalendarza (jak wejście z menu)
+                 if (typeof onShowKalendarz === 'function') {
+                     onShowKalendarz(); 
+                 } else if (typeof generateAndRenderTasks === 'function') {
+                     // Inne brutalne przeładowanie
+                     showSection('kalendarz');
+                 }
+            }
+        }
+
+        if (btnMainPrev && btnMainNext && mainDateInput) {
+            // Kliknięcie w lewo
+            btnMainPrev.addEventListener('click', () => {
+                let d = mainDateInput.valueAsDate || new Date();
+                d.setDate(d.getDate() - 1);
+                mainDateInput.valueAsDate = d;
+                loadVisitsForChangedDate();
+            });
+
+            // Kliknięcie w prawo
+            btnMainNext.addEventListener('click', () => {
+                let d = mainDateInput.valueAsDate || new Date();
+                d.setDate(d.getDate() + 1);
+                mainDateInput.valueAsDate = d;
+                loadVisitsForChangedDate();
+            });
+            
+            // Wykrycie zmiany ręcznej (np. z kafelka z datą)
+            mainDateInput.addEventListener('change', () => {
+                loadVisitsForChangedDate();
+            });
+        }
+    });
 </script>
 </body>
 </html>
