@@ -5186,13 +5186,21 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
             <div style="padding: 20px; text-align: center; color: #999;">Ładowanie historii...</div>
         </div>
         
-        <div class="form-actions" style="justify-content: space-between; margin-top: 15px;">
+<div class="form-actions" style="justify-content: space-between; margin-top: 15px;">
             <button id="btnUseNewActivity" class="btn primary small">➕ Użyj wpisanej</button>
             <button id="activitiesSearchCloseBtn" class="btn ghost">Anuluj</button>
         </div>
     </div>
 </div>
-    <button id="helpFloatingBtn" title="Instrukcja obsługi" style="display: none;">?</button>
+
+<!-- PŁYWAJĄCY PASEK AKCJI DLA MAGAZYNU -->
+<div id="magazynMassActionBar" style="position:fixed; bottom:80px; left:50%; transform:translateX(-50%); background:#2980b9; color:white; padding:15px 20px; border-radius:30px; display:none; align-items:center; gap:15px; z-index:9999; box-shadow: 0 5px 15px rgba(0,0,0,0.3);">
+    <span id="magazynMassCount" style="font-weight:bold;">0 zazn.</span>
+    <button onclick="createCardFromSelected()" style="background:white; color:#2980b9; border:none; padding:8px 15px; border-radius:20px; font-weight:bold; cursor:pointer;">📝 Utwórz kartę z wybranych</button>
+    <button onclick="clearMagazynSelection()" style="background:transparent; border:1px solid white; color:white; padding:8px 15px; border-radius:20px; cursor:pointer;">❌</button>
+</div>
+
+<button id="helpFloatingBtn" title="Instrukcja obsługi" style="display: none;">?</button>
 
 <button id="installFloatingBtn" title="Zainstaluj aplikację" style="display: none;">
     <i class="bi bi-download"></i> </button>
@@ -29142,6 +29150,129 @@ if (celInput) {
         }
     });
 }
+    // ========================================================
+    // TWORZENIE KARTY Z MAGAZYNU (ZAZNACZONE PRODUKTY)
+    // ========================================================
+
+    // 1. Zaznaczanie i odznaczanie checkboxów
+    function toggleMagazynSelection() {
+        const checked = document.querySelectorAll('.magazyn-cb:checked');
+        const bar = document.getElementById('magazynMassActionBar');
+        if (checked.length > 0) {
+            bar.style.display = 'flex';
+            document.getElementById('magazynMassCount').textContent = checked.length + ' zazn.';
+        } else {
+            bar.style.display = 'none';
+        }
+    }
+
+    function clearMagazynSelection() {
+        document.querySelectorAll('.magazyn-cb:checked').forEach(cb => cb.checked = false);
+        toggleMagazynSelection();
+    }
+
+    // 2. Automatyczne doklejanie checkboxów do tabeli magazynu
+    const magazynTableObserver = new MutationObserver(() => {
+        const rows = document.querySelectorAll('#magazynTableBody tr');
+        rows.forEach(row => {
+            // Ignorujemy wiersz, jeśli to jest informacja o ładowaniu (1 długa komórka)
+            if (row.cells.length <= 1) return;
+            
+            // Dodajemy checkbox tylko, jeśli go tam jeszcze nie ma
+            if (!row.querySelector('.magazyn-cb')) {
+                const firstCell = row.cells[0];
+                const originalContent = firstCell.innerHTML; 
+                const productName = firstCell.textContent.trim();
+                
+                const wrapper = document.createElement('div');
+                wrapper.style.display = 'flex';
+                wrapper.style.alignItems = 'center';
+                wrapper.style.gap = '10px';
+                
+                const cb = document.createElement('input');
+                cb.type = 'checkbox';
+                cb.className = 'magazyn-cb';
+                cb.value = productName;
+                cb.style.cssText = 'width: 20px; height: 20px; accent-color: #27ae60; cursor: pointer; flex-shrink: 0;';
+                
+                // Blokujemy propagację, by kliknięcie checkboxa nie otwierało detali magazynu
+                cb.onclick = (e) => { e.stopPropagation(); toggleMagazynSelection(); };
+                
+                const span = document.createElement('span');
+                span.innerHTML = originalContent;
+                
+                wrapper.appendChild(cb);
+                wrapper.appendChild(span);
+                
+                firstCell.innerHTML = '';
+                firstCell.appendChild(wrapper);
+            }
+        });
+    });
+
+    if (document.getElementById('magazynTableBody')) {
+        magazynTableObserver.observe(document.getElementById('magazynTableBody'), { childList: true });
+    }
+
+    // 3. Wstrzykiwanie produktów do Formularza Karty
+    function createCardFromSelected() {
+        const checked = document.querySelectorAll('.magazyn-cb:checked');
+        const selectedProducts = Array.from(checked).map(cb => cb.value);
+        
+        if (selectedProducts.length === 0) return;
+        if (selectedProducts.length > 9) {
+            alert("Możesz dodać maksymalnie 9 produktów na jedną kartę w sekcji 'Leczenie na miejscu'.");
+            return;
+        }
+
+        // 1. Zmień główną zakładkę na kartę leczenia
+        showSection('karta');
+        
+        // 2. Otwórz formularz i przejdź do Kroku 1 (Nagłówek)
+        const fModal = document.getElementById('formModal');
+        if (fModal) {
+            fModal.style.display = 'flex';
+            
+            // Czyścimy stare dane nagłówka (bezpieczeństwo)
+            document.getElementById('formKlient').value = '';
+            document.getElementById('formAdres').value = '';
+            document.getElementById('formNrStada').value = '';
+            
+            showStep(1); 
+            populateRowSelect();
+            document.getElementById('formRowSelect').dataset.prevIndex = 0;
+            
+            // 3. Uzupełniamy wiersze w tle
+            const logicalRows = rowsEditable();
+            
+            // Najpierw wyczyszczenie pierwszych 9 wierszy dla pewności
+            for(let i = 0; i < 9; i++) {
+                if (logicalRows[i]) {
+                    const inp = logicalRows[i].cells[4].querySelector('input');
+                    if (inp) inp.value = '';
+                }
+            }
+
+            // Aplikujemy wybrane produkty do kolejnych wierszy
+            selectedProducts.forEach((prodName, index) => {
+                const row = logicalRows[index]; 
+                if (row) {
+                    const input = row.cells[4].querySelector('input');
+                    if (input) {
+                        input.value = prodName;
+                        // To wywoła standardowy event z Twojej aplikacji (który dociągnie serię, dawkowanie i karencję!)
+                        input.dispatchEvent(new Event('input', { bubbles: true }));
+                    }
+                }
+            });
+
+            clearMagazynSelection();
+            
+            setTimeout(() => {
+                alert(`Dodano ${selectedProducts.length} wybranych produktów do nowej karty leczenia.\n\nWypełnij dane posiadacza i kliknij "Dalej", by uzupełnić dla nich dawki.`);
+            }, 300);
+        }
+    }
 </script>
 </body>
 </html>
