@@ -4748,10 +4748,10 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
     <div id="calendarViewContainer">
         
 <div id="todayViewContainer">
-            <!-- NOWY NAGŁÓWEK ZE STRZAŁKAMI -->
+            <!-- NOWY NAGŁÓWEK ZE STRZAŁKAMI I WYBOREM DATY -->
             <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #6A994E; padding-bottom: 5px; margin-bottom: 10px;">
                 <button id="btnMainVisitPrevDay" class="btn small ghost" style="font-size: 18px; padding: 4px 12px; height: 38px;">◀</button>
-                <h3 id="todayViewTitle" style="margin: 0; text-align: center; border: none; padding: 0;">Dzisiaj</h3>
+                <input type="date" id="mainVisitDateInput" style="border: none; font-size: 18px; font-weight: bold; color: #333; background: transparent; text-align: center; outline: none; cursor: pointer;">
                 <button id="btnMainVisitNextDay" class="btn small ghost" style="font-size: 18px; padding: 4px 12px; height: 38px;">▶</button>
             </div>
             <p id="todayViewSummary" style="text-align: center; font-size: 16px; font-weight: 600; color: #333; margin: -5px 0 15px 0;"></p>
@@ -29277,44 +29277,43 @@ if (celInput) {
         }, 300);
     }
 // ========================================================
-    // STRZAŁKI W GŁÓWNYM WIDOKU KALENDARZA WIZYT (POPRAWIONE)
+    // STRZAŁKI W GŁÓWNYM WIDOKU KALENDARZA WIZYT
     // ========================================================
-    
-    // Podpinamy się pod zmienną "currentCalDate", która obsługuje kalendarz u Ciebie
     const btnMainPrev = document.getElementById('btnMainVisitPrevDay');
     const btnMainNext = document.getElementById('btnMainVisitNextDay');
+    const mainDateInput = document.getElementById('mainVisitDateInput');
 
-    if (btnMainPrev && btnMainNext) {
-        btnMainPrev.addEventListener('click', () => {
-            if (typeof currentCalDate !== 'undefined') {
-                currentCalDate.setDate(currentCalDate.getDate() - 1);
-                updateMainVisitView();
-            }
-        });
-
-        btnMainNext.addEventListener('click', () => {
-            if (typeof currentCalDate !== 'undefined') {
-                currentCalDate.setDate(currentCalDate.getDate() + 1);
-                updateMainVisitView();
-            }
-        });
+    // Ustawia dzisiejszą datę na start
+    if (mainDateInput && !mainDateInput.value) {
+        mainDateInput.valueAsDate = new Date();
     }
 
-    function updateMainVisitView() {
-        // Upewnijmy się, że tytuł uaktualni wyświetlaną datę
-        const titleEl = document.getElementById('todayViewTitle');
-        if (titleEl) {
-            titleEl.textContent = currentCalDate.toLocaleDateString('pl-PL', { day: 'numeric', month: 'long', year: 'numeric' });
-        }
+    if (btnMainPrev && btnMainNext && mainDateInput) {
+        // Kliknięcie w lewo (wczoraj)
+        btnMainPrev.addEventListener('click', () => {
+            let d = mainDateInput.valueAsDate || new Date();
+            d.setDate(d.getDate() - 1);
+            mainDateInput.valueAsDate = d;
+            mainDateInput.dispatchEvent(new Event('change'));
+        });
+
+        // Kliknięcie w prawo (jutro)
+        btnMainNext.addEventListener('click', () => {
+            let d = mainDateInput.valueAsDate || new Date();
+            d.setDate(d.getDate() + 1);
+            mainDateInput.valueAsDate = d;
+            mainDateInput.dispatchEvent(new Event('change'));
+        });
         
-        // Wywołujemy renderowanie "Dzisiejszych" (w tym wypadku wybranego dnia) na ekranie
-        if (typeof renderTodayVisits === 'function') {
-            renderTodayVisits(currentCalDate);
-        } else if (typeof renderDailyVisits === 'function') {
-            renderDailyVisits(currentCalDate);
-        } else {
-            console.warn("Zaktualizuj nazwę funkcji renderującej wizyty w updateMainVisitView() - zobacz dół pliku index.html");
-        }
+        // Wykrycie zmiany daty (strzałką lub z kalendarzyka)
+        mainDateInput.addEventListener('change', () => {
+            const wybranaData = mainDateInput.valueAsDate;
+            
+            // 🔴 TUTAJ WPISZ NAZWĘ SWOJEJ FUNKCJI Z CLIENT.JS 🔴
+            // Np: loadVisitsForDay(wybranaData);
+            // Albo: renderTodayVisits(wybranaData);
+            
+        });
     }
 </script>
 </body>
