@@ -29214,7 +29214,7 @@ if (celInput) {
         magazynTableObserver.observe(document.getElementById('magazynTableBody'), { childList: true });
     }
 
-    // 3. Wstrzykiwanie produktów do Formularza Karty
+// 3. Wstrzykiwanie produktów do Tabeli A4
     function createCardFromSelected() {
         const checked = document.querySelectorAll('.magazyn-cb:checked');
         const selectedProducts = Array.from(checked).map(cb => cb.value);
@@ -29225,53 +29225,51 @@ if (celInput) {
             return;
         }
 
-        // 1. Zmień główną zakładkę na kartę leczenia
+        // 1. Zmień zakładkę od razu na Kartę Leczenia (A4)
         showSection('karta');
         
-        // 2. Otwórz formularz i przejdź do Kroku 1 (Nagłówek)
-        const fModal = document.getElementById('formModal');
-        if (fModal) {
-            fModal.style.display = 'flex';
+        // 2. Czyścimy nagłówek na karcie, aby była gotowa pod nowego klienta
+        const klientSelect = document.getElementById('klientSelect');
+        if (klientSelect) klientSelect.value = '';
+        const adresKlienta = document.getElementById('adresKlienta');
+        if (adresKlienta) adresKlienta.textContent = '';
+        const nrStada = document.getElementById('nrStada');
+        if (nrStada) nrStada.textContent = '';
             
-            // Czyścimy stare dane nagłówka (bezpieczeństwo)
-            document.getElementById('formKlient').value = '';
-            document.getElementById('formAdres').value = '';
-            document.getElementById('formNrStada').value = '';
-            
-            showStep(1); 
-            populateRowSelect();
-            document.getElementById('formRowSelect').dataset.prevIndex = 0;
-            
-            // 3. Uzupełniamy wiersze w tle
-            const logicalRows = rowsEditable();
-            
-            // Najpierw wyczyszczenie pierwszych 9 wierszy dla pewności
-            for(let i = 0; i < 9; i++) {
-                if (logicalRows[i]) {
-                    const inp = logicalRows[i].cells[4].querySelector('input');
-                    if (inp) inp.value = '';
+        // 3. Uzupełniamy wiersze tabeli A4
+        const logicalRows = rowsEditable();
+        
+        // Najpierw wyczyszczenie z leków pierwszych 9 wierszy dla pewności
+        for(let i = 0; i < 9; i++) {
+            if (logicalRows[i]) {
+                const inp = logicalRows[i].cells[4].querySelector('input');
+                if (inp) {
+                    inp.value = '';
+                    // Dodatkowo uruchamiamy przeliczenie, aby wyczyścić serię/karencję, jeśli były wpisane
+                    inp.dispatchEvent(new Event('input', { bubbles: true }));
                 }
             }
-
-            // Aplikujemy wybrane produkty do kolejnych wierszy
-            selectedProducts.forEach((prodName, index) => {
-                const row = logicalRows[index]; 
-                if (row) {
-                    const input = row.cells[4].querySelector('input');
-                    if (input) {
-                        input.value = prodName;
-                        // To wywoła standardowy event z Twojej aplikacji (który dociągnie serię, dawkowanie i karencję!)
-                        input.dispatchEvent(new Event('input', { bubbles: true }));
-                    }
-                }
-            });
-
-            clearMagazynSelection();
-            
-            setTimeout(() => {
-                alert(`Dodano ${selectedProducts.length} wybranych produktów do nowej karty leczenia.\n\nWypełnij dane posiadacza i kliknij "Dalej", by uzupełnić dla nich dawki.`);
-            }, 300);
         }
+
+        // Aplikujemy wybrane produkty do kolejnych wierszy wprost do widoku A4
+        selectedProducts.forEach((prodName, index) => {
+            const row = logicalRows[index]; 
+            if (row) {
+                const input = row.cells[4].querySelector('input');
+                if (input) {
+                    input.value = prodName;
+                    // Wywołuje standardowy event, który wstrzykuje na kartę serię, dawkę i karencję
+                    input.dispatchEvent(new Event('input', { bubbles: true }));
+                }
+            }
+        });
+
+        // Chowamy dolny pasek z magazynu
+        clearMagazynSelection();
+        
+        setTimeout(() => {
+            alert(`Pomyślnie załadowano ${selectedProducts.length} produktów do Karty Leczenia.\n\nWybierz teraz klienta z listy u góry i uzupełnij brakujące ilości w tabeli.`);
+        }, 300);
     }
 </script>
 </body>
