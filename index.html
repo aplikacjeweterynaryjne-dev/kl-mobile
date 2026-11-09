@@ -4747,8 +4747,13 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
 
     <div id="calendarViewContainer">
         
-    <div id="todayViewContainer">
-            <h3 id="todayViewTitle" style="text-align: center; border-bottom: 2px solid #6A994E; padding-bottom: 5px;">Dzisiaj (10 listopada 2025)</h3>
+<div id="todayViewContainer">
+            <!-- NOWY NAGŁÓWEK ZE STRZAŁKAMI -->
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #6A994E; padding-bottom: 5px; margin-bottom: 10px;">
+                <button id="btnMainVisitPrevDay" class="btn small ghost" style="font-size: 18px; padding: 4px 12px; height: 38px;">◀</button>
+                <h3 id="todayViewTitle" style="margin: 0; text-align: center; border: none; padding: 0;">Dzisiaj</h3>
+                <button id="btnMainVisitNextDay" class="btn small ghost" style="font-size: 18px; padding: 4px 12px; height: 38px;">▶</button>
+            </div>
             <p id="todayViewSummary" style="text-align: center; font-size: 16px; font-weight: 600; color: #333; margin: -5px 0 15px 0;"></p>
             <div id="todayVisitList">
                 <p style="text-align:center; color:#888; margin-top: 30px;">Brak wizyt do realizacji na dzisiaj.</p>
@@ -29270,6 +29275,39 @@ if (celInput) {
         setTimeout(() => {
             alert(`Pomyślnie załadowano ${selectedProducts.length} produktów do Karty Leczenia.\n\nWybierz teraz klienta z listy u góry i uzupełnij brakujące ilości w tabeli.`);
         }, 300);
+    }
+    // ========================================================
+    // STRZAŁKI W GŁÓWNYM WIDOKU KALENDARZA WIZYT
+    // ========================================================
+    
+    // Inicjalizujemy globalną datę kalendarza (jeśli nie masz jej w client.js)
+    window.mainVisitDate = window.mainVisitDate || new Date();
+
+    const btnMainPrev = document.getElementById('btnMainVisitPrevDay');
+    const btnMainNext = document.getElementById('btnMainVisitNextDay');
+
+    if (btnMainPrev && btnMainNext) {
+        btnMainPrev.addEventListener('click', () => {
+            window.mainVisitDate.setDate(window.mainVisitDate.getDate() - 1);
+            updateMainVisitView();
+        });
+
+        btnMainNext.addEventListener('click', () => {
+            window.mainVisitDate.setDate(window.mainVisitDate.getDate() + 1);
+            updateMainVisitView();
+        });
+    }
+
+    function updateMainVisitView() {
+        // Wywołaj Twoją oryginalną funkcję z client.js budującą kafelki dla konkretnej daty
+        // Najpopularniejsze nazwy to renderTodayVisits, loadVisitsForDate lub renderDailyVisits
+        if (typeof renderTodayVisits === 'function') {
+            renderTodayVisits(window.mainVisitDate);
+        } else if (typeof renderDailyVisits === 'function') {
+            renderDailyVisits(window.mainVisitDate);
+        } else {
+            console.warn("Podepnij właściwą nazwę funkcji renderującej wizyty w updateMainVisitView()");
+        }
     }
 </script>
 </body>
