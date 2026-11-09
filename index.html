@@ -29276,37 +29276,44 @@ if (celInput) {
             alert(`Pomyślnie załadowano ${selectedProducts.length} produktów do Karty Leczenia.\n\nWybierz teraz klienta z listy u góry i uzupełnij brakujące ilości w tabeli.`);
         }, 300);
     }
-    // ========================================================
-    // STRZAŁKI W GŁÓWNYM WIDOKU KALENDARZA WIZYT
+// ========================================================
+    // STRZAŁKI W GŁÓWNYM WIDOKU KALENDARZA WIZYT (POPRAWIONE)
     // ========================================================
     
-    // Inicjalizujemy globalną datę kalendarza (jeśli nie masz jej w client.js)
-    window.mainVisitDate = window.mainVisitDate || new Date();
-
+    // Podpinamy się pod zmienną "currentCalDate", która obsługuje kalendarz u Ciebie
     const btnMainPrev = document.getElementById('btnMainVisitPrevDay');
     const btnMainNext = document.getElementById('btnMainVisitNextDay');
 
     if (btnMainPrev && btnMainNext) {
         btnMainPrev.addEventListener('click', () => {
-            window.mainVisitDate.setDate(window.mainVisitDate.getDate() - 1);
-            updateMainVisitView();
+            if (typeof currentCalDate !== 'undefined') {
+                currentCalDate.setDate(currentCalDate.getDate() - 1);
+                updateMainVisitView();
+            }
         });
 
         btnMainNext.addEventListener('click', () => {
-            window.mainVisitDate.setDate(window.mainVisitDate.getDate() + 1);
-            updateMainVisitView();
+            if (typeof currentCalDate !== 'undefined') {
+                currentCalDate.setDate(currentCalDate.getDate() + 1);
+                updateMainVisitView();
+            }
         });
     }
 
     function updateMainVisitView() {
-        // Wywołaj Twoją oryginalną funkcję z client.js budującą kafelki dla konkretnej daty
-        // Najpopularniejsze nazwy to renderTodayVisits, loadVisitsForDate lub renderDailyVisits
+        // Upewnijmy się, że tytuł uaktualni wyświetlaną datę
+        const titleEl = document.getElementById('todayViewTitle');
+        if (titleEl) {
+            titleEl.textContent = currentCalDate.toLocaleDateString('pl-PL', { day: 'numeric', month: 'long', year: 'numeric' });
+        }
+        
+        // Wywołujemy renderowanie "Dzisiejszych" (w tym wypadku wybranego dnia) na ekranie
         if (typeof renderTodayVisits === 'function') {
-            renderTodayVisits(window.mainVisitDate);
+            renderTodayVisits(currentCalDate);
         } else if (typeof renderDailyVisits === 'function') {
-            renderDailyVisits(window.mainVisitDate);
+            renderDailyVisits(currentCalDate);
         } else {
-            console.warn("Podepnij właściwą nazwę funkcji renderującej wizyty w updateMainVisitView()");
+            console.warn("Zaktualizuj nazwę funkcji renderującej wizyty w updateMainVisitView() - zobacz dół pliku index.html");
         }
     }
 </script>
