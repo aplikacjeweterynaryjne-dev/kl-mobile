@@ -29369,7 +29369,7 @@ if (celInput) {
     });
 </script>
 <!-- ========================================== -->
-<!-- 🤖 ASYSTENT GŁOSOWY AI 9.0 (KOLEJKA I EDYCJA)-->
+<!-- 🤖 ASYSTENT GŁOSOWY AI 9.2 (CZYSTY INTERFEJS)-->
 <!-- ========================================== -->
 <div id="aiAssistantModal" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.6); display: none; z-index: 20000; justify-content: center; align-items: center;">
     <div class="form-card" style="width: 95%; max-width: 480px; background: white; padding: 20px; border-radius: 12px; border-top: 5px solid #8e44ad; max-height: 95vh; overflow-y: auto;">
@@ -29428,7 +29428,7 @@ if (celInput) {
             </div>
         </div>
 
-        <!-- EDYTOWALNA CHECKLISTA DLA BIEŻĄCEJ SZTUKI -->
+        <!-- EDYTOWALNA CHECKLISTA -->
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
             <h4 style="margin: 0; color: #333; font-size: 14px;">Bieżąca sztuka (w trakcie edycji):</h4>
             <span id="aiSavedCounter" style="background: #27ae60; color: white; padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: bold; display: none;">Zapisano: 0</span>
@@ -29462,10 +29462,6 @@ if (celInput) {
                 <input type="text" id="aiEditWydane" placeholder="Brak" style="border: none; border-bottom: 1px solid #ddd; background: transparent; padding: 4px; font-weight: bold; color: #2980b9; outline: none; width: 100%;">
             </div>
         </div>
-        
-        <button id="aiAddNextCowBtn" class="btn ghost" style="width: 100%; margin-bottom: 10px; border: 2px dashed #8e44ad; color: #8e44ad; font-weight: bold; display: none;">
-            ➕ Zapisz tę sztukę do kolejki
-        </button>
 
         <div class="form-actions" style="justify-content: space-between;">
             <button class="btn ghost" onclick="closeAiModal()" style="padding: 10px;">Anuluj</button>
@@ -29480,7 +29476,6 @@ if (celInput) {
     const menuAsystentBtn = document.getElementById('menuAsystentBtn');
     const aiModal = document.getElementById('aiAssistantModal');
     const aiConfirmBtn = document.getElementById('aiConfirmActionBtn');
-    const aiAddNextCowBtn = document.getElementById('aiAddNextCowBtn');
     
     const tabSwobodny = document.getElementById('tabBtnSwobodny');
     const tabRozmowa = document.getElementById('tabBtnRozmowa');
@@ -29511,6 +29506,7 @@ if (celInput) {
     let isRecording = false;
     let activeMode = 'rozmowa'; 
     let convoState = -1; 
+    let convoWatchdog = null; 
     
     const convoPrompts = [
         "Podaj imię i nazwisko klienta. Możesz też powiedzieć pomiń.",
@@ -29546,6 +29542,7 @@ if (celInput) {
     });
 
     function stopAllAudio() {
+        clearTimeout(convoWatchdog);
         if (aiRecognition) aiRecognition.stop();
         window.speechSynthesis.cancel();
         isRecording = false;
@@ -29563,7 +29560,6 @@ if (celInput) {
             clearFormUI(true);
             allSavedAnimals = [];
             renderSavedAnimals();
-            aiAddNextCowBtn.style.display = 'none';
             aiModal.style.display = 'flex';
             loadVoices(); 
             stopAllAudio();
@@ -29578,6 +29574,19 @@ if (celInput) {
         aiRecognition.continuous = false;     
         aiRecognition.interimResults = false; 
 
+        function startWatchdog() {
+            clearTimeout(convoWatchdog);
+            convoWatchdog = setTimeout(() => {
+                if (isRecording && activeMode === 'rozmowa') {
+                    aiRecognition.stop();
+                    isRecording = false;
+                    convoStatusText.textContent = "⏱️ Zbyt długa cisza. Powtórz lub kliknij POMIŃ.";
+                    convoAvatar.style.transform = 'scale(1)';
+                    speak("Nie usłyszałem. Powtórz lub kliknij pomiń.");
+                }
+            }, 8000); 
+        }
+
         aiRecordBtn.addEventListener('click', () => {
             if (isRecording) {
                 aiRecognition.stop();
@@ -29587,6 +29596,7 @@ if (celInput) {
         });
 
         aiRecognition.onresult = (event) => {
+            clearTimeout(convoWatchdog);
             const text = event.results[0][0].transcript.trim().toLowerCase();
             if (activeMode === 'swobodny') {
                 const currentVal = aiRawTextInput.value.trim();
@@ -29600,13 +29610,15 @@ if (celInput) {
         };
 
         aiRecognition.onerror = (e) => {
+            clearTimeout(convoWatchdog);
             if (activeMode === 'rozmowa') {
-                convoStatusText.textContent = "Nie zrozumiałem, powtórz.";
-                setTimeout(() => { if(isRecording) aiRecognition.start(); }, 1500);
+                convoStatusText.textContent = "Błąd mikrofonu. Spróbuj jeszcze raz.";
+                setTimeout(() => { if(isRecording) { try{ aiRecognition.start(); startWatchdog(); }catch(err){} } }, 1000);
             }
         };
         
         aiRecognition.onend = () => {
+            clearTimeout(convoWatchdog);
             if (activeMode === 'swobodny') {
                 if (isRecording) setTimeout(() => { try { if(isRecording) aiRecognition.start(); } catch(e){} }, 250);
                 else resetSwobodnyUI();
@@ -29640,6 +29652,7 @@ if (celInput) {
         });
 
         convoSkipBtn.addEventListener('click', () => {
+            clearTimeout(convoWatchdog);
             if(aiRecognition) aiRecognition.stop();
             processConvoAnswer("pomiń");
         });
@@ -29648,7 +29661,7 @@ if (celInput) {
             if (convoState === 5) {
                 speak(convoPrompts[convoState], () => {
                     convoStatusText.textContent = "🎙️ Słucham (Tak/Nie)...";
-                    try { isRecording = true; aiRecognition.start(); } catch(e){}
+                    try { isRecording = true; aiRecognition.start(); startWatchdog(); } catch(e){}
                 });
                 return;
             }
@@ -29657,7 +29670,7 @@ if (celInput) {
             speak(convoPrompts[convoState], () => {
                 convoStatusText.textContent = "🎙️ Słucham...";
                 convoListeningPreview.style.display = 'none';
-                try { isRecording = true; aiRecognition.start(); } catch(e) {}
+                try { isRecording = true; aiRecognition.start(); startWatchdog(); } catch(e) {}
             });
         }
 
@@ -29701,12 +29714,11 @@ if (celInput) {
             }
 
             convoState++;
-            checkShowAddButton();
             setTimeout(runConvoStep, 800);
         }
 
         // ===============================================
-        // WIDOK KOLEJKI (ZAPISANYCH SZTUK)
+        // WIDOK KOLEJKI Z ZABEZPIECZENIEM EDYCJI
         // ===============================================
         function renderSavedAnimals() {
             const container = document.getElementById('aiSavedAnimalsContainer');
@@ -29737,30 +29749,42 @@ if (celInput) {
                 const btnDiv = document.createElement('div');
                 btnDiv.style.cssText = "display:flex; gap: 15px;";
 
-                // Przycisk EDYTUJ
                 const editBtn = document.createElement('button');
                 editBtn.innerHTML = '✏️';
                 editBtn.style.cssText = "background:none; border:none; cursor:pointer; font-size: 16px; padding:0;";
                 editBtn.title = "Zmień dane";
                 editBtn.onclick = () => {
-                    stopAllAudio(); // Zatrzymuje gadanie asystenta na czas edycji
-                    edTag.value = animal.tag;
-                    edSztuki.value = animal.liczba;
-                    edRozp.value = animal.rozpoznanie;
-                    edZuzyte.value = animal.zuzyte;
-                    edWydane.value = animal.wydane;
-                    allSavedAnimals.splice(index, 1);
+                    stopAllAudio();
+                    
+                    if (edTag.value.trim() !== '' || edZuzyte.value.trim() !== '') {
+                        allSavedAnimals.push({
+                            tag: edTag.value,
+                            liczba: edSztuki.value || '1',
+                            rozpoznanie: edRozp.value,
+                            zuzyte: edZuzyte.value,
+                            wydane: edWydane.value
+                        });
+                        if(typeof showToast === 'function') showToast("Obecna sztuka zrzucona do kolejki.", "info");
+                    }
+
+                    const targetAnimal = allSavedAnimals[allSavedAnimals.indexOf(animal)];
+                    
+                    edTag.value = targetAnimal.tag;
+                    edSztuki.value = targetAnimal.liczba;
+                    edRozp.value = targetAnimal.rozpoznanie;
+                    edZuzyte.value = targetAnimal.zuzyte;
+                    edWydane.value = targetAnimal.wydane;
+                    
+                    allSavedAnimals.splice(allSavedAnimals.indexOf(targetAnimal), 1);
                     renderSavedAnimals();
-                    checkShowAddButton();
                 };
 
-                // Przycisk USUŃ
                 const delBtn = document.createElement('button');
                 delBtn.innerHTML = '❌';
                 delBtn.style.cssText = "background:none; border:none; cursor:pointer; font-size: 16px; padding:0;";
                 delBtn.title = "Usuń krowę";
                 delBtn.onclick = () => {
-                    allSavedAnimals.splice(index, 1);
+                    allSavedAnimals.splice(allSavedAnimals.indexOf(animal), 1);
                     renderSavedAnimals();
                 };
 
@@ -29785,20 +29809,6 @@ if (celInput) {
             clearFormUI(false); 
             renderSavedAnimals();
         }
-
-        aiAddNextCowBtn.addEventListener('click', () => {
-            saveCurrentAnimalToMemory();
-            if(activeMode === 'swobodny') {
-                aiRawTextInput.value = '';
-                showToast("Sztuka zapisana. Podyktuj następną.", "info");
-            }
-        });
-
-        function checkShowAddButton() {
-            if (edTag.value.length > 2 || edZuzyte.value.length > 2) aiAddNextCowBtn.style.display = 'block';
-            else aiAddNextCowBtn.style.display = 'none';
-        }
-        document.getElementById('aiEditableForm').addEventListener('input', checkShowAddButton);
 
         // --- TRYB SWOBODNY ANALIZA ---
         aiAnalyzeBtn.addEventListener('click', () => {
@@ -29829,13 +29839,8 @@ if (celInput) {
             
             const medsWydane = extractMedsToString(txtWydane);
             if(medsWydane) edWydane.value = (edWydane.value ? edWydane.value + ", " : "") + medsWydane;
-
-            checkShowAddButton();
         });
 
-        // ===============================================
-        // INTELIGENTNE SZUKANIE W MAGAZYNIE (Levenshtein)
-        // ===============================================
         function levenshtein(a, b) {
             let tmp;
             if (a.length === 0) return b.length;
@@ -29856,29 +29861,22 @@ if (celInput) {
         function matchWithWarehouse(spokenName) {
             let bestMatch = capitalizeWords(spokenName); 
             let bestScore = 0;
-            
             let warehouseProds = [];
             document.querySelectorAll('#magazynTableBody tr').forEach(r => {
                 if(r.cells.length > 1) warehouseProds.push(r.cells[0].textContent.trim());
             });
-            
             if (warehouseProds.length === 0) return bestMatch; 
-
             warehouseProds.forEach(p => {
                 let pLow = p.toLowerCase();
                 let sLow = spokenName.toLowerCase();
-                
                 if (pLow.includes(sLow) || sLow.includes(pLow)) {
                     let score = Math.min(pLow.length, sLow.length) / Math.max(pLow.length, sLow.length);
                     if (score > bestScore) { bestScore = score; bestMatch = p; }
                 }
-                
                 let maxLen = Math.max(sLow.length, pLow.length);
                 let dist = levenshtein(sLow, pLow);
                 let sim = (maxLen - dist) / maxLen;
-                if (sim > 0.60 && sim > bestScore) {
-                    bestScore = sim; bestMatch = p;
-                }
+                if (sim > 0.60 && sim > bestScore) { bestScore = sim; bestMatch = p; }
             });
             return bestMatch;
         }
@@ -29902,7 +29900,6 @@ if (celInput) {
                     let lekWords = txtNoNum.split(' ').filter(w => w.trim().length > 1 && !ignoreWords.includes(w.trim().toLowerCase()));
                     let rawLek = lekWords.join(' ').trim();
                     let grammarFixed = dictionary[rawLek] ? dictionary[rawLek] : lekWords.map(w => dictionary[w] || w).join(' ');
-                    
                     if (grammarFixed.length > 1) {
                         let finalLek = matchWithWarehouse(grammarFixed);
                         meds.push(`${finalLek} ${val}`);
@@ -29927,7 +29924,6 @@ if (celInput) {
         function clearFormUI(clearKlient = true) {
             if(clearKlient) edKlient.value = '';
             edTag.value = ''; edSztuki.value = '1'; edRozp.value = ''; edZuzyte.value = ''; edWydane.value = '';
-            checkShowAddButton();
         }
 
         function resetSwobodnyUI() {
@@ -29947,7 +29943,7 @@ if (celInput) {
         }
 
         // ===============================================
-        // WSTRZYKIWANIE STADA DO KARTY 
+        // WSTRZYKIWANIE STADA
         // ===============================================
         aiConfirmBtn.addEventListener('click', () => {
             if(edTag.value || edZuzyte.value) saveCurrentAnimalToMemory();
@@ -29985,10 +29981,10 @@ if (celInput) {
                 const logicalRows = typeof rowsEditable === 'function' ? rowsEditable() : [];
                 if(logicalRows.length === 0) return;
                 
-                for(let i=0; i<13; i++) {
+                for(let i=0; i<15; i++) {
                     if(logicalRows[i] && logicalRows[i].cells.length > 6) {
                         ['1','2','3','4','6'].forEach(c => {
-                            let inp = logicalRows[i].cells[c].querySelector('input');
+                            let inp = logicalRows[i].cells[c]?.querySelector('input');
                             if(inp) { inp.value = ''; inp.dispatchEvent(new Event('input', {bubbles: true})); }
                         });
                     }
@@ -30000,15 +29996,15 @@ if (celInput) {
                     if(inp && inp.value !== val) { inp.value = val; inp.dispatchEvent(new Event('input', {bubbles: true})); }
                 }
 
-                let rowZuz = 0; 
-                let rowWyd = 9; 
+                let rowZuz = 0;   
+                let rowWyd = 10;  
 
                 allSavedAnimals.forEach(animal => {
                     const zuzyteArr = parseEditableStringToArray(animal.zuzyte);
                     const wydaneArr = parseEditableStringToArray(animal.wydane);
 
                     if (zuzyteArr.length === 0 && animal.tag) {
-                        if (rowZuz <= 8 && logicalRows[rowZuz]) {
+                        if (rowZuz <= 9 && logicalRows[rowZuz]) {
                             const r = logicalRows[rowZuz];
                             setVal(r.cells[1], animal.tag);
                             setVal(r.cells[2], animal.liczba);
@@ -30017,7 +30013,7 @@ if (celInput) {
                         }
                     } else {
                         zuzyteArr.forEach(med => {
-                            if (rowZuz <= 8 && logicalRows[rowZuz]) {
+                            if (rowZuz <= 9 && logicalRows[rowZuz]) {
                                 const r = logicalRows[rowZuz];
                                 setVal(r.cells[1], animal.tag);
                                 setVal(r.cells[2], animal.liczba);
@@ -30030,7 +30026,7 @@ if (celInput) {
                     }
 
                     wydaneArr.forEach(med => {
-                        if (rowWyd <= 12 && logicalRows[rowWyd]) {
+                        if (rowWyd <= 14 && logicalRows[rowWyd]) {
                             const r = logicalRows[rowWyd];
                             if (copyToWydane) {
                                 setVal(r.cells[1], animal.tag);
