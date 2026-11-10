@@ -29369,7 +29369,7 @@ if (celInput) {
     });
 </script>
 <!-- ========================================== -->
-<!-- 🤖 ASYSTENT GŁOSOWY AI 3.2 - MODAL I LOGIKA-->
+<!-- 🤖 ASYSTENT GŁOSOWY AI 3.3 - MODAL I LOGIKA-->
 <!-- ========================================== -->
 <div id="aiAssistantModal" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.6); display: none; z-index: 20000; justify-content: center; align-items: center;">
     <div class="form-card" style="width: 95%; max-width: 480px; background: white; padding: 20px; border-radius: 12px; border-top: 5px solid #8e44ad;">
@@ -29438,7 +29438,6 @@ if (celInput) {
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         aiRecognition = new SpeechRecognition();
         aiRecognition.lang = 'pl-PL';
-        // TRYB CIĄGŁY: Słucha dopóki nie klikniesz Stop!
         aiRecognition.continuous = true;     
         aiRecognition.interimResults = false; 
 
@@ -29469,7 +29468,6 @@ if (celInput) {
         });
 
         aiRecognition.onresult = (event) => {
-            // W trybie ciągłym dopisujemy tylko nową partię tekstu
             const resultIndex = event.resultIndex;
             const text = event.results[resultIndex][0].transcript;
             
@@ -29582,76 +29580,85 @@ if (celInput) {
             updateChecklist();
         }
 
-        // TWORZENIE KARTY Z OPÓŹNIENIEM (Omija problem czyszczenia formularza po zmianie zakładki)
+        // TWORZENIE KARTY (BEZPIECZNE WSTRZYKIWANIE DANYCH)
         aiConfirmBtn.addEventListener('click', () => {
             closeAiModal();
-            
-            // Najpierw aktywujemy widok Karty
             showSection('karta');
             
-            // Czekamy 500ms, aż cała strona w zakładce Karta załaduje się na czysto
             setTimeout(() => {
                 const klientSelect = document.getElementById('klientSelect');
                 if (klientSelect && parsedAiAction.klient) {
                     const options = Array.from(klientSelect.options);
-                    const match = options.find(opt => opt.text.toLowerCase().includes(parsedAiAction.klient.toLowerCase()));
+                    const spokenWords = parsedAiAction.klient.toLowerCase().split(' ');
+                    
+                    // Inteligentne szukanie: każde wypowiedziane słowo musi być w nazwie z bazy
+                    const match = options.find(opt => {
+                        const optText = opt.text.toLowerCase();
+                        return spokenWords.every(word => optText.includes(word));
+                    });
+                    
                     if (match) {
                         klientSelect.value = match.value;
+                        // To wywoła asynchroniczne pobranie stada i RESET KARTY
                         klientSelect.dispatchEvent(new Event('change', { bubbles: true }));
                     }
                 }
 
-                const logicalRows = typeof rowsEditable === 'function' ? rowsEditable() : [];
-                
-                // Czyszczenie starej karty
-                for(let i=0; i<13; i++) {
-                     if (logicalRows[i]) {
-                         const inpLek = logicalRows[i].cells[4]?.querySelector('input');
-                         if (inpLek) { inpLek.value = ''; inpLek.dispatchEvent(new Event('input', {bubbles: true})); }
-                         
-                         const inpIlosc = logicalRows[i].cells[6]?.querySelector('input');
-                         if (inpIlosc) { inpIlosc.value = ''; inpIlosc.dispatchEvent(new Event('input', {bubbles: true})); }
-                         
-                         const inpOpis = logicalRows[i].cells[1]?.querySelector('input');
-                         if (inpOpis) { inpOpis.value = ''; inpOpis.dispatchEvent(new Event('input', {bubbles: true})); }
-                     }
-                }
-
-                let currRow = 0;
-                const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
-
-                // ZUŻYTE
-                parsedAiAction.zuzyte.forEach(med => {
-                    if(logicalRows[currRow]) {
-                        const r = logicalRows[currRow];
-                        const opisInp = r.cells[1]?.querySelector('input');
-                        if(opisInp) { opisInp.value = parsedAiAction.tag; opisInp.dispatchEvent(new Event('input', {bubbles: true})); }
-                        
-                        const lekInp = r.cells[4]?.querySelector('input');
-                        if(lekInp) { lekInp.value = capitalize(med.lek); lekInp.dispatchEvent(new Event('input', {bubbles: true})); }
-                        
-                        const iloscInp = r.cells[6]?.querySelector('input');
-                        if(iloscInp) { iloscInp.value = med.ilosc.replace(',','.'); iloscInp.dispatchEvent(new Event('input', {bubbles: true})); }
-                        currRow++;
+                // Czekamy 600ms, aż aplikacja przemieli dane klienta i skończy czyścić kartę
+                setTimeout(() => {
+                    const logicalRows = typeof rowsEditable === 'function' ? rowsEditable() : [];
+                    
+                    // Awaryjne, czyszczenie wierszy
+                    for(let i=0; i<13; i++) {
+                         if (logicalRows[i] && logicalRows[i].cells && logicalRows[i].cells.length > 6) {
+                             const inpLek = logicalRows[i].cells[4].querySelector('input');
+                             if (inpLek) { inpLek.value = ''; inpLek.dispatchEvent(new Event('input', {bubbles: true})); }
+                             
+                             const inpIlosc = logicalRows[i].cells[6].querySelector('input');
+                             if (inpIlosc) { inpIlosc.value = ''; inpIlosc.dispatchEvent(new Event('input', {bubbles: true})); }
+                             
+                             const inpOpis = logicalRows[i].cells[1].querySelector('input');
+                             if (inpOpis) { inpOpis.value = ''; inpOpis.dispatchEvent(new Event('input', {bubbles: true})); }
+                         }
                     }
-                });
 
-                // POZOSTAWIONE
-                parsedAiAction.wydane.forEach(med => {
-                    if(currRow < 9) currRow = 9; 
-                    if(logicalRows[currRow]) {
-                        const r = logicalRows[currRow];
-                        const lekInp = r.cells[4]?.querySelector('input');
-                        if(lekInp) { lekInp.value = capitalize(med.lek); lekInp.dispatchEvent(new Event('input', {bubbles: true})); }
-                        
-                        const iloscInp = r.cells[6]?.querySelector('input');
-                        if(iloscInp) { iloscInp.value = med.ilosc.replace(',','.'); iloscInp.dispatchEvent(new Event('input', {bubbles: true})); }
-                        currRow++;
-                    }
-                });
+                    let currRow = 0;
+                    const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 
-                if (typeof showToast === 'function') showToast("Karta wczytana pomyślnie!", "success");
-            }, 500); // <-- TUTAJ JEST OPÓŹNIENIE (pół sekundy)
+                    // ZUŻYTE (wiersze 1-9)
+                    parsedAiAction.zuzyte.forEach(med => {
+                        if (logicalRows[currRow] && logicalRows[currRow].cells.length > 6) {
+                            const r = logicalRows[currRow];
+                            const opisInp = r.cells[1].querySelector('input');
+                            if (opisInp) { opisInp.value = parsedAiAction.tag; opisInp.dispatchEvent(new Event('input', {bubbles: true})); }
+                            
+                            const lekInp = r.cells[4].querySelector('input');
+                            if (lekInp) { lekInp.value = capitalize(med.lek); lekInp.dispatchEvent(new Event('input', {bubbles: true})); }
+                            
+                            const iloscInp = r.cells[6].querySelector('input');
+                            if (iloscInp) { iloscInp.value = med.ilosc.replace(',','.'); iloscInp.dispatchEvent(new Event('input', {bubbles: true})); }
+                            currRow++;
+                        }
+                    });
+
+                    // POZOSTAWIONE (wiersze 10-13)
+                    parsedAiAction.wydane.forEach(med => {
+                        if (currRow < 9) currRow = 9; 
+                        if (logicalRows[currRow] && logicalRows[currRow].cells.length > 6) {
+                            const r = logicalRows[currRow];
+                            const lekInp = r.cells[4].querySelector('input');
+                            if (lekInp) { lekInp.value = capitalize(med.lek); lekInp.dispatchEvent(new Event('input', {bubbles: true})); }
+                            
+                            const iloscInp = r.cells[6].querySelector('input');
+                            if (iloscInp) { iloscInp.value = med.ilosc.replace(',','.'); iloscInp.dispatchEvent(new Event('input', {bubbles: true})); }
+                            currRow++;
+                        }
+                    });
+
+                    if (typeof showToast === 'function') showToast("Karta wczytana pomyślnie!", "success");
+                }, 600); // 600ms odpoczynku po ustawieniu klienta
+
+            }, 300); // 300ms po otwarciu sekcji Karta
         });
     } else {
         if (menuAsystentBtn) menuAsystentBtn.style.display = 'none';
