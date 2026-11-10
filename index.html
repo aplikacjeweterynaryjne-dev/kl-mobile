@@ -29369,7 +29369,7 @@ if (celInput) {
     });
 </script>
 <!-- ========================================== -->
-<!-- 🤖 ASYSTENT GŁOSOWY AI 10.9 (FIX KLIENTA)  -->
+<!-- 🤖 ASYSTENT GŁOSOWY AI 11.0 (KULOODPORNY)  -->
 <!-- ========================================== -->
 <div id="aiAssistantModal" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.6); display: none; z-index: 20000; justify-content: center; align-items: center;">
     <div class="form-card" style="width: 95%; max-width: 480px; background: white; padding: 20px; border-radius: 12px; border-top: 5px solid #8e44ad; max-height: 95vh; overflow-y: auto;">
@@ -29405,7 +29405,6 @@ if (celInput) {
             <div id="aiSchemeTilesContainer" style="display: none; margin-top: 15px; padding: 15px; background: #fff3e0; border: 1px solid #ffe0b2; border-radius: 8px;">
                 <h4 style="margin: 0 0 10px 0; color: #d35400; font-size: 15px;">Wykryto schematy. Wybierz jeden:</h4>
                 <div id="aiSchemeTilesList" style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: center;">
-                    <!-- Kafelki wstawiane przez JS -->
                 </div>
                 <button id="aiSchemeSkipBtn" class="btn ghost small" style="margin-top: 15px; width: 100%;">❌ Pomiń schemat</button>
             </div>
@@ -30017,7 +30016,7 @@ if (celInput) {
         }
 
         // ===============================================
-        // WSTRZYKIWANIE STADA DO KARTY 
+        // ZABEZPIECZONA NAWIGACJA (ANTI-CRASH)
         // ===============================================
         aiConfirmBtn.addEventListener('click', () => {
             if(edTag.value || edZuzyte.value) saveCurrentAnimalToMemory();
@@ -30026,7 +30025,31 @@ if (celInput) {
                 alert("Nie wpisano żadnych leków ani kolczyków."); return;
             }
 
-            // --- ZMIENIONO: Szukamy KLIENTA i od razu odpalamy logikę w tle ---
+            let hasWydane = allSavedAnimals.some(a => a.wydane.length > 0);
+            let copyToWydane = false;
+            if (hasWydane) {
+                copyToWydane = confirm("Czy skopiować kolczyki, sztuki i rozpoznanie również do sekcji 'Wydane/Pozostawione' na dole karty?");
+            }
+
+            closeAiModal();
+            
+            // BEZPIECZNE PRZEŁĄCZENIE ZAKŁADKI
+            try {
+                if (typeof showSection === 'function') {
+                    showSection('karta');
+                } else {
+                    throw new Error("showSection is not defined");
+                }
+            } catch (err) {
+                console.warn("Wymuszam awaryjne pokazanie karty (omijam błąd w kodzie głównym):", err);
+                const mm = document.getElementById('mainMenuSection');
+                const tb = document.getElementById('mainTabBar');
+                const kl = document.getElementById('kartaLeczeniaSection');
+                if (mm) mm.style.display = 'none';
+                if (tb) tb.style.display = 'flex';
+                if (kl) kl.style.display = 'block';
+            }
+
             const masterKlient = edKlient.value;
             try {
                 const klientSelect = document.getElementById('klientSelect');
@@ -30040,22 +30063,24 @@ if (celInput) {
                     
                     if (match && klientSelect.value !== match.value) {
                         klientSelect.value = match.value;
-                        klientSelect.dispatchEvent(new Event('input', { bubbles: true }));
+                        try {
+                            klientSelect.dispatchEvent(new Event('input', { bubbles: true }));
+                        } catch(err) {}
+                        
+                        // Zabezpieczenie awaryjne adresów (jeśli event wyżej się wykrzaczy)
+                        const adresEl = document.getElementById('adresKlienta');
+                        const stadoEl = document.getElementById('nrStada');
+                        if (adresEl && (!adresEl.textContent || adresEl.textContent === '---')) adresEl.textContent = match.dataset.adres || '';
+                        if (stadoEl && (!stadoEl.textContent || stadoEl.textContent === '---')) stadoEl.textContent = match.dataset.nrstada || '';
                     }
                 }
             } catch (e) { console.error("Błąd doboru klienta:", e); }
 
-            let hasWydane = allSavedAnimals.some(a => a.wydane.length > 0);
-            let copyToWydane = false;
-            if (hasWydane) {
-                copyToWydane = confirm("Czy skopiować kolczyki, sztuki i rozpoznanie również do sekcji 'Wydane/Pozostawione' na dole karty?");
-            }
-
-            closeAiModal();
-            showSection('karta');
-            
-            function getBaseLogicalRowsCount() {
-                return typeof rowsEditable === 'function' ? rowsEditable().length : 14;
+            // AWARIA: Gdy nrDokumentu się nie wygenerował
+            const nrDok = document.getElementById('nrDokumentu');
+            if (nrDok && !nrDok.value) {
+                const now = new Date();
+                nrDok.value = `.../${now.getMonth()+1}/${now.getFullYear()}/AI`;
             }
 
             function injectAllData() {
@@ -30140,7 +30165,6 @@ if (celInput) {
                 });
             }
 
-            // Lekkie wydłużenie czasu początkowego, bo wczytanie klienta pobiera stado
             setTimeout(injectAllData, 800);
             setTimeout(injectAllData, 1500);
             setTimeout(injectAllData, 3000);
