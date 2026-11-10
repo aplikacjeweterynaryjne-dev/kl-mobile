@@ -29369,7 +29369,7 @@ if (celInput) {
     });
 </script>
 <!-- ========================================== -->
-<!-- 🤖 ASYSTENT GŁOSOWY AI 10.8 (PERFEKCYJNE WIERSZE)-->
+<!-- 🤖 ASYSTENT GŁOSOWY AI 10.9 (FIX KLIENTA)  -->
 <!-- ========================================== -->
 <div id="aiAssistantModal" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.6); display: none; z-index: 20000; justify-content: center; align-items: center;">
     <div class="form-card" style="width: 95%; max-width: 480px; background: white; padding: 20px; border-radius: 12px; border-top: 5px solid #8e44ad; max-height: 95vh; overflow-y: auto;">
@@ -29405,6 +29405,7 @@ if (celInput) {
             <div id="aiSchemeTilesContainer" style="display: none; margin-top: 15px; padding: 15px; background: #fff3e0; border: 1px solid #ffe0b2; border-radius: 8px;">
                 <h4 style="margin: 0 0 10px 0; color: #d35400; font-size: 15px;">Wykryto schematy. Wybierz jeden:</h4>
                 <div id="aiSchemeTilesList" style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: center;">
+                    <!-- Kafelki wstawiane przez JS -->
                 </div>
                 <button id="aiSchemeSkipBtn" class="btn ghost small" style="margin-top: 15px; width: 100%;">❌ Pomiń schemat</button>
             </div>
@@ -29756,9 +29757,6 @@ if (celInput) {
             setTimeout(runConvoStep, 800);
         }
 
-        // ===============================================
-        // MĄDRY SCRAPER SCHEMATÓW 
-        // ===============================================
         function attemptToFindSchemes(spokenRozp) {
             let sLow = spokenRozp.toLowerCase().replace(/typu/g, '').replace(/wersja/g, '').replace(/schemat/g, '').replace(/[()]/g, ' ').replace(/\s+/g, ' ').trim();
             if (!sLow) return [];
@@ -30014,22 +30012,12 @@ if (celInput) {
             edTag.value = ''; edSztuki.value = '1'; edRozp.value = ''; edZuzyte.value = ''; edWydane.value = '';
         }
 
-        function resetConvoUI() {
-            convoState = -1;
-            convoStartBtn.style.display = 'inline-block'; convoStartBtn.innerHTML = "▶️ Start Rozmowy";
-            convoSkipBtn.style.display = 'none';
-            convoRetryBtn.style.display = 'none';
-            convoStatusText.textContent = "Kliknij START, aby rozpocząć odpytywanie.";
-            convoListeningPreview.style.display = 'none';
-            aiSchemeTilesContainer.style.display = 'none';
-        }
-
         function capitalizeWords(str) {
             return str.replace(/\b\w/g, l => l.toUpperCase());
         }
 
         // ===============================================
-        // INTELIGENTNE I BEZPIECZNE WSTRZYKIWANIE STADA DO KARTY 
+        // WSTRZYKIWANIE STADA DO KARTY 
         // ===============================================
         aiConfirmBtn.addEventListener('click', () => {
             if(edTag.value || edZuzyte.value) saveCurrentAnimalToMemory();
@@ -30037,6 +30025,25 @@ if (celInput) {
             if(allSavedAnimals.length === 0) {
                 alert("Nie wpisano żadnych leków ani kolczyków."); return;
             }
+
+            // --- ZMIENIONO: Szukamy KLIENTA i od razu odpalamy logikę w tle ---
+            const masterKlient = edKlient.value;
+            try {
+                const klientSelect = document.getElementById('klientSelect');
+                const datalist = document.getElementById('klientList');
+                if (klientSelect && datalist && masterKlient) {
+                    const options = Array.from(datalist.options);
+                    const spokenWords = masterKlient.toLowerCase().trim().split(/\s+/);
+                    const match = options.find(opt => {
+                        return spokenWords.length > 0 && spokenWords.every(word => word.length > 2 && opt.value.toLowerCase().includes(word));
+                    });
+                    
+                    if (match && klientSelect.value !== match.value) {
+                        klientSelect.value = match.value;
+                        klientSelect.dispatchEvent(new Event('input', { bubbles: true }));
+                    }
+                }
+            } catch (e) { console.error("Błąd doboru klienta:", e); }
 
             let hasWydane = allSavedAnimals.some(a => a.wydane.length > 0);
             let copyToWydane = false;
@@ -30046,28 +30053,15 @@ if (celInput) {
 
             closeAiModal();
             showSection('karta');
-
-            const masterKlient = edKlient.value;
-            try {
-                const klientSelect = document.getElementById('klientSelect');
-                if (klientSelect && masterKlient) {
-                    const options = Array.from(klientSelect.options);
-                    const spokenWords = masterKlient.toLowerCase().trim().split(/\s+/);
-                    const match = options.find(opt => {
-                        return spokenWords.length > 0 && spokenWords.every(word => word.length > 2 && opt.text.toLowerCase().includes(word));
-                    });
-                    if (match && klientSelect.value !== match.value) {
-                        klientSelect.value = match.value;
-                        klientSelect.dispatchEvent(new Event('change', { bubbles: true }));
-                    }
-                }
-            } catch (e) {}
+            
+            function getBaseLogicalRowsCount() {
+                return typeof rowsEditable === 'function' ? rowsEditable().length : 14;
+            }
 
             function injectAllData() {
                 let logicalRows = typeof rowsEditable === 'function' ? rowsEditable() : [];
                 if(logicalRows.length === 0) return;
                 
-                // Czyszczenie tabeli przed wpisywaniem
                 for(let i=0; i<logicalRows.length; i++) {
                     if(logicalRows[i] && logicalRows[i].cells.length > 6) {
                         ['1','2','3','4','6'].forEach(c => {
@@ -30079,6 +30073,8 @@ if (celInput) {
                         });
                     }
                 }
+                
+                logicalRows = typeof rowsEditable === 'function' ? rowsEditable() : [];
 
                 function setVal(cell, val) {
                     if(!cell || !val) return;
@@ -30086,7 +30082,6 @@ if (celInput) {
                     if(inp && inp.value !== val) { inp.value = val; inp.dispatchEvent(new Event('input', {bubbles: true})); }
                 }
 
-                // Funkcja lokalizująca pierwszy w 100% pusty wiersz dla danej grupy
                 function getNextEmptyRowIndex(groupName) {
                     const rows = typeof rowsEditable === 'function' ? rowsEditable() : [];
                     for (let i = 0; i < rows.length; i++) {
@@ -30145,9 +30140,10 @@ if (celInput) {
                 });
             }
 
-            setTimeout(injectAllData, 500);
-            setTimeout(injectAllData, 1200);
-            setTimeout(injectAllData, 2500);
+            // Lekkie wydłużenie czasu początkowego, bo wczytanie klienta pobiera stado
+            setTimeout(injectAllData, 800);
+            setTimeout(injectAllData, 1500);
+            setTimeout(injectAllData, 3000);
 
             if (typeof showToast === 'function') {
                 showToast(`Załadowano dane dla ${allSavedAnimals.length} sztuk!`, "success");
