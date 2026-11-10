@@ -29369,7 +29369,7 @@ if (celInput) {
     });
 </script>
 <!-- ========================================== -->
-<!-- 🤖 ASYSTENT GŁOSOWY AI 4.0 - MODAL I LOGIKA-->
+<!-- 🤖 ASYSTENT GŁOSOWY AI 5.0 - MODAL I LOGIKA-->
 <!-- ========================================== -->
 <div id="aiAssistantModal" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.6); display: none; z-index: 20000; justify-content: center; align-items: center;">
     <div class="form-card" style="width: 95%; max-width: 480px; background: white; padding: 20px; border-radius: 12px; border-top: 5px solid #8e44ad;">
@@ -29380,7 +29380,7 @@ if (celInput) {
         
         <!-- WSKAZÓWKA DLA UŻYTKOWNIKA -->
         <p style="font-size: 11px; color: #7f8c8d; margin: 0 0 15px 0; line-height: 1.4; text-align: center; background: #f4f6f7; padding: 8px; border-radius: 6px;">
-            💡 <b>Schemat:</b> <i>"Klient [nazwa], krowa [PL...], rozpoznanie [tekst], zużyłem [ilość] [lek], zostawiłem [ilość] [lek]"</i><br>
+            💡 <b>Schemat:</b> <i>"Klient [nazwa], krowa [PL...], rozpoznanie [tekst], zużyłem [ilość] [lek] i [ilość] [lek], zostawiłem [ilość] [lek]"</i><br>
             (Liczba sztuk ustawi się na 1 automatycznie)
         </p>
         
@@ -29431,8 +29431,8 @@ if (celInput) {
     function closeAiModal() {
         aiModal.style.display = 'none';
         if (aiRecognition && isRecording) {
-            aiRecognition.stop();
             isRecording = false;
+            aiRecognition.stop();
         }
     }
 
@@ -29440,7 +29440,7 @@ if (celInput) {
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         aiRecognition = new SpeechRecognition();
         aiRecognition.lang = 'pl-PL';
-        aiRecognition.continuous = true;     
+        aiRecognition.continuous = false;     
         aiRecognition.interimResults = false; 
 
         if (menuAsystentBtn) {
@@ -29453,14 +29453,14 @@ if (celInput) {
 
         aiRecordBtn.addEventListener('click', () => {
             if (isRecording) {
-                aiRecognition.stop();
                 isRecording = false;
+                aiRecognition.stop();
                 aiRecordBtn.innerHTML = "🎙️ Mów";
                 aiRecordBtn.style.backgroundColor = "#e74c3c";
             } else {
                 try { 
-                    aiRecognition.start(); 
                     isRecording = true;
+                    aiRecognition.start(); 
                     aiRecordBtn.innerHTML = "🛑 Zakończ mówienie";
                     aiRecordBtn.style.backgroundColor = "#c0392b";
                 } catch (e) { 
@@ -29470,9 +29470,7 @@ if (celInput) {
         });
 
         aiRecognition.onresult = (event) => {
-            const resultIndex = event.resultIndex;
-            const text = event.results[resultIndex][0].transcript;
-            
+            const text = event.results[0][0].transcript;
             const currentVal = aiRawTextInput.value.trim();
             aiRawTextInput.value = currentVal ? currentVal + " " + text : text;
             aiAnalyzeBtn.click();
@@ -29480,13 +29478,21 @@ if (celInput) {
 
         aiRecognition.onerror = (e) => {
             console.error(e);
-            if (aiRawTextInput.value === '') aiRawTextInput.value = "[Błąd mikrofonu]";
+            if (aiRawTextInput.value === '' && e.error !== 'no-speech') {
+                aiRawTextInput.value = "[Błąd mikrofonu]";
+            }
         };
         
         aiRecognition.onend = () => {
-            isRecording = false;
-            aiRecordBtn.innerHTML = "🎙️ Mów";
-            aiRecordBtn.style.backgroundColor = "#e74c3c";
+            // AUTOMATYCZNY RESTART jeśli nie kliknięto STOP
+            if (isRecording) {
+                setTimeout(() => {
+                    try { if(isRecording) aiRecognition.start(); } catch(e){}
+                }, 250);
+            } else {
+                aiRecordBtn.innerHTML = "🎙️ Mów";
+                aiRecordBtn.style.backgroundColor = "#e74c3c";
+            }
         };
 
         aiAnalyzeBtn.addEventListener('click', () => {
@@ -29502,15 +29508,14 @@ if (celInput) {
                 text = text.replace(klientMatch[0], ''); 
             }
 
-            // 2. Kolczyk i Liczba sztuk (Zabezpieczenie przed krojeniem cyfr)
+            // 2. Kolczyk i Liczba sztuk
             const tagMatch = text.match(/(?:krow[a-ęy]|kolczyk(?:u)?|numer(?:ze)?|sztuk[a-ei])?\s*([a-z]{0,2}(?:\s*\d){2,14})/i);
             if (tagMatch) {
                 parsedAiAction.tag = tagMatch[1].toUpperCase().replace(/\s+/g, '');
-                parsedAiAction.liczba = '1'; // Domyślnie 1, jeśli podano kolczyk
+                parsedAiAction.liczba = '1'; 
                 text = text.replace(tagMatch[0], ''); 
             }
 
-            // Opcjonalne: jeśli ktoś wyraźnie powie "liczba zwierząt 5"
             const liczbaMatch = text.match(/(?:liczba zwierząt|liczba sztuk|leczonych sztuk)\s+(\d+)/i);
             if (liczbaMatch) {
                 parsedAiAction.liczba = liczbaMatch[1];
@@ -29535,27 +29540,39 @@ if (celInput) {
                 txtWydane = text.substring(splitIndex);
             }
 
-            // 5. Ekstrakcja Leki + Ilości (Do 3 słów)
+            // 5. Ekstrakcja Leki + Ilości (METODA BLOKOWA Z ODMIANĄ)
             function extractProducts(subtext) {
                 const meds = [];
-                const ignoreWords = ['i', 'oraz', 'a', 'zużył', 'zużyłem', 'zużyto', 'podał', 'podałem', 'dostał', 'dostała', 'zostawił', 'zostawiłem', 'wydał', 'wydałem', 'wydano', 'krowa', 'krowę', 'kolczyk', 'numer', 'klient', 'leki', 'lek', 'produkt', 'produkty', 'zużyte', 'pozostawione', 'następnie', 'karta', 'leczenia', 'pl', 'szt', 'sztuk', 'sztuki', 'sztuka', 'rozpoznanie'];
+                const ignoreWords = ['zużył', 'zużyłem', 'zużyto', 'podał', 'podałem', 'dostał', 'dostała', 'zostawił', 'zostawiłem', 'wydał', 'wydałem', 'wydano', 'krowa', 'krowę', 'kolczyk', 'numer', 'klient', 'leki', 'lek', 'produkt', 'produkty', 'zużyte', 'pozostawione', 'następnie', 'karta', 'leczenia', 'pl', 'szt', 'sztuk', 'sztuki', 'sztuka', 'rozpoznanie', 'ml', 'mililitr', 'mililitrów', 'g', 'mg'];
                 
-                const regex = /(\d+(?:[.,]\d+)?)\s*(ml|mililitr|mililitrów|szt|sztuk|sztuki|g|mg|op|opakowań)?\s+([a-ząćęłńóśźż]+(?:\s+[a-ząćęłńóśźż]+){0,2})/gi;
-                let match;
-                while ((match = regex.exec(subtext)) !== null) {
-                    let ilosc = match[1]; 
-                    let lekRaw = match[3];
-                    let lek = lekRaw.split(' ').filter(w => !ignoreWords.includes(w.toLowerCase())).join(' ');
-                    if (lek.length > 1) meds.push({ lek: lek, ilosc: ilosc });
-                }
+                const dictionary = {
+                    'wapnia': 'wapń', 'glukozy': 'glukoza', 'betamoxu': 'betamox', 'dexafortu': 'dexafort', 
+                    'witaminy': 'witamina', 'oksytocyny': 'oksytocyna', 'combikelu': 'combikel', 
+                    'rapidexonu': 'rapidexon', 'shotapenu': 'shotapen', 'synergalu': 'synergal',
+                    'penicyliny': 'penicylina', 'metacamu': 'metacam', 'tolfedyny': 'tolfedyna'
+                };
+
+                // Tniemy zdanie tam, gdzie występuje słowo "i", "oraz" lub przecinek
+                let chunks = subtext.split(/(?:\s+i\s+|\s+oraz\s+|\s+a\s+|,)/);
                 
-                const regexRev = /([a-ząćęłńóśźż]+(?:\s+[a-ząćęłńóśźż]+){0,2})\s+(\d+(?:[.,]\d+)?)\s*(ml|mililitr|mililitrów|szt|sztuk|sztuki|g|mg|op|opakowań)?/gi;
-                while ((match = regexRev.exec(subtext)) !== null) {
-                    let lekRaw = match[1]; 
-                    let ilosc = match[2];
-                    let lek = lekRaw.split(' ').filter(w => !ignoreWords.includes(w.toLowerCase())).join(' ');
-                    if (lek.length > 1 && !meds.find(m => m.lek === lek && m.ilosc === ilosc)) meds.push({ lek: lek, ilosc: ilosc });
-                }
+                chunks.forEach(chunk => {
+                    let iloscMatch = chunk.match(/(\d+(?:[.,]\d+)?)/);
+                    if (iloscMatch) {
+                        let val = iloscMatch[1];
+                        // Usuwamy liczbę i jednostki z nazwy, żeby została sama nazwa leku
+                        let txtNoNum = chunk.replace(/(\d+(?:[.,]\d+)?)\s*(?:ml|mililitr|mililitrów|szt|sztuk|sztuki|g|mg|op|opakowań)?/i, '');
+                        
+                        let lekWords = txtNoNum.split(' ').filter(w => w.trim().length > 1 && !ignoreWords.includes(w.trim().toLowerCase()));
+                        let rawLek = lekWords.join(' ').trim();
+                        
+                        // Zastosowanie słownika
+                        let finalLek = dictionary[rawLek] ? dictionary[rawLek] : lekWords.map(w => dictionary[w] || w).join(' ');
+                        
+                        if (finalLek.length > 1) {
+                            meds.push({ lek: finalLek, ilosc: val });
+                        }
+                    }
+                });
                 return meds;
             }
 
@@ -29609,32 +29626,37 @@ if (celInput) {
         }
 
         // ===============================================
-        // KULOODPORNE WSTRZYKIWANIE DANYCH DO KARTY
+        // BEZPIECZNE WSTRZYKIWANIE (NAWET PRZY BŁĘDZIE KLIENTA)
         // ===============================================
         aiConfirmBtn.addEventListener('click', () => {
             let copyToWydane = false;
             if (parsedAiAction.wydane.length > 0 && (parsedAiAction.tag || parsedAiAction.rozpoznanie)) {
-                copyToWydane = confirm("Wykryto produkty pozostawione. Czy przekopiować automatycznie numer kolczyka, liczbę sztuk i rozpoznanie również do sekcji 'Wydane / Pozostawione'?");
+                copyToWydane = confirm("Wykryto produkty pozostawione. Czy przekopiować automatycznie numer kolczyka, liczbę sztuk i rozpoznanie również do dolnej sekcji?");
             }
 
             closeAiModal();
             showSection('karta');
             
-            // 1. Zmiana Klienta (Jeśli podyktowano)
-            const klientSelect = document.getElementById('klientSelect');
-            if (klientSelect && parsedAiAction.klient) {
-                const options = Array.from(klientSelect.options);
-                const spokenWords = parsedAiAction.klient.toLowerCase().trim().split(/\s+/);
-                
-                const match = options.find(opt => {
-                    const optText = opt.text.toLowerCase();
-                    return spokenWords.length > 0 && spokenWords.every(word => word.length > 2 && optText.includes(word));
-                });
-                
-                if (match && klientSelect.value !== match.value) {
-                    klientSelect.value = match.value;
-                    klientSelect.dispatchEvent(new Event('change', { bubbles: true }));
+            // 1. Próba ustawienia klienta (Odizolowana od reszty!)
+            try {
+                const klientSelect = document.getElementById('klientSelect');
+                if (klientSelect && parsedAiAction.klient) {
+                    const options = Array.from(klientSelect.options);
+                    const spokenWords = parsedAiAction.klient.toLowerCase().trim().split(/\s+/);
+                    
+                    const match = options.find(opt => {
+                        const optText = opt.text.toLowerCase();
+                        return spokenWords.length > 0 && spokenWords.every(word => word.length > 2 && optText.includes(word));
+                    });
+                    
+                    if (match && klientSelect.value !== match.value) {
+                        klientSelect.value = match.value;
+                        // Jeśli tu aplikacja się wysypie, wstrzyknięcie leków poniżej i tak zadziała!
+                        klientSelect.dispatchEvent(new Event('change', { bubbles: true }));
+                    }
                 }
+            } catch (e) {
+                console.warn("Błąd przy automatycznym wyborze klienta, kontynuuję wpisywanie leków.");
             }
 
             // 2. Funkcja wpisująca dane do odpowiednich komórek tabeli
@@ -29685,10 +29707,11 @@ if (celInput) {
                 });
             }
 
-            // 3. Wyścig z Firebase: Strzelamy danymi 3 razy, żeby upewnić się, że nie znikną po odświeżeniu tabeli klienta
+            // 3. Wielokrotne Strzały – nawet jak system doczytuje klienta 2 sekundy, leki zostaną uaktualnione
             setTimeout(injectDataToCard, 400);
             setTimeout(injectDataToCard, 1000);
             setTimeout(injectDataToCard, 2000);
+            setTimeout(injectDataToCard, 3500);
 
             if (typeof showToast === 'function') showToast("Dane wygenerowane i zabezpieczone w formularzu!", "success");
         });
