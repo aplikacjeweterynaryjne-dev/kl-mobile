@@ -29369,16 +29369,21 @@ if (celInput) {
     });
 </script>
 <!-- ========================================== -->
-<!-- 🤖 ASYSTENT GŁOSOWY AI 3.0 - MODAL I LOGIKA-->
+<!-- 🤖 ASYSTENT GŁOSOWY AI 3.1 - MODAL I LOGIKA-->
 <!-- ========================================== -->
 <div id="aiAssistantModal" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.6); display: none; z-index: 20000; justify-content: center; align-items: center;">
     <div class="form-card" style="width: 95%; max-width: 480px; background: white; padding: 20px; border-radius: 12px; border-top: 5px solid #8e44ad;">
         
-        <h3 style="margin-top: 0; color: #8e44ad; text-align: center; margin-bottom: 15px;">
+        <h3 style="margin-top: 0; color: #8e44ad; text-align: center; margin-bottom: 10px;">
             🤖 Twój Asystent
         </h3>
         
-        <!-- POLE TEKSTOWE (Można edytować palcem!) -->
+        <!-- WSKAZÓWKA DLA UŻYTKOWNIKA -->
+        <p style="font-size: 12.5px; color: #7f8c8d; margin: 0 0 15px 0; line-height: 1.4; text-align: center; background: #f4f6f7; padding: 8px; border-radius: 6px;">
+            💡 <b>Schemat:</b> <i>"Klient [nazwa], krowa [PL...], zużyłem [ilość] [lek], zostawiłem [ilość] [lek]"</i>
+        </p>
+        
+        <!-- POLE TEKSTOWE -->
         <textarea id="aiRawTextInput" placeholder="Kliknij MÓW i podyktuj polecenie lub wpisz je ręcznie..." style="width: 100%; height: 80px; padding: 10px; border-radius: 8px; border: 1px solid #ccc; font-size: 15px; resize: none; margin-bottom: 10px; box-sizing: border-box; font-family: inherit;"></textarea>
         
         <!-- PRZYCISKI STERUJĄCE -->
@@ -29402,8 +29407,9 @@ if (celInput) {
         
         <div class="form-actions" style="justify-content: space-between;">
             <button class="btn ghost" onclick="closeAiModal()">Anuluj</button>
-            <button class="btn primary" id="aiConfirmActionBtn" style="background-color: #27ae60; border-color: #2ecc71; font-size: 16px; padding: 10px 20px;" disabled>
-                ⏳ Oczekuję na dane...
+            <!-- STAŁY GUZIK ZATWIERDZAJĄCY -->
+            <button class="btn primary" id="aiConfirmActionBtn" style="background-color: #27ae60; border-color: #2ecc71; font-size: 15px; padding: 10px 15px; opacity: 0.5;" disabled>
+                ✅ Wygeneruj Kartę A4
             </button>
         </div>
     </div>
@@ -29430,18 +29436,17 @@ if (celInput) {
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         aiRecognition = new SpeechRecognition();
         aiRecognition.lang = 'pl-PL';
-        aiRecognition.continuous = false;     // Jeden ciąg mowy = jeden wynik (stabilne!)
-        aiRecognition.interimResults = false; // Czeka aż skończysz mówić
+        aiRecognition.continuous = false;     
+        aiRecognition.interimResults = false; 
 
         if (menuAsystentBtn) {
             menuAsystentBtn.addEventListener('click', () => {
                 resetChecklist();
-                aiRawTextInput.value = ''; // Czyścimy pole
+                aiRawTextInput.value = ''; 
                 aiModal.style.display = 'flex';
             });
         }
 
-        // OBSŁUGA NAGRYWANIA
         aiRecordBtn.addEventListener('click', () => {
             if (isRecording) {
                 aiRecognition.stop();
@@ -29457,15 +29462,10 @@ if (celInput) {
             }
         });
 
-        // WYNIK Z MIKROFONU
         aiRecognition.onresult = (event) => {
             const text = event.results[0][0].transcript;
-            
-            // Dopisujemy tekst, jeśli coś już było (aby można było dyktować "na raty")
             const currentVal = aiRawTextInput.value.trim();
             aiRawTextInput.value = currentVal ? currentVal + " " + text : text;
-            
-            // Automatycznie odpalamy analizę po usłyszeniu
             aiAnalyzeBtn.click();
         };
 
@@ -29480,22 +29480,27 @@ if (celInput) {
             aiRecordBtn.style.backgroundColor = "#e74c3c";
         };
 
-        // RĘCZNA ANALIZA TEKSTU Z POLA
         aiAnalyzeBtn.addEventListener('click', () => {
-            const text = aiRawTextInput.value.toLowerCase();
+            let text = aiRawTextInput.value.toLowerCase();
             if(!text) return;
             
             parsedAiAction.klient = ''; parsedAiAction.tag = ''; parsedAiAction.zuzyte = []; parsedAiAction.wydane = [];
 
             // 1. Klient
             const klientMatch = text.match(/klient(?:a)?\s+([a-ząćęłńóśźż]+\s+[a-ząćęłńóśźż]+)/i);
-            parsedAiAction.klient = klientMatch ? klientMatch[1] : '';
+            if (klientMatch) {
+                parsedAiAction.klient = klientMatch[1];
+                text = text.replace(klientMatch[0], ''); // Wycinamy, by nie myliło parsera leków
+            }
 
-            // 2. Kolczyk
-            const tagMatch = text.match(/(?:krow[a-ę]|kolczyk(?:u)?|numer(?:ze)?)\s*(\d{2,6})/i);
-            parsedAiAction.tag = tagMatch ? tagMatch[1] : '';
+            // 2. Kolczyk (Wspiera prefiksy jak PL)
+            const tagMatch = text.match(/(?:krow[a-ęy]|kolczyk(?:u)?|numer(?:ze)?|sztuk[a-ei])?\s*([a-z]{0,2}\s*\d{2,14})/i);
+            if (tagMatch) {
+                parsedAiAction.tag = tagMatch[1].toUpperCase().replace(/\s+/g, '');
+                text = text.replace(tagMatch[0], ''); // Wycinamy kolczyk z tekstu!
+            }
 
-            // 3. Rozdzielenie Zużyte / Zostawione
+            // 3. Rozdzielenie Zużyte / Zostawione na wyczyszczonym tekście
             let txtZuzyte = text;
             let txtWydane = '';
             const splitMatch = text.match(/(?:zostawi[a-z]*|wyda[a-z]*|pozostawi[a-z]*)/i);
@@ -29508,7 +29513,7 @@ if (celInput) {
             // Funkcja wyciągająca produkty
             function extractProducts(subtext) {
                 const meds = [];
-                const ignoreWords = ['zużył', 'zużyłem', 'zużyto', 'podał', 'podałem', 'dostał', 'dostała', 'zostawił', 'zostawiłem', 'wydał', 'wydałem', 'wydano', 'krowa', 'krowę', 'kolczyk', 'numer', 'klient', 'leki', 'lek', 'produkt', 'produkty', 'zużyte', 'pozostawione', 'następnie', 'karta', 'leczenia'];
+                const ignoreWords = ['zużył', 'zużyłem', 'zużyto', 'podał', 'podałem', 'dostał', 'dostała', 'zostawił', 'zostawiłem', 'wydał', 'wydałem', 'wydano', 'krowa', 'krowę', 'kolczyk', 'numer', 'klient', 'leki', 'lek', 'produkt', 'produkty', 'zużyte', 'pozostawione', 'następnie', 'karta', 'leczenia', 'pl'];
                 
                 const regex = /(\d+(?:[.,]\d+)?)\s*(ml|mililitr|mililitrów|szt|sztuk|sztuki|g|mg)?\s+([a-ząćęłńóśźż]+)/gi;
                 let match;
@@ -29558,13 +29563,13 @@ if (celInput) {
                 elWydane.innerHTML = `⚪ <span style="color:#777;">Pozostawione: (Brak)</span>`;
             }
 
-            // ODBLOKOWANIE GUZIKA ZATWIERDŹ
+            // Włącza/wyłącza stały guzik
             if (parsedAiAction.tag && parsedAiAction.zuzyte.length > 0) {
                 aiConfirmBtn.disabled = false;
-                aiConfirmBtn.innerHTML = "✅ Wygeneruj Kartę A4";
+                aiConfirmBtn.style.opacity = '1';
             } else {
                 aiConfirmBtn.disabled = true;
-                aiConfirmBtn.innerHTML = "⏳ Podyktuj kolczyk i leki...";
+                aiConfirmBtn.style.opacity = '0.5';
             }
         }
 
@@ -29628,7 +29633,7 @@ if (celInput) {
                 }
             });
 
-            if (typeof showToast === 'function') showToast("Gotowe! Możesz teraz wydrukować kartę.", "success");
+            if (typeof showToast === 'function') showToast("Karta wczytana pomyślnie!", "success");
         });
     } else {
         if (menuAsystentBtn) menuAsystentBtn.style.display = 'none';
