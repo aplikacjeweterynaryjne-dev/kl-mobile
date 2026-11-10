@@ -29369,7 +29369,7 @@ if (celInput) {
     });
 </script>
 <!-- ========================================== -->
-<!-- 🤖 ASYSTENT GŁOSOWY AI 10.7 (ZNACZNIKI zost. / lecz.)-->
+<!-- 🤖 ASYSTENT GŁOSOWY AI 10.8 (PERFEKCYJNE WIERSZE)-->
 <!-- ========================================== -->
 <div id="aiAssistantModal" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.6); display: none; z-index: 20000; justify-content: center; align-items: center;">
     <div class="form-card" style="width: 95%; max-width: 480px; background: white; padding: 20px; border-radius: 12px; border-top: 5px solid #8e44ad; max-height: 95vh; overflow-y: auto;">
@@ -29405,7 +29405,6 @@ if (celInput) {
             <div id="aiSchemeTilesContainer" style="display: none; margin-top: 15px; padding: 15px; background: #fff3e0; border: 1px solid #ffe0b2; border-radius: 8px;">
                 <h4 style="margin: 0 0 10px 0; color: #d35400; font-size: 15px;">Wykryto schematy. Wybierz jeden:</h4>
                 <div id="aiSchemeTilesList" style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: center;">
-                    <!-- Kafelki wstawiane przez JS -->
                 </div>
                 <button id="aiSchemeSkipBtn" class="btn ghost small" style="margin-top: 15px; width: 100%;">❌ Pomiń schemat</button>
             </div>
@@ -29492,7 +29491,6 @@ if (celInput) {
     let isRecording = false;
     let convoState = -1; 
     let convoWatchdog = null; 
-    let baseLogicalRowsCount = 14;
     
     let isSchemeUsed = false;
     
@@ -29759,7 +29757,7 @@ if (celInput) {
         }
 
         // ===============================================
-        // MĄDRY SCRAPER SCHEMATÓW (ODCZYTUJE 'zost.1', 'lecz.1')
+        // MĄDRY SCRAPER SCHEMATÓW 
         // ===============================================
         function attemptToFindSchemes(spokenRozp) {
             let sLow = spokenRozp.toLowerCase().replace(/typu/g, '').replace(/wersja/g, '').replace(/schemat/g, '').replace(/[()]/g, ' ').replace(/\s+/g, ' ').trim();
@@ -29795,35 +29793,30 @@ if (celInput) {
                         
                         rows.forEach(tr => {
                             if(tr.cells.length >= 3) {
-                                // Kolumna 0 = Identyfikator ('zost.1', 'lecz.1', '10', '1')
                                 const rowNr = tr.cells[0]?.textContent.trim().toLowerCase() || '';
-                                // Kolumna 1 = Czysta nazwa leku z bazy
+                                const rowFullText = tr.textContent.toLowerCase();
+                                const rowNrInt = parseInt(rowNr, 10);
+                                
                                 const lek = tr.cells[1]?.textContent.trim();
                                 
-                                // ODCINAMY TYLKO PIERWSZĄ ZNALEZIONĄ LICZBĘ z kolumny ilości!
                                 const rawIlosc = tr.cells[2]?.textContent || '';
                                 const mIlosc = rawIlosc.match(/\d+(?:[.,]\d+)?/);
                                 const ilosc = mIlosc ? mIlosc[0] : '1';
                                 
                                 if (lek && lek !== 'Brak' && lek !== '') {
-                                    
-                                    // SPRAWDZAMY CZY PRODUKT JEST POZOSTAWIONY (WYDANY)
                                     let isWydane = false;
-                                    
-                                    // Złota reguła dla nazw 'zost.1', 'zost.2' z bazy:
-                                    if (rowNr.includes('zost') || rowNr.includes('wyd') || rowNr.includes('poz')) {
-                                        isWydane = true;
-                                    } 
-                                    // Jeśli to stare, numeryczne wiersze (10 i więcej = wydane)
-                                    else if (!isNaN(parseInt(rowNr, 10)) && parseInt(rowNr, 10) >= 10) {
+                                    if ((!isNaN(rowNrInt) && rowNrInt >= 10) || 
+                                         rowFullText.includes('wydan') || 
+                                         rowFullText.includes('pozostawi') || 
+                                         rowNr.includes('wyd') || 
+                                         rowNr.includes('poz') ||
+                                         rowNr.includes('zost')) {
                                         isWydane = true;
                                     }
                                     
-                                    // Budujemy bezpieczny format nawiasowy: Nazwa Leka (Ilość)
                                     if (isWydane) {
                                         wydane.push(`${lek} (${ilosc})`);
                                     } else {
-                                        // W każdym innym przypadku (np. 'lecz.1' lub '1') produkt idzie do Zużytych
                                         zuzyte.push(`${lek} (${ilosc})`);
                                     }
                                 }
@@ -30036,7 +30029,7 @@ if (celInput) {
         }
 
         // ===============================================
-        // WSTRZYKIWANIE STADA DO KARTY 
+        // INTELIGENTNE I BEZPIECZNE WSTRZYKIWANIE STADA DO KARTY 
         // ===============================================
         aiConfirmBtn.addEventListener('click', () => {
             if(edTag.value || edZuzyte.value) saveCurrentAnimalToMemory();
@@ -30053,9 +30046,6 @@ if (celInput) {
 
             closeAiModal();
             showSection('karta');
-            
-            baseLogicalRowsCount = typeof rowsEditable === 'function' ? rowsEditable().length : 14;
-            if(baseLogicalRowsCount === 0) baseLogicalRowsCount = 14;
 
             const masterKlient = edKlient.value;
             try {
@@ -30077,6 +30067,7 @@ if (celInput) {
                 let logicalRows = typeof rowsEditable === 'function' ? rowsEditable() : [];
                 if(logicalRows.length === 0) return;
                 
+                // Czyszczenie tabeli przed wpisywaniem
                 for(let i=0; i<logicalRows.length; i++) {
                     if(logicalRows[i] && logicalRows[i].cells.length > 6) {
                         ['1','2','3','4','6'].forEach(c => {
@@ -30088,8 +30079,6 @@ if (celInput) {
                         });
                     }
                 }
-                
-                logicalRows = typeof rowsEditable === 'function' ? rowsEditable() : [];
 
                 function setVal(cell, val) {
                     if(!cell || !val) return;
@@ -30097,48 +30086,60 @@ if (celInput) {
                     if(inp && inp.value !== val) { inp.value = val; inp.dispatchEvent(new Event('input', {bubbles: true})); }
                 }
 
-                let rowZuz = 0;   
-                let rowWydStart = 10 + (logicalRows.length - baseLogicalRowsCount);
-                if (rowWydStart < 10) rowWydStart = 10;
-                let rowWyd = rowWydStart;
+                // Funkcja lokalizująca pierwszy w 100% pusty wiersz dla danej grupy
+                function getNextEmptyRowIndex(groupName) {
+                    const rows = typeof rowsEditable === 'function' ? rowsEditable() : [];
+                    for (let i = 0; i < rows.length; i++) {
+                        if (rows[i].dataset.group === groupName) {
+                            let cell1 = rows[i].cells[1].querySelector('input');
+                            let cell4 = rows[i].cells[4].querySelector('input');
+                            let opis = cell1 ? cell1.value : rows[i].cells[1].textContent;
+                            let lek = cell4 ? cell4.value : rows[i].cells[4].textContent;
+                            if (!opis.trim() && !lek.trim()) {
+                                return i;
+                            }
+                        }
+                    }
+                    return -1; 
+                }
 
                 allSavedAnimals.forEach(animal => {
                     const zuzyteArr = parseEditableStringToArray(animal.zuzyte);
                     const wydaneArr = parseEditableStringToArray(animal.wydane);
 
                     if (zuzyteArr.length === 0 && animal.tag) {
-                        if (rowZuz < rowWydStart && logicalRows[rowZuz]) {
-                            const r = logicalRows[rowZuz];
-                            setVal(r.cells[1], animal.tag);
-                            setVal(r.cells[2], animal.liczba);
-                            setVal(r.cells[3], animal.rozpoznanie);
-                            rowZuz++;
+                        let targetIdx = getNextEmptyRowIndex('used');
+                        let rows = typeof rowsEditable === 'function' ? rowsEditable() : [];
+                        if (targetIdx !== -1 && rows[targetIdx]) {
+                            setVal(rows[targetIdx].cells[1], animal.tag);
+                            setVal(rows[targetIdx].cells[2], animal.liczba);
+                            setVal(rows[targetIdx].cells[3], animal.rozpoznanie);
                         }
                     } else {
                         zuzyteArr.forEach(med => {
-                            if (rowZuz < rowWydStart && logicalRows[rowZuz]) {
-                                const r = logicalRows[rowZuz];
-                                setVal(r.cells[1], animal.tag);
-                                setVal(r.cells[2], animal.liczba);
-                                setVal(r.cells[3], animal.rozpoznanie);
-                                setVal(r.cells[4], med.lek);
-                                setVal(r.cells[6], med.ilosc.replace(',','.'));
-                                rowZuz++;
+                            let targetIdx = getNextEmptyRowIndex('used');
+                            let rows = typeof rowsEditable === 'function' ? rowsEditable() : [];
+                            if (targetIdx !== -1 && rows[targetIdx]) {
+                                setVal(rows[targetIdx].cells[1], animal.tag);
+                                setVal(rows[targetIdx].cells[2], animal.liczba);
+                                setVal(rows[targetIdx].cells[3], animal.rozpoznanie);
+                                setVal(rows[targetIdx].cells[4], med.lek);
+                                setVal(rows[targetIdx].cells[6], med.ilosc.replace(',','.'));
                             }
                         });
                     }
 
                     wydaneArr.forEach(med => {
-                        if (rowWyd < logicalRows.length && logicalRows[rowWyd]) {
-                            const r = logicalRows[rowWyd];
+                        let targetIdx = getNextEmptyRowIndex('left');
+                        let rows = typeof rowsEditable === 'function' ? rowsEditable() : [];
+                        if (targetIdx !== -1 && rows[targetIdx]) {
                             if (copyToWydane) {
-                                setVal(r.cells[1], animal.tag);
-                                setVal(r.cells[2], animal.liczba);
-                                setVal(r.cells[3], animal.rozpoznanie);
+                                setVal(rows[targetIdx].cells[1], animal.tag);
+                                setVal(rows[targetIdx].cells[2], animal.liczba);
+                                setVal(rows[targetIdx].cells[3], animal.rozpoznanie);
                             }
-                            setVal(r.cells[4], med.lek);
-                            setVal(r.cells[6], med.ilosc.replace(',','.'));
-                            rowWyd++;
+                            setVal(rows[targetIdx].cells[4], med.lek);
+                            setVal(rows[targetIdx].cells[6], med.ilosc.replace(',','.'));
                         }
                     });
                 });
