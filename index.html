@@ -29369,7 +29369,7 @@ if (celInput) {
     });
 </script>
 <!-- ========================================== -->
-<!-- 🤖 ASYSTENT GŁOSOWY AI 10.4 (NAWIASY I PRECYZJA)-->
+<!-- 🤖 ASYSTENT GŁOSOWY AI 10.5 (CZYSTE ILOŚCI)-->
 <!-- ========================================== -->
 <div id="aiAssistantModal" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.6); display: none; z-index: 20000; justify-content: center; align-items: center;">
     <div class="form-card" style="width: 95%; max-width: 480px; background: white; padding: 20px; border-radius: 12px; border-top: 5px solid #8e44ad; max-height: 95vh; overflow-y: auto;">
@@ -29437,7 +29437,7 @@ if (celInput) {
                 <input type="text" id="aiEditRozp" placeholder="Opcjonalnie" style="border: none; border-bottom: 1px solid #ddd; background: transparent; padding: 4px; font-weight: bold; color: #27ae60; outline: none; width: 100%;">
             </div>
             <div style="margin-bottom: 8px; display: flex; flex-direction: column;">
-                <label style="color: #777; font-size: 11px; margin-bottom: 2px;">Zużyte leki (np. Wapń (20) ):</label>
+                <label style="color: #777; font-size: 11px; margin-bottom: 2px;">Zużyte leki (np. Wapń (20)):</label>
                 <input type="text" id="aiEditZuzyte" placeholder="Brak leków" style="border: none; border-bottom: 1px solid #ddd; background: transparent; padding: 4px; font-weight: bold; color: #27ae60; outline: none; width: 100%;">
             </div>
             <div style="display: flex; flex-direction: column;">
@@ -29643,9 +29643,6 @@ if (celInput) {
             });
         }
 
-        // ===============================================
-        // MÓZG KONWERSACJI (LOGIKA KAFELKÓW)
-        // ===============================================
         function processConvoAnswer(text) {
             const skipWords = ['pomiń', 'pomin', 'dalej', 'nie', 'brak', 'żaden'];
             const isSkip = skipWords.includes(text);
@@ -29678,7 +29675,6 @@ if (celInput) {
                             btn.style.cssText = 'background-color: #f39c12; border-color: #e67e22; padding: 12px; font-size: 15px; font-weight: bold; border-radius: 8px; flex: 1; min-width: 40%; white-space: normal;';
                             btn.textContent = scheme.nazwa;
                             
-                            // AKCJA KLIKNIĘCIA KAFELKA
                             btn.onclick = () => {
                                 isSchemeUsed = true;
                                 edRozp.value = scheme.nazwa;
@@ -29693,7 +29689,6 @@ if (celInput) {
                                 aiSchemeTilesContainer.style.display = 'none';
                                 convoState = 3;
                                 
-                                // Twardy restart audio, by uniknąć przerwania
                                 if (aiRecognition) aiRecognition.stop();
                                 window.speechSynthesis.cancel();
                                 isRecording = false;
@@ -29757,7 +29752,7 @@ if (celInput) {
         }
 
         // ===============================================
-        // MĄDRY SCRAPER SCHEMATÓW (CZYSTA NAZWA I ILOŚĆ + WYDANE)
+        // MĄDRY SCRAPER SCHEMATÓW (TYLKO PIERWSZA LICZBA)
         // ===============================================
         function attemptToFindSchemes(spokenRozp) {
             let sLow = spokenRozp.toLowerCase().replace(/typu/g, '').replace(/wersja/g, '').replace(/schemat/g, '').replace(/[()]/g, ' ').replace(/\s+/g, ' ').trim();
@@ -29793,16 +29788,17 @@ if (celInput) {
                         
                         rows.forEach(tr => {
                             if(tr.cells.length >= 3) {
-                                // Scraper wg bazy (kolumna 0 to nr wiersza, kolumna 1 to lek, kolumna 2 to ilość)
                                 const rowNr = tr.cells[0]?.textContent.trim().toLowerCase() || '';
                                 const lek = tr.cells[1]?.textContent.trim();
-                                const ilosc = tr.cells[2]?.textContent.replace(/[^\d.,]/g, '').trim() || '1';
+                                
+                                // CZYSTA MAGIA: Bierzemy tylko pierwszą znalezioną liczbę! (np z "5 ml / 100kg" wyciągnie tylko "5")
+                                const rawIlosc = tr.cells[2]?.textContent || '';
+                                const mIlosc = rawIlosc.match(/\d+(?:[.,]\d+)?/);
+                                const ilosc = mIlosc ? mIlosc[0] : '1';
                                 
                                 if (lek && lek !== 'Brak' && lek !== '') {
-                                    // Czy dany lek był ustawiony jako wydany na miejscu / pozostawiony
                                     let isWydane = rowNr.includes('10') || rowNr.includes('11') || rowNr.includes('12') || rowNr.includes('13') || rowNr.includes('14') || rowNr.includes('wyd') || rowNr.includes('poz');
                                     
-                                    // Budujemy bezpieczny format nawiasowy: Nazwa Leka (Ilość)
                                     if (isWydane) {
                                         wydane.push(`${lek} (${ilosc})`);
                                     } else {
@@ -29949,9 +29945,6 @@ if (celInput) {
             return bestMatch;
         }
 
-        // ===============================================
-        // MĄDRE EKSTRAHOWANIE LEKÓW Z GŁOSU (Zwraca format Nawiasowy)
-        // ===============================================
         function extractMedsToString(subtext) {
             const meds = [];
             const ignoreWords = ['zużył', 'dostał', 'zostawił', 'wydał', 'krowa', 'krowę', 'kolczyk', 'klient', 'leki', 'lek', 'rozpoznanie', 'ml', 'mililitr', 'szt', 'sztuk', 'g', 'mg'];
@@ -29971,32 +29964,25 @@ if (celInput) {
                     let lekWords = txtNoNum.split(' ').filter(w => w.trim().length > 1 && !ignoreWords.includes(w.trim().toLowerCase()));
                     let rawLek = lekWords.join(' ').trim();
                     let grammarFixed = dictionary[rawLek] ? dictionary[rawLek] : lekWords.map(w => dictionary[w] || w).join(' ');
-                    
                     if (grammarFixed.length > 1) {
                         let finalLek = matchWithWarehouse(grammarFixed);
-                        meds.push(`${finalLek} (${val})`); // Bezpieczny nawias
+                        meds.push(`${finalLek} (${val})`);
                     }
                 }
             });
             return meds.join(', ');
         }
 
-        // ===============================================
-        // PRECYZYJNY PARSER NAWIASOWY (Rozdziela nazwę i dawkę)
-        // ===============================================
         function parseEditableStringToArray(str) {
             if(!str) return [];
             let items = str.split(',');
             let res = [];
             items.forEach(item => {
                 item = item.trim();
-                
-                // Szukamy liczby w nawiasie na samym końcu: "Nazwa leku (10)"
                 let m = item.match(/(.+?)\s*\(([^)]+)\)$/);
                 if (m) {
                     res.push({ lek: m[1].trim(), ilosc: m[2].replace(/[^\d.,]/g, '').trim() });
                 } else {
-                    // Fallback dla tekstu wpisanego ręcznie bez nawiasu
                     let m2 = item.match(/(.+)\s+(\d+(?:[.,]\d+)?)$/);
                     if (m2) {
                         res.push({ lek: m2[1].trim(), ilosc: m2[2].trim() });
