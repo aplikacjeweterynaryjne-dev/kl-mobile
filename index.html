@@ -29369,7 +29369,7 @@ if (celInput) {
     });
 </script>
 <!-- ========================================== -->
-<!-- 🤖 ASYSTENT GŁOSOWY AI 7.0 (STADO + EDYCJA)-->
+<!-- 🤖 ASYSTENT GŁOSOWY AI 9.0 (KOLEJKA I EDYCJA)-->
 <!-- ========================================== -->
 <div id="aiAssistantModal" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.6); display: none; z-index: 20000; justify-content: center; align-items: center;">
     <div class="form-card" style="width: 95%; max-width: 480px; background: white; padding: 20px; border-radius: 12px; border-top: 5px solid #8e44ad; max-height: 95vh; overflow-y: auto;">
@@ -29378,7 +29378,6 @@ if (celInput) {
             🤖 Twój Asystent
         </h3>
         
-        <!-- ZAKŁADKI STERUJĄCE (ROZMOWA JEST TERAZ PIERWSZA) -->
         <div style="display: flex; gap: 5px; margin-bottom: 15px; border-bottom: 2px solid #eee; padding-bottom: 10px;">
             <button id="tabBtnRozmowa" class="btn" style="flex: 1; background-color: #8e44ad; color: white; border: none; padding: 8px; font-weight: bold; border-radius: 6px;">
                 🗣️ Rozmowa (Głos)
@@ -29388,19 +29387,15 @@ if (celInput) {
             </button>
         </div>
 
-        <!-- ========================================== -->
-        <!-- WIDOK 1: TRYB ROZMOWY (DOMYŚLNY)           -->
-        <!-- ========================================== -->
-        <div id="viewRozmowa" style="display: block; text-align: center; padding-bottom: 15px;">
+        <!-- TRYB ROZMOWY -->
+        <div id="viewRozmowa" style="display: block; text-align: center; padding-bottom: 10px;">
             <div id="convoAvatar" style="font-size: 50px; margin-bottom: 10px; transition: transform 0.3s;">🤖</div>
             <p id="convoStatusText" style="font-size: 15px; font-weight: bold; color: #8e44ad; min-height: 40px; margin: 0 0 15px 0;">
                 Kliknij START, aby rozpocząć odpytywanie.
             </p>
-            
             <p id="convoListeningPreview" style="font-size: 13px; color: #555; font-style: italic; background: #f4f6f7; padding: 8px; border-radius: 6px; display: none;">
                 " <span id="convoHeardText"></span> "
             </p>
-
             <button id="convoStartBtn" class="btn" style="background-color: #27ae60; color: white; border: none; padding: 10px 20px; font-weight: bold; font-size: 16px; border-radius: 8px;">
                 ▶️ Start Rozmowy
             </button>
@@ -29409,9 +29404,7 @@ if (celInput) {
             </button>
         </div>
 
-        <!-- ========================================== -->
-        <!-- WIDOK 2: TRYB SWOBODNY                     -->
-        <!-- ========================================== -->
+        <!-- TRYB SWOBODNY -->
         <div id="viewSwobodny" style="display: none;">
             <p style="font-size: 11px; color: #7f8c8d; margin: 0 0 10px 0; line-height: 1.4; text-align: center; background: #f4f6f7; padding: 8px; border-radius: 6px;">
                 💡 <b>Schemat:</b> <i>"Klient [nazwa], krowa [PL...], rozpoznanie [tekst], zużyłem [ilość] [lek], zostawiłem [ilość] [lek]"</i>
@@ -29427,18 +29420,23 @@ if (celInput) {
             </div>
         </div>
 
-        <!-- ========================================== -->
-        <!-- WSPÓLNA, EDYTOWALNA CHECKLISTA DANYCH      -->
-        <!-- ========================================== -->
+        <!-- LISTA ZAPISANYCH SZTUK (KOLEJKA) -->
+        <div id="aiSavedAnimalsContainer" style="display: none; margin-bottom: 15px;">
+            <h4 style="margin: 0 0 5px 0; color: #333; font-size: 13px;">Zapisane w kolejce (gotowe do wygenerowania):</h4>
+            <div id="aiSavedAnimalsList" style="max-height: 120px; overflow-y: auto; display: flex; flex-direction: column; gap: 5px; background: #fdfdfd; border: 1px solid #eee; padding: 5px; border-radius: 8px;">
+                <!-- Lista wypełniana przez JS -->
+            </div>
+        </div>
+
+        <!-- EDYTOWALNA CHECKLISTA DLA BIEŻĄCEJ SZTUKI -->
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
-            <h4 style="margin: 0; color: #333; font-size: 14px;">Bieżąca sztuka (możesz edytować):</h4>
+            <h4 style="margin: 0; color: #333; font-size: 14px;">Bieżąca sztuka (w trakcie edycji):</h4>
             <span id="aiSavedCounter" style="background: #27ae60; color: white; padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: bold; display: none;">Zapisano: 0</span>
         </div>
         
-        <!-- Zamiana z <li> na edytowalne pola -->
         <div id="aiEditableForm" style="background: #fdfdfd; border: 1px solid #eee; padding: 10px; border-radius: 8px; margin-bottom: 15px; font-size: 13px;">
             <div style="margin-bottom: 8px; display: flex; flex-direction: column;">
-                <label style="color: #777; font-size: 11px; margin-bottom: 2px;">Klient:</label>
+                <label style="color: #777; font-size: 11px; margin-bottom: 2px;">Klient (wspólny dla wizyty):</label>
                 <input type="text" id="aiEditKlient" placeholder="Brak" style="border: none; border-bottom: 1px solid #ddd; background: transparent; padding: 4px; font-weight: bold; color: #27ae60; outline: none; width: 100%;">
             </div>
             <div style="display: flex; gap: 10px; margin-bottom: 8px;">
@@ -29456,7 +29454,7 @@ if (celInput) {
                 <input type="text" id="aiEditRozp" placeholder="Opcjonalnie" style="border: none; border-bottom: 1px solid #ddd; background: transparent; padding: 4px; font-weight: bold; color: #27ae60; outline: none; width: 100%;">
             </div>
             <div style="margin-bottom: 8px; display: flex; flex-direction: column;">
-                <label style="color: #777; font-size: 11px; margin-bottom: 2px;">Zużyte leki (np. Wapń 20, Glukoza 10):</label>
+                <label style="color: #777; font-size: 11px; margin-bottom: 2px;">Zużyte leki (np. Wapń 20):</label>
                 <input type="text" id="aiEditZuzyte" placeholder="Brak leków" style="border: none; border-bottom: 1px solid #ddd; background: transparent; padding: 4px; font-weight: bold; color: #27ae60; outline: none; width: 100%;">
             </div>
             <div style="display: flex; flex-direction: column;">
@@ -29466,7 +29464,7 @@ if (celInput) {
         </div>
         
         <button id="aiAddNextCowBtn" class="btn ghost" style="width: 100%; margin-bottom: 10px; border: 2px dashed #8e44ad; color: #8e44ad; font-weight: bold; display: none;">
-            ➕ Zapisz sztukę i dodaj kolejną
+            ➕ Zapisz tę sztukę do kolejki
         </button>
 
         <div class="form-actions" style="justify-content: space-between;">
@@ -29484,18 +29482,15 @@ if (celInput) {
     const aiConfirmBtn = document.getElementById('aiConfirmActionBtn');
     const aiAddNextCowBtn = document.getElementById('aiAddNextCowBtn');
     
-    // ZAKŁADKI
     const tabSwobodny = document.getElementById('tabBtnSwobodny');
     const tabRozmowa = document.getElementById('tabBtnRozmowa');
     const viewSwobodny = document.getElementById('viewSwobodny');
     const viewRozmowa = document.getElementById('viewRozmowa');
 
-    // UI SWOBODNY
     const aiRawTextInput = document.getElementById('aiRawTextInput');
     const aiRecordBtn = document.getElementById('aiRecordBtn');
     const aiAnalyzeBtn = document.getElementById('aiAnalyzeBtn');
 
-    // UI ROZMOWA
     const convoStartBtn = document.getElementById('convoStartBtn');
     const convoSkipBtn = document.getElementById('convoSkipBtn');
     const convoStatusText = document.getElementById('convoStatusText');
@@ -29503,7 +29498,6 @@ if (celInput) {
     const convoListeningPreview = document.getElementById('convoListeningPreview');
     const convoHeardText = document.getElementById('convoHeardText');
 
-    // POLA EDYTOWALNE
     const edKlient = document.getElementById('aiEditKlient');
     const edTag = document.getElementById('aiEditTag');
     const edSztuki = document.getElementById('aiEditSztuki');
@@ -29512,12 +29506,12 @@ if (celInput) {
     const edWydane = document.getElementById('aiEditWydane');
     const badgeCounter = document.getElementById('aiSavedCounter');
 
-    let allSavedAnimals = []; // Baza na wiele krów
+    let allSavedAnimals = []; 
     let aiRecognition = null;
     let isRecording = false;
-    let activeMode = 'rozmowa'; // DOMYŚLNIE ROZMOWA
-    
+    let activeMode = 'rozmowa'; 
     let convoState = -1; 
+    
     const convoPrompts = [
         "Podaj imię i nazwisko klienta. Możesz też powiedzieć pomiń.",
         "Podaj numer kolczyka krowy.",
@@ -29527,17 +29521,14 @@ if (celInput) {
         "Czy chcesz dodać kolejną sztukę do tej wizyty? Powiedz tak lub nie."
     ];
 
-    // SZUKANIE NAJLEPSZEGO GŁOSU (Mniej robotycznego)
     let bestPolishVoice = null;
     function loadVoices() {
         let voices = window.speechSynthesis.getVoices();
         let plVoices = voices.filter(v => v.lang.includes('pl') || v.lang.includes('PL'));
-        // Priorytetyzujemy głosy sieciowe Google, które są bardzo naturalne
         bestPolishVoice = plVoices.find(v => v.name.toLowerCase().includes('network') || v.name.toLowerCase().includes('google')) || plVoices[0];
     }
     window.speechSynthesis.onvoiceschanged = loadVoices;
 
-    // --- ZAKŁADKI ---
     tabSwobodny.addEventListener('click', () => {
         activeMode = 'swobodny';
         viewSwobodny.style.display = 'block'; viewRozmowa.style.display = 'none';
@@ -29567,15 +29558,14 @@ if (celInput) {
         stopAllAudio();
     }
 
-    // Otwieranie asystenta
     if (menuAsystentBtn) {
         menuAsystentBtn.addEventListener('click', () => {
             clearFormUI(true);
             allSavedAnimals = [];
-            badgeCounter.style.display = 'none';
+            renderSavedAnimals();
             aiAddNextCowBtn.style.display = 'none';
             aiModal.style.display = 'flex';
-            loadVoices(); // Wymuszenie ładowania głosu
+            loadVoices(); 
             stopAllAudio();
         });
     }
@@ -29598,13 +29588,11 @@ if (celInput) {
 
         aiRecognition.onresult = (event) => {
             const text = event.results[0][0].transcript.trim().toLowerCase();
-            
             if (activeMode === 'swobodny') {
                 const currentVal = aiRawTextInput.value.trim();
                 aiRawTextInput.value = currentVal ? currentVal + " " + text : text;
                 aiAnalyzeBtn.click();
-            } 
-            else if (activeMode === 'rozmowa') {
+            } else if (activeMode === 'rozmowa') {
                 convoListeningPreview.style.display = 'block';
                 convoHeardText.textContent = text;
                 processConvoAnswer(text);
@@ -29627,13 +29615,12 @@ if (celInput) {
             }
         };
 
-        // --- SILNIK MOWY (GŁOS ASYSTENTA) ---
         function speak(text, callback) {
             window.speechSynthesis.cancel();
             const utterance = new SpeechSynthesisUtterance(text);
             utterance.lang = 'pl-PL';
             if (bestPolishVoice) utterance.voice = bestPolishVoice;
-            utterance.rate = 1.05; // Ciut żwawsze tempo
+            utterance.rate = 1.05; 
             
             convoAvatar.style.transform = 'scale(1.2)';
             convoStatusText.textContent = `🔊 ${text}`;
@@ -29645,7 +29632,6 @@ if (celInput) {
             window.speechSynthesis.speak(utterance);
         }
 
-        // --- LOGIKA TRYBU ROZMOWY ---
         convoStartBtn.addEventListener('click', () => {
             convoState = 0;
             convoStartBtn.style.display = 'none';
@@ -29659,7 +29645,6 @@ if (celInput) {
         });
 
         function runConvoStep() {
-            // Gdy pytamy o "Czy kolejna sztuka?"
             if (convoState === 5) {
                 speak(convoPrompts[convoState], () => {
                     convoStatusText.textContent = "🎙️ Słucham (Tak/Nie)...";
@@ -29667,7 +29652,6 @@ if (celInput) {
                 });
                 return;
             }
-
             if (convoState >= convoPrompts.length) return;
 
             speak(convoPrompts[convoState], () => {
@@ -29681,27 +29665,27 @@ if (celInput) {
             const skipWords = ['pomiń', 'pomin', 'dalej', 'nie', 'brak'];
             const isSkip = skipWords.includes(text);
 
-            if (convoState === 0 && !isSkip) { // KLIENT
+            if (convoState === 0 && !isSkip) { 
                 const kMatch = text.match(/([a-ząćęłńóśźż]+\s+[a-ząćęłńóśźż]+)/i);
                 edKlient.value = kMatch ? capitalizeWords(kMatch[1]) : capitalizeWords(text);
             } 
-            else if (convoState === 1 && !isSkip) { // KOLCZYK
+            else if (convoState === 1 && !isSkip) { 
                 const tagMatch = text.match(/([a-z]{0,2}(?:\s*\d){2,14})/i);
                 if (tagMatch) edTag.value = tagMatch[1].toUpperCase().replace(/\s+/g, '');
             }
-            else if (convoState === 2 && !isSkip) { // ROZPOZNANIE
+            else if (convoState === 2 && !isSkip) { 
                 edRozp.value = text.charAt(0).toUpperCase() + text.slice(1);
             }
-            else if (convoState === 3 && !isSkip) { // ZUŻYTE
+            else if (convoState === 3 && !isSkip) { 
                 edZuzyte.value = extractMedsToString(text);
             }
-            else if (convoState === 4 && !isSkip) { // WYDANE
+            else if (convoState === 4 && !isSkip) { 
                 edWydane.value = extractMedsToString(text);
             }
-            else if (convoState === 5) { // CZY DODAJEMY KOLEJNĄ?
+            else if (convoState === 5) { 
                 if (text.includes('tak')) {
                     saveCurrentAnimalToMemory();
-                    convoState = 1; // Wracamy do pytania nr 1 (Kolczyk), pomijamy klienta!
+                    convoState = 1; 
                     setTimeout(runConvoStep, 500);
                     return;
                 } else {
@@ -29711,18 +29695,84 @@ if (celInput) {
                     convoStartBtn.style.display = 'inline-block';
                     convoStartBtn.innerHTML = "🔄 Zacznij od nowa";
                     isRecording = false;
-                    speak("Gotowe. Wygeneruj kartę leczenia.");
+                    speak("Gotowe. Możesz wygenerować kartę.");
                     return;
                 }
             }
 
             convoState++;
+            checkShowAddButton();
             setTimeout(runConvoStep, 800);
         }
 
-        // --- ZAPISYWANIE WIELU ZWIERZĄT W PAMIĘCI ---
+        // ===============================================
+        // WIDOK KOLEJKI (ZAPISANYCH SZTUK)
+        // ===============================================
+        function renderSavedAnimals() {
+            const container = document.getElementById('aiSavedAnimalsContainer');
+            const list = document.getElementById('aiSavedAnimalsList');
+            list.innerHTML = '';
+            
+            if (allSavedAnimals.length === 0) {
+                container.style.display = 'none';
+                badgeCounter.style.display = 'none';
+                return;
+            }
+            
+            container.style.display = 'block';
+            badgeCounter.style.display = 'inline-block';
+            badgeCounter.textContent = `Zapisano: ${allSavedAnimals.length}`;
+
+            allSavedAnimals.forEach((animal, index) => {
+                const div = document.createElement('div');
+                div.style.cssText = "display: flex; justify-content: space-between; align-items: center; background: #f4f9f5; padding: 8px 10px; border-radius: 6px; font-size: 13px; border: 1px solid #d1e7dd;";
+                
+                let summary = `<b style="color:#27ae60;">${animal.tag || 'Brak kolczyka'}</b>`;
+                if(animal.zuzyte) summary += ` | ${animal.zuzyte}`;
+                
+                const textSpan = document.createElement('span');
+                textSpan.style.cssText = "white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 70%;";
+                textSpan.innerHTML = summary;
+
+                const btnDiv = document.createElement('div');
+                btnDiv.style.cssText = "display:flex; gap: 15px;";
+
+                // Przycisk EDYTUJ
+                const editBtn = document.createElement('button');
+                editBtn.innerHTML = '✏️';
+                editBtn.style.cssText = "background:none; border:none; cursor:pointer; font-size: 16px; padding:0;";
+                editBtn.title = "Zmień dane";
+                editBtn.onclick = () => {
+                    stopAllAudio(); // Zatrzymuje gadanie asystenta na czas edycji
+                    edTag.value = animal.tag;
+                    edSztuki.value = animal.liczba;
+                    edRozp.value = animal.rozpoznanie;
+                    edZuzyte.value = animal.zuzyte;
+                    edWydane.value = animal.wydane;
+                    allSavedAnimals.splice(index, 1);
+                    renderSavedAnimals();
+                    checkShowAddButton();
+                };
+
+                // Przycisk USUŃ
+                const delBtn = document.createElement('button');
+                delBtn.innerHTML = '❌';
+                delBtn.style.cssText = "background:none; border:none; cursor:pointer; font-size: 16px; padding:0;";
+                delBtn.title = "Usuń krowę";
+                delBtn.onclick = () => {
+                    allSavedAnimals.splice(index, 1);
+                    renderSavedAnimals();
+                };
+
+                btnDiv.appendChild(editBtn);
+                btnDiv.appendChild(delBtn);
+                div.appendChild(textSpan);
+                div.appendChild(btnDiv);
+                list.appendChild(div);
+            });
+        }
+
         function saveCurrentAnimalToMemory() {
-            // Zapisz do tablicy jeśli jest chociaż kolczyk lub lek
             if (edTag.value || edZuzyte.value) {
                 allSavedAnimals.push({
                     tag: edTag.value,
@@ -29731,36 +29781,26 @@ if (celInput) {
                     zuzyte: edZuzyte.value,
                     wydane: edWydane.value
                 });
-                
-                badgeCounter.style.display = 'inline-block';
-                badgeCounter.textContent = `Zapisano sztuk: ${allSavedAnimals.length}`;
             }
-            
-            // Wyczyść formularz, ale ZOSTAW klienta
             clearFormUI(false); 
+            renderSavedAnimals();
         }
 
-        // Ręczny przycisk "Dodaj kolejną" (Dla trybu Swobodnego)
         aiAddNextCowBtn.addEventListener('click', () => {
             saveCurrentAnimalToMemory();
             if(activeMode === 'swobodny') {
                 aiRawTextInput.value = '';
-                showToast("Zapisano. Podyktuj dane dla następnej krowy.", "info");
+                showToast("Sztuka zapisana. Podyktuj następną.", "info");
             }
         });
 
-        // Nasłuchiwanie czy pokazać przycisk "Dodaj kolejną"
         function checkShowAddButton() {
-            if (edTag.value.length > 2 || edZuzyte.value.length > 2) {
-                aiAddNextCowBtn.style.display = 'block';
-            } else {
-                aiAddNextCowBtn.style.display = 'none';
-            }
+            if (edTag.value.length > 2 || edZuzyte.value.length > 2) aiAddNextCowBtn.style.display = 'block';
+            else aiAddNextCowBtn.style.display = 'none';
         }
         document.getElementById('aiEditableForm').addEventListener('input', checkShowAddButton);
 
-
-        // --- LOGIKA TRYBU SWOBODNEGO ---
+        // --- TRYB SWOBODNY ANALIZA ---
         aiAnalyzeBtn.addEventListener('click', () => {
             let text = aiRawTextInput.value.toLowerCase();
             if(!text) return;
@@ -29793,8 +29833,56 @@ if (celInput) {
             checkShowAddButton();
         });
 
+        // ===============================================
+        // INTELIGENTNE SZUKANIE W MAGAZYNIE (Levenshtein)
+        // ===============================================
+        function levenshtein(a, b) {
+            let tmp;
+            if (a.length === 0) return b.length;
+            if (b.length === 0) return a.length;
+            if (a.length > b.length) { tmp = a; a = b; b = tmp; }
+            let i, j, res, alen = a.length, blen = b.length, row = Array(alen);
+            for (i = 0; i <= alen; i++) row[i] = i;
+            for (i = 1; i <= blen; i++) {
+                res = i;
+                for (j = 1; j <= alen; j++) {
+                    tmp = row[j - 1]; row[j - 1] = res;
+                    res = b[i - 1] === a[j - 1] ? tmp : Math.min(tmp + 1, Math.min(res + 1, row[j] + 1));
+                }
+            }
+            return res;
+        }
 
-        // --- POMOCNICZE FUNKCJE ---
+        function matchWithWarehouse(spokenName) {
+            let bestMatch = capitalizeWords(spokenName); 
+            let bestScore = 0;
+            
+            let warehouseProds = [];
+            document.querySelectorAll('#magazynTableBody tr').forEach(r => {
+                if(r.cells.length > 1) warehouseProds.push(r.cells[0].textContent.trim());
+            });
+            
+            if (warehouseProds.length === 0) return bestMatch; 
+
+            warehouseProds.forEach(p => {
+                let pLow = p.toLowerCase();
+                let sLow = spokenName.toLowerCase();
+                
+                if (pLow.includes(sLow) || sLow.includes(pLow)) {
+                    let score = Math.min(pLow.length, sLow.length) / Math.max(pLow.length, sLow.length);
+                    if (score > bestScore) { bestScore = score; bestMatch = p; }
+                }
+                
+                let maxLen = Math.max(sLow.length, pLow.length);
+                let dist = levenshtein(sLow, pLow);
+                let sim = (maxLen - dist) / maxLen;
+                if (sim > 0.60 && sim > bestScore) {
+                    bestScore = sim; bestMatch = p;
+                }
+            });
+            return bestMatch;
+        }
+
         function extractMedsToString(subtext) {
             const meds = [];
             const ignoreWords = ['zużył', 'dostał', 'zostawił', 'wydał', 'krowa', 'krowę', 'kolczyk', 'klient', 'leki', 'lek', 'rozpoznanie', 'ml', 'mililitr', 'szt', 'sztuk', 'g', 'mg'];
@@ -29813,17 +29901,17 @@ if (celInput) {
                     let txtNoNum = chunk.replace(/(\d+(?:[.,]\d+)?)\s*(?:ml|mililitr|mililitrów|szt|sztuk|sztuki|g|mg|op|opakowań)?/i, '');
                     let lekWords = txtNoNum.split(' ').filter(w => w.trim().length > 1 && !ignoreWords.includes(w.trim().toLowerCase()));
                     let rawLek = lekWords.join(' ').trim();
-                    let finalLek = dictionary[rawLek] ? dictionary[rawLek] : lekWords.map(w => dictionary[w] || w).join(' ');
+                    let grammarFixed = dictionary[rawLek] ? dictionary[rawLek] : lekWords.map(w => dictionary[w] || w).join(' ');
                     
-                    if (finalLek.length > 1) {
-                        meds.push(`${capitalizeWords(finalLek)} ${val}`);
+                    if (grammarFixed.length > 1) {
+                        let finalLek = matchWithWarehouse(grammarFixed);
+                        meds.push(`${finalLek} ${val}`);
                     }
                 }
             });
             return meds.join(', ');
         }
 
-        // Tłumacz z ładnego tekstu "Wapń 20, Glukoza 10" na tablicę obiektów
         function parseEditableStringToArray(str) {
             if(!str) return [];
             let items = str.split(',');
@@ -29838,11 +29926,7 @@ if (celInput) {
 
         function clearFormUI(clearKlient = true) {
             if(clearKlient) edKlient.value = '';
-            edTag.value = '';
-            edSztuki.value = '1';
-            edRozp.value = '';
-            edZuzyte.value = '';
-            edWydane.value = '';
+            edTag.value = ''; edSztuki.value = '1'; edRozp.value = ''; edZuzyte.value = ''; edWydane.value = '';
             checkShowAddButton();
         }
 
@@ -29863,20 +29947,15 @@ if (celInput) {
         }
 
         // ===============================================
-        // GENEROWANIE KARTY (WSTRZYKUJE WSZYSTKIE KROWY)
+        // WSTRZYKIWANIE STADA DO KARTY 
         // ===============================================
         aiConfirmBtn.addEventListener('click', () => {
-            // Zapisz to co wisi aktualnie w polach jako ostatnie zwierzę
-            if(edTag.value || edZuzyte.value) {
-                saveCurrentAnimalToMemory();
-            }
-
+            if(edTag.value || edZuzyte.value) saveCurrentAnimalToMemory();
+            
             if(allSavedAnimals.length === 0) {
-                alert("Nie wpisano żadnych leków ani kolczyków.");
-                return;
+                alert("Nie wpisano żadnych leków ani kolczyków."); return;
             }
 
-            // Pytanie o Wydane (Jeśli któraś krowa ma wydane)
             let hasWydane = allSavedAnimals.some(a => a.wydane.length > 0);
             let copyToWydane = false;
             if (hasWydane) {
@@ -29886,7 +29965,6 @@ if (celInput) {
             closeAiModal();
             showSection('karta');
             
-            // 1. Zmiana Klienta (Tylko raz dla całej wizyty)
             const masterKlient = edKlient.value;
             try {
                 const klientSelect = document.getElementById('klientSelect');
@@ -29894,8 +29972,7 @@ if (celInput) {
                     const options = Array.from(klientSelect.options);
                     const spokenWords = masterKlient.toLowerCase().trim().split(/\s+/);
                     const match = options.find(opt => {
-                        const optText = opt.text.toLowerCase();
-                        return spokenWords.length > 0 && spokenWords.every(word => word.length > 2 && optText.includes(word));
+                        return spokenWords.length > 0 && spokenWords.every(word => word.length > 2 && opt.text.toLowerCase().includes(word));
                     });
                     if (match && klientSelect.value !== match.value) {
                         klientSelect.value = match.value;
@@ -29904,38 +29981,54 @@ if (celInput) {
                 }
             } catch (e) {}
 
-            // 2. Wstrzykiwanie WSZYSTKICH KRÓW do tabeli (Z licznikiem wierszy)
             function injectAllData() {
                 const logicalRows = typeof rowsEditable === 'function' ? rowsEditable() : [];
                 if(logicalRows.length === 0) return;
                 
+                for(let i=0; i<13; i++) {
+                    if(logicalRows[i] && logicalRows[i].cells.length > 6) {
+                        ['1','2','3','4','6'].forEach(c => {
+                            let inp = logicalRows[i].cells[c].querySelector('input');
+                            if(inp) { inp.value = ''; inp.dispatchEvent(new Event('input', {bubbles: true})); }
+                        });
+                    }
+                }
+
                 function setVal(cell, val) {
                     if(!cell || !val) return;
                     const inp = cell.querySelector('input');
                     if(inp && inp.value !== val) { inp.value = val; inp.dispatchEvent(new Event('input', {bubbles: true})); }
                 }
 
-                let rowZuz = 0; // Wiersze dla leków zużytych (0 - 8)
-                let rowWyd = 9; // Wiersze dla leków wydanych (9 - 12)
+                let rowZuz = 0; 
+                let rowWyd = 9; 
 
                 allSavedAnimals.forEach(animal => {
                     const zuzyteArr = parseEditableStringToArray(animal.zuzyte);
                     const wydaneArr = parseEditableStringToArray(animal.wydane);
 
-                    // Wypełnianie Zużytych
-                    zuzyteArr.forEach(med => {
+                    if (zuzyteArr.length === 0 && animal.tag) {
                         if (rowZuz <= 8 && logicalRows[rowZuz]) {
                             const r = logicalRows[rowZuz];
                             setVal(r.cells[1], animal.tag);
                             setVal(r.cells[2], animal.liczba);
                             setVal(r.cells[3], animal.rozpoznanie);
-                            setVal(r.cells[4], med.lek);
-                            setVal(r.cells[6], med.ilosc.replace(',','.'));
                             rowZuz++;
                         }
-                    });
+                    } else {
+                        zuzyteArr.forEach(med => {
+                            if (rowZuz <= 8 && logicalRows[rowZuz]) {
+                                const r = logicalRows[rowZuz];
+                                setVal(r.cells[1], animal.tag);
+                                setVal(r.cells[2], animal.liczba);
+                                setVal(r.cells[3], animal.rozpoznanie);
+                                setVal(r.cells[4], med.lek);
+                                setVal(r.cells[6], med.ilosc.replace(',','.'));
+                                rowZuz++;
+                            }
+                        });
+                    }
 
-                    // Wypełnianie Wydanych
                     wydaneArr.forEach(med => {
                         if (rowWyd <= 12 && logicalRows[rowWyd]) {
                             const r = logicalRows[rowWyd];
@@ -29952,12 +30045,15 @@ if (celInput) {
                 });
             }
 
-            // Kilkukrotne wstrzyknięcie (odporność na Firebase)
             setTimeout(injectAllData, 500);
             setTimeout(injectAllData, 1200);
             setTimeout(injectAllData, 2500);
 
-            if (typeof showToast === 'function') showToast(`Załadowano dane dla ${allSavedAnimals.length} sztuk!`, "success");
+            if (typeof showToast === 'function') {
+                showToast(`Załadowano dane dla ${allSavedAnimals.length} sztuk!`, "success");
+            } else {
+                alert(`Załadowano dane dla ${allSavedAnimals.length} sztuk!`);
+            }
         });
     } else {
         if (menuAsystentBtn) menuAsystentBtn.style.display = 'none';
