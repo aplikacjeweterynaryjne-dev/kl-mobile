@@ -29369,7 +29369,7 @@ if (celInput) {
     });
 </script>
 <!-- ========================================== -->
-<!-- 🤖 ASYSTENT GŁOSOWY AI 10.5 (CZYSTE ILOŚCI)-->
+<!-- 🤖 ASYSTENT GŁOSOWY AI 10.6 (OBUDZANIE + WYDANE)-->
 <!-- ========================================== -->
 <div id="aiAssistantModal" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.6); display: none; z-index: 20000; justify-content: center; align-items: center;">
     <div class="form-card" style="width: 95%; max-width: 480px; background: white; padding: 20px; border-radius: 12px; border-top: 5px solid #8e44ad; max-height: 95vh; overflow-y: auto;">
@@ -29387,12 +29387,19 @@ if (celInput) {
             <p id="convoListeningPreview" style="font-size: 14px; color: #555; font-style: italic; background: #f4f6f7; padding: 10px; border-radius: 6px; display: none;">
                 " <span id="convoHeardText"></span> "
             </p>
+            
             <button id="convoStartBtn" class="btn" style="background-color: #27ae60; color: white; border: none; padding: 12px 25px; font-weight: bold; font-size: 18px; border-radius: 8px; width: 100%; margin-bottom: 10px;">
                 ▶️ Start Rozmowy
             </button>
-            <button id="convoSkipBtn" class="btn ghost" style="display: none; width: 100%; padding: 8px 15px; font-size: 14px;">
-                ⏭️ Pomiń to pytanie (lub powiedz "pomiń")
-            </button>
+            
+            <div style="display: flex; gap: 8px; margin-bottom: 5px;">
+                <button id="convoRetryBtn" class="btn" style="display: none; flex: 2; padding: 8px 10px; font-size: 14px; background-color: #f39c12; color: white; font-weight: bold;">
+                    🔄 Powtórz / Obudź
+                </button>
+                <button id="convoSkipBtn" class="btn ghost" style="display: none; flex: 1; padding: 8px 10px; font-size: 14px;">
+                    ⏭️ Pomiń
+                </button>
+            </div>
             
             <!-- KAFELKI DO WYBORU SCHEMATÓW -->
             <div id="aiSchemeTilesContainer" style="display: none; margin-top: 15px; padding: 15px; background: #fff3e0; border: 1px solid #ffe0b2; border-radius: 8px;">
@@ -29462,6 +29469,7 @@ if (celInput) {
     
     const convoStartBtn = document.getElementById('convoStartBtn');
     const convoSkipBtn = document.getElementById('convoSkipBtn');
+    const convoRetryBtn = document.getElementById('convoRetryBtn');
     const convoStatusText = document.getElementById('convoStatusText');
     const convoAvatar = document.getElementById('convoAvatar');
     const convoListeningPreview = document.getElementById('convoListeningPreview');
@@ -29541,11 +29549,7 @@ if (celInput) {
         aiSchemeTilesContainer.style.display = 'none';
         isSchemeUsed = false;
         convoState = 3;
-        
-        if (aiRecognition) aiRecognition.stop();
-        window.speechSynthesis.cancel();
-        isRecording = false;
-
+        stopAllAudio(false);
         setTimeout(runConvoStep, 400);
     });
 
@@ -29564,11 +29568,9 @@ if (celInput) {
                     isRecording = false;
                     
                     if (convoState === 2.5) {
-                        convoStatusText.textContent = "⏱️ Zaznacz schemat na ekranie lub powiedz POMIŃ.";
-                        speak("Kliknij na ekranie który schemat wybrać, lub powiedz pomiń.");
+                        convoStatusText.textContent = "⏱️ Zaznacz schemat na ekranie lub kliknij Pomiń.";
                     } else {
-                        convoStatusText.textContent = "⏱️ Zbyt długa cisza. Powtórz lub kliknij POMIŃ.";
-                        speak("Nie usłyszałem. Powtórz lub kliknij pomiń.");
+                        convoStatusText.textContent = "⏱️ Zbyt długa cisza. Użyj przycisku 'Powtórz', aby obudzić mikrofon.";
                     }
                     convoAvatar.style.transform = 'scale(1)';
                 }
@@ -29585,8 +29587,8 @@ if (celInput) {
 
         aiRecognition.onerror = (e) => {
             clearTimeout(convoWatchdog);
-            convoStatusText.textContent = "Błąd mikrofonu. Spróbuj jeszcze raz.";
-            setTimeout(() => { if(!isRecording) { try{ isRecording=true; aiRecognition.start(); startWatchdog(); }catch(err){} } }, 1000);
+            convoStatusText.textContent = "Błąd mikrofonu. Kliknij przycisk 'Powtórz'.";
+            isRecording = false;
         };
         
         aiRecognition.onend = () => {
@@ -29618,6 +29620,7 @@ if (celInput) {
             aiSchemeTilesContainer.style.display = 'none';
             convoStartBtn.style.display = 'none';
             convoSkipBtn.style.display = 'inline-block';
+            convoRetryBtn.style.display = 'inline-block';
             runConvoStep();
         });
 
@@ -29625,6 +29628,13 @@ if (celInput) {
             clearTimeout(convoWatchdog);
             if(aiRecognition) aiRecognition.stop();
             processConvoAnswer("pomiń");
+        });
+
+        // PRZYCISK RATUNKOWY (POWTÓRZ / OBUDŹ)
+        convoRetryBtn.addEventListener('click', () => {
+            stopAllAudio(false);
+            convoListeningPreview.style.display = 'none';
+            setTimeout(runConvoStep, 400);
         });
 
         function runConvoStep() {
@@ -29643,6 +29653,9 @@ if (celInput) {
             });
         }
 
+        // ===============================================
+        // MÓZG KONWERSACJI (LOGIKA KAFELKÓW)
+        // ===============================================
         function processConvoAnswer(text) {
             const skipWords = ['pomiń', 'pomin', 'dalej', 'nie', 'brak', 'żaden'];
             const isSkip = skipWords.includes(text);
@@ -29675,6 +29688,7 @@ if (celInput) {
                             btn.style.cssText = 'background-color: #f39c12; border-color: #e67e22; padding: 12px; font-size: 15px; font-weight: bold; border-radius: 8px; flex: 1; min-width: 40%; white-space: normal;';
                             btn.textContent = scheme.nazwa;
                             
+                            // AKCJA KLIKNIĘCIA KAFELKA
                             btn.onclick = () => {
                                 isSchemeUsed = true;
                                 edRozp.value = scheme.nazwa;
@@ -29689,11 +29703,9 @@ if (celInput) {
                                 aiSchemeTilesContainer.style.display = 'none';
                                 convoState = 3;
                                 
-                                if (aiRecognition) aiRecognition.stop();
-                                window.speechSynthesis.cancel();
-                                isRecording = false;
-
-                                setTimeout(runConvoStep, 500);
+                                // Miękki restart audio i od razu przejście do kroku 3
+                                stopAllAudio(false);
+                                setTimeout(runConvoStep, 400);
                             };
                             aiSchemeTilesList.appendChild(btn);
                         });
@@ -29712,7 +29724,7 @@ if (celInput) {
                     isSchemeUsed = false;
                     convoState = 3;
                 } else {
-                    convoState = 2.5;
+                    convoState = 2.5; // czekamy na kliknięcie
                 }
             }
             else if (convoState === 3) { 
@@ -29740,6 +29752,7 @@ if (celInput) {
                     convoState = 6;
                     convoStatusText.textContent = "✅ Zakończono wywiad. Możesz wygenerować kartę.";
                     convoSkipBtn.style.display = 'none';
+                    convoRetryBtn.style.display = 'none';
                     convoStartBtn.style.display = 'inline-block';
                     convoStartBtn.innerHTML = "🔄 Zrób wywiad od nowa";
                     isRecording = false;
@@ -29752,7 +29765,7 @@ if (celInput) {
         }
 
         // ===============================================
-        // MĄDRY SCRAPER SCHEMATÓW (TYLKO PIERWSZA LICZBA)
+        // MĄDRY SCRAPER SCHEMATÓW (CZYSTA NAZWA, ILOŚĆ I WYDANE)
         // ===============================================
         function attemptToFindSchemes(spokenRozp) {
             let sLow = spokenRozp.toLowerCase().replace(/typu/g, '').replace(/wersja/g, '').replace(/schemat/g, '').replace(/[()]/g, ' ').replace(/\s+/g, ' ').trim();
@@ -29788,17 +29801,31 @@ if (celInput) {
                         
                         rows.forEach(tr => {
                             if(tr.cells.length >= 3) {
+                                // Scraper wg bazy (kolumna 0 to nr wiersza, kolumna 1 to lek, kolumna 2 to ilość)
                                 const rowNr = tr.cells[0]?.textContent.trim().toLowerCase() || '';
+                                const rowFullText = tr.textContent.toLowerCase();
+                                const rowNrInt = parseInt(rowNr, 10);
+                                
                                 const lek = tr.cells[1]?.textContent.trim();
                                 
-                                // CZYSTA MAGIA: Bierzemy tylko pierwszą znalezioną liczbę! (np z "5 ml / 100kg" wyciągnie tylko "5")
+                                // ODCINAMY TYLKO PIERWSZĄ ZNALEZIONĄ LICZBĘ!
                                 const rawIlosc = tr.cells[2]?.textContent || '';
                                 const mIlosc = rawIlosc.match(/\d+(?:[.,]\d+)?/);
                                 const ilosc = mIlosc ? mIlosc[0] : '1';
                                 
                                 if (lek && lek !== 'Brak' && lek !== '') {
-                                    let isWydane = rowNr.includes('10') || rowNr.includes('11') || rowNr.includes('12') || rowNr.includes('13') || rowNr.includes('14') || rowNr.includes('wyd') || rowNr.includes('poz');
+                                    // BARDZO PRECYZYJNA LOGIKA "WYDANYCH":
+                                    // Sprawdzamy czy numer to 10+, albo czy gdziekolwiek w wierszu pada "wydane" lub "pozostawione"
+                                    let isWydane = false;
+                                    if ((!isNaN(rowNrInt) && rowNrInt >= 10) || 
+                                         rowFullText.includes('wydan') || 
+                                         rowFullText.includes('pozostawi') || 
+                                         rowNr.includes('wyd') || 
+                                         rowNr.includes('poz')) {
+                                        isWydane = true;
+                                    }
                                     
+                                    // Budujemy bezpieczny format nawiasowy: Nazwa Leka (Ilość)
                                     if (isWydane) {
                                         wydane.push(`${lek} (${ilosc})`);
                                     } else {
@@ -30003,6 +30030,7 @@ if (celInput) {
             convoState = -1;
             convoStartBtn.style.display = 'inline-block'; convoStartBtn.innerHTML = "▶️ Start Rozmowy";
             convoSkipBtn.style.display = 'none';
+            convoRetryBtn.style.display = 'none';
             convoStatusText.textContent = "Kliknij START, aby rozpocząć odpytywanie.";
             convoListeningPreview.style.display = 'none';
             aiSchemeTilesContainer.style.display = 'none';
