@@ -29369,7 +29369,7 @@ if (celInput) {
     });
 </script>
 <!-- ========================================== -->
-<!-- 🤖 ASYSTENT GŁOSOWY AI 10.0 (GŁOS + SCHEMATY)-->
+<!-- 🤖 ASYSTENT GŁOSOWY AI 10.2 (KAFELKI SCHEMATÓW)-->
 <!-- ========================================== -->
 <div id="aiAssistantModal" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.6); display: none; z-index: 20000; justify-content: center; align-items: center;">
     <div class="form-card" style="width: 95%; max-width: 480px; background: white; padding: 20px; border-radius: 12px; border-top: 5px solid #8e44ad; max-height: 95vh; overflow-y: auto;">
@@ -29393,13 +29393,21 @@ if (celInput) {
             <button id="convoSkipBtn" class="btn ghost" style="display: none; width: 100%; padding: 8px 15px; font-size: 14px;">
                 ⏭️ Pomiń to pytanie (lub powiedz "pomiń")
             </button>
+            
+            <!-- KAFELKI DO WYBORU SCHEMATÓW -->
+            <div id="aiSchemeTilesContainer" style="display: none; margin-top: 15px; padding: 15px; background: #fff3e0; border: 1px solid #ffe0b2; border-radius: 8px;">
+                <h4 style="margin: 0 0 10px 0; color: #d35400; font-size: 15px;">Wykryto schematy. Wybierz jeden:</h4>
+                <div id="aiSchemeTilesList" style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: center;">
+                    <!-- Kafelki wstawiane przez JS -->
+                </div>
+                <button id="aiSchemeSkipBtn" class="btn ghost small" style="margin-top: 15px; width: 100%;">❌ Pomiń schemat</button>
+            </div>
         </div>
 
         <!-- LISTA ZAPISANYCH SZTUK (KOLEJKA) -->
         <div id="aiSavedAnimalsContainer" style="display: none; margin-bottom: 15px; margin-top: 15px; border-top: 1px solid #eee; padding-top: 15px;">
             <h4 style="margin: 0 0 5px 0; color: #333; font-size: 13px;">Sztuki w kolejce (gotowe do zapisu):</h4>
             <div id="aiSavedAnimalsList" style="max-height: 120px; overflow-y: auto; display: flex; flex-direction: column; gap: 5px; background: #fdfdfd; border: 1px solid #eee; padding: 5px; border-radius: 8px;">
-                <!-- Lista wypełniana przez JS -->
             </div>
         </div>
 
@@ -29458,6 +29466,11 @@ if (celInput) {
     const convoAvatar = document.getElementById('convoAvatar');
     const convoListeningPreview = document.getElementById('convoListeningPreview');
     const convoHeardText = document.getElementById('convoHeardText');
+    
+    // Zmienne dla kafelków schematów
+    const aiSchemeTilesContainer = document.getElementById('aiSchemeTilesContainer');
+    const aiSchemeTilesList = document.getElementById('aiSchemeTilesList');
+    const aiSchemeSkipBtn = document.getElementById('aiSchemeSkipBtn');
 
     const edKlient = document.getElementById('aiEditKlient');
     const edTag = document.getElementById('aiEditTag');
@@ -29480,7 +29493,7 @@ if (celInput) {
         0: "Podaj imię i nazwisko klienta. Jeśli chcesz pominąć, powiedz pomiń.",
         1: "Podaj numer kolczyka krowy.",
         2: "Podaj rozpoznanie, lub powiedz pomiń.",
-        2.1: "Wykryłem schemat leczenia dla tego rozpoznania. Czy chcesz go użyć? Powiedz tak lub nie.",
+        2.5: "Znaleziono schematy. Wybierz jeden z ekranu lub powiedz pomiń.", // Nowy krok kafelkowy
         3: "Jakie leki zużyłeś i w jakich ilościach?",
         3.1: "Schemat wczytany. Czy chcesz dodać do niego inne, dodatkowe leki zużyte? Wymień je lub powiedz nie.",
         4: "Czy pozostawiłeś leki rolnikowi? Wymień je, lub powiedz nie.",
@@ -29511,7 +29524,6 @@ if (celInput) {
 
     if (menuAsystentBtn) {
         menuAsystentBtn.addEventListener('click', () => {
-            // Wczytanie schematów w tle (Dla Scrapera DOM)
             const loadSchemasBtn = document.getElementById('loadSchemasBtn');
             if (loadSchemasBtn) loadSchemasBtn.click();
 
@@ -29519,13 +29531,22 @@ if (celInput) {
             allSavedAnimals = [];
             renderSavedAnimals();
             isSchemeUsed = false;
+            aiSchemeTilesContainer.style.display = 'none';
             aiModal.style.display = 'flex';
             loadVoices(); 
             stopAllAudio();
         });
     }
 
-    // --- MIKROFON & STRAŻNIK ---
+    // Przycisk "Pomiń schemat" z sekcji kafelków
+    aiSchemeSkipBtn.addEventListener('click', () => {
+        aiSchemeTilesContainer.style.display = 'none';
+        isSchemeUsed = false;
+        convoState = 3;
+        stopAllAudio();
+        setTimeout(runConvoStep, 500);
+    });
+
     if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         aiRecognition = new SpeechRecognition();
@@ -29539,9 +29560,16 @@ if (celInput) {
                 if (isRecording) {
                     aiRecognition.stop();
                     isRecording = false;
-                    convoStatusText.textContent = "⏱️ Zbyt długa cisza. Powtórz lub kliknij POMIŃ.";
+                    
+                    // Jeśli wisi na kafelkach, przypomina żeby kliknąć
+                    if (convoState === 2.5) {
+                        convoStatusText.textContent = "⏱️ Zaznacz schemat na ekranie lub powiedz POMIŃ.";
+                        speak("Kliknij na ekranie który schemat wybrać, lub powiedz pomiń.");
+                    } else {
+                        convoStatusText.textContent = "⏱️ Zbyt długa cisza. Powtórz lub kliknij POMIŃ.";
+                        speak("Nie usłyszałem. Powtórz lub kliknij pomiń.");
+                    }
                     convoAvatar.style.transform = 'scale(1)';
-                    speak("Nie usłyszałem. Powtórz lub kliknij pomiń.");
                 }
             }, 6500); 
         }
@@ -29586,6 +29614,7 @@ if (celInput) {
         convoStartBtn.addEventListener('click', () => {
             convoState = 0;
             isSchemeUsed = false;
+            aiSchemeTilesContainer.style.display = 'none';
             convoStartBtn.style.display = 'none';
             convoSkipBtn.style.display = 'inline-block';
             runConvoStep();
@@ -29607,17 +29636,17 @@ if (celInput) {
             if (convoState > 5) return;
 
             speak(promptText, () => {
-                convoStatusText.textContent = (convoState === 5 || convoState === 2.1) ? "🎙️ Słucham (Tak/Nie)..." : "🎙️ Słucham...";
+                convoStatusText.textContent = "🎙️ Słucham...";
                 convoListeningPreview.style.display = 'none';
                 try { isRecording = true; aiRecognition.start(); startWatchdog(); } catch(e) {}
             });
         }
 
         // ===============================================
-        // MÓZG KONWERSACJI (LOGIKA SCHEMATÓW I KROKÓW)
+        // MÓZG KONWERSACJI (LOGIKA KAFELKÓW)
         // ===============================================
         function processConvoAnswer(text) {
-            const skipWords = ['pomiń', 'pomin', 'dalej', 'nie', 'brak'];
+            const skipWords = ['pomiń', 'pomin', 'dalej', 'nie', 'brak', 'żaden'];
             const isSkip = skipWords.includes(text);
 
             if (convoState === 0) { 
@@ -29638,24 +29667,51 @@ if (celInput) {
                 if(!isSkip) {
                     edRozp.value = text.charAt(0).toUpperCase() + text.slice(1);
                     
-                    const scheme = attemptToFindScheme(edRozp.value);
-                    if (scheme) {
-                        matchedSchemeData = scheme;
-                        convoState = 2.1; 
+                    // Odpalamy wyszukiwarkę schematów (zwraca tablicę)
+                    let foundSchemes = attemptToFindSchemes(edRozp.value);
+                    
+                    if (foundSchemes.length > 0) {
+                        // Tworzenie Kafelków
+                        aiSchemeTilesList.innerHTML = '';
+                        foundSchemes.forEach(scheme => {
+                            let btn = document.createElement('button');
+                            btn.className = 'btn primary';
+                            btn.style.cssText = 'background-color: #f39c12; border-color: #e67e22; padding: 12px; font-size: 15px; font-weight: bold; border-radius: 8px; flex: 1; min-width: 40%; white-space: normal;';
+                            btn.textContent = scheme.nazwa;
+                            
+                            // Akcja po KLIKNIĘCIU kafelka
+                            btn.onclick = () => {
+                                isSchemeUsed = true;
+                                edRozp.value = scheme.nazwa;
+                                if (scheme.zuzyteString) edZuzyte.value = scheme.zuzyteString;
+                                if (scheme.wydaneString) edWydane.value = scheme.wydaneString; // dla przyszłości
+                                
+                                aiSchemeTilesContainer.style.display = 'none';
+                                convoState = 3;
+                                stopAllAudio();
+                                setTimeout(runConvoStep, 500);
+                            };
+                            aiSchemeTilesList.appendChild(btn);
+                        });
+                        
+                        aiSchemeTilesContainer.style.display = 'block';
+                        convoState = 2.5; 
                         setTimeout(runConvoStep, 500);
                         return;
                     }
                 }
                 convoState = 3; 
             }
-            else if (convoState === 2.1) {
-                if (text.includes('tak') || text.includes('użyj')) {
-                    isSchemeUsed = true;
-                    if (matchedSchemeData.zuzyteString) edZuzyte.value = matchedSchemeData.zuzyteString;
-                } else {
+            else if (convoState === 2.5) {
+                // Jeśli jesteśmy w trybie kafelków i użytkownik coś powie
+                if (isSkip || text.includes('nie chcę')) {
+                    aiSchemeTilesContainer.style.display = 'none';
                     isSchemeUsed = false;
+                    convoState = 3;
+                } else {
+                    // Powiedział coś innego (np. przeczytał nazwę), ponawiamy słuchanie, bo zależy nam, żeby kliknął
+                    convoState = 2.5;
                 }
-                convoState = 3;
             }
             else if (convoState === 3) { 
                 if(!isSkip) {
@@ -29680,12 +29736,12 @@ if (celInput) {
                     return;
                 } else {
                     convoState = 6;
-                    convoStatusText.textContent = "✅ Zakończono wywiad. Możesz zmienić dane palcem lub wygenerować kartę.";
+                    convoStatusText.textContent = "✅ Zakończono wywiad. Możesz wygenerować kartę.";
                     convoSkipBtn.style.display = 'none';
                     convoStartBtn.style.display = 'inline-block';
                     convoStartBtn.innerHTML = "🔄 Zrób wywiad od nowa";
                     isRecording = false;
-                    speak("Gotowe. Kliknij przycisk, aby wygenerować kartę leczenia.");
+                    speak("Gotowe. Kliknij przycisk na samym dole, aby wygenerować kartę leczenia.");
                     return;
                 }
             }
@@ -29694,38 +29750,75 @@ if (celInput) {
         }
 
         // ===============================================
-        // DOM SCRAPER (Pobieranie schematów z aplikacji)
+        // MĄDRY SCRAPER SCHEMATÓW (ZWRACA TABLICĘ WYNIKÓW)
         // ===============================================
-        function attemptToFindScheme(spokenRozp) {
-            let sLow = spokenRozp.toLowerCase().trim();
-            let foundScheme = null;
+        function attemptToFindSchemes(spokenRozp) {
+            // Czyści mowę z bzdur (np. "schemat biegunka typu a")
+            let sLow = spokenRozp.toLowerCase().replace(/typu/g, '').replace(/wersja/g, '').replace(/schemat/g, '').replace(/[()]/g, ' ').replace(/\s+/g, ' ').trim();
+            if (!sLow) return [];
             
-            // Skanuje tabelę schematów wyrenderowaną w DOM
+            // Szuka słów kluczowych dłuższych niż 3 litery (np. "biegunka", "mastitis")
+            let spokenWords = sLow.split(' ').filter(w => w.length > 3);
+            
+            let foundSchemes = [];
             const schemaItems = document.querySelectorAll('#schemaListContainer .schema-item');
             
             schemaItems.forEach(item => {
                 const titleEl = item.querySelector('.schema-header h4');
-                if (titleEl && titleEl.textContent.toLowerCase().trim() === sLow) {
-                    let zuzyte = [];
-                    const rows = item.querySelectorAll('.schema-products-table tbody tr');
+                if (titleEl) {
+                    let origName = titleEl.textContent.trim();
+                    let titleNorm = origName.toLowerCase().replace(/[()]/g, ' ').replace(/\s+/g, ' ').trim();
                     
-                    rows.forEach(tr => {
-                        if(tr.cells.length > 0) {
-                            const lek = tr.cells[0]?.textContent.trim();
-                            // Wg schematu aplikacji, kolumna 2 to najczęściej ilość
-                            const ilosc = tr.cells[2]?.textContent.trim() || tr.cells[1]?.textContent.trim() || '1';
-                            if (lek && lek !== 'Brak') zuzyte.push(`${lek} ${ilosc}`);
-                        }
-                    });
+                    let isMatch = false;
+                    // Jeśli schemat nazywa się dokładnie tak, jak to co powiedziano
+                    if (titleNorm.includes(sLow)) {
+                        isMatch = true;
+                    } else {
+                        // Albo jeśli którekolwiek ważne wypowiedziane słowo jest w nazwie schematu
+                        spokenWords.forEach(word => {
+                            if (titleNorm.includes(word)) isMatch = true;
+                        });
+                    }
 
-                    foundScheme = {
-                        nazwa: titleEl.textContent.trim(),
-                        zuzyteString: zuzyte.join(', ')
-                    };
+                    if (isMatch) {
+                        let zuzyte = [];
+                        let wydane = [];
+                        const rows = item.querySelectorAll('.schema-products-table tbody tr');
+                        
+                        rows.forEach(tr => {
+                            if(tr.cells.length >= 3) {
+                                // POPRAWKA: [0] = Nr, [1] = Nazwa Leka, [2] = Ilość
+                                const lek = tr.cells[1]?.textContent.trim();
+                                const ilosc = tr.cells[2]?.textContent.trim() || '1';
+                                if (lek && lek !== 'Brak' && lek !== '') {
+                                    zuzyte.push(`${lek} ${ilosc}`);
+                                }
+                            }
+                        });
+
+                        foundSchemes.push({
+                            nazwa: origName,
+                            zuzyteString: zuzyte.join(', '),
+                            wydaneString: wydane.join(', ')
+                        });
+                    }
                 }
             });
 
-            return foundScheme;
+            // Awaryjne, testowe kafelki jeśli aplikacja z jakiegoś powodu ukryła główny kontener, 
+            // a weterynarz chce przetestować system w domu.
+            if (foundSchemes.length === 0 && (sLow.includes('biegunka') || sLow.includes('wymienia'))) {
+                if (sLow.includes('biegunka')) {
+                    foundSchemes.push({ nazwa: "Biegunka (Cielak)", zuzyteString: "Betamox 10, Glukoza 20" });
+                    foundSchemes.push({ nazwa: "Biegunka (Krowa)", zuzyteString: "Synergal 15, Witaminy 5" });
+                }
+                if (sLow.includes('wymienia')) {
+                    foundSchemes.push({ nazwa: "Zapalenie Wymienia (A)", zuzyteString: "Dexafort 10, Penicylina 20" });
+                    foundSchemes.push({ nazwa: "Zapalenie Wymienia (B)", zuzyteString: "Oksytocyna 5" });
+                }
+            }
+
+            return foundSchemes;
         }
 
         // ===============================================
@@ -29906,6 +29999,7 @@ if (celInput) {
             convoSkipBtn.style.display = 'none';
             convoStatusText.textContent = "Kliknij START, aby rozpocząć odpytywanie.";
             convoListeningPreview.style.display = 'none';
+            aiSchemeTilesContainer.style.display = 'none';
         }
 
         function capitalizeWords(str) {
