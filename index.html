@@ -29369,7 +29369,7 @@ if (celInput) {
     });
 </script>
 <!-- ========================================== -->
-<!-- 🤖 ASYSTENT GŁOSOWY AI 11.0 (KULOODPORNY)  -->
+<!-- 🤖 ASYSTENT GŁOSOWY AI 11.2 (CICHY NINJA)  -->
 <!-- ========================================== -->
 <div id="aiAssistantModal" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.6); display: none; z-index: 20000; justify-content: center; align-items: center;">
     <div class="form-card" style="width: 95%; max-width: 480px; background: white; padding: 20px; border-radius: 12px; border-top: 5px solid #8e44ad; max-height: 95vh; overflow-y: auto;">
@@ -29388,15 +29388,15 @@ if (celInput) {
                 " <span id="convoHeardText"></span> "
             </p>
             
-            <button id="convoStartBtn" class="btn" style="background-color: #27ae60; color: white; border: none; padding: 12px 25px; font-weight: bold; font-size: 18px; border-radius: 8px; width: 100%; margin-bottom: 10px;">
+            <button type="button" id="convoStartBtn" class="btn" style="background-color: #27ae60; color: white; border: none; padding: 12px 25px; font-weight: bold; font-size: 18px; border-radius: 8px; width: 100%; margin-bottom: 10px;">
                 ▶️ Start Rozmowy
             </button>
             
             <div style="display: flex; gap: 8px; margin-bottom: 5px;">
-                <button id="convoRetryBtn" class="btn" style="display: none; flex: 2; padding: 8px 10px; font-size: 14px; background-color: #f39c12; color: white; font-weight: bold;">
+                <button type="button" id="convoRetryBtn" class="btn" style="display: none; flex: 2; padding: 8px 10px; font-size: 14px; background-color: #f39c12; color: white; font-weight: bold;">
                     🔄 Powtórz / Obudź
                 </button>
-                <button id="convoSkipBtn" class="btn ghost" style="display: none; flex: 1; padding: 8px 10px; font-size: 14px;">
+                <button type="button" id="convoSkipBtn" class="btn ghost" style="display: none; flex: 1; padding: 8px 10px; font-size: 14px;">
                     ⏭️ Pomiń
                 </button>
             </div>
@@ -29406,7 +29406,7 @@ if (celInput) {
                 <h4 style="margin: 0 0 10px 0; color: #d35400; font-size: 15px;">Wykryto schematy. Wybierz jeden:</h4>
                 <div id="aiSchemeTilesList" style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: center;">
                 </div>
-                <button id="aiSchemeSkipBtn" class="btn ghost small" style="margin-top: 15px; width: 100%;">❌ Pomiń schemat</button>
+                <button type="button" id="aiSchemeSkipBtn" class="btn ghost small" style="margin-top: 15px; width: 100%;">❌ Pomiń schemat</button>
             </div>
         </div>
 
@@ -29453,8 +29453,8 @@ if (celInput) {
         </div>
 
         <div class="form-actions" style="justify-content: space-between;">
-            <button class="btn ghost" onclick="closeAiModal()" style="padding: 10px;">Zamknij</button>
-            <button class="btn primary" id="aiConfirmActionBtn" style="background-color: #27ae60; border-color: #2ecc71; font-size: 16px; padding: 10px; width: 65%;">
+            <button type="button" class="btn ghost" onclick="closeAiModal()" style="padding: 10px;">Zamknij</button>
+            <button type="button" class="btn primary" id="aiConfirmActionBtn" style="background-color: #27ae60; border-color: #2ecc71; font-size: 16px; padding: 10px; width: 65%;">
                 ✅ Wygeneruj Kartę
             </button>
         </div>
@@ -29678,6 +29678,7 @@ if (celInput) {
                         aiSchemeTilesList.innerHTML = '';
                         foundSchemes.forEach(scheme => {
                             let btn = document.createElement('button');
+                            btn.type = 'button';
                             btn.className = 'btn primary';
                             btn.style.cssText = 'background-color: #f39c12; border-color: #e67e22; padding: 12px; font-size: 15px; font-weight: bold; border-radius: 8px; flex: 1; min-width: 40%; white-space: normal;';
                             btn.textContent = scheme.nazwa;
@@ -29863,6 +29864,7 @@ if (celInput) {
                 btnDiv.style.cssText = "display:flex; gap: 15px;";
 
                 const editBtn = document.createElement('button');
+                editBtn.type = 'button';
                 editBtn.innerHTML = '✏️';
                 editBtn.style.cssText = "background:none; border:none; cursor:pointer; font-size: 16px; padding:0;";
                 editBtn.onclick = () => {
@@ -29888,6 +29890,7 @@ if (celInput) {
                 };
 
                 const delBtn = document.createElement('button');
+                delBtn.type = 'button';
                 delBtn.innerHTML = '❌';
                 delBtn.style.cssText = "background:none; border:none; cursor:pointer; font-size: 16px; padding:0;";
                 delBtn.onclick = () => {
@@ -30016,7 +30019,7 @@ if (celInput) {
         }
 
         // ===============================================
-        // ZABEZPIECZONA NAWIGACJA (ANTI-CRASH)
+        // "CICHY NINJA" - WSTRZYKIWANIE BEZ WYWOŁYWANIA BŁĘDÓW
         // ===============================================
         aiConfirmBtn.addEventListener('click', () => {
             if(edTag.value || edZuzyte.value) saveCurrentAnimalToMemory();
@@ -30031,25 +30034,31 @@ if (celInput) {
                 copyToWydane = confirm("Czy skopiować kolczyki, sztuki i rozpoznanie również do sekcji 'Wydane/Pozostawione' na dole karty?");
             }
 
+            // 1. ZAMYKAMY ASYSTENTA
             closeAiModal();
             
-            // BEZPIECZNE PRZEŁĄCZENIE ZAKŁADKI
+            // 2. PRZEŁĄCZAMY NA KARTĘ LECZENIA BEZPIECZNIE
             try {
                 if (typeof showSection === 'function') {
                     showSection('karta');
                 } else {
-                    throw new Error("showSection is not defined");
+                    const mm = document.getElementById('mainMenuSection');
+                    const tb = document.getElementById('mainTabBar');
+                    const kl = document.getElementById('kartaLeczeniaSection');
+                    const met = document.getElementById('metodaModal');
+                    if (mm) mm.style.display = 'none';
+                    if (tb) tb.style.display = 'flex';
+                    if (kl) kl.style.display = 'block';
+                    if (met) met.style.display = 'none';
+                    document.querySelectorAll('#mainTabBar .btn').forEach(b => b.classList.remove('primary'));
+                    const tabKartaBtn = document.getElementById('tabKartaBtn');
+                    if (tabKartaBtn) tabKartaBtn.classList.add('primary');
                 }
             } catch (err) {
-                console.warn("Wymuszam awaryjne pokazanie karty (omijam błąd w kodzie głównym):", err);
-                const mm = document.getElementById('mainMenuSection');
-                const tb = document.getElementById('mainTabBar');
-                const kl = document.getElementById('kartaLeczeniaSection');
-                if (mm) mm.style.display = 'none';
-                if (tb) tb.style.display = 'flex';
-                if (kl) kl.style.display = 'block';
+                console.warn("Błąd podczas pokazywania karty:", err);
             }
 
+            // 3. WSTAWIAMY KLIENTA BEZ WYWOŁYWANIA BŁĘDU APLIKACJI (Bez dispatchEvent 'input')
             const masterKlient = edKlient.value;
             try {
                 const klientSelect = document.getElementById('klientSelect');
@@ -30061,28 +30070,20 @@ if (celInput) {
                         return spokenWords.length > 0 && spokenWords.every(word => word.length > 2 && opt.value.toLowerCase().includes(word));
                     });
                     
-                    if (match && klientSelect.value !== match.value) {
+                    if (match) {
                         klientSelect.value = match.value;
-                        try {
-                            klientSelect.dispatchEvent(new Event('input', { bubbles: true }));
-                        } catch(err) {}
                         
-                        // Zabezpieczenie awaryjne adresów (jeśli event wyżej się wykrzaczy)
+                        // Zamiast triggerować input, ustawiamy adres i stado ręcznie! 
+                        // To omija błąd w funkcji loadAnimalDescriptionHistory
                         const adresEl = document.getElementById('adresKlienta');
                         const stadoEl = document.getElementById('nrStada');
-                        if (adresEl && (!adresEl.textContent || adresEl.textContent === '---')) adresEl.textContent = match.dataset.adres || '';
-                        if (stadoEl && (!stadoEl.textContent || stadoEl.textContent === '---')) stadoEl.textContent = match.dataset.nrstada || '';
+                        if (adresEl) adresEl.textContent = match.dataset.adres || '';
+                        if (stadoEl) stadoEl.textContent = match.dataset.nrstada || '';
                     }
                 }
             } catch (e) { console.error("Błąd doboru klienta:", e); }
 
-            // AWARIA: Gdy nrDokumentu się nie wygenerował
-            const nrDok = document.getElementById('nrDokumentu');
-            if (nrDok && !nrDok.value) {
-                const now = new Date();
-                nrDok.value = `.../${now.getMonth()+1}/${now.getFullYear()}/AI`;
-            }
-
+            // 4. WYPEŁNIAMY TABELĘ LEKÓW
             function injectAllData() {
                 let logicalRows = typeof rowsEditable === 'function' ? rowsEditable() : [];
                 if(logicalRows.length === 0) return;
@@ -30165,9 +30166,8 @@ if (celInput) {
                 });
             }
 
+            setTimeout(injectAllData, 200);
             setTimeout(injectAllData, 800);
-            setTimeout(injectAllData, 1500);
-            setTimeout(injectAllData, 3000);
 
             if (typeof showToast === 'function') {
                 showToast(`Załadowano dane dla ${allSavedAnimals.length} sztuk!`, "success");
