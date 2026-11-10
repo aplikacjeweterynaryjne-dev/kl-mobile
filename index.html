@@ -29369,7 +29369,7 @@ if (celInput) {
     });
 </script>
 <!-- ========================================== -->
-<!-- 🤖 ASYSTENT GŁOSOWY AI 10.6 (OBUDZANIE + WYDANE)-->
+<!-- 🤖 ASYSTENT GŁOSOWY AI 10.7 (ZNACZNIKI zost. / lecz.)-->
 <!-- ========================================== -->
 <div id="aiAssistantModal" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.6); display: none; z-index: 20000; justify-content: center; align-items: center;">
     <div class="form-card" style="width: 95%; max-width: 480px; background: white; padding: 20px; border-radius: 12px; border-top: 5px solid #8e44ad; max-height: 95vh; overflow-y: auto;">
@@ -29630,7 +29630,6 @@ if (celInput) {
             processConvoAnswer("pomiń");
         });
 
-        // PRZYCISK RATUNKOWY (POWTÓRZ / OBUDŹ)
         convoRetryBtn.addEventListener('click', () => {
             stopAllAudio(false);
             convoListeningPreview.style.display = 'none';
@@ -29653,9 +29652,6 @@ if (celInput) {
             });
         }
 
-        // ===============================================
-        // MÓZG KONWERSACJI (LOGIKA KAFELKÓW)
-        // ===============================================
         function processConvoAnswer(text) {
             const skipWords = ['pomiń', 'pomin', 'dalej', 'nie', 'brak', 'żaden'];
             const isSkip = skipWords.includes(text);
@@ -29688,7 +29684,6 @@ if (celInput) {
                             btn.style.cssText = 'background-color: #f39c12; border-color: #e67e22; padding: 12px; font-size: 15px; font-weight: bold; border-radius: 8px; flex: 1; min-width: 40%; white-space: normal;';
                             btn.textContent = scheme.nazwa;
                             
-                            // AKCJA KLIKNIĘCIA KAFELKA
                             btn.onclick = () => {
                                 isSchemeUsed = true;
                                 edRozp.value = scheme.nazwa;
@@ -29703,7 +29698,6 @@ if (celInput) {
                                 aiSchemeTilesContainer.style.display = 'none';
                                 convoState = 3;
                                 
-                                // Miękki restart audio i od razu przejście do kroku 3
                                 stopAllAudio(false);
                                 setTimeout(runConvoStep, 400);
                             };
@@ -29724,7 +29718,7 @@ if (celInput) {
                     isSchemeUsed = false;
                     convoState = 3;
                 } else {
-                    convoState = 2.5; // czekamy na kliknięcie
+                    convoState = 2.5; 
                 }
             }
             else if (convoState === 3) { 
@@ -29765,7 +29759,7 @@ if (celInput) {
         }
 
         // ===============================================
-        // MĄDRY SCRAPER SCHEMATÓW (CZYSTA NAZWA, ILOŚĆ I WYDANE)
+        // MĄDRY SCRAPER SCHEMATÓW (ODCZYTUJE 'zost.1', 'lecz.1')
         // ===============================================
         function attemptToFindSchemes(spokenRozp) {
             let sLow = spokenRozp.toLowerCase().replace(/typu/g, '').replace(/wersja/g, '').replace(/schemat/g, '').replace(/[()]/g, ' ').replace(/\s+/g, ' ').trim();
@@ -29801,27 +29795,27 @@ if (celInput) {
                         
                         rows.forEach(tr => {
                             if(tr.cells.length >= 3) {
-                                // Scraper wg bazy (kolumna 0 to nr wiersza, kolumna 1 to lek, kolumna 2 to ilość)
+                                // Kolumna 0 = Identyfikator ('zost.1', 'lecz.1', '10', '1')
                                 const rowNr = tr.cells[0]?.textContent.trim().toLowerCase() || '';
-                                const rowFullText = tr.textContent.toLowerCase();
-                                const rowNrInt = parseInt(rowNr, 10);
-                                
+                                // Kolumna 1 = Czysta nazwa leku z bazy
                                 const lek = tr.cells[1]?.textContent.trim();
                                 
-                                // ODCINAMY TYLKO PIERWSZĄ ZNALEZIONĄ LICZBĘ!
+                                // ODCINAMY TYLKO PIERWSZĄ ZNALEZIONĄ LICZBĘ z kolumny ilości!
                                 const rawIlosc = tr.cells[2]?.textContent || '';
                                 const mIlosc = rawIlosc.match(/\d+(?:[.,]\d+)?/);
                                 const ilosc = mIlosc ? mIlosc[0] : '1';
                                 
                                 if (lek && lek !== 'Brak' && lek !== '') {
-                                    // BARDZO PRECYZYJNA LOGIKA "WYDANYCH":
-                                    // Sprawdzamy czy numer to 10+, albo czy gdziekolwiek w wierszu pada "wydane" lub "pozostawione"
+                                    
+                                    // SPRAWDZAMY CZY PRODUKT JEST POZOSTAWIONY (WYDANY)
                                     let isWydane = false;
-                                    if ((!isNaN(rowNrInt) && rowNrInt >= 10) || 
-                                         rowFullText.includes('wydan') || 
-                                         rowFullText.includes('pozostawi') || 
-                                         rowNr.includes('wyd') || 
-                                         rowNr.includes('poz')) {
+                                    
+                                    // Złota reguła dla nazw 'zost.1', 'zost.2' z bazy:
+                                    if (rowNr.includes('zost') || rowNr.includes('wyd') || rowNr.includes('poz')) {
+                                        isWydane = true;
+                                    } 
+                                    // Jeśli to stare, numeryczne wiersze (10 i więcej = wydane)
+                                    else if (!isNaN(parseInt(rowNr, 10)) && parseInt(rowNr, 10) >= 10) {
                                         isWydane = true;
                                     }
                                     
@@ -29829,6 +29823,7 @@ if (celInput) {
                                     if (isWydane) {
                                         wydane.push(`${lek} (${ilosc})`);
                                     } else {
+                                        // W każdym innym przypadku (np. 'lecz.1' lub '1') produkt idzie do Zużytych
                                         zuzyte.push(`${lek} (${ilosc})`);
                                     }
                                 }
