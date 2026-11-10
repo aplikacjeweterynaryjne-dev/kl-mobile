@@ -29369,7 +29369,7 @@ if (celInput) {
     });
 </script>
 <!-- ========================================== -->
-<!-- 🤖 ASYSTENT GŁOSOWY AI 6.0 (ZAKŁADKI + GŁOS)-->
+<!-- 🤖 ASYSTENT GŁOSOWY AI 7.0 (STADO + EDYCJA)-->
 <!-- ========================================== -->
 <div id="aiAssistantModal" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.6); display: none; z-index: 20000; justify-content: center; align-items: center;">
     <div class="form-card" style="width: 95%; max-width: 480px; background: white; padding: 20px; border-radius: 12px; border-top: 5px solid #8e44ad; max-height: 95vh; overflow-y: auto;">
@@ -29378,44 +29378,25 @@ if (celInput) {
             🤖 Twój Asystent
         </h3>
         
-        <!-- ZAKŁADKI STERUJĄCE -->
+        <!-- ZAKŁADKI STERUJĄCE (ROZMOWA JEST TERAZ PIERWSZA) -->
         <div style="display: flex; gap: 5px; margin-bottom: 15px; border-bottom: 2px solid #eee; padding-bottom: 10px;">
-            <button id="tabBtnSwobodny" class="btn" style="flex: 1; background-color: #8e44ad; color: white; border: none; padding: 8px; font-weight: bold; border-radius: 6px;">
-                📝 Swobodny
-            </button>
-            <button id="tabBtnRozmowa" class="btn" style="flex: 1; background-color: #f1f1f1; color: #555; border: none; padding: 8px; font-weight: bold; border-radius: 6px;">
+            <button id="tabBtnRozmowa" class="btn" style="flex: 1; background-color: #8e44ad; color: white; border: none; padding: 8px; font-weight: bold; border-radius: 6px;">
                 🗣️ Rozmowa (Głos)
             </button>
+            <button id="tabBtnSwobodny" class="btn" style="flex: 1; background-color: #f1f1f1; color: #555; border: none; padding: 8px; font-weight: bold; border-radius: 6px;">
+                📝 Swobodny
+            </button>
         </div>
 
         <!-- ========================================== -->
-        <!-- WIDOK 1: TRYB SWOBODNY (STARY)             -->
+        <!-- WIDOK 1: TRYB ROZMOWY (DOMYŚLNY)           -->
         <!-- ========================================== -->
-        <div id="viewSwobodny" style="display: block;">
-            <p style="font-size: 11px; color: #7f8c8d; margin: 0 0 10px 0; line-height: 1.4; text-align: center; background: #f4f6f7; padding: 8px; border-radius: 6px;">
-                💡 <b>Schemat:</b> <i>"Klient [nazwa], krowa [PL...], rozpoznanie [tekst], zużyłem [ilość] [lek], zostawiłem [ilość] [lek]"</i>
-            </p>
-            <textarea id="aiRawTextInput" placeholder="Kliknij MÓW i podyktuj polecenie..." style="width: 100%; height: 60px; padding: 10px; border-radius: 8px; border: 1px solid #ccc; font-size: 14px; resize: none; margin-bottom: 10px; box-sizing: border-box; font-family: inherit;"></textarea>
-            <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-                <button id="aiRecordBtn" class="btn" style="flex: 1; background-color: #e74c3c; color: white; border: none; padding: 10px; font-weight: bold;">
-                    🎙️ Mów
-                </button>
-                <button id="aiAnalyzeBtn" class="btn" style="flex: 1; background-color: #3498db; color: white; border: none; padding: 10px; font-weight: bold;">
-                    🧠 Analizuj
-                </button>
-            </div>
-        </div>
-
-        <!-- ========================================== -->
-        <!-- WIDOK 2: TRYB ROZMOWY (NOWY)               -->
-        <!-- ========================================== -->
-        <div id="viewRozmowa" style="display: none; text-align: center; padding-bottom: 15px;">
+        <div id="viewRozmowa" style="display: block; text-align: center; padding-bottom: 15px;">
             <div id="convoAvatar" style="font-size: 50px; margin-bottom: 10px; transition: transform 0.3s;">🤖</div>
-            <p id="convoStatusText" style="font-size: 16px; font-weight: bold; color: #8e44ad; min-height: 40px; margin: 0 0 15px 0;">
+            <p id="convoStatusText" style="font-size: 15px; font-weight: bold; color: #8e44ad; min-height: 40px; margin: 0 0 15px 0;">
                 Kliknij START, aby rozpocząć odpytywanie.
             </p>
             
-            <!-- Podgląd tego co Asystent usłyszał w danym kroku -->
             <p id="convoListeningPreview" style="font-size: 13px; color: #555; font-style: italic; background: #f4f6f7; padding: 8px; border-radius: 6px; display: none;">
                 " <span id="convoHeardText"></span> "
             </p>
@@ -29428,19 +29409,69 @@ if (celInput) {
             </button>
         </div>
 
-        <!-- WSPÓLNA CHECKLISTA DLA OBU TRYBÓW -->
-        <h4 style="margin-bottom: 5px; margin-top: 0; color: #333; font-size: 14px;">Zebrane dane:</h4>
-        <ul id="aiChecklist" style="list-style: none; padding: 0; margin: 0 0 15px 0; font-size: 13px; background: #fdfdfd; border: 1px solid #eee; padding: 10px; border-radius: 8px; line-height: 1.6;">
-            <li id="aiCheckKlient">⚪ <span style="color:#777;">Klient: </span></li>
-            <li id="aiCheckTag">⚪ <span style="color:#777;">Kolczyk: </span></li>
-            <li id="aiCheckRozp">⚪ <span style="color:#777;">Rozpoznanie: </span></li>
-            <li id="aiCheckZuzyte">⚪ <span style="color:#777;">Zużyte: </span></li>
-            <li id="aiCheckWydane">⚪ <span style="color:#777;">Pozostawione: </span></li>
-        </ul>
+        <!-- ========================================== -->
+        <!-- WIDOK 2: TRYB SWOBODNY                     -->
+        <!-- ========================================== -->
+        <div id="viewSwobodny" style="display: none;">
+            <p style="font-size: 11px; color: #7f8c8d; margin: 0 0 10px 0; line-height: 1.4; text-align: center; background: #f4f6f7; padding: 8px; border-radius: 6px;">
+                💡 <b>Schemat:</b> <i>"Klient [nazwa], krowa [PL...], rozpoznanie [tekst], zużyłem [ilość] [lek], zostawiłem [ilość] [lek]"</i>
+            </p>
+            <textarea id="aiRawTextInput" placeholder="Kliknij MÓW i podyktuj wszystko naraz..." style="width: 100%; height: 60px; padding: 10px; border-radius: 8px; border: 1px solid #ccc; font-size: 14px; resize: none; margin-bottom: 10px; box-sizing: border-box; font-family: inherit;"></textarea>
+            <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                <button id="aiRecordBtn" class="btn" style="flex: 1; background-color: #e74c3c; color: white; border: none; padding: 10px; font-weight: bold;">
+                    🎙️ Mów
+                </button>
+                <button id="aiAnalyzeBtn" class="btn" style="flex: 1; background-color: #3498db; color: white; border: none; padding: 10px; font-weight: bold;">
+                    🧠 Analizuj
+                </button>
+            </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- WSPÓLNA, EDYTOWALNA CHECKLISTA DANYCH      -->
+        <!-- ========================================== -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+            <h4 style="margin: 0; color: #333; font-size: 14px;">Bieżąca sztuka (możesz edytować):</h4>
+            <span id="aiSavedCounter" style="background: #27ae60; color: white; padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: bold; display: none;">Zapisano: 0</span>
+        </div>
         
+        <!-- Zamiana z <li> na edytowalne pola -->
+        <div id="aiEditableForm" style="background: #fdfdfd; border: 1px solid #eee; padding: 10px; border-radius: 8px; margin-bottom: 15px; font-size: 13px;">
+            <div style="margin-bottom: 8px; display: flex; flex-direction: column;">
+                <label style="color: #777; font-size: 11px; margin-bottom: 2px;">Klient:</label>
+                <input type="text" id="aiEditKlient" placeholder="Brak" style="border: none; border-bottom: 1px solid #ddd; background: transparent; padding: 4px; font-weight: bold; color: #27ae60; outline: none; width: 100%;">
+            </div>
+            <div style="display: flex; gap: 10px; margin-bottom: 8px;">
+                <div style="flex: 2; display: flex; flex-direction: column;">
+                    <label style="color: #777; font-size: 11px; margin-bottom: 2px;">Kolczyk:</label>
+                    <input type="text" id="aiEditTag" placeholder="Brak" style="border: none; border-bottom: 1px solid #ddd; background: transparent; padding: 4px; font-weight: bold; color: #27ae60; outline: none; width: 100%;">
+                </div>
+                <div style="flex: 1; display: flex; flex-direction: column;">
+                    <label style="color: #777; font-size: 11px; margin-bottom: 2px;">Sztuk:</label>
+                    <input type="text" id="aiEditSztuki" placeholder="1" style="border: none; border-bottom: 1px solid #ddd; background: transparent; padding: 4px; font-weight: bold; color: #333; outline: none; width: 100%;">
+                </div>
+            </div>
+            <div style="margin-bottom: 8px; display: flex; flex-direction: column;">
+                <label style="color: #777; font-size: 11px; margin-bottom: 2px;">Rozpoznanie:</label>
+                <input type="text" id="aiEditRozp" placeholder="Opcjonalnie" style="border: none; border-bottom: 1px solid #ddd; background: transparent; padding: 4px; font-weight: bold; color: #27ae60; outline: none; width: 100%;">
+            </div>
+            <div style="margin-bottom: 8px; display: flex; flex-direction: column;">
+                <label style="color: #777; font-size: 11px; margin-bottom: 2px;">Zużyte leki (np. Wapń 20, Glukoza 10):</label>
+                <input type="text" id="aiEditZuzyte" placeholder="Brak leków" style="border: none; border-bottom: 1px solid #ddd; background: transparent; padding: 4px; font-weight: bold; color: #27ae60; outline: none; width: 100%;">
+            </div>
+            <div style="display: flex; flex-direction: column;">
+                <label style="color: #777; font-size: 11px; margin-bottom: 2px;">Wydane leki:</label>
+                <input type="text" id="aiEditWydane" placeholder="Brak" style="border: none; border-bottom: 1px solid #ddd; background: transparent; padding: 4px; font-weight: bold; color: #2980b9; outline: none; width: 100%;">
+            </div>
+        </div>
+        
+        <button id="aiAddNextCowBtn" class="btn ghost" style="width: 100%; margin-bottom: 10px; border: 2px dashed #8e44ad; color: #8e44ad; font-weight: bold; display: none;">
+            ➕ Zapisz sztukę i dodaj kolejną
+        </button>
+
         <div class="form-actions" style="justify-content: space-between;">
             <button class="btn ghost" onclick="closeAiModal()" style="padding: 10px;">Anuluj</button>
-            <button class="btn primary" id="aiConfirmActionBtn" style="background-color: #27ae60; border-color: #2ecc71; font-size: 15px; padding: 10px; opacity: 0.5;" disabled>
+            <button class="btn primary" id="aiConfirmActionBtn" style="background-color: #27ae60; border-color: #2ecc71; font-size: 15px; padding: 10px; width: 60%;">
                 ✅ Wygeneruj Kartę
             </button>
         </div>
@@ -29451,6 +29482,7 @@ if (celInput) {
     const menuAsystentBtn = document.getElementById('menuAsystentBtn');
     const aiModal = document.getElementById('aiAssistantModal');
     const aiConfirmBtn = document.getElementById('aiConfirmActionBtn');
+    const aiAddNextCowBtn = document.getElementById('aiAddNextCowBtn');
     
     // ZAKŁADKI
     const tabSwobodny = document.getElementById('tabBtnSwobodny');
@@ -29458,12 +29490,12 @@ if (celInput) {
     const viewSwobodny = document.getElementById('viewSwobodny');
     const viewRozmowa = document.getElementById('viewRozmowa');
 
-    // SWOBODNY WIDOK
+    // UI SWOBODNY
     const aiRawTextInput = document.getElementById('aiRawTextInput');
     const aiRecordBtn = document.getElementById('aiRecordBtn');
     const aiAnalyzeBtn = document.getElementById('aiAnalyzeBtn');
 
-    // ROZMOWA WIDOK
+    // UI ROZMOWA
     const convoStartBtn = document.getElementById('convoStartBtn');
     const convoSkipBtn = document.getElementById('convoSkipBtn');
     const convoStatusText = document.getElementById('convoStatusText');
@@ -29471,27 +29503,44 @@ if (celInput) {
     const convoListeningPreview = document.getElementById('convoListeningPreview');
     const convoHeardText = document.getElementById('convoHeardText');
 
-    let parsedAiAction = { klient: '', tag: '', liczba: '', rozpoznanie: '', zuzyte: [], wydane: [] };
+    // POLA EDYTOWALNE
+    const edKlient = document.getElementById('aiEditKlient');
+    const edTag = document.getElementById('aiEditTag');
+    const edSztuki = document.getElementById('aiEditSztuki');
+    const edRozp = document.getElementById('aiEditRozp');
+    const edZuzyte = document.getElementById('aiEditZuzyte');
+    const edWydane = document.getElementById('aiEditWydane');
+    const badgeCounter = document.getElementById('aiSavedCounter');
+
+    let allSavedAnimals = []; // Baza na wiele krów
     let aiRecognition = null;
     let isRecording = false;
-    let activeMode = 'swobodny'; // 'swobodny' lub 'rozmowa'
+    let activeMode = 'rozmowa'; // DOMYŚLNIE ROZMOWA
     
-    // Zmienne Konwersacji
     let convoState = -1; 
-    // 0 = Klient, 1 = Kolczyk, 2 = Rozpoznanie, 3 = Zużyte, 4 = Wydane
     const convoPrompts = [
-        "Podaj imię i nazwisko klienta. Jeśli nie chcesz, powiedz pomiń.",
+        "Podaj imię i nazwisko klienta. Możesz też powiedzieć pomiń.",
         "Podaj numer kolczyka krowy.",
         "Podaj rozpoznanie, lub powiedz pomiń.",
         "Jakie leki zużyłeś i w jakich ilościach?",
-        "Czy pozostawiłeś jakieś leki dla rolnika? Wymień je, lub powiedz nie."
+        "Czy pozostawiłeś leki rolnikowi? Wymień je, lub powiedz nie.",
+        "Czy chcesz dodać kolejną sztukę do tej wizyty? Powiedz tak lub nie."
     ];
 
-    // --- PRZEŁĄCZANIE ZAKŁADEK ---
+    // SZUKANIE NAJLEPSZEGO GŁOSU (Mniej robotycznego)
+    let bestPolishVoice = null;
+    function loadVoices() {
+        let voices = window.speechSynthesis.getVoices();
+        let plVoices = voices.filter(v => v.lang.includes('pl') || v.lang.includes('PL'));
+        // Priorytetyzujemy głosy sieciowe Google, które są bardzo naturalne
+        bestPolishVoice = plVoices.find(v => v.name.toLowerCase().includes('network') || v.name.toLowerCase().includes('google')) || plVoices[0];
+    }
+    window.speechSynthesis.onvoiceschanged = loadVoices;
+
+    // --- ZAKŁADKI ---
     tabSwobodny.addEventListener('click', () => {
         activeMode = 'swobodny';
-        viewSwobodny.style.display = 'block';
-        viewRozmowa.style.display = 'none';
+        viewSwobodny.style.display = 'block'; viewRozmowa.style.display = 'none';
         tabSwobodny.style.backgroundColor = '#8e44ad'; tabSwobodny.style.color = 'white';
         tabRozmowa.style.backgroundColor = '#f1f1f1'; tabRozmowa.style.color = '#555';
         stopAllAudio();
@@ -29499,8 +29548,7 @@ if (celInput) {
 
     tabRozmowa.addEventListener('click', () => {
         activeMode = 'rozmowa';
-        viewSwobodny.style.display = 'none';
-        viewRozmowa.style.display = 'block';
+        viewSwobodny.style.display = 'none'; viewRozmowa.style.display = 'block';
         tabRozmowa.style.backgroundColor = '#8e44ad'; tabRozmowa.style.color = 'white';
         tabSwobodny.style.backgroundColor = '#f1f1f1'; tabSwobodny.style.color = '#555';
         stopAllAudio();
@@ -29519,7 +29567,20 @@ if (celInput) {
         stopAllAudio();
     }
 
-    // --- ROZPOZNAWANIE MOWY ---
+    // Otwieranie asystenta
+    if (menuAsystentBtn) {
+        menuAsystentBtn.addEventListener('click', () => {
+            clearFormUI(true);
+            allSavedAnimals = [];
+            badgeCounter.style.display = 'none';
+            aiAddNextCowBtn.style.display = 'none';
+            aiModal.style.display = 'flex';
+            loadVoices(); // Wymuszenie ładowania głosu
+            stopAllAudio();
+        });
+    }
+
+    // --- MIKROFON ---
     if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         aiRecognition = new SpeechRecognition();
@@ -29527,29 +29588,14 @@ if (celInput) {
         aiRecognition.continuous = false;     
         aiRecognition.interimResults = false; 
 
-        if (menuAsystentBtn) {
-            menuAsystentBtn.addEventListener('click', () => {
-                resetChecklist();
-                aiModal.style.display = 'flex';
-                stopAllAudio();
-            });
-        }
-
-        // AKCJA: TRYB SWOBODNY - MÓW
         aiRecordBtn.addEventListener('click', () => {
             if (isRecording) {
                 aiRecognition.stop();
             } else {
-                try { 
-                    isRecording = true;
-                    aiRecognition.start(); 
-                    aiRecordBtn.innerHTML = "🛑 Zakończ";
-                    aiRecordBtn.style.backgroundColor = "#c0392b";
-                } catch (e) {}
+                try { isRecording = true; aiRecognition.start(); aiRecordBtn.innerHTML = "🛑 Zakończ"; aiRecordBtn.style.backgroundColor = "#c0392b"; } catch (e) {}
             }
         });
 
-        // WYNIK MOWY (Wspólny dla obu trybów)
         aiRecognition.onresult = (event) => {
             const text = event.results[0][0].transcript.trim().toLowerCase();
             
@@ -29566,9 +29612,6 @@ if (celInput) {
         };
 
         aiRecognition.onerror = (e) => {
-            if (activeMode === 'swobodny' && aiRawTextInput.value === '' && e.error !== 'no-speech') {
-                aiRawTextInput.value = "[Błąd]";
-            }
             if (activeMode === 'rozmowa') {
                 convoStatusText.textContent = "Nie zrozumiałem, powtórz.";
                 setTimeout(() => { if(isRecording) aiRecognition.start(); }, 1500);
@@ -29577,21 +29620,184 @@ if (celInput) {
         
         aiRecognition.onend = () => {
             if (activeMode === 'swobodny') {
-                if (isRecording) {
-                    setTimeout(() => { try { if(isRecording) aiRecognition.start(); } catch(e){} }, 250);
-                } else {
-                    resetSwobodnyUI();
-                }
+                if (isRecording) setTimeout(() => { try { if(isRecording) aiRecognition.start(); } catch(e){} }, 250);
+                else resetSwobodnyUI();
             } else if (activeMode === 'rozmowa') {
-                // Konwersacja steruje włączaniem mikrofonu samodzielnie
                 convoAvatar.style.transform = 'scale(1)';
             }
         };
 
-        // --- SILNIK EKSTRAKCJI DANYCH (SŁOWNIK) ---
-        function extractProductsFromText(subtext) {
+        // --- SILNIK MOWY (GŁOS ASYSTENTA) ---
+        function speak(text, callback) {
+            window.speechSynthesis.cancel();
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = 'pl-PL';
+            if (bestPolishVoice) utterance.voice = bestPolishVoice;
+            utterance.rate = 1.05; // Ciut żwawsze tempo
+            
+            convoAvatar.style.transform = 'scale(1.2)';
+            convoStatusText.textContent = `🔊 ${text}`;
+            
+            utterance.onend = () => {
+                convoAvatar.style.transform = 'scale(1)';
+                if(callback) callback();
+            };
+            window.speechSynthesis.speak(utterance);
+        }
+
+        // --- LOGIKA TRYBU ROZMOWY ---
+        convoStartBtn.addEventListener('click', () => {
+            convoState = 0;
+            convoStartBtn.style.display = 'none';
+            convoSkipBtn.style.display = 'inline-block';
+            runConvoStep();
+        });
+
+        convoSkipBtn.addEventListener('click', () => {
+            if(aiRecognition) aiRecognition.stop();
+            processConvoAnswer("pomiń");
+        });
+
+        function runConvoStep() {
+            // Gdy pytamy o "Czy kolejna sztuka?"
+            if (convoState === 5) {
+                speak(convoPrompts[convoState], () => {
+                    convoStatusText.textContent = "🎙️ Słucham (Tak/Nie)...";
+                    try { isRecording = true; aiRecognition.start(); } catch(e){}
+                });
+                return;
+            }
+
+            if (convoState >= convoPrompts.length) return;
+
+            speak(convoPrompts[convoState], () => {
+                convoStatusText.textContent = "🎙️ Słucham...";
+                convoListeningPreview.style.display = 'none';
+                try { isRecording = true; aiRecognition.start(); } catch(e) {}
+            });
+        }
+
+        function processConvoAnswer(text) {
+            const skipWords = ['pomiń', 'pomin', 'dalej', 'nie', 'brak'];
+            const isSkip = skipWords.includes(text);
+
+            if (convoState === 0 && !isSkip) { // KLIENT
+                const kMatch = text.match(/([a-ząćęłńóśźż]+\s+[a-ząćęłńóśźż]+)/i);
+                edKlient.value = kMatch ? capitalizeWords(kMatch[1]) : capitalizeWords(text);
+            } 
+            else if (convoState === 1 && !isSkip) { // KOLCZYK
+                const tagMatch = text.match(/([a-z]{0,2}(?:\s*\d){2,14})/i);
+                if (tagMatch) edTag.value = tagMatch[1].toUpperCase().replace(/\s+/g, '');
+            }
+            else if (convoState === 2 && !isSkip) { // ROZPOZNANIE
+                edRozp.value = text.charAt(0).toUpperCase() + text.slice(1);
+            }
+            else if (convoState === 3 && !isSkip) { // ZUŻYTE
+                edZuzyte.value = extractMedsToString(text);
+            }
+            else if (convoState === 4 && !isSkip) { // WYDANE
+                edWydane.value = extractMedsToString(text);
+            }
+            else if (convoState === 5) { // CZY DODAJEMY KOLEJNĄ?
+                if (text.includes('tak')) {
+                    saveCurrentAnimalToMemory();
+                    convoState = 1; // Wracamy do pytania nr 1 (Kolczyk), pomijamy klienta!
+                    setTimeout(runConvoStep, 500);
+                    return;
+                } else {
+                    convoState = 6;
+                    convoStatusText.textContent = "✅ Zakończono odpytywanie.";
+                    convoSkipBtn.style.display = 'none';
+                    convoStartBtn.style.display = 'inline-block';
+                    convoStartBtn.innerHTML = "🔄 Zacznij od nowa";
+                    isRecording = false;
+                    speak("Gotowe. Wygeneruj kartę leczenia.");
+                    return;
+                }
+            }
+
+            convoState++;
+            setTimeout(runConvoStep, 800);
+        }
+
+        // --- ZAPISYWANIE WIELU ZWIERZĄT W PAMIĘCI ---
+        function saveCurrentAnimalToMemory() {
+            // Zapisz do tablicy jeśli jest chociaż kolczyk lub lek
+            if (edTag.value || edZuzyte.value) {
+                allSavedAnimals.push({
+                    tag: edTag.value,
+                    liczba: edSztuki.value || '1',
+                    rozpoznanie: edRozp.value,
+                    zuzyte: edZuzyte.value,
+                    wydane: edWydane.value
+                });
+                
+                badgeCounter.style.display = 'inline-block';
+                badgeCounter.textContent = `Zapisano sztuk: ${allSavedAnimals.length}`;
+            }
+            
+            // Wyczyść formularz, ale ZOSTAW klienta
+            clearFormUI(false); 
+        }
+
+        // Ręczny przycisk "Dodaj kolejną" (Dla trybu Swobodnego)
+        aiAddNextCowBtn.addEventListener('click', () => {
+            saveCurrentAnimalToMemory();
+            if(activeMode === 'swobodny') {
+                aiRawTextInput.value = '';
+                showToast("Zapisano. Podyktuj dane dla następnej krowy.", "info");
+            }
+        });
+
+        // Nasłuchiwanie czy pokazać przycisk "Dodaj kolejną"
+        function checkShowAddButton() {
+            if (edTag.value.length > 2 || edZuzyte.value.length > 2) {
+                aiAddNextCowBtn.style.display = 'block';
+            } else {
+                aiAddNextCowBtn.style.display = 'none';
+            }
+        }
+        document.getElementById('aiEditableForm').addEventListener('input', checkShowAddButton);
+
+
+        // --- LOGIKA TRYBU SWOBODNEGO ---
+        aiAnalyzeBtn.addEventListener('click', () => {
+            let text = aiRawTextInput.value.toLowerCase();
+            if(!text) return;
+
+            const klientMatch = text.match(/klient(?:a)?\s+([a-ząćęłńóśźż]+\s+[a-ząćęłńóśźż]+)/i);
+            if (klientMatch) { edKlient.value = capitalizeWords(klientMatch[1]); text = text.replace(klientMatch[0], ''); }
+
+            const tagMatch = text.match(/(?:krow[a-ęy]|kolczyk(?:u)?|numer(?:ze)?|sztuk[a-ei])?\s*([a-z]{0,2}(?:\s*\d){2,14})/i);
+            if (tagMatch) { edTag.value = tagMatch[1].toUpperCase().replace(/\s+/g, ''); text = text.replace(tagMatch[0], ''); }
+
+            const liczbaMatch = text.match(/(?:liczba zwierząt|liczba sztuk|leczonych sztuk)\s+(\d+)/i);
+            if (liczbaMatch) { edSztuki.value = liczbaMatch[1]; text = text.replace(liczbaMatch[0], ''); }
+
+            const rozpMatch = text.match(/(?:rozpoznanie|diagnoza)\s+(.*?)(?=\s+(?:zuży|poda|da|zostaw|wyda|produkt|lek)|$)/i);
+            if (rozpMatch) { edRozp.value = rozpMatch[1].trim().charAt(0).toUpperCase() + rozpMatch[1].trim().slice(1); text = text.replace(rozpMatch[0], ''); }
+
+            let txtZuzyte = text, txtWydane = '';
+            const splitMatch = text.match(/(?:zostawi[a-z]*|wyda[a-z]*|pozostawi[a-z]*)/i);
+            if (splitMatch) {
+                const splitIndex = text.indexOf(splitMatch[0]);
+                txtZuzyte = text.substring(0, splitIndex); txtWydane = text.substring(splitIndex);
+            }
+
+            const medsZuzyte = extractMedsToString(txtZuzyte);
+            if(medsZuzyte) edZuzyte.value = (edZuzyte.value ? edZuzyte.value + ", " : "") + medsZuzyte;
+            
+            const medsWydane = extractMedsToString(txtWydane);
+            if(medsWydane) edWydane.value = (edWydane.value ? edWydane.value + ", " : "") + medsWydane;
+
+            checkShowAddButton();
+        });
+
+
+        // --- POMOCNICZE FUNKCJE ---
+        function extractMedsToString(subtext) {
             const meds = [];
-            const ignoreWords = ['zużył', 'dostał', 'zostawił', 'wydał', 'krowa', 'krowę', 'kolczyk', 'klient', 'leki', 'lek', 'rozpoznanie', 'ml', 'mililitr', 'szt', 'sztuk', 'g', 'mg', 'pomiń', 'nie', 'brak'];
+            const ignoreWords = ['zużył', 'dostał', 'zostawił', 'wydał', 'krowa', 'krowę', 'kolczyk', 'klient', 'leki', 'lek', 'rozpoznanie', 'ml', 'mililitr', 'szt', 'sztuk', 'g', 'mg'];
             const dictionary = {
                 'wapnia': 'wapń', 'glukozy': 'glukoza', 'betamoxu': 'betamox', 'dexafortu': 'dexafort', 
                 'witaminy': 'witamina', 'oksytocyny': 'oksytocyna', 'combikelu': 'combikel', 
@@ -29608,209 +29814,85 @@ if (celInput) {
                     let lekWords = txtNoNum.split(' ').filter(w => w.trim().length > 1 && !ignoreWords.includes(w.trim().toLowerCase()));
                     let rawLek = lekWords.join(' ').trim();
                     let finalLek = dictionary[rawLek] ? dictionary[rawLek] : lekWords.map(w => dictionary[w] || w).join(' ');
-                    if (finalLek.length > 1) meds.push({ lek: finalLek, ilosc: val });
-                }
-            });
-            return meds;
-        }
-
-        // AKCJA: TRYB SWOBODNY - ANALIZA
-        aiAnalyzeBtn.addEventListener('click', () => {
-            let text = aiRawTextInput.value.toLowerCase();
-            if(!text) return;
-            parsedAiAction = { klient: '', tag: '', liczba: '', rozpoznanie: '', zuzyte: [], wydane: [] };
-
-            const klientMatch = text.match(/klient(?:a)?\s+([a-ząćęłńóśźż]+\s+[a-ząćęłńóśźż]+)/i);
-            if (klientMatch) { parsedAiAction.klient = klientMatch[1]; text = text.replace(klientMatch[0], ''); }
-
-            const tagMatch = text.match(/(?:krow[a-ęy]|kolczyk(?:u)?|numer(?:ze)?|sztuk[a-ei])?\s*([a-z]{0,2}(?:\s*\d){2,14})/i);
-            if (tagMatch) { parsedAiAction.tag = tagMatch[1].toUpperCase().replace(/\s+/g, ''); parsedAiAction.liczba = '1'; text = text.replace(tagMatch[0], ''); }
-
-            const liczbaMatch = text.match(/(?:liczba zwierząt|liczba sztuk|leczonych sztuk)\s+(\d+)/i);
-            if (liczbaMatch) { parsedAiAction.liczba = liczbaMatch[1]; text = text.replace(liczbaMatch[0], ''); }
-
-            const rozpMatch = text.match(/(?:rozpoznanie|diagnoza)\s+(.*?)(?=\s+(?:zuży|poda|da|zostaw|wyda|produkt|lek)|$)/i);
-            if (rozpMatch) { parsedAiAction.rozpoznanie = rozpMatch[1].trim().charAt(0).toUpperCase() + rozpMatch[1].trim().slice(1); text = text.replace(rozpMatch[0], ''); }
-
-            let txtZuzyte = text, txtWydane = '';
-            const splitMatch = text.match(/(?:zostawi[a-z]*|wyda[a-z]*|pozostawi[a-z]*)/i);
-            if (splitMatch) {
-                const splitIndex = text.indexOf(splitMatch[0]);
-                txtZuzyte = text.substring(0, splitIndex); txtWydane = text.substring(splitIndex);
-            }
-
-            parsedAiAction.zuzyte = extractProductsFromText(txtZuzyte);
-            parsedAiAction.wydane = extractProductsFromText(txtWydane);
-            updateChecklist();
-        });
-
-        // --- TRYB ROZMOWY LOGIKA ---
-        function speak(text, callback) {
-            window.speechSynthesis.cancel(); // Czyść kolejkę
-            const utterance = new SpeechSynthesisUtterance(text);
-            utterance.lang = 'pl-PL';
-            utterance.rate = 1.0; // Prędkość mówienia
-            
-            convoAvatar.style.transform = 'scale(1.2)';
-            convoStatusText.textContent = `🔊 ${text}`;
-            
-            utterance.onend = () => {
-                convoAvatar.style.transform = 'scale(1)';
-                if(callback) callback();
-            };
-            window.speechSynthesis.speak(utterance);
-        }
-
-        convoStartBtn.addEventListener('click', () => {
-            resetChecklist();
-            convoState = 0;
-            convoStartBtn.style.display = 'none';
-            convoSkipBtn.style.display = 'inline-block';
-            runConvoStep();
-        });
-
-        convoSkipBtn.addEventListener('click', () => {
-            if(aiRecognition) aiRecognition.stop();
-            processConvoAnswer("pomiń");
-        });
-
-        function runConvoStep() {
-            if (convoState >= convoPrompts.length) {
-                convoStatusText.textContent = "✅ Gotowe! Sprawdź checklistę poniżej i wygeneruj kartę.";
-                convoSkipBtn.style.display = 'none';
-                convoStartBtn.style.display = 'inline-block';
-                convoStartBtn.innerHTML = "🔄 Zacznij od nowa";
-                isRecording = false;
-                speak("Zakończono odpytywanie. Możesz wygenerować kartę leczenia.");
-                return;
-            }
-
-            // Asystent mówi, a potem słucha
-            speak(convoPrompts[convoState], () => {
-                convoStatusText.textContent = "🎙️ Słucham...";
-                convoAvatar.style.transform = 'scale(1.1)';
-                convoListeningPreview.style.display = 'none';
-                try { 
-                    isRecording = true;
-                    aiRecognition.start(); 
-                } catch(e) { console.warn("Mikrofon błąd", e); }
-            });
-        }
-
-        function processConvoAnswer(text) {
-            const skipWords = ['pomiń', 'pomin', 'dalej', 'nie', 'brak'];
-            const isSkip = skipWords.includes(text);
-
-            if (convoState === 0) { // KLIENT
-                if (!isSkip) {
-                    const kMatch = text.match(/([a-ząćęłńóśźż]+\s+[a-ząćęłńóśźż]+)/i);
-                    parsedAiAction.klient = kMatch ? kMatch[1] : text;
-                }
-            } 
-            else if (convoState === 1) { // KOLCZYK
-                if (!isSkip) {
-                    const tagMatch = text.match(/([a-z]{0,2}(?:\s*\d){2,14})/i);
-                    if (tagMatch) {
-                        parsedAiAction.tag = tagMatch[1].toUpperCase().replace(/\s+/g, '');
-                        parsedAiAction.liczba = '1';
+                    
+                    if (finalLek.length > 1) {
+                        meds.push(`${capitalizeWords(finalLek)} ${val}`);
                     }
                 }
-            }
-            else if (convoState === 2) { // ROZPOZNANIE
-                if (!isSkip) parsedAiAction.rozpoznanie = text.charAt(0).toUpperCase() + text.slice(1);
-            }
-            else if (convoState === 3) { // ZUŻYTE
-                if (!isSkip) parsedAiAction.zuzyte = extractProductsFromText(text);
-            }
-            else if (convoState === 4) { // WYDANE
-                if (!isSkip) parsedAiAction.wydane = extractProductsFromText(text);
-            }
-
-            updateChecklist();
-            convoState++;
-            
-            // Lekkie opóźnienie przed kolejnym pytaniem, by można było przeczytać co usłyszał
-            setTimeout(runConvoStep, 800);
+            });
+            return meds.join(', ');
         }
 
-        // WSPÓLNE AKTUALIZOWANIE WIZUALNE
-        function updateChecklist() {
-            const elKlient = document.getElementById('aiCheckKlient');
-            if (parsedAiAction.klient) elKlient.innerHTML = `✅ <span style="color:#27ae60;">Klient: <b>${parsedAiAction.klient}</b></span>`;
-            else elKlient.innerHTML = `⚪ <span style="color:#777;">Klient: (Brak)</span>`;
-
-            const elTag = document.getElementById('aiCheckTag');
-            if (parsedAiAction.tag) elTag.innerHTML = `✅ <span style="color:#27ae60;">Kolczyk: <b>${parsedAiAction.tag}</b> (szt. ${parsedAiAction.liczba})</span>`;
-            else elTag.innerHTML = `❌ <span style="color:#c0392b; font-weight:bold;">Brak kolczyka krowy</span>`;
-
-            const elRozp = document.getElementById('aiCheckRozp');
-            if (parsedAiAction.rozpoznanie) elRozp.innerHTML = `✅ <span style="color:#27ae60;">Rozpoznanie: <b>${parsedAiAction.rozpoznanie}</b></span>`;
-            else elRozp.innerHTML = `⚪ <span style="color:#777;">Rozpoznanie: (Brak)</span>`;
-
-            const elZuzyte = document.getElementById('aiCheckZuzyte');
-            if (parsedAiAction.zuzyte.length > 0) {
-                const zTxt = parsedAiAction.zuzyte.map(m => `${m.lek} (${m.ilosc})`).join(', ');
-                elZuzyte.innerHTML = `✅ <span style="color:#27ae60;">Zużyte: <b>${zTxt}</b></span>`;
-            } else {
-                elZuzyte.innerHTML = `❌ <span style="color:#c0392b; font-weight:bold;">Brak leków</span>`;
-            }
-
-            const elWydane = document.getElementById('aiCheckWydane');
-            if (parsedAiAction.wydane.length > 0) {
-                const wTxt = parsedAiAction.wydane.map(m => `${m.lek} (${m.ilosc})`).join(', ');
-                elWydane.innerHTML = `✅ <span style="color:#2980b9;">Pozostawione: <b>${wTxt}</b></span>`;
-            } else {
-                elWydane.innerHTML = `⚪ <span style="color:#777;">Pozostawione: (Brak)</span>`;
-            }
-
-            if (parsedAiAction.tag && parsedAiAction.zuzyte.length > 0) {
-                aiConfirmBtn.disabled = false;
-                aiConfirmBtn.style.opacity = '1';
-            } else {
-                aiConfirmBtn.disabled = true;
-                aiConfirmBtn.style.opacity = '0.5';
-            }
+        // Tłumacz z ładnego tekstu "Wapń 20, Glukoza 10" na tablicę obiektów
+        function parseEditableStringToArray(str) {
+            if(!str) return [];
+            let items = str.split(',');
+            let res = [];
+            items.forEach(item => {
+                let m = item.match(/(.+?)\s+(\d+(?:[.,]\d+)?)/); 
+                if (m) res.push({ lek: m[1].trim(), ilosc: m[2].trim() });
+                else if(item.trim()) res.push({ lek: item.trim(), ilosc: '1' });
+            });
+            return res;
         }
 
-        function resetChecklist() {
-            parsedAiAction = { klient: '', tag: '', liczba: '', rozpoznanie: '', zuzyte: [], wydane: [] };
-            updateChecklist();
+        function clearFormUI(clearKlient = true) {
+            if(clearKlient) edKlient.value = '';
+            edTag.value = '';
+            edSztuki.value = '1';
+            edRozp.value = '';
+            edZuzyte.value = '';
+            edWydane.value = '';
+            checkShowAddButton();
         }
 
         function resetSwobodnyUI() {
-            if(aiRecordBtn) {
-                aiRecordBtn.innerHTML = "🎙️ Mów";
-                aiRecordBtn.style.backgroundColor = "#e74c3c";
-            }
+            if(aiRecordBtn) { aiRecordBtn.innerHTML = "🎙️ Mów"; aiRecordBtn.style.backgroundColor = "#e74c3c"; }
         }
 
         function resetConvoUI() {
             convoState = -1;
-            convoStartBtn.style.display = 'inline-block';
-            convoStartBtn.innerHTML = "▶️ Start Rozmowy";
+            convoStartBtn.style.display = 'inline-block'; convoStartBtn.innerHTML = "▶️ Start Rozmowy";
             convoSkipBtn.style.display = 'none';
             convoStatusText.textContent = "Kliknij START, aby rozpocząć odpytywanie.";
             convoListeningPreview.style.display = 'none';
-            convoAvatar.style.transform = 'scale(1)';
+        }
+
+        function capitalizeWords(str) {
+            return str.replace(/\b\w/g, l => l.toUpperCase());
         }
 
         // ===============================================
-        // GENEROWANIE KARTY (WSPÓLNE KULOODPORNE)
+        // GENEROWANIE KARTY (WSTRZYKUJE WSZYSTKIE KROWY)
         // ===============================================
         aiConfirmBtn.addEventListener('click', () => {
+            // Zapisz to co wisi aktualnie w polach jako ostatnie zwierzę
+            if(edTag.value || edZuzyte.value) {
+                saveCurrentAnimalToMemory();
+            }
+
+            if(allSavedAnimals.length === 0) {
+                alert("Nie wpisano żadnych leków ani kolczyków.");
+                return;
+            }
+
+            // Pytanie o Wydane (Jeśli któraś krowa ma wydane)
+            let hasWydane = allSavedAnimals.some(a => a.wydane.length > 0);
             let copyToWydane = false;
-            if (parsedAiAction.wydane.length > 0 && (parsedAiAction.tag || parsedAiAction.rozpoznanie)) {
-                copyToWydane = confirm("Czy przekopiować automatycznie numer kolczyka, liczbę sztuk i rozpoznanie również do sekcji 'Pozostawione'?");
+            if (hasWydane) {
+                copyToWydane = confirm("Czy skopiować kolczyki, sztuki i rozpoznanie również do sekcji 'Wydane/Pozostawione' na dole karty?");
             }
 
             closeAiModal();
             showSection('karta');
             
+            // 1. Zmiana Klienta (Tylko raz dla całej wizyty)
+            const masterKlient = edKlient.value;
             try {
                 const klientSelect = document.getElementById('klientSelect');
-                if (klientSelect && parsedAiAction.klient) {
+                if (klientSelect && masterKlient) {
                     const options = Array.from(klientSelect.options);
-                    const spokenWords = parsedAiAction.klient.toLowerCase().trim().split(/\s+/);
+                    const spokenWords = masterKlient.toLowerCase().trim().split(/\s+/);
                     const match = options.find(opt => {
                         const optText = opt.text.toLowerCase();
                         return spokenWords.length > 0 && spokenWords.every(word => word.length > 2 && optText.includes(word));
@@ -29820,53 +29902,62 @@ if (celInput) {
                         klientSelect.dispatchEvent(new Event('change', { bubbles: true }));
                     }
                 }
-            } catch (e) { console.warn("Błąd doboru klienta."); }
+            } catch (e) {}
 
-            function injectDataToCard() {
+            // 2. Wstrzykiwanie WSZYSTKICH KRÓW do tabeli (Z licznikiem wierszy)
+            function injectAllData() {
                 const logicalRows = typeof rowsEditable === 'function' ? rowsEditable() : [];
                 if(logicalRows.length === 0) return;
-                const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+                
                 function setVal(cell, val) {
                     if(!cell || !val) return;
                     const inp = cell.querySelector('input');
                     if(inp && inp.value !== val) { inp.value = val; inp.dispatchEvent(new Event('input', {bubbles: true})); }
                 }
 
-                let currRow = 0;
-                parsedAiAction.zuzyte.forEach(med => {
-                    if (logicalRows[currRow] && logicalRows[currRow].cells.length > 6) {
-                        const r = logicalRows[currRow];
-                        setVal(r.cells[1], parsedAiAction.tag);
-                        setVal(r.cells[2], parsedAiAction.liczba);
-                        setVal(r.cells[3], parsedAiAction.rozpoznanie);
-                        setVal(r.cells[4], capitalize(med.lek));
-                        setVal(r.cells[6], med.ilosc.replace(',','.'));
-                        currRow++;
-                    }
-                });
+                let rowZuz = 0; // Wiersze dla leków zużytych (0 - 8)
+                let rowWyd = 9; // Wiersze dla leków wydanych (9 - 12)
 
-                parsedAiAction.wydane.forEach(med => {
-                    if (currRow < 9) currRow = 9; 
-                    if (logicalRows[currRow] && logicalRows[currRow].cells.length > 6) {
-                        const r = logicalRows[currRow];
-                        if (copyToWydane) {
-                            setVal(r.cells[1], parsedAiAction.tag);
-                            setVal(r.cells[2], parsedAiAction.liczba);
-                            setVal(r.cells[3], parsedAiAction.rozpoznanie);
+                allSavedAnimals.forEach(animal => {
+                    const zuzyteArr = parseEditableStringToArray(animal.zuzyte);
+                    const wydaneArr = parseEditableStringToArray(animal.wydane);
+
+                    // Wypełnianie Zużytych
+                    zuzyteArr.forEach(med => {
+                        if (rowZuz <= 8 && logicalRows[rowZuz]) {
+                            const r = logicalRows[rowZuz];
+                            setVal(r.cells[1], animal.tag);
+                            setVal(r.cells[2], animal.liczba);
+                            setVal(r.cells[3], animal.rozpoznanie);
+                            setVal(r.cells[4], med.lek);
+                            setVal(r.cells[6], med.ilosc.replace(',','.'));
+                            rowZuz++;
                         }
-                        setVal(r.cells[4], capitalize(med.lek));
-                        setVal(r.cells[6], med.ilosc.replace(',','.'));
-                        currRow++;
-                    }
+                    });
+
+                    // Wypełnianie Wydanych
+                    wydaneArr.forEach(med => {
+                        if (rowWyd <= 12 && logicalRows[rowWyd]) {
+                            const r = logicalRows[rowWyd];
+                            if (copyToWydane) {
+                                setVal(r.cells[1], animal.tag);
+                                setVal(r.cells[2], animal.liczba);
+                                setVal(r.cells[3], animal.rozpoznanie);
+                            }
+                            setVal(r.cells[4], med.lek);
+                            setVal(r.cells[6], med.ilosc.replace(',','.'));
+                            rowWyd++;
+                        }
+                    });
                 });
             }
 
-            setTimeout(injectDataToCard, 400);
-            setTimeout(injectDataToCard, 1000);
-            setTimeout(injectDataToCard, 2000);
-            setTimeout(injectDataToCard, 3500);
+            // Kilkukrotne wstrzyknięcie (odporność na Firebase)
+            setTimeout(injectAllData, 500);
+            setTimeout(injectAllData, 1200);
+            setTimeout(injectAllData, 2500);
 
-            if (typeof showToast === 'function') showToast("Karta wygenerowana!", "success");
+            if (typeof showToast === 'function') showToast(`Załadowano dane dla ${allSavedAnimals.length} sztuk!`, "success");
         });
     } else {
         if (menuAsystentBtn) menuAsystentBtn.style.display = 'none';
