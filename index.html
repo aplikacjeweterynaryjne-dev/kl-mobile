@@ -3239,6 +3239,10 @@ background-color: #eef;
 </div>
 <div id="mainMenuSection" style="display: none; flex-direction: column; align-items: center; justify-content: flex-start; padding-top: 30px; width: 100%; box-sizing: border-box;">
   <h2 style="font-size: 24px; color: #333; margin-bottom: 25px;">Menu Główne</h2>
+    <!-- PRZYCISK ASYSTENTA AI -->
+    <button id="menuAsystentBtn" class="menu-btn" style="background-color: #f3e5f5; border-color: #ce93d8; color: #8e44ad; font-weight: bold; font-size: 22px;">
+        🤖 Asystent Głosowy AI TESTY
+    </button>
   <button id="menuKalendarzBtn" class="menu-btn">🗓️ Kalendarz wizyt</button>
   <button id="menuKartaBtn" class="menu-btn">📝 Generator kart leczenia</button>
 <button id="menuKalkulatorBtn" class="menu-btn">🧮 Kalkulator wizyty</button>
@@ -29363,6 +29367,184 @@ if (celInput) {
             });
         }
     });
+</script>
+    <!-- ========================================== -->
+<!-- 🤖 ASYSTENT GŁOSOWY AI - MODAL I LOGIKA    -->
+<!-- ========================================== -->
+<div id="aiAssistantModal" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.6); display: none; z-index: 20000; justify-content: center; align-items: center;">
+    <div class="form-card" style="width: 95%; max-width: 450px; background: white; padding: 20px; border-radius: 12px; border-top: 5px solid #8e44ad; text-align: center;">
+        
+        <h3 style="margin-top: 0; color: #8e44ad; display: flex; justify-content: center; align-items: center; gap: 10px;">
+            🤖 Twój Asystent
+        </h3>
+        
+        <!-- Stan SŁUCHANIA -->
+        <div id="aiListeningIndicator" style="margin: 20px 0;">
+            <div style="font-size: 50px;">🎙️</div>
+            <p style="color: #e74c3c; font-weight: bold; margin-top: 10px; font-size: 18px;">Słucham...</p>
+        </div>
+
+        <!-- Stan ZROZUMIANO -->
+        <div id="aiResultContainer" style="display: none; text-align: left;">
+            <p style="font-size: 15px; color: #555; font-style: italic; padding: 10px; background: #f4f4f4; border-radius: 8px;">
+                " <span id="aiRecognizedText" style="font-weight: bold;"></span> "
+            </p>
+            
+            <h4 style="margin-bottom: 5px; color: #333;">Zrozumiałem następująco:</h4>
+            <div id="aiParsedResults" style="font-size: 16px; margin-bottom: 20px; background: #fdfdfd; border: 1px solid #eee; padding: 10px; border-radius: 8px;">
+            </div>
+        </div>
+        
+        <div class="form-actions" style="justify-content: space-between;">
+            <button class="btn ghost" onclick="closeAiModal()">Anuluj</button>
+            <button class="btn primary" id="aiConfirmActionBtn" style="display: none; background-color: #8e44ad; border-color: #732d91; font-size: 18px; padding: 10px 20px;">
+                ✅ Wykonaj
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const menuAsystentBtn = document.getElementById('menuAsystentBtn');
+    const aiModal = document.getElementById('aiAssistantModal');
+    const aiListeningIndicator = document.getElementById('aiListeningIndicator');
+    const aiResultContainer = document.getElementById('aiResultContainer');
+    const aiTextSpan = document.getElementById('aiRecognizedText');
+    const aiResultsDiv = document.getElementById('aiParsedResults');
+    const aiConfirmBtn = document.getElementById('aiConfirmActionBtn');
+
+    let parsedAiAction = null;
+    let aiRecognition = null;
+
+    function closeAiModal() {
+        aiModal.style.display = 'none';
+        if (aiRecognition) aiRecognition.stop();
+    }
+
+    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        aiRecognition = new SpeechRecognition();
+        aiRecognition.lang = 'pl-PL';
+        aiRecognition.continuous = false;
+        aiRecognition.interimResults = false;
+
+        if (menuAsystentBtn) {
+            menuAsystentBtn.addEventListener('click', () => {
+                aiListeningIndicator.style.display = 'block';
+                aiResultContainer.style.display = 'none';
+                aiConfirmBtn.style.display = 'none';
+                aiModal.style.display = 'flex';
+                try { aiRecognition.start(); } catch (e) { console.warn("Rozpoznawanie już działa."); }
+            });
+        }
+
+        aiRecognition.onresult = (event) => {
+            const text = event.results[0][0].transcript;
+            aiListeningIndicator.style.display = 'none';
+            aiResultContainer.style.display = 'block';
+            processAssistantCommand(text.toLowerCase());
+        };
+
+        aiRecognition.onerror = (e) => {
+            console.error('Błąd asystenta:', e.error);
+            aiListeningIndicator.style.display = 'none';
+            aiResultContainer.style.display = 'block';
+            aiTextSpan.textContent = "[Nie usłyszałem]";
+            aiResultsDiv.innerHTML = `<span style="color:#c0392b;">Nic nie usłyszałem lub wystąpił błąd. Spróbuj ponownie.</span>`;
+            aiConfirmBtn.style.display = 'none';
+        };
+
+        function processAssistantCommand(text) {
+            aiTextSpan.textContent = text;
+            let html = '';
+            parsedAiAction = { type: null, data: {} };
+
+            if (text.includes('kart') || text.includes('leczenia')) {
+                parsedAiAction.type = 'karta_leczenia';
+                const tagMatch = text.match(/(?:krow[a-zę]+|numer(?:ze)?|kolczyk(?:u)?)\s+(\d{2,6})/i) || text.match(/(\d{3,6})/);
+                const tag = tagMatch ? tagMatch[1] : '';
+                
+                const lekMatch1 = text.match(/(\d+(?:[.,]\d+)?)\s*(ml|mililitr|mililitrów|szt|g|mg)?\s+([a-ząćęłńóśźż]+)/i);
+                const lekMatch2 = text.match(/([a-ząćęłńóśźż]+)\s+(\d+(?:[.,]\d+)?)\s*(ml|mililitr|mililitrów|szt|g|mg)?/i);
+                
+                let ilosc = ''; let lek = '';
+                const ignoreWords = ['zużyłem', 'dałem', 'krowę', 'numer', 'kartę', 'stworzyć', 'leczenia'];
+                
+                if (lekMatch1 && !ignoreWords.includes(lekMatch1[3])) {
+                    ilosc = lekMatch1[1]; lek = lekMatch1[3];
+                } else if (lekMatch2 && !ignoreWords.includes(lekMatch2[1])) {
+                    lek = lekMatch2[1]; ilosc = lekMatch2[2];
+                }
+
+                html = `
+                    <div style="margin-bottom: 5px;"><strong>Akcja:</strong> Nowa Karta Leczenia 📝</div>
+                    <div style="margin-bottom: 5px;"><strong>Nr krowy:</strong> <span style="color:#27ae60; font-weight:bold;">${tag || '---'}</span></div>
+                    <div style="margin-bottom: 5px;"><strong>Produkt:</strong> <span style="text-transform: capitalize; color:#2980b9; font-weight:bold;">${lek || '---'}</span></div>
+                    <div><strong>Ilość:</strong> <span style="color:#c0392b; font-weight:bold;">${ilosc || '---'}</span></div>
+                `;
+                parsedAiAction.data = { tag, lek, ilosc };
+
+            } else if (text.includes('raport') || text.includes('statystyk') || text.includes('utarg')) {
+                parsedAiAction.type = 'raporty';
+                html = `<div><strong>Akcja:</strong> Otwarcie modułu Raportów 📊</div>`;
+            } else {
+                html = `<span style="color:#c0392b;">Nie zrozumiałem polecenia. <br>Powiedz np: <b>"Stwórz kartę leczenia na krowę numer 1234, zużyłem 20 mililitrów Betamoxu"</b>.</span>`;
+                parsedAiAction.type = 'unknown';
+            }
+
+            aiResultsDiv.innerHTML = html;
+            aiConfirmBtn.style.display = parsedAiAction.type !== 'unknown' ? 'block' : 'none';
+        }
+
+        aiConfirmBtn.addEventListener('click', () => {
+            closeAiModal();
+            
+            if (parsedAiAction.type === 'karta_leczenia') {
+                showSection('karta');
+                const fModal = document.getElementById('formModal');
+                if (fModal) {
+                    fModal.style.display = 'flex';
+                    if (typeof showStep === 'function') showStep(2); 
+                    
+                    setTimeout(() => {
+                        const logicalRows = typeof rowsEditable === 'function' ? rowsEditable() : [];
+                        const row = logicalRows[0];
+                        if (row) {
+                            if (parsedAiAction.data.tag) {
+                                const opisInput = row.cells[1].querySelector('input');
+                                if (opisInput) opisInput.value = parsedAiAction.data.tag;
+                            }
+                            if (parsedAiAction.data.lek) {
+                                const lekInput = row.cells[4].querySelector('input');
+                                if (lekInput) {
+                                    const cLek = parsedAiAction.data.lek.charAt(0).toUpperCase() + parsedAiAction.data.lek.slice(1);
+                                    lekInput.value = cLek;
+                                    lekInput.dispatchEvent(new Event('input', { bubbles: true }));
+                                }
+                            }
+                            if (parsedAiAction.data.ilosc) {
+                                const iloscInput = row.cells[6].querySelector('input[type="number"]');
+                                if (iloscInput) iloscInput.value = parsedAiAction.data.ilosc.replace(',', '.');
+                            }
+                        }
+                        
+                        if (typeof selectRowInForm === 'function') selectRowInForm(0);
+                        const formRowSelect = document.getElementById('formRowSelect');
+                        if (formRowSelect) {
+                            formRowSelect.value = 0;
+                            formRowSelect.dataset.prevIndex = 0;
+                        }
+                        
+                        if (typeof showToast === 'function') showToast("Karta wygenerowana z dyktowania!", "success");
+                    }, 400); 
+                }
+            } else if (parsedAiAction.type === 'raporty') {
+                showSection('raporty');
+            }
+        });
+    } else {
+        if (menuAsystentBtn) menuAsystentBtn.style.display = 'none';
+    }
 </script>
 </body>
 </html>
