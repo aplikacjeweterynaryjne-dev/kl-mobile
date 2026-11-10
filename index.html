@@ -29369,7 +29369,7 @@ if (celInput) {
     });
 </script>
 <!-- ========================================== -->
-<!-- 🤖 ASYSTENT GŁOSOWY AI 3.3 - MODAL I LOGIKA-->
+<!-- 🤖 ASYSTENT GŁOSOWY AI 3.4 - MODAL I LOGIKA-->
 <!-- ========================================== -->
 <div id="aiAssistantModal" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.6); display: none; z-index: 20000; justify-content: center; align-items: center;">
     <div class="form-card" style="width: 95%; max-width: 480px; background: white; padding: 20px; border-radius: 12px; border-top: 5px solid #8e44ad;">
@@ -29493,18 +29493,22 @@ if (celInput) {
             
             parsedAiAction.klient = ''; parsedAiAction.tag = ''; parsedAiAction.zuzyte = []; parsedAiAction.wydane = [];
 
+            // 1. Klient
             const klientMatch = text.match(/klient(?:a)?\s+([a-ząćęłńóśźż]+\s+[a-ząćęłńóśźż]+)/i);
             if (klientMatch) {
                 parsedAiAction.klient = klientMatch[1];
                 text = text.replace(klientMatch[0], ''); 
             }
 
-            const tagMatch = text.match(/(?:krow[a-ęy]|kolczyk(?:u)?|numer(?:ze)?|sztuk[a-ei])?\s*([a-z]{0,2}\s*\d{2,14})/i);
+            // 2. Kolczyk (Nowa wersja - łapie cyfry rozdzielone spacjami)
+            const tagMatch = text.match(/(?:krow[a-ęy]|kolczyk(?:u)?|numer(?:ze)?|sztuk[a-ei])?\s*([a-z]{0,2}(?:\s*\d){2,14})/i);
             if (tagMatch) {
+                // Sklejamy kolczyk w jedną całość (bez spacji) i wycinamy go ze zdania, by nie mieszał w lekach!
                 parsedAiAction.tag = tagMatch[1].toUpperCase().replace(/\s+/g, '');
                 text = text.replace(tagMatch[0], ''); 
             }
 
+            // 3. Rozdzielenie na Zużyte i Zostawione
             let txtZuzyte = text;
             let txtWydane = '';
             const splitMatch = text.match(/(?:zostawi[a-z]*|wyda[a-z]*|pozostawi[a-z]*)/i);
@@ -29514,21 +29518,36 @@ if (celInput) {
                 txtWydane = text.substring(splitIndex);
             }
 
+            // 4. Inteligentna ekstrakcja leków (do 3 słów)
             function extractProducts(subtext) {
                 const meds = [];
-                const ignoreWords = ['zużył', 'zużyłem', 'zużyto', 'podał', 'podałem', 'dostał', 'dostała', 'zostawił', 'zostawiłem', 'wydał', 'wydałem', 'wydano', 'krowa', 'krowę', 'kolczyk', 'numer', 'klient', 'leki', 'lek', 'produkt', 'produkty', 'zużyte', 'pozostawione', 'następnie', 'karta', 'leczenia', 'pl'];
+                // Słowa, które Asystent wyrzuci z nazwy leku:
+                const ignoreWords = ['i', 'oraz', 'a', 'zużył', 'zużyłem', 'zużyto', 'podał', 'podałem', 'dostał', 'dostała', 'zostawił', 'zostawiłem', 'wydał', 'wydałem', 'wydano', 'krowa', 'krowę', 'kolczyk', 'numer', 'klient', 'leki', 'lek', 'produkt', 'produkty', 'zużyte', 'pozostawione', 'następnie', 'karta', 'leczenia', 'pl', 'szt', 'sztuk', 'sztuki', 'sztuka'];
                 
-                const regex = /(\d+(?:[.,]\d+)?)\s*(ml|mililitr|mililitrów|szt|sztuk|sztuki|g|mg)?\s+([a-ząćęłńóśźż]+)/gi;
+                // Szuka schematu: Liczba -> opcjonalna jednostka -> Nazwa Leku (od 1 do 3 słów)
+                const regex = /(\d+(?:[.,]\d+)?)\s*(ml|mililitr|mililitrów|szt|sztuk|sztuki|g|mg|op|opakowań)?\s+([a-ząćęłńóśźż]+(?:\s+[a-ząćęłńóśźż]+){0,2})/gi;
                 let match;
                 while ((match = regex.exec(subtext)) !== null) {
-                    let ilosc = match[1]; let lek = match[3];
-                    if (!ignoreWords.includes(lek.toLowerCase())) meds.push({ lek: lek, ilosc: ilosc });
+                    let ilosc = match[1]; 
+                    let lekRaw = match[3];
+                    
+                    // Czyścimy nazwę leku ze zbędnych słów-wypełniaczy
+                    let lek = lekRaw.split(' ').filter(w => !ignoreWords.includes(w.toLowerCase())).join(' ');
+                    
+                    if (lek.length > 1) {
+                        meds.push({ lek: lek, ilosc: ilosc });
+                    }
                 }
                 
-                const regexRev = /([a-ząćęłńóśźż]+)\s+(\d+(?:[.,]\d+)?)\s*(ml|mililitr|mililitrów|szt|sztuk|sztuki|g|mg)?/gi;
+                // Szuka odwrotnie: Nazwa Leku -> Liczba -> opcjonalna jednostka
+                const regexRev = /([a-ząćęłńóśźż]+(?:\s+[a-ząćęłńóśźż]+){0,2})\s+(\d+(?:[.,]\d+)?)\s*(ml|mililitr|mililitrów|szt|sztuk|sztuki|g|mg|op|opakowań)?/gi;
                 while ((match = regexRev.exec(subtext)) !== null) {
-                    let lek = match[1]; let ilosc = match[2];
-                    if (!ignoreWords.includes(lek.toLowerCase()) && !meds.find(m => m.lek === lek && m.ilosc === ilosc)) {
+                    let lekRaw = match[1]; 
+                    let ilosc = match[2];
+                    
+                    let lek = lekRaw.split(' ').filter(w => !ignoreWords.includes(w.toLowerCase())).join(' ');
+                    
+                    if (lek.length > 1 && !meds.find(m => m.lek === lek && m.ilosc === ilosc)) {
                         meds.push({ lek: lek, ilosc: ilosc });
                     }
                 }
@@ -29566,6 +29585,7 @@ if (celInput) {
                 elWydane.innerHTML = `⚪ <span style="color:#777;">Pozostawione: (Brak)</span>`;
             }
 
+            // Włącza/wyłącza stały guzik
             if (parsedAiAction.tag && parsedAiAction.zuzyte.length > 0) {
                 aiConfirmBtn.disabled = false;
                 aiConfirmBtn.style.opacity = '1';
@@ -29580,85 +29600,88 @@ if (celInput) {
             updateChecklist();
         }
 
-        // TWORZENIE KARTY (BEZPIECZNE WSTRZYKIWANIE DANYCH)
+        // ===============================================
+        // WSTRZYKIWANIE DANYCH DO KARTY (BEZPIECZNE)
+        // ===============================================
         aiConfirmBtn.addEventListener('click', () => {
             closeAiModal();
             showSection('karta');
             
+            let injectionDelay = 400; // Domyślne szybkie ładowanie (jeśli bez klienta)
+            
+            // 1. Zmiana Klienta (Jeśli podyktowano)
+            const klientSelect = document.getElementById('klientSelect');
+            if (klientSelect && parsedAiAction.klient) {
+                const options = Array.from(klientSelect.options);
+                const spokenWords = parsedAiAction.klient.toLowerCase().trim().split(/\s+/);
+                
+                const match = options.find(opt => {
+                    const optText = opt.text.toLowerCase();
+                    // Szuka dopasowania każdego słowa, dłuższego niż 2 litery
+                    return spokenWords.length > 0 && spokenWords.every(word => word.length > 2 && optText.includes(word));
+                });
+                
+                if (match && klientSelect.value !== match.value) {
+                    klientSelect.value = match.value;
+                    klientSelect.dispatchEvent(new Event('change', { bubbles: true }));
+                    injectionDelay = 1200; // Zmienił się klient -> dajemy Firebase 1.2 sekundy na pobranie stada i wyczyszczenie tabeli!
+                }
+            }
+
+            // 2. Wstrzykiwanie do A4 (Po odpowiednim czasie)
             setTimeout(() => {
-                const klientSelect = document.getElementById('klientSelect');
-                if (klientSelect && parsedAiAction.klient) {
-                    const options = Array.from(klientSelect.options);
-                    const spokenWords = parsedAiAction.klient.toLowerCase().split(' ');
-                    
-                    // Inteligentne szukanie: każde wypowiedziane słowo musi być w nazwie z bazy
-                    const match = options.find(opt => {
-                        const optText = opt.text.toLowerCase();
-                        return spokenWords.every(word => optText.includes(word));
-                    });
-                    
-                    if (match) {
-                        klientSelect.value = match.value;
-                        // To wywoła asynchroniczne pobranie stada i RESET KARTY
-                        klientSelect.dispatchEvent(new Event('change', { bubbles: true }));
-                    }
+                const logicalRows = typeof rowsEditable === 'function' ? rowsEditable() : [];
+                
+                // Ostateczne czyszczenie tabeli
+                for(let i=0; i<13; i++) {
+                     if (logicalRows[i] && logicalRows[i].cells && logicalRows[i].cells.length > 6) {
+                         const inpLek = logicalRows[i].cells[4].querySelector('input');
+                         if (inpLek) { inpLek.value = ''; inpLek.dispatchEvent(new Event('input', {bubbles: true})); }
+                         
+                         const inpIlosc = logicalRows[i].cells[6].querySelector('input');
+                         if (inpIlosc) { inpIlosc.value = ''; inpIlosc.dispatchEvent(new Event('input', {bubbles: true})); }
+                         
+                         const inpOpis = logicalRows[i].cells[1].querySelector('input');
+                         if (inpOpis) { inpOpis.value = ''; inpOpis.dispatchEvent(new Event('input', {bubbles: true})); }
+                     }
                 }
 
-                // Czekamy 600ms, aż aplikacja przemieli dane klienta i skończy czyścić kartę
-                setTimeout(() => {
-                    const logicalRows = typeof rowsEditable === 'function' ? rowsEditable() : [];
-                    
-                    // Awaryjne, czyszczenie wierszy
-                    for(let i=0; i<13; i++) {
-                         if (logicalRows[i] && logicalRows[i].cells && logicalRows[i].cells.length > 6) {
-                             const inpLek = logicalRows[i].cells[4].querySelector('input');
-                             if (inpLek) { inpLek.value = ''; inpLek.dispatchEvent(new Event('input', {bubbles: true})); }
-                             
-                             const inpIlosc = logicalRows[i].cells[6].querySelector('input');
-                             if (inpIlosc) { inpIlosc.value = ''; inpIlosc.dispatchEvent(new Event('input', {bubbles: true})); }
-                             
-                             const inpOpis = logicalRows[i].cells[1].querySelector('input');
-                             if (inpOpis) { inpOpis.value = ''; inpOpis.dispatchEvent(new Event('input', {bubbles: true})); }
-                         }
+                let currRow = 0;
+                const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+
+                // ZUŻYTE (wiersze 1-9)
+                parsedAiAction.zuzyte.forEach(med => {
+                    if (logicalRows[currRow] && logicalRows[currRow].cells.length > 6) {
+                        const r = logicalRows[currRow];
+                        const opisInp = r.cells[1].querySelector('input');
+                        if (opisInp) { opisInp.value = parsedAiAction.tag; opisInp.dispatchEvent(new Event('input', {bubbles: true})); }
+                        
+                        const lekInp = r.cells[4].querySelector('input');
+                        if (lekInp) { lekInp.value = capitalize(med.lek); lekInp.dispatchEvent(new Event('input', {bubbles: true})); }
+                        
+                        const iloscInp = r.cells[6].querySelector('input');
+                        if (iloscInp) { iloscInp.value = med.ilosc.replace(',','.'); iloscInp.dispatchEvent(new Event('input', {bubbles: true})); }
+                        currRow++;
                     }
+                });
 
-                    let currRow = 0;
-                    const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+                // POZOSTAWIONE (wiersze 10-13)
+                parsedAiAction.wydane.forEach(med => {
+                    if (currRow < 9) currRow = 9; 
+                    if (logicalRows[currRow] && logicalRows[currRow].cells.length > 6) {
+                        const r = logicalRows[currRow];
+                        const lekInp = r.cells[4].querySelector('input');
+                        if (lekInp) { lekInp.value = capitalize(med.lek); lekInp.dispatchEvent(new Event('input', {bubbles: true})); }
+                        
+                        const iloscInp = r.cells[6].querySelector('input');
+                        if (iloscInp) { iloscInp.value = med.ilosc.replace(',','.'); iloscInp.dispatchEvent(new Event('input', {bubbles: true})); }
+                        currRow++;
+                    }
+                });
 
-                    // ZUŻYTE (wiersze 1-9)
-                    parsedAiAction.zuzyte.forEach(med => {
-                        if (logicalRows[currRow] && logicalRows[currRow].cells.length > 6) {
-                            const r = logicalRows[currRow];
-                            const opisInp = r.cells[1].querySelector('input');
-                            if (opisInp) { opisInp.value = parsedAiAction.tag; opisInp.dispatchEvent(new Event('input', {bubbles: true})); }
-                            
-                            const lekInp = r.cells[4].querySelector('input');
-                            if (lekInp) { lekInp.value = capitalize(med.lek); lekInp.dispatchEvent(new Event('input', {bubbles: true})); }
-                            
-                            const iloscInp = r.cells[6].querySelector('input');
-                            if (iloscInp) { iloscInp.value = med.ilosc.replace(',','.'); iloscInp.dispatchEvent(new Event('input', {bubbles: true})); }
-                            currRow++;
-                        }
-                    });
+                if (typeof showToast === 'function') showToast("Karta wygenerowana! Możesz drukować.", "success");
+            }, injectionDelay); 
 
-                    // POZOSTAWIONE (wiersze 10-13)
-                    parsedAiAction.wydane.forEach(med => {
-                        if (currRow < 9) currRow = 9; 
-                        if (logicalRows[currRow] && logicalRows[currRow].cells.length > 6) {
-                            const r = logicalRows[currRow];
-                            const lekInp = r.cells[4].querySelector('input');
-                            if (lekInp) { lekInp.value = capitalize(med.lek); lekInp.dispatchEvent(new Event('input', {bubbles: true})); }
-                            
-                            const iloscInp = r.cells[6].querySelector('input');
-                            if (iloscInp) { iloscInp.value = med.ilosc.replace(',','.'); iloscInp.dispatchEvent(new Event('input', {bubbles: true})); }
-                            currRow++;
-                        }
-                    });
-
-                    if (typeof showToast === 'function') showToast("Karta wczytana pomyślnie!", "success");
-                }, 600); // 600ms odpoczynku po ustawieniu klienta
-
-            }, 300); // 300ms po otwarciu sekcji Karta
         });
     } else {
         if (menuAsystentBtn) menuAsystentBtn.style.display = 'none';
