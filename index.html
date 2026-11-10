@@ -29369,48 +29369,79 @@ if (celInput) {
     });
 </script>
 <!-- ========================================== -->
-<!-- 🤖 ASYSTENT GŁOSOWY AI 5.0 - MODAL I LOGIKA-->
+<!-- 🤖 ASYSTENT GŁOSOWY AI 6.0 (ZAKŁADKI + GŁOS)-->
 <!-- ========================================== -->
 <div id="aiAssistantModal" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.6); display: none; z-index: 20000; justify-content: center; align-items: center;">
-    <div class="form-card" style="width: 95%; max-width: 480px; background: white; padding: 20px; border-radius: 12px; border-top: 5px solid #8e44ad;">
+    <div class="form-card" style="width: 95%; max-width: 480px; background: white; padding: 20px; border-radius: 12px; border-top: 5px solid #8e44ad; max-height: 95vh; overflow-y: auto;">
         
-        <h3 style="margin-top: 0; color: #8e44ad; text-align: center; margin-bottom: 10px;">
+        <h3 style="margin-top: 0; color: #8e44ad; text-align: center; margin-bottom: 15px;">
             🤖 Twój Asystent
         </h3>
         
-        <!-- WSKAZÓWKA DLA UŻYTKOWNIKA -->
-        <p style="font-size: 11px; color: #7f8c8d; margin: 0 0 15px 0; line-height: 1.4; text-align: center; background: #f4f6f7; padding: 8px; border-radius: 6px;">
-            💡 <b>Schemat:</b> <i>"Klient [nazwa], krowa [PL...], rozpoznanie [tekst], zużyłem [ilość] [lek] i [ilość] [lek], zostawiłem [ilość] [lek]"</i><br>
-            (Liczba sztuk ustawi się na 1 automatycznie)
-        </p>
-        
-        <!-- POLE TEKSTOWE -->
-        <textarea id="aiRawTextInput" placeholder="Kliknij MÓW i podyktuj polecenie..." style="width: 100%; height: 80px; padding: 10px; border-radius: 8px; border: 1px solid #ccc; font-size: 15px; resize: none; margin-bottom: 10px; box-sizing: border-box; font-family: inherit;"></textarea>
-        
-        <!-- PRZYCISKI STERUJĄCE -->
-        <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-            <button id="aiRecordBtn" class="btn" style="flex: 1; background-color: #e74c3c; color: white; border: none; padding: 10px; font-weight: bold;">
-                🎙️ Mów
+        <!-- ZAKŁADKI STERUJĄCE -->
+        <div style="display: flex; gap: 5px; margin-bottom: 15px; border-bottom: 2px solid #eee; padding-bottom: 10px;">
+            <button id="tabBtnSwobodny" class="btn" style="flex: 1; background-color: #8e44ad; color: white; border: none; padding: 8px; font-weight: bold; border-radius: 6px;">
+                📝 Swobodny
             </button>
-            <button id="aiAnalyzeBtn" class="btn" style="flex: 1; background-color: #3498db; color: white; border: none; padding: 10px; font-weight: bold;">
-                🧠 Analizuj
+            <button id="tabBtnRozmowa" class="btn" style="flex: 1; background-color: #f1f1f1; color: #555; border: none; padding: 8px; font-weight: bold; border-radius: 6px;">
+                🗣️ Rozmowa (Głos)
             </button>
         </div>
-        
-        <!-- Interaktywna Checklista -->
-        <h4 style="margin-bottom: 10px; color: #333;">Checklista Karty Leczenia:</h4>
-        <ul id="aiChecklist" style="list-style: none; padding: 0; margin: 0 0 20px 0; font-size: 14px; background: #fdfdfd; border: 1px solid #eee; padding: 10px; border-radius: 8px; line-height: 1.8;">
+
+        <!-- ========================================== -->
+        <!-- WIDOK 1: TRYB SWOBODNY (STARY)             -->
+        <!-- ========================================== -->
+        <div id="viewSwobodny" style="display: block;">
+            <p style="font-size: 11px; color: #7f8c8d; margin: 0 0 10px 0; line-height: 1.4; text-align: center; background: #f4f6f7; padding: 8px; border-radius: 6px;">
+                💡 <b>Schemat:</b> <i>"Klient [nazwa], krowa [PL...], rozpoznanie [tekst], zużyłem [ilość] [lek], zostawiłem [ilość] [lek]"</i>
+            </p>
+            <textarea id="aiRawTextInput" placeholder="Kliknij MÓW i podyktuj polecenie..." style="width: 100%; height: 60px; padding: 10px; border-radius: 8px; border: 1px solid #ccc; font-size: 14px; resize: none; margin-bottom: 10px; box-sizing: border-box; font-family: inherit;"></textarea>
+            <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                <button id="aiRecordBtn" class="btn" style="flex: 1; background-color: #e74c3c; color: white; border: none; padding: 10px; font-weight: bold;">
+                    🎙️ Mów
+                </button>
+                <button id="aiAnalyzeBtn" class="btn" style="flex: 1; background-color: #3498db; color: white; border: none; padding: 10px; font-weight: bold;">
+                    🧠 Analizuj
+                </button>
+            </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- WIDOK 2: TRYB ROZMOWY (NOWY)               -->
+        <!-- ========================================== -->
+        <div id="viewRozmowa" style="display: none; text-align: center; padding-bottom: 15px;">
+            <div id="convoAvatar" style="font-size: 50px; margin-bottom: 10px; transition: transform 0.3s;">🤖</div>
+            <p id="convoStatusText" style="font-size: 16px; font-weight: bold; color: #8e44ad; min-height: 40px; margin: 0 0 15px 0;">
+                Kliknij START, aby rozpocząć odpytywanie.
+            </p>
+            
+            <!-- Podgląd tego co Asystent usłyszał w danym kroku -->
+            <p id="convoListeningPreview" style="font-size: 13px; color: #555; font-style: italic; background: #f4f6f7; padding: 8px; border-radius: 6px; display: none;">
+                " <span id="convoHeardText"></span> "
+            </p>
+
+            <button id="convoStartBtn" class="btn" style="background-color: #27ae60; color: white; border: none; padding: 10px 20px; font-weight: bold; font-size: 16px; border-radius: 8px;">
+                ▶️ Start Rozmowy
+            </button>
+            <button id="convoSkipBtn" class="btn ghost" style="display: none; margin-top: 10px; padding: 5px 15px; font-size: 13px;">
+                ⏭️ Pomiń to pytanie
+            </button>
+        </div>
+
+        <!-- WSPÓLNA CHECKLISTA DLA OBU TRYBÓW -->
+        <h4 style="margin-bottom: 5px; margin-top: 0; color: #333; font-size: 14px;">Zebrane dane:</h4>
+        <ul id="aiChecklist" style="list-style: none; padding: 0; margin: 0 0 15px 0; font-size: 13px; background: #fdfdfd; border: 1px solid #eee; padding: 10px; border-radius: 8px; line-height: 1.6;">
             <li id="aiCheckKlient">⚪ <span style="color:#777;">Klient: </span></li>
             <li id="aiCheckTag">⚪ <span style="color:#777;">Kolczyk: </span></li>
             <li id="aiCheckRozp">⚪ <span style="color:#777;">Rozpoznanie: </span></li>
-            <li id="aiCheckZuzyte">⚪ <span style="color:#777;">Produkty zużyte: </span></li>
-            <li id="aiCheckWydane">⚪ <span style="color:#777;">Produkty pozostawione: </span></li>
+            <li id="aiCheckZuzyte">⚪ <span style="color:#777;">Zużyte: </span></li>
+            <li id="aiCheckWydane">⚪ <span style="color:#777;">Pozostawione: </span></li>
         </ul>
         
         <div class="form-actions" style="justify-content: space-between;">
-            <button class="btn ghost" onclick="closeAiModal()">Anuluj</button>
-            <button class="btn primary" id="aiConfirmActionBtn" style="background-color: #27ae60; border-color: #2ecc71; font-size: 15px; padding: 10px 15px; opacity: 0.5;" disabled>
-                ✅ Wygeneruj Kartę A4
+            <button class="btn ghost" onclick="closeAiModal()" style="padding: 10px;">Anuluj</button>
+            <button class="btn primary" id="aiConfirmActionBtn" style="background-color: #27ae60; border-color: #2ecc71; font-size: 15px; padding: 10px; opacity: 0.5;" disabled>
+                ✅ Wygeneruj Kartę
             </button>
         </div>
     </div>
@@ -29419,23 +29450,76 @@ if (celInput) {
 <script>
     const menuAsystentBtn = document.getElementById('menuAsystentBtn');
     const aiModal = document.getElementById('aiAssistantModal');
+    const aiConfirmBtn = document.getElementById('aiConfirmActionBtn');
+    
+    // ZAKŁADKI
+    const tabSwobodny = document.getElementById('tabBtnSwobodny');
+    const tabRozmowa = document.getElementById('tabBtnRozmowa');
+    const viewSwobodny = document.getElementById('viewSwobodny');
+    const viewRozmowa = document.getElementById('viewRozmowa');
+
+    // SWOBODNY WIDOK
     const aiRawTextInput = document.getElementById('aiRawTextInput');
     const aiRecordBtn = document.getElementById('aiRecordBtn');
     const aiAnalyzeBtn = document.getElementById('aiAnalyzeBtn');
-    const aiConfirmBtn = document.getElementById('aiConfirmActionBtn');
+
+    // ROZMOWA WIDOK
+    const convoStartBtn = document.getElementById('convoStartBtn');
+    const convoSkipBtn = document.getElementById('convoSkipBtn');
+    const convoStatusText = document.getElementById('convoStatusText');
+    const convoAvatar = document.getElementById('convoAvatar');
+    const convoListeningPreview = document.getElementById('convoListeningPreview');
+    const convoHeardText = document.getElementById('convoHeardText');
 
     let parsedAiAction = { klient: '', tag: '', liczba: '', rozpoznanie: '', zuzyte: [], wydane: [] };
     let aiRecognition = null;
     let isRecording = false;
+    let activeMode = 'swobodny'; // 'swobodny' lub 'rozmowa'
+    
+    // Zmienne Konwersacji
+    let convoState = -1; 
+    // 0 = Klient, 1 = Kolczyk, 2 = Rozpoznanie, 3 = Zużyte, 4 = Wydane
+    const convoPrompts = [
+        "Podaj imię i nazwisko klienta. Jeśli nie chcesz, powiedz pomiń.",
+        "Podaj numer kolczyka krowy.",
+        "Podaj rozpoznanie, lub powiedz pomiń.",
+        "Jakie leki zużyłeś i w jakich ilościach?",
+        "Czy pozostawiłeś jakieś leki dla rolnika? Wymień je, lub powiedz nie."
+    ];
+
+    // --- PRZEŁĄCZANIE ZAKŁADEK ---
+    tabSwobodny.addEventListener('click', () => {
+        activeMode = 'swobodny';
+        viewSwobodny.style.display = 'block';
+        viewRozmowa.style.display = 'none';
+        tabSwobodny.style.backgroundColor = '#8e44ad'; tabSwobodny.style.color = 'white';
+        tabRozmowa.style.backgroundColor = '#f1f1f1'; tabRozmowa.style.color = '#555';
+        stopAllAudio();
+    });
+
+    tabRozmowa.addEventListener('click', () => {
+        activeMode = 'rozmowa';
+        viewSwobodny.style.display = 'none';
+        viewRozmowa.style.display = 'block';
+        tabRozmowa.style.backgroundColor = '#8e44ad'; tabRozmowa.style.color = 'white';
+        tabSwobodny.style.backgroundColor = '#f1f1f1'; tabSwobodny.style.color = '#555';
+        stopAllAudio();
+    });
+
+    function stopAllAudio() {
+        if (aiRecognition) aiRecognition.stop();
+        window.speechSynthesis.cancel();
+        isRecording = false;
+        resetSwobodnyUI();
+        resetConvoUI();
+    }
 
     function closeAiModal() {
         aiModal.style.display = 'none';
-        if (aiRecognition && isRecording) {
-            isRecording = false;
-            aiRecognition.stop();
-        }
+        stopAllAudio();
     }
 
+    // --- ROZPOZNAWANIE MOWY ---
     if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         aiRecognition = new SpeechRecognition();
@@ -29446,146 +29530,214 @@ if (celInput) {
         if (menuAsystentBtn) {
             menuAsystentBtn.addEventListener('click', () => {
                 resetChecklist();
-                aiRawTextInput.value = ''; 
                 aiModal.style.display = 'flex';
+                stopAllAudio();
             });
         }
 
+        // AKCJA: TRYB SWOBODNY - MÓW
         aiRecordBtn.addEventListener('click', () => {
             if (isRecording) {
-                isRecording = false;
                 aiRecognition.stop();
-                aiRecordBtn.innerHTML = "🎙️ Mów";
-                aiRecordBtn.style.backgroundColor = "#e74c3c";
             } else {
                 try { 
                     isRecording = true;
                     aiRecognition.start(); 
-                    aiRecordBtn.innerHTML = "🛑 Zakończ mówienie";
+                    aiRecordBtn.innerHTML = "🛑 Zakończ";
                     aiRecordBtn.style.backgroundColor = "#c0392b";
-                } catch (e) { 
-                    console.warn("Mikrofon już działa."); 
-                }
+                } catch (e) {}
             }
         });
 
+        // WYNIK MOWY (Wspólny dla obu trybów)
         aiRecognition.onresult = (event) => {
-            const text = event.results[0][0].transcript;
-            const currentVal = aiRawTextInput.value.trim();
-            aiRawTextInput.value = currentVal ? currentVal + " " + text : text;
-            aiAnalyzeBtn.click();
+            const text = event.results[0][0].transcript.trim().toLowerCase();
+            
+            if (activeMode === 'swobodny') {
+                const currentVal = aiRawTextInput.value.trim();
+                aiRawTextInput.value = currentVal ? currentVal + " " + text : text;
+                aiAnalyzeBtn.click();
+            } 
+            else if (activeMode === 'rozmowa') {
+                convoListeningPreview.style.display = 'block';
+                convoHeardText.textContent = text;
+                processConvoAnswer(text);
+            }
         };
 
         aiRecognition.onerror = (e) => {
-            console.error(e);
-            if (aiRawTextInput.value === '' && e.error !== 'no-speech') {
-                aiRawTextInput.value = "[Błąd mikrofonu]";
+            if (activeMode === 'swobodny' && aiRawTextInput.value === '' && e.error !== 'no-speech') {
+                aiRawTextInput.value = "[Błąd]";
+            }
+            if (activeMode === 'rozmowa') {
+                convoStatusText.textContent = "Nie zrozumiałem, powtórz.";
+                setTimeout(() => { if(isRecording) aiRecognition.start(); }, 1500);
             }
         };
         
         aiRecognition.onend = () => {
-            // AUTOMATYCZNY RESTART jeśli nie kliknięto STOP
-            if (isRecording) {
-                setTimeout(() => {
-                    try { if(isRecording) aiRecognition.start(); } catch(e){}
-                }, 250);
-            } else {
-                aiRecordBtn.innerHTML = "🎙️ Mów";
-                aiRecordBtn.style.backgroundColor = "#e74c3c";
+            if (activeMode === 'swobodny') {
+                if (isRecording) {
+                    setTimeout(() => { try { if(isRecording) aiRecognition.start(); } catch(e){} }, 250);
+                } else {
+                    resetSwobodnyUI();
+                }
+            } else if (activeMode === 'rozmowa') {
+                // Konwersacja steruje włączaniem mikrofonu samodzielnie
+                convoAvatar.style.transform = 'scale(1)';
             }
         };
 
+        // --- SILNIK EKSTRAKCJI DANYCH (SŁOWNIK) ---
+        function extractProductsFromText(subtext) {
+            const meds = [];
+            const ignoreWords = ['zużył', 'dostał', 'zostawił', 'wydał', 'krowa', 'krowę', 'kolczyk', 'klient', 'leki', 'lek', 'rozpoznanie', 'ml', 'mililitr', 'szt', 'sztuk', 'g', 'mg', 'pomiń', 'nie', 'brak'];
+            const dictionary = {
+                'wapnia': 'wapń', 'glukozy': 'glukoza', 'betamoxu': 'betamox', 'dexafortu': 'dexafort', 
+                'witaminy': 'witamina', 'oksytocyny': 'oksytocyna', 'combikelu': 'combikel', 
+                'rapidexonu': 'rapidexon', 'shotapenu': 'shotapen', 'synergalu': 'synergal',
+                'penicyliny': 'penicylina', 'metacamu': 'metacam', 'tolfedyny': 'tolfedyna'
+            };
+
+            let chunks = subtext.split(/(?:\s+i\s+|\s+oraz\s+|\s+a\s+|,)/);
+            chunks.forEach(chunk => {
+                let iloscMatch = chunk.match(/(\d+(?:[.,]\d+)?)/);
+                if (iloscMatch) {
+                    let val = iloscMatch[1];
+                    let txtNoNum = chunk.replace(/(\d+(?:[.,]\d+)?)\s*(?:ml|mililitr|mililitrów|szt|sztuk|sztuki|g|mg|op|opakowań)?/i, '');
+                    let lekWords = txtNoNum.split(' ').filter(w => w.trim().length > 1 && !ignoreWords.includes(w.trim().toLowerCase()));
+                    let rawLek = lekWords.join(' ').trim();
+                    let finalLek = dictionary[rawLek] ? dictionary[rawLek] : lekWords.map(w => dictionary[w] || w).join(' ');
+                    if (finalLek.length > 1) meds.push({ lek: finalLek, ilosc: val });
+                }
+            });
+            return meds;
+        }
+
+        // AKCJA: TRYB SWOBODNY - ANALIZA
         aiAnalyzeBtn.addEventListener('click', () => {
             let text = aiRawTextInput.value.toLowerCase();
             if(!text) return;
-            
             parsedAiAction = { klient: '', tag: '', liczba: '', rozpoznanie: '', zuzyte: [], wydane: [] };
 
-            // 1. Klient
             const klientMatch = text.match(/klient(?:a)?\s+([a-ząćęłńóśźż]+\s+[a-ząćęłńóśźż]+)/i);
-            if (klientMatch) {
-                parsedAiAction.klient = klientMatch[1];
-                text = text.replace(klientMatch[0], ''); 
-            }
+            if (klientMatch) { parsedAiAction.klient = klientMatch[1]; text = text.replace(klientMatch[0], ''); }
 
-            // 2. Kolczyk i Liczba sztuk
             const tagMatch = text.match(/(?:krow[a-ęy]|kolczyk(?:u)?|numer(?:ze)?|sztuk[a-ei])?\s*([a-z]{0,2}(?:\s*\d){2,14})/i);
-            if (tagMatch) {
-                parsedAiAction.tag = tagMatch[1].toUpperCase().replace(/\s+/g, '');
-                parsedAiAction.liczba = '1'; 
-                text = text.replace(tagMatch[0], ''); 
-            }
+            if (tagMatch) { parsedAiAction.tag = tagMatch[1].toUpperCase().replace(/\s+/g, ''); parsedAiAction.liczba = '1'; text = text.replace(tagMatch[0], ''); }
 
             const liczbaMatch = text.match(/(?:liczba zwierząt|liczba sztuk|leczonych sztuk)\s+(\d+)/i);
-            if (liczbaMatch) {
-                parsedAiAction.liczba = liczbaMatch[1];
-                text = text.replace(liczbaMatch[0], '');
-            }
+            if (liczbaMatch) { parsedAiAction.liczba = liczbaMatch[1]; text = text.replace(liczbaMatch[0], ''); }
 
-            // 3. Rozpoznanie
             const rozpMatch = text.match(/(?:rozpoznanie|diagnoza)\s+(.*?)(?=\s+(?:zuży|poda|da|zostaw|wyda|produkt|lek)|$)/i);
-            if (rozpMatch) {
-                const rawRozp = rozpMatch[1].trim();
-                parsedAiAction.rozpoznanie = rawRozp.charAt(0).toUpperCase() + rawRozp.slice(1);
-                text = text.replace(rozpMatch[0], '');
-            }
+            if (rozpMatch) { parsedAiAction.rozpoznanie = rozpMatch[1].trim().charAt(0).toUpperCase() + rozpMatch[1].trim().slice(1); text = text.replace(rozpMatch[0], ''); }
 
-            // 4. Rozdzielenie na Zużyte i Zostawione
-            let txtZuzyte = text;
-            let txtWydane = '';
+            let txtZuzyte = text, txtWydane = '';
             const splitMatch = text.match(/(?:zostawi[a-z]*|wyda[a-z]*|pozostawi[a-z]*)/i);
             if (splitMatch) {
                 const splitIndex = text.indexOf(splitMatch[0]);
-                txtZuzyte = text.substring(0, splitIndex);
-                txtWydane = text.substring(splitIndex);
+                txtZuzyte = text.substring(0, splitIndex); txtWydane = text.substring(splitIndex);
             }
 
-            // 5. Ekstrakcja Leki + Ilości (METODA BLOKOWA Z ODMIANĄ)
-            function extractProducts(subtext) {
-                const meds = [];
-                const ignoreWords = ['zużył', 'zużyłem', 'zużyto', 'podał', 'podałem', 'dostał', 'dostała', 'zostawił', 'zostawiłem', 'wydał', 'wydałem', 'wydano', 'krowa', 'krowę', 'kolczyk', 'numer', 'klient', 'leki', 'lek', 'produkt', 'produkty', 'zużyte', 'pozostawione', 'następnie', 'karta', 'leczenia', 'pl', 'szt', 'sztuk', 'sztuki', 'sztuka', 'rozpoznanie', 'ml', 'mililitr', 'mililitrów', 'g', 'mg'];
-                
-                const dictionary = {
-                    'wapnia': 'wapń', 'glukozy': 'glukoza', 'betamoxu': 'betamox', 'dexafortu': 'dexafort', 
-                    'witaminy': 'witamina', 'oksytocyny': 'oksytocyna', 'combikelu': 'combikel', 
-                    'rapidexonu': 'rapidexon', 'shotapenu': 'shotapen', 'synergalu': 'synergal',
-                    'penicyliny': 'penicylina', 'metacamu': 'metacam', 'tolfedyny': 'tolfedyna'
-                };
-
-                // Tniemy zdanie tam, gdzie występuje słowo "i", "oraz" lub przecinek
-                let chunks = subtext.split(/(?:\s+i\s+|\s+oraz\s+|\s+a\s+|,)/);
-                
-                chunks.forEach(chunk => {
-                    let iloscMatch = chunk.match(/(\d+(?:[.,]\d+)?)/);
-                    if (iloscMatch) {
-                        let val = iloscMatch[1];
-                        // Usuwamy liczbę i jednostki z nazwy, żeby została sama nazwa leku
-                        let txtNoNum = chunk.replace(/(\d+(?:[.,]\d+)?)\s*(?:ml|mililitr|mililitrów|szt|sztuk|sztuki|g|mg|op|opakowań)?/i, '');
-                        
-                        let lekWords = txtNoNum.split(' ').filter(w => w.trim().length > 1 && !ignoreWords.includes(w.trim().toLowerCase()));
-                        let rawLek = lekWords.join(' ').trim();
-                        
-                        // Zastosowanie słownika
-                        let finalLek = dictionary[rawLek] ? dictionary[rawLek] : lekWords.map(w => dictionary[w] || w).join(' ');
-                        
-                        if (finalLek.length > 1) {
-                            meds.push({ lek: finalLek, ilosc: val });
-                        }
-                    }
-                });
-                return meds;
-            }
-
-            parsedAiAction.zuzyte = extractProducts(txtZuzyte);
-            parsedAiAction.wydane = extractProducts(txtWydane);
-
+            parsedAiAction.zuzyte = extractProductsFromText(txtZuzyte);
+            parsedAiAction.wydane = extractProductsFromText(txtWydane);
             updateChecklist();
         });
 
+        // --- TRYB ROZMOWY LOGIKA ---
+        function speak(text, callback) {
+            window.speechSynthesis.cancel(); // Czyść kolejkę
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = 'pl-PL';
+            utterance.rate = 1.0; // Prędkość mówienia
+            
+            convoAvatar.style.transform = 'scale(1.2)';
+            convoStatusText.textContent = `🔊 ${text}`;
+            
+            utterance.onend = () => {
+                convoAvatar.style.transform = 'scale(1)';
+                if(callback) callback();
+            };
+            window.speechSynthesis.speak(utterance);
+        }
+
+        convoStartBtn.addEventListener('click', () => {
+            resetChecklist();
+            convoState = 0;
+            convoStartBtn.style.display = 'none';
+            convoSkipBtn.style.display = 'inline-block';
+            runConvoStep();
+        });
+
+        convoSkipBtn.addEventListener('click', () => {
+            if(aiRecognition) aiRecognition.stop();
+            processConvoAnswer("pomiń");
+        });
+
+        function runConvoStep() {
+            if (convoState >= convoPrompts.length) {
+                convoStatusText.textContent = "✅ Gotowe! Sprawdź checklistę poniżej i wygeneruj kartę.";
+                convoSkipBtn.style.display = 'none';
+                convoStartBtn.style.display = 'inline-block';
+                convoStartBtn.innerHTML = "🔄 Zacznij od nowa";
+                isRecording = false;
+                speak("Zakończono odpytywanie. Możesz wygenerować kartę leczenia.");
+                return;
+            }
+
+            // Asystent mówi, a potem słucha
+            speak(convoPrompts[convoState], () => {
+                convoStatusText.textContent = "🎙️ Słucham...";
+                convoAvatar.style.transform = 'scale(1.1)';
+                convoListeningPreview.style.display = 'none';
+                try { 
+                    isRecording = true;
+                    aiRecognition.start(); 
+                } catch(e) { console.warn("Mikrofon błąd", e); }
+            });
+        }
+
+        function processConvoAnswer(text) {
+            const skipWords = ['pomiń', 'pomin', 'dalej', 'nie', 'brak'];
+            const isSkip = skipWords.includes(text);
+
+            if (convoState === 0) { // KLIENT
+                if (!isSkip) {
+                    const kMatch = text.match(/([a-ząćęłńóśźż]+\s+[a-ząćęłńóśźż]+)/i);
+                    parsedAiAction.klient = kMatch ? kMatch[1] : text;
+                }
+            } 
+            else if (convoState === 1) { // KOLCZYK
+                if (!isSkip) {
+                    const tagMatch = text.match(/([a-z]{0,2}(?:\s*\d){2,14})/i);
+                    if (tagMatch) {
+                        parsedAiAction.tag = tagMatch[1].toUpperCase().replace(/\s+/g, '');
+                        parsedAiAction.liczba = '1';
+                    }
+                }
+            }
+            else if (convoState === 2) { // ROZPOZNANIE
+                if (!isSkip) parsedAiAction.rozpoznanie = text.charAt(0).toUpperCase() + text.slice(1);
+            }
+            else if (convoState === 3) { // ZUŻYTE
+                if (!isSkip) parsedAiAction.zuzyte = extractProductsFromText(text);
+            }
+            else if (convoState === 4) { // WYDANE
+                if (!isSkip) parsedAiAction.wydane = extractProductsFromText(text);
+            }
+
+            updateChecklist();
+            convoState++;
+            
+            // Lekkie opóźnienie przed kolejnym pytaniem, by można było przeczytać co usłyszał
+            setTimeout(runConvoStep, 800);
+        }
+
+        // WSPÓLNE AKTUALIZOWANIE WIZUALNE
         function updateChecklist() {
             const elKlient = document.getElementById('aiCheckKlient');
             if (parsedAiAction.klient) elKlient.innerHTML = `✅ <span style="color:#27ae60;">Klient: <b>${parsedAiAction.klient}</b></span>`;
-            else elKlient.innerHTML = `⚪ <span style="color:#777;">Klient: (opcjonalnie)</span>`;
+            else elKlient.innerHTML = `⚪ <span style="color:#777;">Klient: (Brak)</span>`;
 
             const elTag = document.getElementById('aiCheckTag');
             if (parsedAiAction.tag) elTag.innerHTML = `✅ <span style="color:#27ae60;">Kolczyk: <b>${parsedAiAction.tag}</b> (szt. ${parsedAiAction.liczba})</span>`;
@@ -29593,14 +29745,14 @@ if (celInput) {
 
             const elRozp = document.getElementById('aiCheckRozp');
             if (parsedAiAction.rozpoznanie) elRozp.innerHTML = `✅ <span style="color:#27ae60;">Rozpoznanie: <b>${parsedAiAction.rozpoznanie}</b></span>`;
-            else elRozp.innerHTML = `⚪ <span style="color:#777;">Rozpoznanie: (opcjonalnie)</span>`;
+            else elRozp.innerHTML = `⚪ <span style="color:#777;">Rozpoznanie: (Brak)</span>`;
 
             const elZuzyte = document.getElementById('aiCheckZuzyte');
             if (parsedAiAction.zuzyte.length > 0) {
                 const zTxt = parsedAiAction.zuzyte.map(m => `${m.lek} (${m.ilosc})`).join(', ');
                 elZuzyte.innerHTML = `✅ <span style="color:#27ae60;">Zużyte: <b>${zTxt}</b></span>`;
             } else {
-                elZuzyte.innerHTML = `❌ <span style="color:#c0392b; font-weight:bold;">Brak leków zużytych</span>`;
+                elZuzyte.innerHTML = `❌ <span style="color:#c0392b; font-weight:bold;">Brak leków</span>`;
             }
 
             const elWydane = document.getElementById('aiCheckWydane');
@@ -29625,59 +29777,62 @@ if (celInput) {
             updateChecklist();
         }
 
+        function resetSwobodnyUI() {
+            if(aiRecordBtn) {
+                aiRecordBtn.innerHTML = "🎙️ Mów";
+                aiRecordBtn.style.backgroundColor = "#e74c3c";
+            }
+        }
+
+        function resetConvoUI() {
+            convoState = -1;
+            convoStartBtn.style.display = 'inline-block';
+            convoStartBtn.innerHTML = "▶️ Start Rozmowy";
+            convoSkipBtn.style.display = 'none';
+            convoStatusText.textContent = "Kliknij START, aby rozpocząć odpytywanie.";
+            convoListeningPreview.style.display = 'none';
+            convoAvatar.style.transform = 'scale(1)';
+        }
+
         // ===============================================
-        // BEZPIECZNE WSTRZYKIWANIE (NAWET PRZY BŁĘDZIE KLIENTA)
+        // GENEROWANIE KARTY (WSPÓLNE KULOODPORNE)
         // ===============================================
         aiConfirmBtn.addEventListener('click', () => {
             let copyToWydane = false;
             if (parsedAiAction.wydane.length > 0 && (parsedAiAction.tag || parsedAiAction.rozpoznanie)) {
-                copyToWydane = confirm("Wykryto produkty pozostawione. Czy przekopiować automatycznie numer kolczyka, liczbę sztuk i rozpoznanie również do dolnej sekcji?");
+                copyToWydane = confirm("Czy przekopiować automatycznie numer kolczyka, liczbę sztuk i rozpoznanie również do sekcji 'Pozostawione'?");
             }
 
             closeAiModal();
             showSection('karta');
             
-            // 1. Próba ustawienia klienta (Odizolowana od reszty!)
             try {
                 const klientSelect = document.getElementById('klientSelect');
                 if (klientSelect && parsedAiAction.klient) {
                     const options = Array.from(klientSelect.options);
                     const spokenWords = parsedAiAction.klient.toLowerCase().trim().split(/\s+/);
-                    
                     const match = options.find(opt => {
                         const optText = opt.text.toLowerCase();
                         return spokenWords.length > 0 && spokenWords.every(word => word.length > 2 && optText.includes(word));
                     });
-                    
                     if (match && klientSelect.value !== match.value) {
                         klientSelect.value = match.value;
-                        // Jeśli tu aplikacja się wysypie, wstrzyknięcie leków poniżej i tak zadziała!
                         klientSelect.dispatchEvent(new Event('change', { bubbles: true }));
                     }
                 }
-            } catch (e) {
-                console.warn("Błąd przy automatycznym wyborze klienta, kontynuuję wpisywanie leków.");
-            }
+            } catch (e) { console.warn("Błąd doboru klienta."); }
 
-            // 2. Funkcja wpisująca dane do odpowiednich komórek tabeli
             function injectDataToCard() {
                 const logicalRows = typeof rowsEditable === 'function' ? rowsEditable() : [];
                 if(logicalRows.length === 0) return;
-                
                 const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
-
                 function setVal(cell, val) {
                     if(!cell || !val) return;
                     const inp = cell.querySelector('input');
-                    if(inp && inp.value !== val) {
-                        inp.value = val;
-                        inp.dispatchEvent(new Event('input', {bubbles: true}));
-                    }
+                    if(inp && inp.value !== val) { inp.value = val; inp.dispatchEvent(new Event('input', {bubbles: true})); }
                 }
 
                 let currRow = 0;
-
-                // ZUŻYTE (wiersze 1-9)
                 parsedAiAction.zuzyte.forEach(med => {
                     if (logicalRows[currRow] && logicalRows[currRow].cells.length > 6) {
                         const r = logicalRows[currRow];
@@ -29690,7 +29845,6 @@ if (celInput) {
                     }
                 });
 
-                // POZOSTAWIONE (wiersze 10-13)
                 parsedAiAction.wydane.forEach(med => {
                     if (currRow < 9) currRow = 9; 
                     if (logicalRows[currRow] && logicalRows[currRow].cells.length > 6) {
@@ -29707,13 +29861,12 @@ if (celInput) {
                 });
             }
 
-            // 3. Wielokrotne Strzały – nawet jak system doczytuje klienta 2 sekundy, leki zostaną uaktualnione
             setTimeout(injectDataToCard, 400);
             setTimeout(injectDataToCard, 1000);
             setTimeout(injectDataToCard, 2000);
             setTimeout(injectDataToCard, 3500);
 
-            if (typeof showToast === 'function') showToast("Dane wygenerowane i zabezpieczone w formularzu!", "success");
+            if (typeof showToast === 'function') showToast("Karta wygenerowana!", "success");
         });
     } else {
         if (menuAsystentBtn) menuAsystentBtn.style.display = 'none';
