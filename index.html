@@ -29369,7 +29369,7 @@ if (celInput) {
     });
 </script>
 <!-- ========================================== -->
-<!-- 🤖 ASYSTENT GŁOSOWY AI 9.2 (CZYSTY INTERFEJS)-->
+<!-- 🤖 ASYSTENT GŁOSOWY AI 9.2 (DYNAMICZNE WSTRZYKIWANIE)-->
 <!-- ========================================== -->
 <div id="aiAssistantModal" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.6); display: none; z-index: 20000; justify-content: center; align-items: center;">
     <div class="form-card" style="width: 95%; max-width: 480px; background: white; padding: 20px; border-radius: 12px; border-top: 5px solid #8e44ad; max-height: 95vh; overflow-y: auto;">
@@ -29422,7 +29422,7 @@ if (celInput) {
 
         <!-- LISTA ZAPISANYCH SZTUK (KOLEJKA) -->
         <div id="aiSavedAnimalsContainer" style="display: none; margin-bottom: 15px;">
-            <h4 style="margin: 0 0 5px 0; color: #333; font-size: 13px;">Zapisane w kolejce (gotowe do wygenerowania):</h4>
+            <h4 style="margin: 0 0 5px 0; color: #333; font-size: 13px;">Zapisane w kolejce:</h4>
             <div id="aiSavedAnimalsList" style="max-height: 120px; overflow-y: auto; display: flex; flex-direction: column; gap: 5px; background: #fdfdfd; border: 1px solid #eee; padding: 5px; border-radius: 8px;">
                 <!-- Lista wypełniana przez JS -->
             </div>
@@ -29430,7 +29430,7 @@ if (celInput) {
 
         <!-- EDYTOWALNA CHECKLISTA -->
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
-            <h4 style="margin: 0; color: #333; font-size: 14px;">Bieżąca sztuka (w trakcie edycji):</h4>
+            <h4 style="margin: 0; color: #333; font-size: 14px;">Bieżąca sztuka:</h4>
             <span id="aiSavedCounter" style="background: #27ae60; color: white; padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: bold; display: none;">Zapisano: 0</span>
         </div>
         
@@ -29507,6 +29507,7 @@ if (celInput) {
     let activeMode = 'rozmowa'; 
     let convoState = -1; 
     let convoWatchdog = null; 
+    let baseLogicalRowsCount = 14;
     
     const convoPrompts = [
         "Podaj imię i nazwisko klienta. Możesz też powiedzieć pomiń.",
@@ -29566,7 +29567,7 @@ if (celInput) {
         });
     }
 
-    // --- MIKROFON ---
+    // --- MIKROFON (Z ULEPSZONYM STRAŻNIKIEM) ---
     if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         aiRecognition = new SpeechRecognition();
@@ -29576,6 +29577,7 @@ if (celInput) {
 
         function startWatchdog() {
             clearTimeout(convoWatchdog);
+            // 5.5 sekundy ciszy = reset i przypomnienie
             convoWatchdog = setTimeout(() => {
                 if (isRecording && activeMode === 'rozmowa') {
                     aiRecognition.stop();
@@ -29584,7 +29586,7 @@ if (celInput) {
                     convoAvatar.style.transform = 'scale(1)';
                     speak("Nie usłyszałem. Powtórz lub kliknij pomiń.");
                 }
-            }, 8000); 
+            }, 5500); 
         }
 
         aiRecordBtn.addEventListener('click', () => {
@@ -29712,14 +29714,10 @@ if (celInput) {
                     return;
                 }
             }
-
             convoState++;
             setTimeout(runConvoStep, 800);
         }
 
-        // ===============================================
-        // WIDOK KOLEJKI Z ZABEZPIECZENIEM EDYCJI
-        // ===============================================
         function renderSavedAnimals() {
             const container = document.getElementById('aiSavedAnimalsContainer');
             const list = document.getElementById('aiSavedAnimalsList');
@@ -29756,6 +29754,7 @@ if (celInput) {
                 editBtn.onclick = () => {
                     stopAllAudio();
                     
+                    // ZABEZPIECZENIE: Zrzucamy to, co jest aktualnie wpisane w polach z powrotem do kolejki!
                     if (edTag.value.trim() !== '' || edZuzyte.value.trim() !== '') {
                         allSavedAnimals.push({
                             tag: edTag.value,
@@ -29764,9 +29763,10 @@ if (celInput) {
                             zuzyte: edZuzyte.value,
                             wydane: edWydane.value
                         });
-                        if(typeof showToast === 'function') showToast("Obecna sztuka zrzucona do kolejki.", "info");
+                        if(typeof showToast === 'function') showToast("Poprzednia sztuka bezpiecznie zrzucona na dół.", "info");
                     }
 
+                    // Wyciągamy klikniętą krowę z tablicy do formularza
                     const targetAnimal = allSavedAnimals[allSavedAnimals.indexOf(animal)];
                     
                     edTag.value = targetAnimal.tag;
@@ -29810,7 +29810,6 @@ if (celInput) {
             renderSavedAnimals();
         }
 
-        // --- TRYB SWOBODNY ANALIZA ---
         aiAnalyzeBtn.addEventListener('click', () => {
             let text = aiRawTextInput.value.toLowerCase();
             if(!text) return;
@@ -29943,7 +29942,7 @@ if (celInput) {
         }
 
         // ===============================================
-        // WSTRZYKIWANIE STADA
+        // WSTRZYKIWANIE (DYNAMICZNY OFFSET DLA AUTO-GROW)
         // ===============================================
         aiConfirmBtn.addEventListener('click', () => {
             if(edTag.value || edZuzyte.value) saveCurrentAnimalToMemory();
@@ -29961,6 +29960,10 @@ if (celInput) {
             closeAiModal();
             showSection('karta');
             
+            // Rejestrujemy długość pustej, fabrycznej tabeli (domyślnie ok. 14 wierszy)
+            baseLogicalRowsCount = typeof rowsEditable === 'function' ? rowsEditable().length : 14;
+            if(baseLogicalRowsCount === 0) baseLogicalRowsCount = 14;
+
             const masterKlient = edKlient.value;
             try {
                 const klientSelect = document.getElementById('klientSelect');
@@ -29978,17 +29981,24 @@ if (celInput) {
             } catch (e) {}
 
             function injectAllData() {
-                const logicalRows = typeof rowsEditable === 'function' ? rowsEditable() : [];
+                let logicalRows = typeof rowsEditable === 'function' ? rowsEditable() : [];
                 if(logicalRows.length === 0) return;
                 
-                for(let i=0; i<15; i++) {
+                // 1. Oczyszczamy tabelę z wypełnionych pól - żeby zresetować ewentualny auto-grow
+                for(let i=0; i<logicalRows.length; i++) {
                     if(logicalRows[i] && logicalRows[i].cells.length > 6) {
                         ['1','2','3','4','6'].forEach(c => {
                             let inp = logicalRows[i].cells[c]?.querySelector('input');
-                            if(inp) { inp.value = ''; inp.dispatchEvent(new Event('input', {bubbles: true})); }
+                            if(inp && inp.value !== '') { 
+                                inp.value = ''; 
+                                inp.dispatchEvent(new Event('input', {bubbles: true})); 
+                            }
                         });
                     }
                 }
+                
+                // Pobieramy rzędy na nowo (być może aplikacja usunęła zbędne wiersze)
+                logicalRows = typeof rowsEditable === 'function' ? rowsEditable() : [];
 
                 function setVal(cell, val) {
                     if(!cell || !val) return;
@@ -29997,14 +30007,19 @@ if (celInput) {
                 }
 
                 let rowZuz = 0;   
-                let rowWyd = 10;  
+                
+                // DYNAMICZNY START WYDANYCH - Zawsze z offsetem od dołu (bezpieczne przed auto-grow)
+                // W czystej tabeli Wydane to indeks 10.
+                let rowWydStart = 10 + (logicalRows.length - baseLogicalRowsCount);
+                if (rowWydStart < 10) rowWydStart = 10;
+                let rowWyd = rowWydStart;
 
                 allSavedAnimals.forEach(animal => {
                     const zuzyteArr = parseEditableStringToArray(animal.zuzyte);
                     const wydaneArr = parseEditableStringToArray(animal.wydane);
 
                     if (zuzyteArr.length === 0 && animal.tag) {
-                        if (rowZuz <= 9 && logicalRows[rowZuz]) {
+                        if (rowZuz < rowWydStart && logicalRows[rowZuz]) {
                             const r = logicalRows[rowZuz];
                             setVal(r.cells[1], animal.tag);
                             setVal(r.cells[2], animal.liczba);
@@ -30013,7 +30028,7 @@ if (celInput) {
                         }
                     } else {
                         zuzyteArr.forEach(med => {
-                            if (rowZuz <= 9 && logicalRows[rowZuz]) {
+                            if (rowZuz < rowWydStart && logicalRows[rowZuz]) {
                                 const r = logicalRows[rowZuz];
                                 setVal(r.cells[1], animal.tag);
                                 setVal(r.cells[2], animal.liczba);
@@ -30026,7 +30041,7 @@ if (celInput) {
                     }
 
                     wydaneArr.forEach(med => {
-                        if (rowWyd <= 14 && logicalRows[rowWyd]) {
+                        if (rowWyd < logicalRows.length && logicalRows[rowWyd]) {
                             const r = logicalRows[rowWyd];
                             if (copyToWydane) {
                                 setVal(r.cells[1], animal.tag);
@@ -30055,5 +30070,6 @@ if (celInput) {
         if (menuAsystentBtn) menuAsystentBtn.style.display = 'none';
     }
 </script>
+
 </body>
 </html>
