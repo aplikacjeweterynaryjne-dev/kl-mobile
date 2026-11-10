@@ -29158,24 +29158,35 @@ if (celInput) {
         }
     });
 }
-    // ========================================================
+   // ========================================================
     // TWORZENIE KARTY Z MAGAZYNU (ZAZNACZONE PRODUKTY)
     // ========================================================
 
+    // NOWOŚĆ: Pamięć zaznaczonych produktów (odporna na wyszukiwarkę)
+    let selectedMagazynProducts = new Set();
+
     // 1. Zaznaczanie i odznaczanie checkboxów
-    function toggleMagazynSelection() {
-        const checked = document.querySelectorAll('.magazyn-cb:checked');
+    function toggleMagazynSelection(checkbox) {
+        if (checkbox) {
+            if (checkbox.checked) {
+                selectedMagazynProducts.add(checkbox.value);
+            } else {
+                selectedMagazynProducts.delete(checkbox.value);
+            }
+        }
+        
         const bar = document.getElementById('magazynMassActionBar');
-        if (checked.length > 0) {
+        if (selectedMagazynProducts.size > 0) {
             bar.style.display = 'flex';
-            document.getElementById('magazynMassCount').textContent = checked.length + ' zazn.';
+            document.getElementById('magazynMassCount').textContent = selectedMagazynProducts.size + ' zazn.';
         } else {
             bar.style.display = 'none';
         }
     }
 
     function clearMagazynSelection() {
-        document.querySelectorAll('.magazyn-cb:checked').forEach(cb => cb.checked = false);
+        selectedMagazynProducts.clear();
+        document.querySelectorAll('.magazyn-cb').forEach(cb => cb.checked = false);
         toggleMagazynSelection();
     }
 
@@ -29203,8 +29214,16 @@ if (celInput) {
                 cb.value = productName;
                 cb.style.cssText = 'width: 20px; height: 20px; accent-color: #27ae60; cursor: pointer; flex-shrink: 0;';
                 
+                // ODZYSKIWANIE PAMIĘCI: Jeśli produkt jest w pamięci, zaznacz go!
+                if (selectedMagazynProducts.has(productName)) {
+                    cb.checked = true;
+                }
+                
                 // Blokujemy propagację, by kliknięcie checkboxa nie otwierało detali magazynu
-                cb.onclick = (e) => { e.stopPropagation(); toggleMagazynSelection(); };
+                cb.onclick = (e) => { 
+                    e.stopPropagation(); 
+                    toggleMagazynSelection(cb); 
+                };
                 
                 const span = document.createElement('span');
                 span.innerHTML = originalContent;
@@ -29222,10 +29241,10 @@ if (celInput) {
         magazynTableObserver.observe(document.getElementById('magazynTableBody'), { childList: true });
     }
 
-// 3. Wstrzykiwanie produktów do Tabeli A4
+    // 3. Wstrzykiwanie produktów do Tabeli A4
     function createCardFromSelected() {
-        const checked = document.querySelectorAll('.magazyn-cb:checked');
-        const selectedProducts = Array.from(checked).map(cb => cb.value);
+        // Pobieramy zaznaczone z naszej trwałej pamięci!
+        const selectedProducts = Array.from(selectedMagazynProducts);
         
         if (selectedProducts.length === 0) return;
         if (selectedProducts.length > 9) {
@@ -29253,7 +29272,6 @@ if (celInput) {
                 const inp = logicalRows[i].cells[4].querySelector('input');
                 if (inp) {
                     inp.value = '';
-                    // Dodatkowo uruchamiamy przeliczenie, aby wyczyścić serię/karencję, jeśli były wpisane
                     inp.dispatchEvent(new Event('input', { bubbles: true }));
                 }
             }
@@ -29266,13 +29284,12 @@ if (celInput) {
                 const input = row.cells[4].querySelector('input');
                 if (input) {
                     input.value = prodName;
-                    // Wywołuje standardowy event, który wstrzykuje na kartę serię, dawkę i karencję
                     input.dispatchEvent(new Event('input', { bubbles: true }));
                 }
             }
         });
 
-        // Chowamy dolny pasek z magazynu
+        // Chowamy dolny pasek z magazynu i czyścimy pamięć
         clearMagazynSelection();
         
         setTimeout(() => {
