@@ -29369,7 +29369,7 @@ if (celInput) {
     });
 </script>
 <!-- ========================================== -->
-<!-- 🤖 ASYSTENT GŁOSOWY AI 3.1 - MODAL I LOGIKA-->
+<!-- 🤖 ASYSTENT GŁOSOWY AI 3.2 - MODAL I LOGIKA-->
 <!-- ========================================== -->
 <div id="aiAssistantModal" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.6); display: none; z-index: 20000; justify-content: center; align-items: center;">
     <div class="form-card" style="width: 95%; max-width: 480px; background: white; padding: 20px; border-radius: 12px; border-top: 5px solid #8e44ad;">
@@ -29384,7 +29384,7 @@ if (celInput) {
         </p>
         
         <!-- POLE TEKSTOWE -->
-        <textarea id="aiRawTextInput" placeholder="Kliknij MÓW i podyktuj polecenie lub wpisz je ręcznie..." style="width: 100%; height: 80px; padding: 10px; border-radius: 8px; border: 1px solid #ccc; font-size: 15px; resize: none; margin-bottom: 10px; box-sizing: border-box; font-family: inherit;"></textarea>
+        <textarea id="aiRawTextInput" placeholder="Kliknij MÓW i podyktuj polecenie..." style="width: 100%; height: 80px; padding: 10px; border-radius: 8px; border: 1px solid #ccc; font-size: 15px; resize: none; margin-bottom: 10px; box-sizing: border-box; font-family: inherit;"></textarea>
         
         <!-- PRZYCISKI STERUJĄCE -->
         <div style="display: flex; gap: 10px; margin-bottom: 15px;">
@@ -29407,7 +29407,6 @@ if (celInput) {
         
         <div class="form-actions" style="justify-content: space-between;">
             <button class="btn ghost" onclick="closeAiModal()">Anuluj</button>
-            <!-- STAŁY GUZIK ZATWIERDZAJĄCY -->
             <button class="btn primary" id="aiConfirmActionBtn" style="background-color: #27ae60; border-color: #2ecc71; font-size: 15px; padding: 10px 15px; opacity: 0.5;" disabled>
                 ✅ Wygeneruj Kartę A4
             </button>
@@ -29429,14 +29428,18 @@ if (celInput) {
 
     function closeAiModal() {
         aiModal.style.display = 'none';
-        if (aiRecognition && isRecording) aiRecognition.stop();
+        if (aiRecognition && isRecording) {
+            aiRecognition.stop();
+            isRecording = false;
+        }
     }
 
     if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         aiRecognition = new SpeechRecognition();
         aiRecognition.lang = 'pl-PL';
-        aiRecognition.continuous = false;     
+        // TRYB CIĄGŁY: Słucha dopóki nie klikniesz Stop!
+        aiRecognition.continuous = true;     
         aiRecognition.interimResults = false; 
 
         if (menuAsystentBtn) {
@@ -29450,11 +29453,14 @@ if (celInput) {
         aiRecordBtn.addEventListener('click', () => {
             if (isRecording) {
                 aiRecognition.stop();
+                isRecording = false;
+                aiRecordBtn.innerHTML = "🎙️ Mów";
+                aiRecordBtn.style.backgroundColor = "#e74c3c";
             } else {
                 try { 
                     aiRecognition.start(); 
                     isRecording = true;
-                    aiRecordBtn.innerHTML = "🛑 Słucham...";
+                    aiRecordBtn.innerHTML = "🛑 Zakończ mówienie";
                     aiRecordBtn.style.backgroundColor = "#c0392b";
                 } catch (e) { 
                     console.warn("Mikrofon już działa."); 
@@ -29463,7 +29469,10 @@ if (celInput) {
         });
 
         aiRecognition.onresult = (event) => {
-            const text = event.results[0][0].transcript;
+            // W trybie ciągłym dopisujemy tylko nową partię tekstu
+            const resultIndex = event.resultIndex;
+            const text = event.results[resultIndex][0].transcript;
+            
             const currentVal = aiRawTextInput.value.trim();
             aiRawTextInput.value = currentVal ? currentVal + " " + text : text;
             aiAnalyzeBtn.click();
@@ -29476,7 +29485,7 @@ if (celInput) {
         
         aiRecognition.onend = () => {
             isRecording = false;
-            aiRecordBtn.innerHTML = "🎙️ Mów (Dodaj)";
+            aiRecordBtn.innerHTML = "🎙️ Mów";
             aiRecordBtn.style.backgroundColor = "#e74c3c";
         };
 
@@ -29486,21 +29495,18 @@ if (celInput) {
             
             parsedAiAction.klient = ''; parsedAiAction.tag = ''; parsedAiAction.zuzyte = []; parsedAiAction.wydane = [];
 
-            // 1. Klient
             const klientMatch = text.match(/klient(?:a)?\s+([a-ząćęłńóśźż]+\s+[a-ząćęłńóśźż]+)/i);
             if (klientMatch) {
                 parsedAiAction.klient = klientMatch[1];
-                text = text.replace(klientMatch[0], ''); // Wycinamy, by nie myliło parsera leków
+                text = text.replace(klientMatch[0], ''); 
             }
 
-            // 2. Kolczyk (Wspiera prefiksy jak PL)
             const tagMatch = text.match(/(?:krow[a-ęy]|kolczyk(?:u)?|numer(?:ze)?|sztuk[a-ei])?\s*([a-z]{0,2}\s*\d{2,14})/i);
             if (tagMatch) {
                 parsedAiAction.tag = tagMatch[1].toUpperCase().replace(/\s+/g, '');
-                text = text.replace(tagMatch[0], ''); // Wycinamy kolczyk z tekstu!
+                text = text.replace(tagMatch[0], ''); 
             }
 
-            // 3. Rozdzielenie Zużyte / Zostawione na wyczyszczonym tekście
             let txtZuzyte = text;
             let txtWydane = '';
             const splitMatch = text.match(/(?:zostawi[a-z]*|wyda[a-z]*|pozostawi[a-z]*)/i);
@@ -29510,7 +29516,6 @@ if (celInput) {
                 txtWydane = text.substring(splitIndex);
             }
 
-            // Funkcja wyciągająca produkty
             function extractProducts(subtext) {
                 const meds = [];
                 const ignoreWords = ['zużył', 'zużyłem', 'zużyto', 'podał', 'podałem', 'dostał', 'dostała', 'zostawił', 'zostawiłem', 'wydał', 'wydałem', 'wydano', 'krowa', 'krowę', 'kolczyk', 'numer', 'klient', 'leki', 'lek', 'produkt', 'produkty', 'zużyte', 'pozostawione', 'następnie', 'karta', 'leczenia', 'pl'];
@@ -29563,7 +29568,6 @@ if (celInput) {
                 elWydane.innerHTML = `⚪ <span style="color:#777;">Pozostawione: (Brak)</span>`;
             }
 
-            // Włącza/wyłącza stały guzik
             if (parsedAiAction.tag && parsedAiAction.zuzyte.length > 0) {
                 aiConfirmBtn.disabled = false;
                 aiConfirmBtn.style.opacity = '1';
@@ -29578,62 +29582,76 @@ if (celInput) {
             updateChecklist();
         }
 
-        // TWORZENIE KARTY (WPROST DO WIDOKU A4)
+        // TWORZENIE KARTY Z OPÓŹNIENIEM (Omija problem czyszczenia formularza po zmianie zakładki)
         aiConfirmBtn.addEventListener('click', () => {
             closeAiModal();
+            
+            // Najpierw aktywujemy widok Karty
             showSection('karta');
             
-            const klientSelect = document.getElementById('klientSelect');
-            if (klientSelect && parsedAiAction.klient) {
-                const options = Array.from(klientSelect.options);
-                const match = options.find(opt => opt.text.toLowerCase().includes(parsedAiAction.klient.toLowerCase()));
-                if (match) {
-                    klientSelect.value = match.value;
-                    klientSelect.dispatchEvent(new Event('change', { bubbles: true }));
+            // Czekamy 500ms, aż cała strona w zakładce Karta załaduje się na czysto
+            setTimeout(() => {
+                const klientSelect = document.getElementById('klientSelect');
+                if (klientSelect && parsedAiAction.klient) {
+                    const options = Array.from(klientSelect.options);
+                    const match = options.find(opt => opt.text.toLowerCase().includes(parsedAiAction.klient.toLowerCase()));
+                    if (match) {
+                        klientSelect.value = match.value;
+                        klientSelect.dispatchEvent(new Event('change', { bubbles: true }));
+                    }
                 }
-            }
 
-            const logicalRows = typeof rowsEditable === 'function' ? rowsEditable() : [];
-            
-            for(let i=0; i<13; i++) {
-                 if (logicalRows[i]) {
-                     const inpLek = logicalRows[i].cells[4].querySelector('input');
-                     if (inpLek) { inpLek.value = ''; inpLek.dispatchEvent(new Event('input', {bubbles: true})); }
-                 }
-            }
-
-            let currRow = 0;
-            const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
-
-            parsedAiAction.zuzyte.forEach(med => {
-                if(logicalRows[currRow]) {
-                    const r = logicalRows[currRow];
-                    const opisInp = r.cells[1].querySelector('input');
-                    if(opisInp) opisInp.value = parsedAiAction.tag;
-                    
-                    const lekInp = r.cells[4].querySelector('input');
-                    if(lekInp) { lekInp.value = capitalize(med.lek); lekInp.dispatchEvent(new Event('input', {bubbles: true})); }
-                    
-                    const iloscInp = r.cells[6].querySelector('input');
-                    if(iloscInp) iloscInp.value = med.ilosc.replace(',','.');
-                    currRow++;
+                const logicalRows = typeof rowsEditable === 'function' ? rowsEditable() : [];
+                
+                // Czyszczenie starej karty
+                for(let i=0; i<13; i++) {
+                     if (logicalRows[i]) {
+                         const inpLek = logicalRows[i].cells[4]?.querySelector('input');
+                         if (inpLek) { inpLek.value = ''; inpLek.dispatchEvent(new Event('input', {bubbles: true})); }
+                         
+                         const inpIlosc = logicalRows[i].cells[6]?.querySelector('input');
+                         if (inpIlosc) { inpIlosc.value = ''; inpIlosc.dispatchEvent(new Event('input', {bubbles: true})); }
+                         
+                         const inpOpis = logicalRows[i].cells[1]?.querySelector('input');
+                         if (inpOpis) { inpOpis.value = ''; inpOpis.dispatchEvent(new Event('input', {bubbles: true})); }
+                     }
                 }
-            });
 
-            parsedAiAction.wydane.forEach(med => {
-                if(currRow < 9) currRow = 9; 
-                if(logicalRows[currRow]) {
-                    const r = logicalRows[currRow];
-                    const lekInp = r.cells[4].querySelector('input');
-                    if(lekInp) { lekInp.value = capitalize(med.lek); lekInp.dispatchEvent(new Event('input', {bubbles: true})); }
-                    
-                    const iloscInp = r.cells[6].querySelector('input');
-                    if(iloscInp) iloscInp.value = med.ilosc.replace(',','.');
-                    currRow++;
-                }
-            });
+                let currRow = 0;
+                const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 
-            if (typeof showToast === 'function') showToast("Karta wczytana pomyślnie!", "success");
+                // ZUŻYTE
+                parsedAiAction.zuzyte.forEach(med => {
+                    if(logicalRows[currRow]) {
+                        const r = logicalRows[currRow];
+                        const opisInp = r.cells[1]?.querySelector('input');
+                        if(opisInp) { opisInp.value = parsedAiAction.tag; opisInp.dispatchEvent(new Event('input', {bubbles: true})); }
+                        
+                        const lekInp = r.cells[4]?.querySelector('input');
+                        if(lekInp) { lekInp.value = capitalize(med.lek); lekInp.dispatchEvent(new Event('input', {bubbles: true})); }
+                        
+                        const iloscInp = r.cells[6]?.querySelector('input');
+                        if(iloscInp) { iloscInp.value = med.ilosc.replace(',','.'); iloscInp.dispatchEvent(new Event('input', {bubbles: true})); }
+                        currRow++;
+                    }
+                });
+
+                // POZOSTAWIONE
+                parsedAiAction.wydane.forEach(med => {
+                    if(currRow < 9) currRow = 9; 
+                    if(logicalRows[currRow]) {
+                        const r = logicalRows[currRow];
+                        const lekInp = r.cells[4]?.querySelector('input');
+                        if(lekInp) { lekInp.value = capitalize(med.lek); lekInp.dispatchEvent(new Event('input', {bubbles: true})); }
+                        
+                        const iloscInp = r.cells[6]?.querySelector('input');
+                        if(iloscInp) { iloscInp.value = med.ilosc.replace(',','.'); iloscInp.dispatchEvent(new Event('input', {bubbles: true})); }
+                        currRow++;
+                    }
+                });
+
+                if (typeof showToast === 'function') showToast("Karta wczytana pomyślnie!", "success");
+            }, 500); // <-- TUTAJ JEST OPÓŹNIENIE (pół sekundy)
         });
     } else {
         if (menuAsystentBtn) menuAsystentBtn.style.display = 'none';
