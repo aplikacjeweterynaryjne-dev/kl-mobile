@@ -29369,19 +29369,27 @@ if (celInput) {
     });
 </script>
 <!-- ========================================== -->
-<!-- 🤖 ASYSTENT GŁOSOWY AI 2.0 - MODAL I LOGIKA-->
+<!-- 🤖 ASYSTENT GŁOSOWY AI 3.0 - MODAL I LOGIKA-->
 <!-- ========================================== -->
 <div id="aiAssistantModal" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.6); display: none; z-index: 20000; justify-content: center; align-items: center;">
     <div class="form-card" style="width: 95%; max-width: 480px; background: white; padding: 20px; border-radius: 12px; border-top: 5px solid #8e44ad;">
         
-        <h3 style="margin-top: 0; color: #8e44ad; text-align: center; display: flex; justify-content: center; align-items: center; gap: 10px;">
-            <div class="ai-pulse-icon" style="font-size:24px;">🎙️</div> Twój Asystent
+        <h3 style="margin-top: 0; color: #8e44ad; text-align: center; margin-bottom: 15px;">
+            🤖 Twój Asystent
         </h3>
         
-        <!-- Pasek tego co Asystent słyszy NA ŻYWO -->
-        <p style="font-size: 14px; color: #555; font-style: italic; padding: 10px; background: #f8f9fa; border-radius: 8px; min-height: 40px;">
-            " <span id="aiRecognizedText" style="font-weight: bold; color: #333;">Słucham...</span> "
-        </p>
+        <!-- POLE TEKSTOWE (Można edytować palcem!) -->
+        <textarea id="aiRawTextInput" placeholder="Kliknij MÓW i podyktuj polecenie lub wpisz je ręcznie..." style="width: 100%; height: 80px; padding: 10px; border-radius: 8px; border: 1px solid #ccc; font-size: 15px; resize: none; margin-bottom: 10px; box-sizing: border-box; font-family: inherit;"></textarea>
+        
+        <!-- PRZYCISKI STERUJĄCE -->
+        <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+            <button id="aiRecordBtn" class="btn" style="flex: 1; background-color: #e74c3c; color: white; border: none; padding: 10px; font-weight: bold;">
+                🎙️ Mów
+            </button>
+            <button id="aiAnalyzeBtn" class="btn" style="flex: 1; background-color: #3498db; color: white; border: none; padding: 10px; font-weight: bold;">
+                🧠 Analizuj
+            </button>
+        </div>
         
         <!-- Interaktywna Checklista -->
         <h4 style="margin-bottom: 10px; color: #333;">Checklista Karty Leczenia:</h4>
@@ -29401,79 +29409,95 @@ if (celInput) {
     </div>
 </div>
 
-<style>
-    @keyframes pulseAi { 0% { transform: scale(1); } 50% { transform: scale(1.2); } 100% { transform: scale(1); } }
-    .ai-pulse-active { animation: pulseAi 1s infinite; }
-</style>
-
 <script>
     const menuAsystentBtn = document.getElementById('menuAsystentBtn');
     const aiModal = document.getElementById('aiAssistantModal');
-    const aiTextSpan = document.getElementById('aiRecognizedText');
+    const aiRawTextInput = document.getElementById('aiRawTextInput');
+    const aiRecordBtn = document.getElementById('aiRecordBtn');
+    const aiAnalyzeBtn = document.getElementById('aiAnalyzeBtn');
     const aiConfirmBtn = document.getElementById('aiConfirmActionBtn');
-    const pulseIcon = document.querySelector('.ai-pulse-icon');
 
     let parsedAiAction = { klient: '', tag: '', zuzyte: [], wydane: [] };
     let aiRecognition = null;
+    let isRecording = false;
 
     function closeAiModal() {
         aiModal.style.display = 'none';
-        if (aiRecognition) aiRecognition.stop();
-        pulseIcon.classList.remove('ai-pulse-active');
+        if (aiRecognition && isRecording) aiRecognition.stop();
     }
 
     if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         aiRecognition = new SpeechRecognition();
         aiRecognition.lang = 'pl-PL';
-        aiRecognition.continuous = true;     // Pozwala dyktować z przerwami na oddech
-        aiRecognition.interimResults = true; // Pozwala analizować słowa NA ŻYWO!
+        aiRecognition.continuous = false;     // Jeden ciąg mowy = jeden wynik (stabilne!)
+        aiRecognition.interimResults = false; // Czeka aż skończysz mówić
 
         if (menuAsystentBtn) {
             menuAsystentBtn.addEventListener('click', () => {
                 resetChecklist();
-                aiTextSpan.textContent = "Słucham Twoich poleceń...";
+                aiRawTextInput.value = ''; // Czyścimy pole
                 aiModal.style.display = 'flex';
-                pulseIcon.classList.add('ai-pulse-active');
-                try { aiRecognition.start(); } catch (e) { console.warn("Mikrofon włączony."); }
             });
         }
 
-        // WYDOBYWANIE TEKSTU NA ŻYWO
-        aiRecognition.onresult = (event) => {
-            let finalAndInterimText = '';
-            for (let i = 0; i < event.results.length; ++i) {
-                finalAndInterimText += event.results[i][0].transcript;
+        // OBSŁUGA NAGRYWANIA
+        aiRecordBtn.addEventListener('click', () => {
+            if (isRecording) {
+                aiRecognition.stop();
+            } else {
+                try { 
+                    aiRecognition.start(); 
+                    isRecording = true;
+                    aiRecordBtn.innerHTML = "🛑 Słucham...";
+                    aiRecordBtn.style.backgroundColor = "#c0392b";
+                } catch (e) { 
+                    console.warn("Mikrofon już działa."); 
+                }
             }
+        });
+
+        // WYNIK Z MIKROFONU
+        aiRecognition.onresult = (event) => {
+            const text = event.results[0][0].transcript;
             
-            const currentText = finalAndInterimText.toLowerCase();
-            aiTextSpan.textContent = currentText;
+            // Dopisujemy tekst, jeśli coś już było (aby można było dyktować "na raty")
+            const currentVal = aiRawTextInput.value.trim();
+            aiRawTextInput.value = currentVal ? currentVal + " " + text : text;
             
-            // Odpalamy analizę na żywo po każdym słowie
-            processLiveCommand(currentText);
+            // Automatycznie odpalamy analizę po usłyszeniu
+            aiAnalyzeBtn.click();
         };
 
         aiRecognition.onerror = (e) => {
-            aiTextSpan.textContent = "[Błąd mikrofonu. Spróbuj ponownie.]";
-            pulseIcon.classList.remove('ai-pulse-active');
+            console.error(e);
+            if (aiRawTextInput.value === '') aiRawTextInput.value = "[Błąd mikrofonu]";
         };
         
-        aiRecognition.onend = () => pulseIcon.classList.remove('ai-pulse-active');
+        aiRecognition.onend = () => {
+            isRecording = false;
+            aiRecordBtn.innerHTML = "🎙️ Mów (Dodaj)";
+            aiRecordBtn.style.backgroundColor = "#e74c3c";
+        };
 
-        // SILNIK ANALIZUJĄCY SŁOWA KLUCZE
-        function processLiveCommand(text) {
-            // 1. Wyciąganie Klienta
+        // RĘCZNA ANALIZA TEKSTU Z POLA
+        aiAnalyzeBtn.addEventListener('click', () => {
+            const text = aiRawTextInput.value.toLowerCase();
+            if(!text) return;
+            
+            parsedAiAction.klient = ''; parsedAiAction.tag = ''; parsedAiAction.zuzyte = []; parsedAiAction.wydane = [];
+
+            // 1. Klient
             const klientMatch = text.match(/klient(?:a)?\s+([a-ząćęłńóśźż]+\s+[a-ząćęłńóśźż]+)/i);
             parsedAiAction.klient = klientMatch ? klientMatch[1] : '';
 
-            // 2. Wyciąganie Kolczyka (Bez pomyłki z ilością leku)
+            // 2. Kolczyk
             const tagMatch = text.match(/(?:krow[a-ę]|kolczyk(?:u)?|numer(?:ze)?)\s*(\d{2,6})/i);
             parsedAiAction.tag = tagMatch ? tagMatch[1] : '';
 
-            // 3. Podział zdania na ZUŻYTE i POZOSTAWIONE
+            // 3. Rozdzielenie Zużyte / Zostawione
             let txtZuzyte = text;
             let txtWydane = '';
-            
             const splitMatch = text.match(/(?:zostawi[a-z]*|wyda[a-z]*|pozostawi[a-z]*)/i);
             if (splitMatch) {
                 const splitIndex = text.indexOf(splitMatch[0]);
@@ -29481,27 +29505,21 @@ if (celInput) {
                 txtWydane = text.substring(splitIndex);
             }
 
-            // Funkcja pomocnicza znajdująca produkty + omijająca komendy
+            // Funkcja wyciągająca produkty
             function extractProducts(subtext) {
                 const meds = [];
                 const ignoreWords = ['zużył', 'zużyłem', 'zużyto', 'podał', 'podałem', 'dostał', 'dostała', 'zostawił', 'zostawiłem', 'wydał', 'wydałem', 'wydano', 'krowa', 'krowę', 'kolczyk', 'numer', 'klient', 'leki', 'lek', 'produkt', 'produkty', 'zużyte', 'pozostawione', 'następnie', 'karta', 'leczenia'];
                 
-                // Szukamy frazy: Ilość -> (opcjonalnie jednostka) -> Nazwa_Leku
                 const regex = /(\d+(?:[.,]\d+)?)\s*(ml|mililitr|mililitrów|szt|sztuk|sztuki|g|mg)?\s+([a-ząćęłńóśźż]+)/gi;
                 let match;
                 while ((match = regex.exec(subtext)) !== null) {
-                    let ilosc = match[1];
-                    let lek = match[3];
-                    if (!ignoreWords.includes(lek.toLowerCase())) {
-                        meds.push({ lek: lek, ilosc: ilosc });
-                    }
+                    let ilosc = match[1]; let lek = match[3];
+                    if (!ignoreWords.includes(lek.toLowerCase())) meds.push({ lek: lek, ilosc: ilosc });
                 }
                 
-                // Szukamy też odwrotnie: Nazwa_Leku -> Ilość -> (Jednostka)
                 const regexRev = /([a-ząćęłńóśźż]+)\s+(\d+(?:[.,]\d+)?)\s*(ml|mililitr|mililitrów|szt|sztuk|sztuki|g|mg)?/gi;
                 while ((match = regexRev.exec(subtext)) !== null) {
-                    let lek = match[1];
-                    let ilosc = match[2];
+                    let lek = match[1]; let ilosc = match[2];
                     if (!ignoreWords.includes(lek.toLowerCase()) && !meds.find(m => m.lek === lek && m.ilosc === ilosc)) {
                         meds.push({ lek: lek, ilosc: ilosc });
                     }
@@ -29512,22 +29530,18 @@ if (celInput) {
             parsedAiAction.zuzyte = extractProducts(txtZuzyte);
             parsedAiAction.wydane = extractProducts(txtWydane);
 
-            // AKTUALIZACJA CHECKLISTY W UI
             updateChecklist();
-        }
+        });
 
         function updateChecklist() {
-            // Klient
             const elKlient = document.getElementById('aiCheckKlient');
             if (parsedAiAction.klient) elKlient.innerHTML = `✅ <span style="color:#27ae60;">Klient: <b>${parsedAiAction.klient}</b></span>`;
             else elKlient.innerHTML = `⚪ <span style="color:#777;">Klient: (opcjonalnie)</span>`;
 
-            // Kolczyk
             const elTag = document.getElementById('aiCheckTag');
             if (parsedAiAction.tag) elTag.innerHTML = `✅ <span style="color:#27ae60;">Kolczyk: <b>${parsedAiAction.tag}</b></span>`;
             else elTag.innerHTML = `❌ <span style="color:#c0392b; font-weight:bold;">Brak kolczyka krowy</span>`;
 
-            // Zużyte
             const elZuzyte = document.getElementById('aiCheckZuzyte');
             if (parsedAiAction.zuzyte.length > 0) {
                 const zTxt = parsedAiAction.zuzyte.map(m => `${m.lek} (${m.ilosc})`).join(', ');
@@ -29536,7 +29550,6 @@ if (celInput) {
                 elZuzyte.innerHTML = `❌ <span style="color:#c0392b; font-weight:bold;">Brak leków zużytych</span>`;
             }
 
-            // Zostawione (nie są obowiązkowe do odblokowania guzika)
             const elWydane = document.getElementById('aiCheckWydane');
             if (parsedAiAction.wydane.length > 0) {
                 const wTxt = parsedAiAction.wydane.map(m => `${m.lek} (${m.ilosc})`).join(', ');
@@ -29545,7 +29558,7 @@ if (celInput) {
                 elWydane.innerHTML = `⚪ <span style="color:#777;">Pozostawione: (Brak)</span>`;
             }
 
-            // ODBLOKOWANIE GUZIKA ZATWIERDŹ (musi być chociaż lek i kolczyk)
+            // ODBLOKOWANIE GUZIKA ZATWIERDŹ
             if (parsedAiAction.tag && parsedAiAction.zuzyte.length > 0) {
                 aiConfirmBtn.disabled = false;
                 aiConfirmBtn.innerHTML = "✅ Wygeneruj Kartę A4";
@@ -29563,26 +29576,20 @@ if (celInput) {
         // TWORZENIE KARTY (WPROST DO WIDOKU A4)
         aiConfirmBtn.addEventListener('click', () => {
             closeAiModal();
-            
-            // 1. Zmień zakładkę na Karta Leczenia
             showSection('karta');
             
-            // 2. Skopiuj ewentualnego klienta z dyktowania
             const klientSelect = document.getElementById('klientSelect');
             if (klientSelect && parsedAiAction.klient) {
                 const options = Array.from(klientSelect.options);
                 const match = options.find(opt => opt.text.toLowerCase().includes(parsedAiAction.klient.toLowerCase()));
                 if (match) {
                     klientSelect.value = match.value;
-                    // Wymuś załadowanie danych tego klienta
                     klientSelect.dispatchEvent(new Event('change', { bubbles: true }));
                 }
             }
 
-            // 3. Wstrzykiwanie wierszy bezpośrednio w widok
             const logicalRows = typeof rowsEditable === 'function' ? rowsEditable() : [];
             
-            // Czyszczenie starej karty
             for(let i=0; i<13; i++) {
                  if (logicalRows[i]) {
                      const inpLek = logicalRows[i].cells[4].querySelector('input');
@@ -29593,39 +29600,30 @@ if (celInput) {
             let currRow = 0;
             const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 
-            // Wypełnianie Zużytych (Górne wiersze 1-9)
             parsedAiAction.zuzyte.forEach(med => {
                 if(logicalRows[currRow]) {
                     const r = logicalRows[currRow];
-                    
-                    // Kolczyk krowy w kolumnie "Opis" (cells[1])
                     const opisInp = r.cells[1].querySelector('input');
                     if(opisInp) opisInp.value = parsedAiAction.tag;
                     
-                    // Lek (cells[4])
                     const lekInp = r.cells[4].querySelector('input');
                     if(lekInp) { lekInp.value = capitalize(med.lek); lekInp.dispatchEvent(new Event('input', {bubbles: true})); }
                     
-                    // Ilość (cells[6])
                     const iloscInp = r.cells[6].querySelector('input');
                     if(iloscInp) iloscInp.value = med.ilosc.replace(',','.');
-                    
                     currRow++;
                 }
             });
 
-            // Wypełnianie Pozostawionych (Dolne wiersze 10-13 = logicalRows indeksy od 9 wzwyż)
             parsedAiAction.wydane.forEach(med => {
-                if(currRow < 9) currRow = 9; // Przeskakujemy prosto do sekcji wydanych
+                if(currRow < 9) currRow = 9; 
                 if(logicalRows[currRow]) {
                     const r = logicalRows[currRow];
-                    
                     const lekInp = r.cells[4].querySelector('input');
                     if(lekInp) { lekInp.value = capitalize(med.lek); lekInp.dispatchEvent(new Event('input', {bubbles: true})); }
                     
                     const iloscInp = r.cells[6].querySelector('input');
                     if(iloscInp) iloscInp.value = med.ilosc.replace(',','.');
-                    
                     currRow++;
                 }
             });
