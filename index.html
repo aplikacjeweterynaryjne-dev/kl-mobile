@@ -30157,5 +30157,295 @@ if (celInput) {
         if (menuAsystentBtn) menuAsystentBtn.style.display = 'none';
     }
 </script>
+    <!-- ========================================== -->
+<!-- 🤖 ASYSTENT GŁOSOWY: KALENDARZ WIZYT       -->
+<!-- ========================================== -->
+<div id="calendarAiModal" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.6); display: none; z-index: 20000; justify-content: center; align-items: center;">
+    <div class="form-card" style="width: 95%; max-width: 480px; background: white; padding: 20px; border-radius: 12px; border-top: 5px solid #2980b9; max-height: 95vh; overflow-y: auto;">
+        
+        <h3 style="margin-top: 0; color: #2980b9; text-align: center; margin-bottom: 20px; font-size: 20px;">
+            🗓️ Asystent Wizyt
+        </h3>
+
+        <div style="text-align: center; padding-bottom: 10px;">
+            <div id="calAiAvatar" style="font-size: 60px; margin-bottom: 10px; transition: transform 0.3s;">🤖</div>
+            <p id="calAiStatusText" style="font-size: 16px; font-weight: bold; color: #2980b9; min-height: 50px; margin: 0 0 15px 0;">
+                Gotowy do zaplanowania wizyty.
+            </p>
+            <p id="calAiListeningPreview" style="font-size: 14px; color: #555; font-style: italic; background: #f4f6f7; padding: 10px; border-radius: 6px; display: none;">
+                " <span id="calAiHeardText"></span> "
+            </p>
+            
+            <button type="button" id="calAiStartBtn" class="btn" style="background-color: #2980b9; color: white; border: none; padding: 12px 25px; font-weight: bold; font-size: 18px; border-radius: 8px; width: 100%; margin-bottom: 10px;">
+                ▶️ Rozpocznij
+            </button>
+            
+            <div style="display: flex; gap: 8px; margin-bottom: 5px;">
+                <button type="button" id="calAiRetryBtn" class="btn" style="display: none; flex: 2; padding: 8px 10px; font-size: 14px; background-color: #f39c12; color: white; font-weight: bold;">
+                    🔄 Powtórz
+                </button>
+                <button type="button" id="calAiSkipBtn" class="btn ghost" style="display: none; flex: 1; padding: 8px 10px; font-size: 14px;">
+                    ⏭️ Pomiń
+                </button>
+            </div>
+        </div>
+
+        <div id="calAiPreviewForm" style="background: #fdfdfd; border: 1px solid #eee; padding: 10px; border-radius: 8px; margin-top: 15px; font-size: 13px;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                <span style="color: #777;">Klient:</span> <b id="calPrvKlient" style="color:#2980b9;">-</b>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                <span style="color: #777;">Data:</span> <b id="calPrvData" style="color:#2980b9;">-</b>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                <span style="color: #777;">Pora:</span> <b id="calPrvPora" style="color:#2980b9;">-</b>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                <span style="color: #777;">Cel:</span> <b id="calPrvCel" style="color:#2980b9;">-</b>
+            </div>
+            <div style="display: flex; justify-content: space-between;">
+                <span style="color: #777;">Notatka:</span> <b id="calPrvNotatka" style="color:#2980b9;">-</b>
+            </div>
+        </div>
+
+        <div class="form-actions" style="justify-content: center; margin-top: 15px;">
+            <button type="button" class="btn ghost" onclick="document.getElementById('calendarAiModal').style.display='none'; stopCalAiAudio();" style="width: 100%;">Anuluj i zamknij</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // 1. Dodanie pływającego przycisku Asystenta do sekcji Kalendarza
+    document.addEventListener("DOMContentLoaded", () => {
+        const kalendarzSec = document.getElementById('kalendarzWizytSection');
+        if (kalendarzSec) {
+            const calAiBtn = document.createElement('button');
+            calAiBtn.type = 'button';
+            calAiBtn.id = 'calendarAiFloatBtn';
+            calAiBtn.innerHTML = '🤖';
+            // Umiejscowienie wyżej niż główny przycisk dodawania wizyty (+)
+            calAiBtn.style.cssText = 'position: fixed; bottom: 150px; right: 20px; width: 60px; height: 60px; border-radius: 50%; font-size: 30px; line-height: 1; padding: 0; z-index: 1000; background-color: #8e44ad; color: white; border: 2px solid white; box-shadow: 0 4px 10px rgba(0,0,0,0.3); cursor: pointer;';
+            kalendarzSec.appendChild(calAiBtn);
+            
+            calAiBtn.addEventListener('click', () => {
+                resetCalAiForm();
+                document.getElementById('calendarAiModal').style.display = 'flex';
+            });
+        }
+    });
+
+    // 2. Zmienne logiczne
+    let calAiState = -1;
+    let calAiRec = null;
+    let calAiRecording = false;
+    let calAiWatchdog = null;
+    let calData = { klient: '', data: '', pora: 'Obojętne', cel: '', notatka: '' };
+
+    const calPrompts = {
+        0: "Podaj imię i nazwisko klienta.",
+        1: "Kiedy ma się odbyć wizyta? Powiedz dzisiaj, jutro lub pojutrze.",
+        2: "O jakiej porze? Powiedz rano, południe, wieczór, obojętnie lub pilne.",
+        3: "Jaki jest cel wizyty?",
+        4: "Czy chcesz dodać notatkę? Podyktuj ją lub powiedz pomiń."
+    };
+
+    const calModal = document.getElementById('calendarAiModal');
+    const calStartBtn = document.getElementById('calAiStartBtn');
+    const calSkipBtn = document.getElementById('calAiSkipBtn');
+    const calRetryBtn = document.getElementById('calAiRetryBtn');
+    const calStatus = document.getElementById('calAiStatusText');
+    const calAvatar = document.getElementById('calAiAvatar');
+    const calPreviewBox = document.getElementById('calAiListeningPreview');
+    const calHeard = document.getElementById('calAiHeardText');
+
+    function stopCalAiAudio() {
+        clearTimeout(calAiWatchdog);
+        if (calAiRec) calAiRec.stop();
+        window.speechSynthesis.cancel();
+        calAiRecording = false;
+    }
+
+    function resetCalAiForm() {
+        calAiState = -1;
+        calData = { klient: '', data: '', pora: 'Obojętne', cel: '', notatka: '' };
+        calStartBtn.style.display = 'inline-block';
+        calSkipBtn.style.display = 'none';
+        calRetryBtn.style.display = 'none';
+        calPreviewBox.style.display = 'none';
+        calStatus.textContent = "Gotowy do zaplanowania wizyty.";
+        updateCalAiPreviewUI();
+    }
+
+    function updateCalAiPreviewUI() {
+        document.getElementById('calPrvKlient').textContent = calData.klient || '-';
+        document.getElementById('calPrvData').textContent = calData.data || '-';
+        document.getElementById('calPrvPora').textContent = calData.pora || '-';
+        document.getElementById('calPrvCel').textContent = calData.cel || '-';
+        document.getElementById('calPrvNotatka').textContent = calData.notatka || '-';
+    }
+
+    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        calAiRec = new SpeechRecognition();
+        calAiRec.lang = 'pl-PL';
+        calAiRec.continuous = false;     
+        calAiRec.interimResults = false; 
+
+        calAiRec.onresult = (e) => {
+            clearTimeout(calAiWatchdog);
+            const text = e.results[0][0].transcript.trim();
+            calPreviewBox.style.display = 'block';
+            calHeard.textContent = text;
+            processCalAiAnswer(text);
+        };
+
+        calAiRec.onerror = () => {
+            clearTimeout(calAiWatchdog);
+            calStatus.textContent = "Błąd mikrofonu. Kliknij Powtórz.";
+            calAiRecording = false;
+        };
+        
+        calAiRec.onend = () => {
+            clearTimeout(calAiWatchdog);
+            calAvatar.style.transform = 'scale(1)';
+            calAiRecording = false;
+        };
+    }
+
+    function calAiSpeak(text, callback) {
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'pl-PL';
+        let voices = window.speechSynthesis.getVoices();
+        let plVoices = voices.filter(v => v.lang.includes('pl') || v.lang.includes('PL'));
+        utterance.voice = plVoices.find(v => v.name.toLowerCase().includes('network') || v.name.toLowerCase().includes('google')) || plVoices[0];
+        utterance.rate = 1.05; 
+        
+        calAvatar.style.transform = 'scale(1.2)';
+        calStatus.textContent = `🔊 ${text}`;
+        
+        utterance.onend = () => {
+            calAvatar.style.transform = 'scale(1)';
+            if(callback) callback();
+        };
+        window.speechSynthesis.speak(utterance);
+    }
+
+    function startCalAiStep() {
+        if (calAiState > 4) return;
+        calAiSpeak(calPrompts[calAiState], () => {
+            calStatus.textContent = "🎙️ Słucham...";
+            calPreviewBox.style.display = 'none';
+            try { 
+                calAiRecording = true; 
+                calAiRec.start(); 
+                
+                calAiWatchdog = setTimeout(() => {
+                    if (calAiRecording) {
+                        calAiRec.stop();
+                        calAiRecording = false;
+                        calStatus.textContent = "⏱️ Zbyt długa cisza. Kliknij Powtórz.";
+                        calAvatar.style.transform = 'scale(1)';
+                    }
+                }, 6500);
+            } catch(e) {}
+        });
+    }
+
+    calStartBtn.addEventListener('click', () => {
+        calAiState = 0;
+        calStartBtn.style.display = 'none';
+        calSkipBtn.style.display = 'inline-block';
+        calRetryBtn.style.display = 'inline-block';
+        startCalAiStep();
+    });
+
+    calSkipBtn.addEventListener('click', () => {
+        if(calAiRec) calAiRec.stop();
+        processCalAiAnswer("pomiń");
+    });
+
+    calRetryBtn.addEventListener('click', () => {
+        stopCalAiAudio();
+        setTimeout(startCalAiStep, 400);
+    });
+
+    // Inteligentne dekodowanie daty
+    function parseSpokenDate(text) {
+        const today = new Date();
+        const lowText = text.toLowerCase();
+        
+        if (lowText.includes('pojutrz')) {
+            today.setDate(today.getDate() + 2);
+        } else if (lowText.includes('jutr')) {
+            today.setDate(today.getDate() + 1);
+        } 
+        // Domyślnie i dla "dzisiaj" zostawiamy dzisiejszą datę
+        
+        const year = today.getFullYear();
+        const month = String(today.getMonth() + 1).padStart(2, '0');
+        const day = String(today.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    }
+
+    // Inteligentne dekodowanie czasu
+    function parseSpokenTime(text) {
+        const lowText = text.toLowerCase();
+        if (lowText.includes('rano') || lowText.includes('szóst') || lowText.includes('dziesiąt')) return '6-10';
+        if (lowText.includes('połudn') || lowText.includes('jedenast') || lowText.includes('dwunast')) return '10-15';
+        if (lowText.includes('wieczór') || lowText.includes('wieczor') || lowText.includes('popołudn') || lowText.includes('piętnast')) return '15-20';
+        if (lowText.includes('piln')) return 'Pilne';
+        return 'Obojętne'; // Domyślnie zielony
+    }
+
+    function processCalAiAnswer(text) {
+        const isSkip = text.toLowerCase().includes('pomiń') || text.toLowerCase().includes('pomin');
+
+        if (calAiState === 0) {
+            if(!isSkip) calData.klient = text.replace(/\b\w/g, l => l.toUpperCase());
+        } else if (calAiState === 1) {
+            if(!isSkip) calData.data = parseSpokenDate(text);
+            else {
+                const now = new Date();
+                calData.data = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+            }
+        } else if (calAiState === 2) {
+            if(!isSkip) calData.pora = parseSpokenTime(text);
+        } else if (calAiState === 3) {
+            if(!isSkip) calData.cel = text.charAt(0).toUpperCase() + text.slice(1);
+        } else if (calAiState === 4) {
+            if(!isSkip) calData.notatka = text.charAt(0).toUpperCase() + text.slice(1);
+        }
+
+        updateCalAiPreviewUI();
+        calAiState++;
+
+        if (calAiState > 4) {
+            // FINISZ: Zamykamy AI, otwieramy natywny formularz i wklejamy dane!
+            calStatus.textContent = "✅ Gotowe! Otwieram formularz wizyty...";
+            calSkipBtn.style.display = 'none';
+            calRetryBtn.style.display = 'none';
+            
+            calAiSpeak("Gotowe. Otwieram formularz wizyty.", () => {
+                calModal.style.display = 'none';
+                
+                // 1. Wywołujemy "Plusik" z Twojej aplikacji, żeby wszystko bezpiecznie zainicjowała (np. statusy itp.)
+                const addVisitBtn = document.getElementById('addVisitBtn');
+                if(addVisitBtn) addVisitBtn.click();
+                
+                // 2. Z małym opóźnieniem wklejamy nasze zebrane dane
+                setTimeout(() => {
+                    if(calData.klient) document.getElementById('visitFormKlient').value = calData.klient;
+                    if(calData.data) document.getElementById('visitFormDate').value = calData.data;
+                    if(calData.pora) document.getElementById('visitFormPoraDnia').value = calData.pora;
+                    if(calData.cel) document.getElementById('visitFormCel').value = calData.cel;
+                    if(calData.notatka) document.getElementById('visitFormNotatka').value = calData.notatka;
+                }, 300);
+            });
+        } else {
+            setTimeout(startCalAiStep, 800);
+        }
+    }
+</script>
 </body>
 </html>
