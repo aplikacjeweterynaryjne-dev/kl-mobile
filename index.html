@@ -30157,7 +30157,7 @@ if (celInput) {
         if (menuAsystentBtn) menuAsystentBtn.style.display = 'none';
     }
 </script>
-    <!-- ========================================== -->
+<!-- ========================================== -->
 <!-- 🤖 ASYSTENT GŁOSOWY: KALENDARZ WIZYT       -->
 <!-- ========================================== -->
 <div id="calendarAiModal" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.6); display: none; z-index: 20000; justify-content: center; align-items: center;">
@@ -30190,21 +30190,35 @@ if (celInput) {
             </div>
         </div>
 
+        <!-- ZMIENIONE NA EDYTOWALNE POLA FORMULARZA -->
         <div id="calAiPreviewForm" style="background: #fdfdfd; border: 1px solid #eee; padding: 10px; border-radius: 8px; margin-top: 15px; font-size: 13px;">
-            <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
-                <span style="color: #777;">Klient:</span> <b id="calPrvKlient" style="color:#2980b9;">-</b>
+            <div style="margin-bottom: 8px; display: flex; flex-direction: column;">
+                <label style="color: #777; font-size: 11px; margin-bottom: 2px;">Klient:</label>
+                <input type="text" id="calPrvKlient" placeholder="Brak" style="border: none; border-bottom: 1px solid #ddd; background: transparent; padding: 4px; font-weight: bold; color: #2980b9; outline: none; width: 100%;">
             </div>
-            <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
-                <span style="color: #777;">Data:</span> <b id="calPrvData" style="color:#2980b9;">-</b>
+            <div style="display: flex; gap: 10px; margin-bottom: 8px;">
+                <div style="flex: 1; display: flex; flex-direction: column;">
+                    <label style="color: #777; font-size: 11px; margin-bottom: 2px;">Data:</label>
+                    <input type="date" id="calPrvData" style="border: none; border-bottom: 1px solid #ddd; background: transparent; padding: 4px; font-weight: bold; color: #2980b9; outline: none; width: 100%;">
+                </div>
+                <div style="flex: 1; display: flex; flex-direction: column;">
+                    <label style="color: #777; font-size: 11px; margin-bottom: 2px;">Pora:</label>
+                    <select id="calPrvPora" style="border: none; border-bottom: 1px solid #ddd; background: transparent; padding: 4px; font-weight: bold; color: #2980b9; outline: none; width: 100%;">
+                        <option value="Obojętne">Obojętne</option>
+                        <option value="6-10">Rano (6-10)</option>
+                        <option value="10-15">Południe (10-15)</option>
+                        <option value="15-20">Wieczór (15-20)</option>
+                        <option value="Pilne">Pilne</option>
+                    </select>
+                </div>
             </div>
-            <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
-                <span style="color: #777;">Pora:</span> <b id="calPrvPora" style="color:#2980b9;">-</b>
+            <div style="margin-bottom: 8px; display: flex; flex-direction: column;">
+                <label style="color: #777; font-size: 11px; margin-bottom: 2px;">Cel:</label>
+                <input type="text" id="calPrvCel" placeholder="Brak" style="border: none; border-bottom: 1px solid #ddd; background: transparent; padding: 4px; font-weight: bold; color: #2980b9; outline: none; width: 100%;">
             </div>
-            <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
-                <span style="color: #777;">Cel:</span> <b id="calPrvCel" style="color:#2980b9;">-</b>
-            </div>
-            <div style="display: flex; justify-content: space-between;">
-                <span style="color: #777;">Notatka:</span> <b id="calPrvNotatka" style="color:#2980b9;">-</b>
+            <div style="margin-bottom: 8px; display: flex; flex-direction: column;">
+                <label style="color: #777; font-size: 11px; margin-bottom: 2px;">Notatka:</label>
+                <textarea id="calPrvNotatka" rows="2" placeholder="Brak" style="border: 1px solid #ddd; border-radius: 4px; background: transparent; padding: 4px; color: #2980b9; outline: none; width: 100%; box-sizing: border-box;"></textarea>
             </div>
         </div>
 
@@ -30277,11 +30291,11 @@ if (celInput) {
     }
 
     function updateCalAiPreviewUI() {
-        document.getElementById('calPrvKlient').textContent = calData.klient || '-';
-        document.getElementById('calPrvData').textContent = calData.data || '-';
-        document.getElementById('calPrvPora').textContent = calData.pora || '-';
-        document.getElementById('calPrvCel').textContent = calData.cel || '-';
-        document.getElementById('calPrvNotatka').textContent = calData.notatka || '-';
+        document.getElementById('calPrvKlient').value = calData.klient || '';
+        document.getElementById('calPrvData').value = calData.data || '';
+        document.getElementById('calPrvPora').value = calData.pora || 'Obojętne';
+        document.getElementById('calPrvCel').value = calData.cel || '';
+        document.getElementById('calPrvNotatka').value = calData.notatka || '';
     }
 
     if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
@@ -30421,7 +30435,14 @@ if (celInput) {
         calAiState++;
 
         if (calAiState > 4) {
-            // FINISZ: Zamykamy AI, otwieramy natywny formularz i wklejamy dane!
+            
+            // Pobieramy OSTATECZNE dane z pól edytowalnych (uwzględniając ewentualne ręczne poprawki usera!)
+            const finalKlient = document.getElementById('calPrvKlient').value.trim();
+            const finalData = document.getElementById('calPrvData').value;
+            const finalPora = document.getElementById('calPrvPora').value;
+            const finalCel = document.getElementById('calPrvCel').value.trim();
+            const finalNotatka = document.getElementById('calPrvNotatka').value.trim();
+
             calStatus.textContent = "✅ Gotowe! Otwieram formularz wizyty...";
             calSkipBtn.style.display = 'none';
             calRetryBtn.style.display = 'none';
@@ -30429,17 +30450,52 @@ if (celInput) {
             calAiSpeak("Gotowe. Otwieram formularz wizyty.", () => {
                 calModal.style.display = 'none';
                 
-                // 1. Wywołujemy "Plusik" z Twojej aplikacji, żeby wszystko bezpiecznie zainicjowała (np. statusy itp.)
+                // 1. Wywołujemy "Plusik" z Twojej aplikacji, żeby wszystko bezpiecznie zainicjowała
                 const addVisitBtn = document.getElementById('addVisitBtn');
                 if(addVisitBtn) addVisitBtn.click();
                 
-                // 2. Z małym opóźnieniem wklejamy nasze zebrane dane
+                // 2. Z małym opóźnieniem wklejamy nasze zebrane, ostateczne dane
                 setTimeout(() => {
-                    if(calData.klient) document.getElementById('visitFormKlient').value = calData.klient;
-                    if(calData.data) document.getElementById('visitFormDate').value = calData.data;
-                    if(calData.pora) document.getElementById('visitFormPoraDnia').value = calData.pora;
-                    if(calData.cel) document.getElementById('visitFormCel').value = calData.cel;
-                    if(calData.notatka) document.getElementById('visitFormNotatka').value = calData.notatka;
+                    // --- CICHY NINJA KLIENTA ---
+                    if(finalKlient) {
+                        let searchName = finalKlient.toLowerCase();
+                        let matchedName = finalKlient; 
+                        let matchedAdres = '---';
+                        let matchedTelefon = '---';
+
+                        // Krok A: Szukamy najpierw w globalnej pamięci aplikacji (cachedClients)
+                        if (typeof cachedClients !== 'undefined' && cachedClients && cachedClients.length > 0) {
+                            const clientObj = cachedClients.find(c => c.nazwa && c.nazwa.toLowerCase().includes(searchName));
+                            if (clientObj) {
+                                matchedName = clientObj.nazwa;
+                                matchedAdres = clientObj.adres || '---';
+                                matchedTelefon = clientObj.telefon || '---';
+                            }
+                        } else {
+                            // Krok B: Fallback, szukamy w ukrytej liście <datalist id="klientList">
+                            const datalist = document.getElementById('klientList');
+                            if (datalist) {
+                                const opts = Array.from(datalist.options);
+                                const opt = opts.find(o => o.value.toLowerCase().includes(searchName));
+                                if (opt) {
+                                    matchedName = opt.value;
+                                    matchedAdres = opt.dataset.adres || '---';
+                                }
+                            }
+                        }
+
+                        // Ręczne, bezpośrednie wpisanie do DOM
+                        document.getElementById('visitFormKlient').value = matchedName;
+                        const adresEl = document.getElementById('visitFormKlientAdres');
+                        const telEl = document.getElementById('visitFormKlientTelefon');
+                        if(adresEl) adresEl.textContent = matchedAdres;
+                        if(telEl) telEl.textContent = matchedTelefon;
+                    }
+                    
+                    if(finalData) document.getElementById('visitFormDate').value = finalData;
+                    if(finalPora) document.getElementById('visitFormPoraDnia').value = finalPora;
+                    if(finalCel) document.getElementById('visitFormCel').value = finalCel;
+                    if(finalNotatka) document.getElementById('visitFormNotatka').value = finalNotatka;
                 }, 300);
             });
         } else {
