@@ -30573,7 +30573,8 @@ if (celInput) {
         mainAiBtn.type = 'button';
         mainAiBtn.id = 'mainAiFloatBtn';
         mainAiBtn.innerHTML = '🧠';
-        mainAiBtn.style.cssText = 'position: fixed; top: 115px; right: 15px; width: 40px; height: 40px; border-radius: 50%; font-size: 20px; padding: 0; display: none; justify-content: center; align-items: center; z-index: 1000; background-color: #f39c12; color: white; border: 2px solid white; box-shadow: 0 4px 15px rgba(0,0,0,0.3); cursor: pointer;';
+        // POPRAWKA: Przycisk zmniejszony (40px) i przesunięty pod znak zapytania (prawo-góra)
+        mainAiBtn.style.cssText = 'position: fixed; top: 15px; right: 65px; width: 40px; height: 40px; border-radius: 50%; font-size: 20px; display: flex; justify-content: center; align-items: center; padding: 0; z-index: 1000; background-color: #f39c12; color: white; border: 2px solid white; box-shadow: 0 4px 15px rgba(0,0,0,0.3); cursor: pointer; display: none;';
         
         menuSec.appendChild(mainAiBtn);
         
@@ -30757,16 +30758,24 @@ if (celInput) {
         return visits;
     }
 
+    // --- FUNKCJE JĘZYKOWE (GRAMATYKA ODMIENNA) ---
+    function getWordNumber(num, isBiernik = true) {
+        const wordsMianownik = {1: "jedna", 2: "dwie", 3: "trzy", 4: "cztery", 5: "pięć", 6: "sześć", 7: "siedem", 8: "osiem", 9: "dziewięć", 10: "dziesięć"};
+        const wordsBiernik = {1: "jedną", 2: "dwie", 3: "trzy", 4: "cztery", 5: "pięć", 6: "sześć", 7: "siedem", 8: "osiem", 9: "dziewięć", 10: "dziesięć"};
+        if (num <= 10) return isBiernik ? wordsBiernik[num] : wordsMianownik[num];
+        return num.toString();
+    }
+
     function formatWizyty(liczba, przypadek = 'biernik') {
-        if (liczba === 1) {
-            return przypadek === 'biernik' ? "jedną wizytę" : "1 wizyta";
-        }
+        let strLiczba = getWordNumber(liczba, przypadek === 'biernik');
+        if (liczba === 1) return przypadek === 'biernik' ? `${strLiczba} wizytę` : `${strLiczba} wizyta`;
+        
         const r10 = liczba % 10;
         const r100 = liczba % 100;
         if (r10 >= 2 && r10 <= 4 && (r100 < 10 || r100 >= 20)) {
-            return `${liczba} wizyty`;
+            return `${strLiczba} wizyty`;
         }
-        return `${liczba} wizyt`;
+        return `${strLiczba} wizyt`;
     }
 
     function formatPozostalo(liczba) {
@@ -30783,22 +30792,48 @@ if (celInput) {
         let text = "";
         
         if (pendingRemaining.length === 0) {
-            text += "Wszystkie wizyty na dziś zostały zrealizowane. Dobra robota! ";
+            text += "Wszystkie wizyty na dziś zostały zrealizowane. Dobra robota, można iść na kawę! ";
         } else {
             text += `Do zrealizowania ${formatPozostalo(pendingRemaining.length)} ${formatWizyty(pendingRemaining.length, 'mianownik')}. `;
-            const firstPending = pendingRemaining[0];
-            let celWymowa = firstPending.cel.replace('💉', 'szczepienie').replace('🔍', 'badanie');
-            text += `Następna wizyta, klient: ${firstPending.klient}. Zaplanowany zabieg to: ${celWymowa}. `;
+            
+            if (pendingRemaining.length > 10) {
+                text += "Niezły zapiernicz dzisiaj! Nie ma co się ociągać. ";
+            }
+
+            const toRead = pendingRemaining.slice(0, 5); // ODCZYTUJE DO 5 WIZYT
+            if (toRead.length > 0) {
+                text += "Na liście są: ";
+                toRead.forEach((v, index) => {
+                    let celWymowa = v.cel.replace('💉', 'szczepienie').replace('🔍', 'badanie');
+                    if (!celWymowa) celWymowa = "brak wpisanego celu";
+                    
+                    if (index === 0) {
+                        text += `Najpierw klient: ${v.klient}, zabieg to ${celWymowa}. `;
+                    } else if (index === toRead.length - 1 && toRead.length > 1) {
+                        text += `A na koniec ${v.klient} na ${celWymowa}. `;
+                    } else {
+                        text += `Następnie ${v.klient}, w celu: ${celWymowa}. `;
+                    }
+                });
+            }
+            if (pendingRemaining.length > 5) {
+                text += "I jeszcze kilka innych, ale to sprawdzisz już w kalendarzu. ";
+            }
         }
 
         if (activeAiNotes.length > 0) {
-            text += `W notatniku masz zapisane ${activeAiNotes.length} przypomnienia. Oto one. `;
+            text += `W notatniku masz zapisane ${activeAiNotes.length} przypomnienia. Otwieram listę: `;
             activeAiNotes.forEach((note, idx) => {
-                text += `Pozycja ${idx + 1}: ${note}. `;
+                text += `Numer ${idx + 1}: ${note}. `;
             });
         }
         
-        text += "Życzę udanego dnia w terenie!";
+        const goodbyes = [
+            "Życzę spokojnego dnia w terenie!",
+            "Szerokiej drogi!",
+            "Powodzenia dzisiaj!"
+        ];
+        text += goodbyes[Math.floor(Math.random() * goodbyes.length)];
         return text;
     }
 
