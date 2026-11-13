@@ -30190,7 +30190,6 @@ if (celInput) {
             </div>
         </div>
 
-        <!-- ZMIENIONE NA EDYTOWALNE POLA FORMULARZA -->
         <div id="calAiPreviewForm" style="background: #fdfdfd; border: 1px solid #eee; padding: 10px; border-radius: 8px; margin-top: 15px; font-size: 13px;">
             <div style="margin-bottom: 8px; display: flex; flex-direction: column;">
                 <label style="color: #777; font-size: 11px; margin-bottom: 2px;">Klient:</label>
@@ -30228,8 +30227,59 @@ if (celInput) {
     </div>
 </div>
 
+<!-- ========================================== -->
+<!-- 🧠 ASYSTENT GŁÓWNY (INTERAKTYWNY BRIEFING) -->
+<!-- ========================================== -->
+<div id="mainMenuAiModal" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.7); display: none; z-index: 30000; justify-content: center; align-items: center;">
+    <div class="form-card" style="width: 95%; max-width: 480px; background: white; padding: 20px; border-radius: 12px; border-top: 5px solid #f39c12; max-height: 95vh; overflow-y: auto; box-shadow: 0 10px 25px rgba(0,0,0,0.5);">
+        
+        <h3 style="margin-top: 0; color: #d35400; text-align: center; margin-bottom: 20px; font-size: 20px;">
+            🧠 Centralny Asystent
+        </h3>
+
+        <div style="text-align: center; padding-bottom: 15px;">
+            <div id="mainAiAvatar" style="font-size: 60px; margin-bottom: 10px; transition: transform 0.3s;">🤖</div>
+            <p id="mainAiStatusText" style="font-size: 16px; font-weight: bold; color: #d35400; min-height: 50px; margin: 0 0 15px 0;">
+                Witaj w Menu. W czym mogę pomóc?
+            </p>
+            <p id="mainAiListeningPreview" style="font-size: 14px; color: #555; font-style: italic; background: #fdf3e7; padding: 10px; border-radius: 6px; display: none; border: 1px solid #fae5d3;">
+                " <span id="mainAiHeardText"></span> "
+            </p>
+            
+            <div id="mainAiActionButtons" style="display: flex; flex-direction: column; gap: 10px;">
+                <button type="button" id="mainAiBriefingBtn" class="btn" style="background-color: #2980b9; color: white; border: none; padding: 12px; font-weight: bold; font-size: 16px; border-radius: 8px; width: 100%;">
+                    🌅 Podsumowanie Dnia (Briefing)
+                </button>
+                <button type="button" id="mainAiNoteBtn" class="btn" style="background-color: #27ae60; color: white; border: none; padding: 12px; font-weight: bold; font-size: 16px; border-radius: 8px; width: 100%;">
+                    📝 Podyktuj Notatkę
+                </button>
+            </div>
+            
+            <button type="button" id="mainAiCancelActionBtn" class="btn ghost" style="display: none; width: 100%; margin-top: 10px; padding: 10px; font-size: 14px; border-color: #e74c3c; color: #e74c3c;">
+                ❌ Przerwij słuchanie
+            </button>
+        </div>
+
+        <!-- LISTA ZAPISANYCH NOTATEK -->
+        <div style="margin-top: 10px; border-top: 2px dashed #eee; padding-top: 15px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <h4 style="margin: 0; color: #333; font-size: 14px;">Twoje aktywne notatki:</h4>
+                <span id="mainAiNoteCountBadge" style="background: #f39c12; color: white; padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: bold;">0</span>
+            </div>
+            <div id="mainAiNotesList" style="max-height: 150px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; background: #fafafa; border: 1px solid #eee; padding: 10px; border-radius: 8px;">
+            </div>
+        </div>
+
+        <div class="form-actions" style="justify-content: center; margin-top: 20px;">
+            <button type="button" class="btn ghost" onclick="closeMainAiModal()" style="width: 100%; padding: 12px; font-size: 15px;">Zamknij Asystenta</button>
+        </div>
+    </div>
+</div>
+
 <script>
-    // 1. Dodanie pływającego przycisku Asystenta do sekcji Kalendarza
+    // ==========================================
+    // Skrypt Asystenta Kalendarza Wizyt
+    // ==========================================
     document.addEventListener("DOMContentLoaded", () => {
         const kalendarzSec = document.getElementById('kalendarzWizytSection');
         if (kalendarzSec) {
@@ -30237,7 +30287,6 @@ if (celInput) {
             calAiBtn.type = 'button';
             calAiBtn.id = 'calendarAiFloatBtn';
             calAiBtn.innerHTML = '🤖';
-            // Umiejscowienie wyżej niż główny przycisk dodawania wizyty (+)
             calAiBtn.style.cssText = 'position: fixed; bottom: 150px; right: 20px; width: 60px; height: 60px; border-radius: 50%; font-size: 30px; line-height: 1; padding: 0; z-index: 1000; background-color: #8e44ad; color: white; border: 2px solid white; box-shadow: 0 4px 10px rgba(0,0,0,0.3); cursor: pointer;';
             kalendarzSec.appendChild(calAiBtn);
             
@@ -30248,7 +30297,6 @@ if (celInput) {
         }
     });
 
-    // 2. Zmienne logiczne
     let calAiState = -1;
     let calAiRec = null;
     let calAiRecording = false;
@@ -30384,7 +30432,6 @@ if (celInput) {
         setTimeout(startCalAiStep, 400);
     });
 
-    // Inteligentne dekodowanie daty
     function parseSpokenDate(text) {
         const today = new Date();
         const lowText = text.toLowerCase();
@@ -30394,7 +30441,6 @@ if (celInput) {
         } else if (lowText.includes('jutr')) {
             today.setDate(today.getDate() + 1);
         } 
-        // Domyślnie i dla "dzisiaj" zostawiamy dzisiejszą datę
         
         const year = today.getFullYear();
         const month = String(today.getMonth() + 1).padStart(2, '0');
@@ -30402,14 +30448,13 @@ if (celInput) {
         return `${year}-${month}-${day}`;
     }
 
-    // Inteligentne dekodowanie czasu
     function parseSpokenTime(text) {
         const lowText = text.toLowerCase();
         if (lowText.includes('rano') || lowText.includes('szóst') || lowText.includes('dziesiąt')) return '6-10';
         if (lowText.includes('połudn') || lowText.includes('jedenast') || lowText.includes('dwunast')) return '10-15';
         if (lowText.includes('wieczór') || lowText.includes('wieczor') || lowText.includes('popołudn') || lowText.includes('piętnast')) return '15-20';
         if (lowText.includes('piln')) return 'Pilne';
-        return 'Obojętne'; // Domyślnie zielony
+        return 'Obojętne';
     }
 
     function processCalAiAnswer(text) {
@@ -30435,8 +30480,6 @@ if (celInput) {
         calAiState++;
 
         if (calAiState > 4) {
-            
-            // Pobieramy OSTATECZNE dane z pól edytowalnych (uwzględniając ewentualne ręczne poprawki usera!)
             const finalKlient = document.getElementById('calPrvKlient').value.trim();
             const finalData = document.getElementById('calPrvData').value;
             const finalPora = document.getElementById('calPrvPora').value;
@@ -30450,20 +30493,16 @@ if (celInput) {
             calAiSpeak("Gotowe. Otwieram formularz wizyty.", () => {
                 calModal.style.display = 'none';
                 
-                // 1. Wywołujemy "Plusik" z Twojej aplikacji, żeby wszystko bezpiecznie zainicjowała
                 const addVisitBtn = document.getElementById('addVisitBtn');
                 if(addVisitBtn) addVisitBtn.click();
                 
-                // 2. Z małym opóźnieniem wklejamy nasze zebrane, ostateczne dane
                 setTimeout(() => {
-                    // --- CICHY NINJA KLIENTA ---
                     if(finalKlient) {
                         let searchName = finalKlient.toLowerCase();
                         let matchedName = finalKlient; 
                         let matchedAdres = '---';
                         let matchedTelefon = '---';
 
-                        // Krok A: Szukamy najpierw w globalnej pamięci aplikacji (cachedClients)
                         if (typeof cachedClients !== 'undefined' && cachedClients && cachedClients.length > 0) {
                             const clientObj = cachedClients.find(c => c.nazwa && c.nazwa.toLowerCase().includes(searchName));
                             if (clientObj) {
@@ -30472,7 +30511,6 @@ if (celInput) {
                                 matchedTelefon = clientObj.telefon || '---';
                             }
                         } else {
-                            // Krok B: Fallback, szukamy w ukrytej liście <datalist id="klientList">
                             const datalist = document.getElementById('klientList');
                             if (datalist) {
                                 const opts = Array.from(datalist.options);
@@ -30484,7 +30522,6 @@ if (celInput) {
                             }
                         }
 
-                        // Ręczne, bezpośrednie wpisanie do DOM
                         document.getElementById('visitFormKlient').value = matchedName;
                         const adresEl = document.getElementById('visitFormKlientAdres');
                         const telEl = document.getElementById('visitFormKlientTelefon');
@@ -30502,59 +30539,11 @@ if (celInput) {
             setTimeout(startCalAiStep, 800);
         }
     }
-</script>
-<script>
-    <!-- ========================================== -->
-<!-- 🧠 ASYSTENT GŁÓWNY (INTERAKTYWNY BRIEFING) -->
-<!-- ========================================== -->
-<div id="mainMenuAiModal" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.7); display: none; z-index: 30000; justify-content: center; align-items: center;">
-    <div class="form-card" style="width: 95%; max-width: 480px; background: white; padding: 20px; border-radius: 12px; border-top: 5px solid #f39c12; max-height: 95vh; overflow-y: auto; box-shadow: 0 10px 25px rgba(0,0,0,0.5);">
-        
-        <h3 style="margin-top: 0; color: #d35400; text-align: center; margin-bottom: 20px; font-size: 20px;">
-            🧠 Centralny Asystent
-        </h3>
 
-        <div style="text-align: center; padding-bottom: 15px;">
-            <div id="mainAiAvatar" style="font-size: 60px; margin-bottom: 10px; transition: transform 0.3s;">🤖</div>
-            <p id="mainAiStatusText" style="font-size: 16px; font-weight: bold; color: #d35400; min-height: 50px; margin: 0 0 15px 0;">
-                Witaj w Menu. W czym mogę pomóc?
-            </p>
-            <p id="mainAiListeningPreview" style="font-size: 14px; color: #555; font-style: italic; background: #fdf3e7; padding: 10px; border-radius: 6px; display: none; border: 1px solid #fae5d3;">
-                " <span id="mainAiHeardText"></span> "
-            </p>
-            
-            <div id="mainAiActionButtons" style="display: flex; flex-direction: column; gap: 10px;">
-                <button type="button" id="mainAiBriefingBtn" class="btn" style="background-color: #2980b9; color: white; border: none; padding: 12px; font-weight: bold; font-size: 16px; border-radius: 8px; width: 100%;">
-                    🌅 Podsumowanie Dnia (Briefing)
-                </button>
-                <button type="button" id="mainAiNoteBtn" class="btn" style="background-color: #27ae60; color: white; border: none; padding: 12px; font-weight: bold; font-size: 16px; border-radius: 8px; width: 100%;">
-                    📝 Podyktuj Notatkę
-                </button>
-            </div>
-            
-            <button type="button" id="mainAiCancelActionBtn" class="btn ghost" style="display: none; width: 100%; margin-top: 10px; padding: 10px; font-size: 14px; border-color: #e74c3c; color: #e74c3c;">
-                ❌ Przerwij słuchanie
-            </button>
-        </div>
-
-        <!-- LISTA ZAPISANYCH NOTATEK -->
-        <div style="margin-top: 10px; border-top: 2px dashed #eee; padding-top: 15px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                <h4 style="margin: 0; color: #333; font-size: 14px;">Twoje aktywne notatki:</h4>
-                <span id="mainAiNoteCountBadge" style="background: #f39c12; color: white; padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: bold;">0</span>
-            </div>
-            <div id="mainAiNotesList" style="max-height: 150px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; background: #fafafa; border: 1px solid #eee; padding: 10px; border-radius: 8px;">
-            </div>
-        </div>
-
-        <div class="form-actions" style="justify-content: center; margin-top: 20px;">
-            <button type="button" class="btn ghost" onclick="closeMainAiModal()" style="width: 100%; padding: 12px; font-size: 15px;">Zamknij Asystenta</button>
-        </div>
-    </div>
-</div>
-
-<script>
-    // Zmienne globalne i logika stanu
+    // ==========================================
+    // Skrypt Centralnego Asystenta w Menu
+    // ==========================================
+    
     let mainAiRec = null;
     let mainAiRecording = false;
     let mainAiWatchdog = null;
@@ -30563,7 +30552,6 @@ if (celInput) {
     let currentVisitsData = null; 
     let pendingVisitsToResolve = []; 
 
-    // Kuloodporne pobieranie elementów (eliminuje błąd null)
     const ui = {
         get modal() { return document.getElementById('mainMenuAiModal'); },
         get noteBtn() { return document.getElementById('mainAiNoteBtn'); },
@@ -30585,8 +30573,7 @@ if (celInput) {
         mainAiBtn.type = 'button';
         mainAiBtn.id = 'mainAiFloatBtn';
         mainAiBtn.innerHTML = '🧠';
-        // POPRAWKA: Przycisk zmniejszony do 40px i ustawiony zaraz obok przycisku "Pomoc" (Prawy górny róg)
-        mainAiBtn.style.cssText = 'position: fixed; top: 15px; right: 65px; width: 40px; height: 40px; border-radius: 50%; font-size: 20px; padding: 0; display: none; justify-content: center; align-items: center; z-index: 1000; background-color: #f39c12; color: white; border: 2px solid white; box-shadow: 0 4px 15px rgba(0,0,0,0.3); cursor: pointer;';
+        mainAiBtn.style.cssText = 'position: fixed; top: 115px; right: 15px; width: 40px; height: 40px; border-radius: 50%; font-size: 20px; padding: 0; display: none; justify-content: center; align-items: center; z-index: 1000; background-color: #f39c12; color: white; border: 2px solid white; box-shadow: 0 4px 15px rgba(0,0,0,0.3); cursor: pointer;';
         
         menuSec.appendChild(mainAiBtn);
         
@@ -30605,7 +30592,6 @@ if (celInput) {
             mainAiSpeak("Witaj. Wybierz opcję na ekranie.");
         });
 
-        // Podpięcie przycisków wewnątrz modala
         if (ui.cancelBtn) ui.cancelBtn.addEventListener('click', stopMainAiAudio);
         if (ui.briefingBtn) ui.briefingBtn.addEventListener('click', handleBriefingClick);
         if (ui.noteBtn) ui.noteBtn.addEventListener('click', handleNoteClick);
