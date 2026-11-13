@@ -30503,7 +30503,7 @@ if (celInput) {
         }
     }
 </script>
-    <!-- ========================================== -->
+<!-- ========================================== -->
 <!-- 🧠 ASYSTENT GŁÓWNY (INTERAKTYWNY BRIEFING) -->
 <!-- ========================================== -->
 <div id="mainMenuAiModal" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.7); display: none; z-index: 30000; justify-content: center; align-items: center;">
@@ -30560,7 +30560,8 @@ if (celInput) {
         mainAiBtn.type = 'button';
         mainAiBtn.id = 'mainAiFloatBtn';
         mainAiBtn.innerHTML = '🧠';
-        mainAiBtn.style.cssText = 'position: fixed; bottom: 80px; left: 20px; width: 65px; height: 65px; border-radius: 50%; font-size: 32px; line-height: 1; padding: 0; z-index: 1000; background-color: #f39c12; color: white; border: 2px solid white; box-shadow: 0 4px 15px rgba(0,0,0,0.3); cursor: pointer; display: none;';
+        // POPRAWKA: Prawy górny róg, pod znakiem zapytania i ewentualnym przyciskiem instalacji
+        mainAiBtn.style.cssText = 'position: fixed; top: 115px; right: 15px; width: 55px; height: 55px; border-radius: 50%; font-size: 28px; line-height: 1; padding: 0; z-index: 1000; background-color: #f39c12; color: white; border: 2px solid white; box-shadow: 0 4px 15px rgba(0,0,0,0.3); cursor: pointer; display: none;';
         
         menuSec.appendChild(mainAiBtn);
         
@@ -30586,8 +30587,9 @@ if (celInput) {
     let activeAiNotes = [];
     
     // Zmienne stanu do sterowania rozmową
-    let mainAiState = -1; // -1: Czeka, 1: Pytanie o realizację wizyt, 2: Dyktowanie notatki
-    let pendingVisitsToResolve = []; // Przechowuje wizyty poranne do oznaczenia jako zrealizowane
+    let mainAiState = -1; 
+    let currentVisitsData = null; // Przechowuje stan wizyt do kontynuowania czytania
+    let pendingVisitsToResolve = []; 
 
     const mainModal = document.getElementById('mainMenuAiModal');
     const noteBtn = document.getElementById('mainAiNoteBtn');
@@ -30742,7 +30744,6 @@ if (celInput) {
 
     // --- LOGIKA BIZNESOWA: CZYTANIE WIZYT Z DOM ---
     function getTodayVisitsFromDOM() {
-        // Zczytuje kafelki wizyt renderowane w dzisiejszym kalendarzu
         const items = document.querySelectorAll('#todayVisitList .visit-item');
         let visits = [];
         items.forEach(item => {
@@ -30750,16 +30751,45 @@ if (celInput) {
             const celEl = item.querySelector('.visit-item-info .purpose');
             const btnStatus = item.querySelector('.btn-quick-status');
             
+            // POPRAWKA: Inteligentne usuwanie podwójnego słowa "Cel:"
+            let rawCel = celEl ? celEl.textContent.trim() : '';
+            let cleanCel = rawCel.replace(/^Cel:\s*/i, '').trim(); 
+            
             visits.push({
                 element: item,
                 status: item.dataset.status || 'Nowa',
                 pora: item.dataset.pora || 'Obojętne',
                 klient: klientEl ? klientEl.textContent.trim() : 'Nieznany klient',
-                cel: celEl ? celEl.textContent.trim() : '',
+                cel: cleanCel,
                 btn: btnStatus
             });
         });
         return visits;
+    }
+
+    // Funkcja do czytania reszty raportu (wykorzystywana w wielu miejscach)
+    function generateRestOfBriefing(pendingRemaining) {
+        let text = "";
+        
+        if (pendingRemaining.length === 0) {
+            text += "Wszystkie wizyty na dziś zostały zrealizowane. Dobra robota! ";
+        } else {
+            text += `Do zrealizowania pozostało ${pendingRemaining.length} wizyt. `;
+            const firstPending = pendingRemaining[0];
+            let celWymowa = firstPending.cel.replace('💉', 'szczepienie').replace('🔍', 'badanie');
+            text += `Następna wizyta, klient: ${firstPending.klient}. Zaplanowany zabieg to: ${celWymowa}. `;
+        }
+
+        // POPRAWKA: Asystent nareszcie czyta treść notatek!
+        if (activeAiNotes.length > 0) {
+            text += `W notatniku masz zapisane ${activeAiNotes.length} przypomnienia. Oto one. `;
+            activeAiNotes.forEach((note, idx) => {
+                text += `Pozycja ${idx + 1}: ${note}. `;
+            });
+        }
+        
+        text += "Życzę udanego dnia w terenie!";
+        return text;
     }
 
     // AKCJA 1: BRIEFING I INTERAKCJA
@@ -30769,49 +30799,32 @@ if (celInput) {
         
         const visits = getTodayVisitsFromDOM();
         const pending = visits.filter(v => v.status !== 'Zrealizowana');
-        const completed = visits.filter(v => v.status === 'Zrealizowana');
         
-        // Jeśli nie ma wizyt w DOM (może kalendarz się nie wczytał, albo ich nie ma)
         if (visits.length === 0) {
             mainAiSpeak("Dzień dobry. W kalendarzu nie ma na dzisiaj żadnych wizyt, lub lista nie została jeszcze zsynchronizowana.", stopMainAiAudio);
             return;
         }
 
         const currentHour = new Date().getHours();
-        
-        // Szukamy niezrealizowanych porannych wizyt (jeśli mamy już po 11:00)
         const morningPending = pending.filter(v => v.pora === '6-10');
         
         if (currentHour >= 11 && morningPending.length > 0) {
-            // WYZWANIE INTERAKTYWNE: Pyta o zrealizowanie zaległych wizyt
+            // WYZWANIE INTERAKTYWNE
             const names = morningPending.map(v => v.klient).join(" oraz ");
             pendingVisitsToResolve = morningPending;
-            mainAiState = 1; // Ustawia stan oczekiwania na potwierdzenie
+            currentVisitsData = { all: visits, pending: pending }; // Zapisujemy stan
+            mainAiState = 1; 
             
-            const askText = `Dzień dobry. Masz dzisiaj łącznie ${visits.length} wizyt. Zauważyłem jednak, że wciąż masz ${morningPending.length} niezrealizowane wizyty poranne u: ${names}. Czy mam je teraz oznaczyć jako zakończone? Powiedz tak lub nie.`;
+            // POPRAWKA GRAMATYKI: Zmiana z "u: Kowalski" na "Klienci to: Kowalski"
+            const askText = `Dzień dobry. Masz dzisiaj łącznie ${visits.length} wizyt. Zauważyłem jednak, że wciąż masz niezrealizowane wizyty poranne. Klienci to: ${names}. Czy mam je teraz oznaczyć jako zakończone? Powiedz tak lub nie.`;
             
             mainAiSpeak(askText, () => {
-                startMainAiListening(8000); // Czeka 8 sekund na odpowiedź
+                startMainAiListening(8000); 
             });
         } else {
-            // STANDARDOWY BRIEFING (Brak zaległości, lub jest rano)
-            let briefingText = `Dzień dobry. Na dzisiaj przypada łącznie ${visits.length} wizyt. `;
-            
-            if (pending.length === 0) {
-                briefingText += "Wszystkie wizyty zostały już zrealizowane. Dobra robota! ";
-            } else {
-                briefingText += `Do zrealizowania pozostało Ci ${pending.length} wizyt. `;
-                const firstPending = pending[0];
-                // Lekko wygładza wymowę celi wizyty
-                let celWymowa = firstPending.cel.replace('💉', 'szczepienie').replace('🔍', 'badanie');
-                briefingText += `Najbliższa wizyta to ${firstPending.klient}. Cel: ${celWymowa}. `;
-            }
-
-            if (activeAiNotes.length > 0) {
-                briefingText += `Oprócz tego, w notatniku masz zapisane ${activeAiNotes.length} przypomnienia. `;
-            }
-            
-            briefingText += "Życzę udanego dnia w terenie!";
+            // STANDARDOWY BRIEFING BEZ PRZERYWANIA
+            let briefingText = `Dzień dobry. Masz dzisiaj łącznie ${visits.length} wizyt. `;
+            briefingText += generateRestOfBriefing(pending);
             mainAiSpeak(briefingText, stopMainAiAudio);
         }
     });
@@ -30820,7 +30833,7 @@ if (celInput) {
     noteBtn.addEventListener('click', () => {
         actionButtons.style.display = 'none';
         cancelBtn.style.display = 'block';
-        mainAiState = 2; // Stan dyktowania notatki
+        mainAiState = 2; 
         
         mainAiSpeak("Słucham. Co zapisać?", () => {
             startMainAiListening(8000);
@@ -30834,15 +30847,26 @@ if (celInput) {
         // SCENARIUSZ 1: Potwierdzenie zrealizowania zaległych wizyt
         if (mainAiState === 1) {
             if (lowText.includes('tak') || lowText.includes('zrealizuj') || lowText.includes('oznacz') || lowText.includes('pewnie')) {
-                // Symuluje kliknięcie przycisków w Twoim kalendarzu w tle
+                // Symuluje kliknięcie w tle
                 pendingVisitsToResolve.forEach(v => {
                     if (v.btn) v.btn.click();
                 });
-                mainAiSpeak("Gotowe, oznaczyłem je jako zrealizowane. Kontynuuj dobrą pracę!", stopMainAiAudio);
+                
+                // POPRAWKA: Po zamknięciu wizyt asystent czyta resztę raportu
+                let remainingPending = currentVisitsData.pending.filter(v => !pendingVisitsToResolve.includes(v));
+                let responseText = "Gotowe, oznaczyłem je jako zrealizowane. " + generateRestOfBriefing(remainingPending);
+                
+                mainAiSpeak(responseText, stopMainAiAudio);
+                
             } else if (lowText.includes('nie') || lowText.includes('zostaw') || lowText.includes('pomiń')) {
-                mainAiSpeak("Zrozumiałem. Zostawiam statusy bez zmian.", stopMainAiAudio);
+                
+                // Jeśli odmówisz, też przeczyta resztę
+                let responseText = "Zrozumiałem, zostawiam bez zmian. " + generateRestOfBriefing(currentVisitsData.pending);
+                mainAiSpeak(responseText, stopMainAiAudio);
+                
             } else {
-                mainAiSpeak("Nie usłyszałem wyraźnego tak lub nie. Zostawiam wizyty bez zmian.", stopMainAiAudio);
+                let responseText = "Nie usłyszałem wyraźnego tak lub nie. Zostawiam wizyty bez zmian. " + generateRestOfBriefing(currentVisitsData.pending);
+                mainAiSpeak(responseText, stopMainAiAudio);
             }
         } 
         // SCENARIUSZ 2: Zapisywanie Notatki
