@@ -30503,5 +30503,364 @@ if (celInput) {
         }
     }
 </script>
+    <!-- ========================================== -->
+<!-- 🧠 ASYSTENT GŁÓWNY (INTERAKTYWNY BRIEFING) -->
+<!-- ========================================== -->
+<div id="mainMenuAiModal" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.7); display: none; z-index: 30000; justify-content: center; align-items: center;">
+    <div class="form-card" style="width: 95%; max-width: 480px; background: white; padding: 20px; border-radius: 12px; border-top: 5px solid #f39c12; max-height: 95vh; overflow-y: auto; box-shadow: 0 10px 25px rgba(0,0,0,0.5);">
+        
+        <h3 style="margin-top: 0; color: #d35400; text-align: center; margin-bottom: 20px; font-size: 20px;">
+            🧠 Centralny Asystent
+        </h3>
+
+        <div style="text-align: center; padding-bottom: 15px;">
+            <div id="mainAiAvatar" style="font-size: 60px; margin-bottom: 10px; transition: transform 0.3s;">🤖</div>
+            <p id="mainAiStatusText" style="font-size: 16px; font-weight: bold; color: #d35400; min-height: 50px; margin: 0 0 15px 0;">
+                Witaj w Menu. W czym mogę pomóc?
+            </p>
+            <p id="mainAiListeningPreview" style="font-size: 14px; color: #555; font-style: italic; background: #fdf3e7; padding: 10px; border-radius: 6px; display: none; border: 1px solid #fae5d3;">
+                " <span id="mainAiHeardText"></span> "
+            </p>
+            
+            <div id="mainAiActionButtons" style="display: flex; flex-direction: column; gap: 10px;">
+                <button type="button" id="mainAiBriefingBtn" class="btn" style="background-color: #2980b9; color: white; border: none; padding: 12px; font-weight: bold; font-size: 16px; border-radius: 8px; width: 100%;">
+                    🌅 Podsumowanie Dnia (Briefing)
+                </button>
+                <button type="button" id="mainAiNoteBtn" class="btn" style="background-color: #27ae60; color: white; border: none; padding: 12px; font-weight: bold; font-size: 16px; border-radius: 8px; width: 100%;">
+                    📝 Podyktuj Notatkę
+                </button>
+            </div>
+            
+            <button type="button" id="mainAiCancelActionBtn" class="btn ghost" style="display: none; width: 100%; margin-top: 10px; padding: 10px; font-size: 14px; border-color: #e74c3c; color: #e74c3c;">
+                ❌ Przerwij słuchanie
+            </button>
+        </div>
+
+        <!-- LISTA ZAPISANYCH NOTATEK -->
+        <div style="margin-top: 10px; border-top: 2px dashed #eee; padding-top: 15px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <h4 style="margin: 0; color: #333; font-size: 14px;">Twoje aktywne notatki:</h4>
+                <span id="mainAiNoteCountBadge" style="background: #f39c12; color: white; padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: bold;">0</span>
+            </div>
+            <div id="mainAiNotesList" style="max-height: 150px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; background: #fafafa; border: 1px solid #eee; padding: 10px; border-radius: 8px;">
+            </div>
+        </div>
+
+        <div class="form-actions" style="justify-content: center; margin-top: 20px;">
+            <button type="button" class="btn ghost" onclick="closeMainAiModal()" style="width: 100%; padding: 12px; font-size: 15px;">Zamknij Asystenta</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", () => {
+        const menuSec = document.getElementById('mainMenuSection') || document.body;
+        
+        const mainAiBtn = document.createElement('button');
+        mainAiBtn.type = 'button';
+        mainAiBtn.id = 'mainAiFloatBtn';
+        mainAiBtn.innerHTML = '🧠';
+        mainAiBtn.style.cssText = 'position: fixed; bottom: 80px; left: 20px; width: 65px; height: 65px; border-radius: 50%; font-size: 32px; line-height: 1; padding: 0; z-index: 1000; background-color: #f39c12; color: white; border: 2px solid white; box-shadow: 0 4px 15px rgba(0,0,0,0.3); cursor: pointer; display: none;';
+        
+        menuSec.appendChild(mainAiBtn);
+        
+        setInterval(() => {
+            const isMenuVisible = document.getElementById('mainMenuSection') && document.getElementById('mainMenuSection').style.display !== 'none';
+            if(isMenuVisible) {
+                mainAiBtn.style.display = 'block';
+            } else {
+                mainAiBtn.style.display = 'none';
+            }
+        }, 500);
+
+        mainAiBtn.addEventListener('click', () => {
+            loadAiNotes();
+            document.getElementById('mainMenuAiModal').style.display = 'flex';
+            mainAiSpeak("Witaj. Wybierz opcję na ekranie.");
+        });
+    });
+
+    let mainAiRec = null;
+    let mainAiRecording = false;
+    let mainAiWatchdog = null;
+    let activeAiNotes = [];
+    
+    // Zmienne stanu do sterowania rozmową
+    let mainAiState = -1; // -1: Czeka, 1: Pytanie o realizację wizyt, 2: Dyktowanie notatki
+    let pendingVisitsToResolve = []; // Przechowuje wizyty poranne do oznaczenia jako zrealizowane
+
+    const mainModal = document.getElementById('mainMenuAiModal');
+    const noteBtn = document.getElementById('mainAiNoteBtn');
+    const briefingBtn = document.getElementById('mainAiBriefingBtn');
+    const cancelBtn = document.getElementById('mainAiCancelActionBtn');
+    const mainStatus = document.getElementById('mainAiStatusText');
+    const mainAvatar = document.getElementById('mainAiAvatar');
+    const previewBox = document.getElementById('mainAiListeningPreview');
+    const heardText = document.getElementById('mainAiHeardText');
+    const notesListContainer = document.getElementById('mainAiNotesList');
+    const noteCountBadge = document.getElementById('mainAiNoteCountBadge');
+    const actionButtons = document.getElementById('mainAiActionButtons');
+
+    function loadAiNotes() {
+        const saved = localStorage.getItem('weterynarz_ai_notes');
+        if (saved) {
+            try { activeAiNotes = JSON.parse(saved); } catch(e) { activeAiNotes = []; }
+        }
+        renderAiNotes();
+    }
+
+    function saveAiNotes() {
+        localStorage.setItem('weterynarz_ai_notes', JSON.stringify(activeAiNotes));
+        renderAiNotes();
+    }
+
+    function renderAiNotes() {
+        notesListContainer.innerHTML = '';
+        noteCountBadge.textContent = activeAiNotes.length;
+        
+        if (activeAiNotes.length === 0) {
+            notesListContainer.innerHTML = '<span style="color: #999; font-style: italic; text-align: center;">Brak notatek. Czysty umysł!</span>';
+            return;
+        }
+
+        activeAiNotes.forEach((note, index) => {
+            const div = document.createElement('div');
+            div.style.cssText = "display: flex; justify-content: space-between; align-items: center; background: white; padding: 10px; border-radius: 6px; border: 1px solid #e0e0e0; box-shadow: 0 1px 3px rgba(0,0,0,0.05);";
+            
+            const textSpan = document.createElement('span');
+            textSpan.style.cssText = "font-size: 13px; color: #333; line-height: 1.4; width: 85%; word-wrap: break-word;";
+            textSpan.textContent = `📌 ${note}`;
+
+            const delBtn = document.createElement('button');
+            delBtn.type = 'button';
+            delBtn.innerHTML = '🗑️';
+            delBtn.style.cssText = "background: #fdf1f0; border: 1px solid #fadbd8; border-radius: 4px; cursor:pointer; font-size: 14px; padding: 5px 8px;";
+            delBtn.onclick = () => {
+                activeAiNotes.splice(index, 1);
+                saveAiNotes();
+            };
+
+            div.appendChild(textSpan);
+            div.appendChild(delBtn);
+            notesListContainer.appendChild(div);
+        });
+    }
+
+    function closeMainAiModal() {
+        mainModal.style.display = 'none';
+        stopMainAiAudio();
+    }
+
+    function stopMainAiAudio() {
+        clearTimeout(mainAiWatchdog);
+        if (mainAiRec) mainAiRec.stop();
+        window.speechSynthesis.cancel();
+        mainAiRecording = false;
+        mainAiState = -1;
+        
+        actionButtons.style.display = 'flex';
+        cancelBtn.style.display = 'none';
+        previewBox.style.display = 'none';
+        mainStatus.textContent = "Witaj w Menu. W czym mogę pomóc?";
+        mainAvatar.style.transform = 'scale(1)';
+    }
+
+    let mainPolishVoice = null;
+    function loadMainVoices() {
+        let voices = window.speechSynthesis.getVoices();
+        let plVoices = voices.filter(v => v.lang.includes('pl') || v.lang.includes('PL'));
+        mainPolishVoice = plVoices.find(v => v.name.toLowerCase().includes('network') || v.name.toLowerCase().includes('google')) || plVoices[0];
+    }
+    window.speechSynthesis.onvoiceschanged = loadMainVoices;
+
+    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        mainAiRec = new SpeechRecognition();
+        mainAiRec.lang = 'pl-PL';
+        mainAiRec.continuous = false;     
+        mainAiRec.interimResults = false; 
+
+        mainAiRec.onresult = (e) => {
+            clearTimeout(mainAiWatchdog);
+            const text = e.results[0][0].transcript.trim();
+            previewBox.style.display = 'block';
+            heardText.textContent = text;
+            processMainAiAnswer(text);
+        };
+
+        mainAiRec.onerror = () => {
+            clearTimeout(mainAiWatchdog);
+            mainStatus.textContent = "Nie usłyszałem. Spróbuj ponownie.";
+            mainAiRecording = false;
+            setTimeout(stopMainAiAudio, 2000);
+        };
+        
+        mainAiRec.onend = () => {
+            clearTimeout(mainAiWatchdog);
+            mainAvatar.style.transform = 'scale(1)';
+            mainAiRecording = false;
+        };
+    }
+
+    function mainAiSpeak(text, callback) {
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'pl-PL';
+        if (mainPolishVoice) utterance.voice = mainPolishVoice;
+        utterance.rate = 1.05; 
+        
+        mainAvatar.style.transform = 'scale(1.2)';
+        mainStatus.textContent = `🔊 Trwa odtwarzanie...`;
+        
+        utterance.onend = () => {
+            mainAvatar.style.transform = 'scale(1)';
+            if(callback) callback();
+        };
+        window.speechSynthesis.speak(utterance);
+    }
+
+    function startMainAiListening(timeoutMs = 8000) {
+        mainStatus.textContent = "🎙️ Słucham...";
+        previewBox.style.display = 'none';
+        try { 
+            mainAiRecording = true; 
+            mainAiRec.start(); 
+            
+            mainAiWatchdog = setTimeout(() => {
+                if (mainAiRecording) {
+                    mainAiRec.stop();
+                    mainStatus.textContent = "⏱️ Zbyt długa cisza. Anulowano.";
+                    setTimeout(stopMainAiAudio, 2000);
+                }
+            }, timeoutMs);
+        } catch(e) {}
+    }
+
+    cancelBtn.addEventListener('click', () => {
+        stopMainAiAudio();
+    });
+
+    // --- LOGIKA BIZNESOWA: CZYTANIE WIZYT Z DOM ---
+    function getTodayVisitsFromDOM() {
+        // Zczytuje kafelki wizyt renderowane w dzisiejszym kalendarzu
+        const items = document.querySelectorAll('#todayVisitList .visit-item');
+        let visits = [];
+        items.forEach(item => {
+            const klientEl = item.querySelector('.visit-item-info strong');
+            const celEl = item.querySelector('.visit-item-info .purpose');
+            const btnStatus = item.querySelector('.btn-quick-status');
+            
+            visits.push({
+                element: item,
+                status: item.dataset.status || 'Nowa',
+                pora: item.dataset.pora || 'Obojętne',
+                klient: klientEl ? klientEl.textContent.trim() : 'Nieznany klient',
+                cel: celEl ? celEl.textContent.trim() : '',
+                btn: btnStatus
+            });
+        });
+        return visits;
+    }
+
+    // AKCJA 1: BRIEFING I INTERAKCJA
+    briefingBtn.addEventListener('click', () => {
+        actionButtons.style.display = 'none';
+        cancelBtn.style.display = 'block';
+        
+        const visits = getTodayVisitsFromDOM();
+        const pending = visits.filter(v => v.status !== 'Zrealizowana');
+        const completed = visits.filter(v => v.status === 'Zrealizowana');
+        
+        // Jeśli nie ma wizyt w DOM (może kalendarz się nie wczytał, albo ich nie ma)
+        if (visits.length === 0) {
+            mainAiSpeak("Dzień dobry. W kalendarzu nie ma na dzisiaj żadnych wizyt, lub lista nie została jeszcze zsynchronizowana.", stopMainAiAudio);
+            return;
+        }
+
+        const currentHour = new Date().getHours();
+        
+        // Szukamy niezrealizowanych porannych wizyt (jeśli mamy już po 11:00)
+        const morningPending = pending.filter(v => v.pora === '6-10');
+        
+        if (currentHour >= 11 && morningPending.length > 0) {
+            // WYZWANIE INTERAKTYWNE: Pyta o zrealizowanie zaległych wizyt
+            const names = morningPending.map(v => v.klient).join(" oraz ");
+            pendingVisitsToResolve = morningPending;
+            mainAiState = 1; // Ustawia stan oczekiwania na potwierdzenie
+            
+            const askText = `Dzień dobry. Masz dzisiaj łącznie ${visits.length} wizyt. Zauważyłem jednak, że wciąż masz ${morningPending.length} niezrealizowane wizyty poranne u: ${names}. Czy mam je teraz oznaczyć jako zakończone? Powiedz tak lub nie.`;
+            
+            mainAiSpeak(askText, () => {
+                startMainAiListening(8000); // Czeka 8 sekund na odpowiedź
+            });
+        } else {
+            // STANDARDOWY BRIEFING (Brak zaległości, lub jest rano)
+            let briefingText = `Dzień dobry. Na dzisiaj przypada łącznie ${visits.length} wizyt. `;
+            
+            if (pending.length === 0) {
+                briefingText += "Wszystkie wizyty zostały już zrealizowane. Dobra robota! ";
+            } else {
+                briefingText += `Do zrealizowania pozostało Ci ${pending.length} wizyt. `;
+                const firstPending = pending[0];
+                // Lekko wygładza wymowę celi wizyty
+                let celWymowa = firstPending.cel.replace('💉', 'szczepienie').replace('🔍', 'badanie');
+                briefingText += `Najbliższa wizyta to ${firstPending.klient}. Cel: ${celWymowa}. `;
+            }
+
+            if (activeAiNotes.length > 0) {
+                briefingText += `Oprócz tego, w notatniku masz zapisane ${activeAiNotes.length} przypomnienia. `;
+            }
+            
+            briefingText += "Życzę udanego dnia w terenie!";
+            mainAiSpeak(briefingText, stopMainAiAudio);
+        }
+    });
+
+    // AKCJA 2: NOTATNIK
+    noteBtn.addEventListener('click', () => {
+        actionButtons.style.display = 'none';
+        cancelBtn.style.display = 'block';
+        mainAiState = 2; // Stan dyktowania notatki
+        
+        mainAiSpeak("Słucham. Co zapisać?", () => {
+            startMainAiListening(8000);
+        });
+    });
+
+    // --- PRZETWARZANIE ODPOWIEDZI (GŁÓWNY MÓZG) ---
+    function processMainAiAnswer(text) {
+        const lowText = text.toLowerCase();
+
+        // SCENARIUSZ 1: Potwierdzenie zrealizowania zaległych wizyt
+        if (mainAiState === 1) {
+            if (lowText.includes('tak') || lowText.includes('zrealizuj') || lowText.includes('oznacz') || lowText.includes('pewnie')) {
+                // Symuluje kliknięcie przycisków w Twoim kalendarzu w tle
+                pendingVisitsToResolve.forEach(v => {
+                    if (v.btn) v.btn.click();
+                });
+                mainAiSpeak("Gotowe, oznaczyłem je jako zrealizowane. Kontynuuj dobrą pracę!", stopMainAiAudio);
+            } else if (lowText.includes('nie') || lowText.includes('zostaw') || lowText.includes('pomiń')) {
+                mainAiSpeak("Zrozumiałem. Zostawiam statusy bez zmian.", stopMainAiAudio);
+            } else {
+                mainAiSpeak("Nie usłyszałem wyraźnego tak lub nie. Zostawiam wizyty bez zmian.", stopMainAiAudio);
+            }
+        } 
+        // SCENARIUSZ 2: Zapisywanie Notatki
+        else if (mainAiState === 2) {
+            if (text.length > 2 && !lowText.includes('pomiń') && !lowText.includes('anuluj')) {
+                const formattedNote = text.charAt(0).toUpperCase() + text.slice(1);
+                activeAiNotes.push(formattedNote);
+                saveAiNotes();
+                mainStatus.textContent = "✅ Notatka zapisana!";
+                mainAiSpeak("Zapisano notatkę.", stopMainAiAudio);
+            } else {
+                mainStatus.textContent = "❌ Nic nie zrozumiałem / Anulowano.";
+                setTimeout(stopMainAiAudio, 2000);
+            }
+        }
+        
+        mainAiState = -1;
+    }
+</script>
 </body>
 </html>
