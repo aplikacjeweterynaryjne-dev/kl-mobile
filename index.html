@@ -30504,6 +30504,80 @@ if (celInput) {
     }
 </script>
 <script>
+    <!-- ========================================== -->
+<!-- 🧠 ASYSTENT GŁÓWNY (INTERAKTYWNY BRIEFING) -->
+<!-- ========================================== -->
+<div id="mainMenuAiModal" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.7); display: none; z-index: 30000; justify-content: center; align-items: center;">
+    <div class="form-card" style="width: 95%; max-width: 480px; background: white; padding: 20px; border-radius: 12px; border-top: 5px solid #f39c12; max-height: 95vh; overflow-y: auto; box-shadow: 0 10px 25px rgba(0,0,0,0.5);">
+        
+        <h3 style="margin-top: 0; color: #d35400; text-align: center; margin-bottom: 20px; font-size: 20px;">
+            🧠 Centralny Asystent
+        </h3>
+
+        <div style="text-align: center; padding-bottom: 15px;">
+            <div id="mainAiAvatar" style="font-size: 60px; margin-bottom: 10px; transition: transform 0.3s;">🤖</div>
+            <p id="mainAiStatusText" style="font-size: 16px; font-weight: bold; color: #d35400; min-height: 50px; margin: 0 0 15px 0;">
+                Witaj w Menu. W czym mogę pomóc?
+            </p>
+            <p id="mainAiListeningPreview" style="font-size: 14px; color: #555; font-style: italic; background: #fdf3e7; padding: 10px; border-radius: 6px; display: none; border: 1px solid #fae5d3;">
+                " <span id="mainAiHeardText"></span> "
+            </p>
+            
+            <div id="mainAiActionButtons" style="display: flex; flex-direction: column; gap: 10px;">
+                <button type="button" id="mainAiBriefingBtn" class="btn" style="background-color: #2980b9; color: white; border: none; padding: 12px; font-weight: bold; font-size: 16px; border-radius: 8px; width: 100%;">
+                    🌅 Podsumowanie Dnia (Briefing)
+                </button>
+                <button type="button" id="mainAiNoteBtn" class="btn" style="background-color: #27ae60; color: white; border: none; padding: 12px; font-weight: bold; font-size: 16px; border-radius: 8px; width: 100%;">
+                    📝 Podyktuj Notatkę
+                </button>
+            </div>
+            
+            <button type="button" id="mainAiCancelActionBtn" class="btn ghost" style="display: none; width: 100%; margin-top: 10px; padding: 10px; font-size: 14px; border-color: #e74c3c; color: #e74c3c;">
+                ❌ Przerwij słuchanie
+            </button>
+        </div>
+
+        <!-- LISTA ZAPISANYCH NOTATEK -->
+        <div style="margin-top: 10px; border-top: 2px dashed #eee; padding-top: 15px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <h4 style="margin: 0; color: #333; font-size: 14px;">Twoje aktywne notatki:</h4>
+                <span id="mainAiNoteCountBadge" style="background: #f39c12; color: white; padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: bold;">0</span>
+            </div>
+            <div id="mainAiNotesList" style="max-height: 150px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; background: #fafafa; border: 1px solid #eee; padding: 10px; border-radius: 8px;">
+            </div>
+        </div>
+
+        <div class="form-actions" style="justify-content: center; margin-top: 20px;">
+            <button type="button" class="btn ghost" onclick="closeMainAiModal()" style="width: 100%; padding: 12px; font-size: 15px;">Zamknij Asystenta</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Zmienne globalne i logika stanu
+    let mainAiRec = null;
+    let mainAiRecording = false;
+    let mainAiWatchdog = null;
+    let activeAiNotes = [];
+    let mainAiState = -1; 
+    let currentVisitsData = null; 
+    let pendingVisitsToResolve = []; 
+
+    // Kuloodporne pobieranie elementów (eliminuje błąd null)
+    const ui = {
+        get modal() { return document.getElementById('mainMenuAiModal'); },
+        get noteBtn() { return document.getElementById('mainAiNoteBtn'); },
+        get briefingBtn() { return document.getElementById('mainAiBriefingBtn'); },
+        get cancelBtn() { return document.getElementById('mainAiCancelActionBtn'); },
+        get status() { return document.getElementById('mainAiStatusText'); },
+        get avatar() { return document.getElementById('mainAiAvatar'); },
+        get previewBox() { return document.getElementById('mainAiListeningPreview'); },
+        get heardText() { return document.getElementById('mainAiHeardText'); },
+        get notesList() { return document.getElementById('mainAiNotesList'); },
+        get noteBadge() { return document.getElementById('mainAiNoteCountBadge'); },
+        get actions() { return document.getElementById('mainAiActionButtons'); }
+    };
+
     document.addEventListener("DOMContentLoaded", () => {
         const menuSec = document.getElementById('mainMenuSection') || document.body;
         
@@ -30511,14 +30585,15 @@ if (celInput) {
         mainAiBtn.type = 'button';
         mainAiBtn.id = 'mainAiFloatBtn';
         mainAiBtn.innerHTML = '🧠';
-        mainAiBtn.style.cssText = 'position: fixed; top: 115px; right: 15px; width: 55px; height: 55px; border-radius: 50%; font-size: 28px; line-height: 1; padding: 0; z-index: 1000; background-color: #f39c12; color: white; border: 2px solid white; box-shadow: 0 4px 15px rgba(0,0,0,0.3); cursor: pointer; display: none;';
+        // POPRAWKA: Przycisk zmniejszony do 40px i ustawiony zaraz obok przycisku "Pomoc" (Prawy górny róg)
+        mainAiBtn.style.cssText = 'position: fixed; top: 15px; right: 65px; width: 40px; height: 40px; border-radius: 50%; font-size: 20px; padding: 0; display: none; justify-content: center; align-items: center; z-index: 1000; background-color: #f39c12; color: white; border: 2px solid white; box-shadow: 0 4px 15px rgba(0,0,0,0.3); cursor: pointer;';
         
         menuSec.appendChild(mainAiBtn);
         
         setInterval(() => {
             const isMenuVisible = document.getElementById('mainMenuSection') && document.getElementById('mainMenuSection').style.display !== 'none';
             if(isMenuVisible) {
-                mainAiBtn.style.display = 'block';
+                mainAiBtn.style.display = 'flex';
             } else {
                 mainAiBtn.style.display = 'none';
             }
@@ -30526,31 +30601,15 @@ if (celInput) {
 
         mainAiBtn.addEventListener('click', () => {
             loadAiNotes();
-            document.getElementById('mainMenuAiModal').style.display = 'flex';
+            if (ui.modal) ui.modal.style.display = 'flex';
             mainAiSpeak("Witaj. Wybierz opcję na ekranie.");
         });
+
+        // Podpięcie przycisków wewnątrz modala
+        if (ui.cancelBtn) ui.cancelBtn.addEventListener('click', stopMainAiAudio);
+        if (ui.briefingBtn) ui.briefingBtn.addEventListener('click', handleBriefingClick);
+        if (ui.noteBtn) ui.noteBtn.addEventListener('click', handleNoteClick);
     });
-
-    let mainAiRec = null;
-    let mainAiRecording = false;
-    let mainAiWatchdog = null;
-    let activeAiNotes = [];
-    
-    let mainAiState = -1; 
-    let currentVisitsData = null; 
-    let pendingVisitsToResolve = []; 
-
-    const mainModal = document.getElementById('mainMenuAiModal');
-    const noteBtn = document.getElementById('mainAiNoteBtn');
-    const briefingBtn = document.getElementById('mainAiBriefingBtn');
-    const cancelBtn = document.getElementById('mainAiCancelActionBtn');
-    const mainStatus = document.getElementById('mainAiStatusText');
-    const mainAvatar = document.getElementById('mainAiAvatar');
-    const previewBox = document.getElementById('mainAiListeningPreview');
-    const heardText = document.getElementById('mainAiHeardText');
-    const notesListContainer = document.getElementById('mainAiNotesList');
-    const noteCountBadge = document.getElementById('mainAiNoteCountBadge');
-    const actionButtons = document.getElementById('mainAiActionButtons');
 
     function loadAiNotes() {
         const saved = localStorage.getItem('weterynarz_ai_notes');
@@ -30566,11 +30625,13 @@ if (celInput) {
     }
 
     function renderAiNotes() {
-        notesListContainer.innerHTML = '';
-        noteCountBadge.textContent = activeAiNotes.length;
+        if (!ui.notesList || !ui.noteBadge) return;
+
+        ui.notesList.innerHTML = '';
+        ui.noteBadge.textContent = activeAiNotes.length;
         
         if (activeAiNotes.length === 0) {
-            notesListContainer.innerHTML = '<span style="color: #999; font-style: italic; text-align: center;">Brak notatek. Czysty umysł!</span>';
+            ui.notesList.innerHTML = '<span style="color: #999; font-style: italic; text-align: center;">Brak notatek. Czysty umysł!</span>';
             return;
         }
 
@@ -30593,12 +30654,12 @@ if (celInput) {
 
             div.appendChild(textSpan);
             div.appendChild(delBtn);
-            notesListContainer.appendChild(div);
+            ui.notesList.appendChild(div);
         });
     }
 
     function closeMainAiModal() {
-        mainModal.style.display = 'none';
+        if (ui.modal) ui.modal.style.display = 'none';
         stopMainAiAudio();
     }
 
@@ -30609,11 +30670,11 @@ if (celInput) {
         mainAiRecording = false;
         mainAiState = -1;
         
-        actionButtons.style.display = 'flex';
-        cancelBtn.style.display = 'none';
-        previewBox.style.display = 'none';
-        mainStatus.textContent = "Witaj w Menu. W czym mogę pomóc?";
-        mainAvatar.style.transform = 'scale(1)';
+        if (ui.actions) ui.actions.style.display = 'flex';
+        if (ui.cancelBtn) ui.cancelBtn.style.display = 'none';
+        if (ui.previewBox) ui.previewBox.style.display = 'none';
+        if (ui.status) ui.status.textContent = "Witaj w Menu. W czym mogę pomóc?";
+        if (ui.avatar) ui.avatar.style.transform = 'scale(1)';
     }
 
     let mainPolishVoice = null;
@@ -30634,21 +30695,21 @@ if (celInput) {
         mainAiRec.onresult = (e) => {
             clearTimeout(mainAiWatchdog);
             const text = e.results[0][0].transcript.trim();
-            previewBox.style.display = 'block';
-            heardText.textContent = text;
+            if (ui.previewBox) ui.previewBox.style.display = 'block';
+            if (ui.heardText) ui.heardText.textContent = text;
             processMainAiAnswer(text);
         };
 
         mainAiRec.onerror = () => {
             clearTimeout(mainAiWatchdog);
-            mainStatus.textContent = "Nie usłyszałem. Spróbuj ponownie.";
+            if (ui.status) ui.status.textContent = "Nie usłyszałem. Spróbuj ponownie.";
             mainAiRecording = false;
             setTimeout(stopMainAiAudio, 2000);
         };
         
         mainAiRec.onend = () => {
             clearTimeout(mainAiWatchdog);
-            mainAvatar.style.transform = 'scale(1)';
+            if (ui.avatar) ui.avatar.style.transform = 'scale(1)';
             mainAiRecording = false;
         };
     }
@@ -30660,19 +30721,19 @@ if (celInput) {
         if (mainPolishVoice) utterance.voice = mainPolishVoice;
         utterance.rate = 1.05; 
         
-        mainAvatar.style.transform = 'scale(1.2)';
-        mainStatus.textContent = `🔊 Trwa odtwarzanie...`;
+        if (ui.avatar) ui.avatar.style.transform = 'scale(1.2)';
+        if (ui.status) ui.status.textContent = `🔊 Trwa odtwarzanie...`;
         
         utterance.onend = () => {
-            mainAvatar.style.transform = 'scale(1)';
+            if (ui.avatar) ui.avatar.style.transform = 'scale(1)';
             if(callback) callback();
         };
         window.speechSynthesis.speak(utterance);
     }
 
     function startMainAiListening(timeoutMs = 8000) {
-        mainStatus.textContent = "🎙️ Słucham...";
-        previewBox.style.display = 'none';
+        if (ui.status) ui.status.textContent = "🎙️ Słucham...";
+        if (ui.previewBox) ui.previewBox.style.display = 'none';
         try { 
             mainAiRecording = true; 
             mainAiRec.start(); 
@@ -30680,16 +30741,12 @@ if (celInput) {
             mainAiWatchdog = setTimeout(() => {
                 if (mainAiRecording) {
                     mainAiRec.stop();
-                    mainStatus.textContent = "⏱️ Zbyt długa cisza. Anulowano.";
+                    if (ui.status) ui.status.textContent = "⏱️ Zbyt długa cisza. Anulowano.";
                     setTimeout(stopMainAiAudio, 2000);
                 }
             }, timeoutMs);
         } catch(e) {}
     }
-
-    cancelBtn.addEventListener('click', () => {
-        stopMainAiAudio();
-    });
 
     function getTodayVisitsFromDOM() {
         const items = document.querySelectorAll('#todayVisitList .visit-item');
@@ -30714,7 +30771,6 @@ if (celInput) {
         return visits;
     }
 
-    // --- FUNKCJE JĘZYKOWE (GRAMATYKA) ---
     function formatWizyty(liczba, przypadek = 'biernik') {
         if (liczba === 1) {
             return przypadek === 'biernik' ? "jedną wizytę" : "1 wizyta";
@@ -30736,7 +30792,6 @@ if (celInput) {
         }
         return "pozostało Ci";
     }
-    // -------------------------------------
 
     function generateRestOfBriefing(pendingRemaining) {
         let text = "";
@@ -30761,9 +30816,9 @@ if (celInput) {
         return text;
     }
 
-    briefingBtn.addEventListener('click', () => {
-        actionButtons.style.display = 'none';
-        cancelBtn.style.display = 'block';
+    function handleBriefingClick() {
+        if (ui.actions) ui.actions.style.display = 'none';
+        if (ui.cancelBtn) ui.cancelBtn.style.display = 'block';
         
         const visits = getTodayVisitsFromDOM();
         const pending = visits.filter(v => v.status !== 'Zrealizowana');
@@ -30792,17 +30847,17 @@ if (celInput) {
             briefingText += generateRestOfBriefing(pending);
             mainAiSpeak(briefingText, stopMainAiAudio);
         }
-    });
+    }
 
-    noteBtn.addEventListener('click', () => {
-        actionButtons.style.display = 'none';
-        cancelBtn.style.display = 'block';
+    function handleNoteClick() {
+        if (ui.actions) ui.actions.style.display = 'none';
+        if (ui.cancelBtn) ui.cancelBtn.style.display = 'block';
         mainAiState = 2; 
         
         mainAiSpeak("Słucham. Co zapisać?", () => {
             startMainAiListening(8000);
         });
-    });
+    }
 
     function processMainAiAnswer(text) {
         const lowText = text.toLowerCase();
@@ -30832,10 +30887,10 @@ if (celInput) {
                 const formattedNote = text.charAt(0).toUpperCase() + text.slice(1);
                 activeAiNotes.push(formattedNote);
                 saveAiNotes();
-                mainStatus.textContent = "✅ Notatka zapisana!";
+                if (ui.status) ui.status.textContent = "✅ Notatka zapisana!";
                 mainAiSpeak("Zapisano notatkę.", stopMainAiAudio);
             } else {
-                mainStatus.textContent = "❌ Nic nie zrozumiałem / Anulowano.";
+                if (ui.status) ui.status.textContent = "❌ Nic nie zrozumiałem / Anulowano.";
                 setTimeout(stopMainAiAudio, 2000);
             }
         }
