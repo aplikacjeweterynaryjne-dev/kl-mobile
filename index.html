@@ -30503,55 +30503,6 @@ if (celInput) {
         }
     }
 </script>
-<!-- ========================================== -->
-<!-- 🧠 ASYSTENT GŁÓWNY (INTERAKTYWNY BRIEFING) -->
-<!-- ========================================== -->
-<div id="mainMenuAiModal" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.7); display: none; z-index: 30000; justify-content: center; align-items: center;">
-    <div class="form-card" style="width: 95%; max-width: 480px; background: white; padding: 20px; border-radius: 12px; border-top: 5px solid #f39c12; max-height: 95vh; overflow-y: auto; box-shadow: 0 10px 25px rgba(0,0,0,0.5);">
-        
-        <h3 style="margin-top: 0; color: #d35400; text-align: center; margin-bottom: 20px; font-size: 20px;">
-            🧠 Centralny Asystent
-        </h3>
-
-        <div style="text-align: center; padding-bottom: 15px;">
-            <div id="mainAiAvatar" style="font-size: 60px; margin-bottom: 10px; transition: transform 0.3s;">🤖</div>
-            <p id="mainAiStatusText" style="font-size: 16px; font-weight: bold; color: #d35400; min-height: 50px; margin: 0 0 15px 0;">
-                Witaj w Menu. W czym mogę pomóc?
-            </p>
-            <p id="mainAiListeningPreview" style="font-size: 14px; color: #555; font-style: italic; background: #fdf3e7; padding: 10px; border-radius: 6px; display: none; border: 1px solid #fae5d3;">
-                " <span id="mainAiHeardText"></span> "
-            </p>
-            
-            <div id="mainAiActionButtons" style="display: flex; flex-direction: column; gap: 10px;">
-                <button type="button" id="mainAiBriefingBtn" class="btn" style="background-color: #2980b9; color: white; border: none; padding: 12px; font-weight: bold; font-size: 16px; border-radius: 8px; width: 100%;">
-                    🌅 Podsumowanie Dnia (Briefing)
-                </button>
-                <button type="button" id="mainAiNoteBtn" class="btn" style="background-color: #27ae60; color: white; border: none; padding: 12px; font-weight: bold; font-size: 16px; border-radius: 8px; width: 100%;">
-                    📝 Podyktuj Notatkę
-                </button>
-            </div>
-            
-            <button type="button" id="mainAiCancelActionBtn" class="btn ghost" style="display: none; width: 100%; margin-top: 10px; padding: 10px; font-size: 14px; border-color: #e74c3c; color: #e74c3c;">
-                ❌ Przerwij słuchanie
-            </button>
-        </div>
-
-        <!-- LISTA ZAPISANYCH NOTATEK -->
-        <div style="margin-top: 10px; border-top: 2px dashed #eee; padding-top: 15px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                <h4 style="margin: 0; color: #333; font-size: 14px;">Twoje aktywne notatki:</h4>
-                <span id="mainAiNoteCountBadge" style="background: #f39c12; color: white; padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: bold;">0</span>
-            </div>
-            <div id="mainAiNotesList" style="max-height: 150px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; background: #fafafa; border: 1px solid #eee; padding: 10px; border-radius: 8px;">
-            </div>
-        </div>
-
-        <div class="form-actions" style="justify-content: center; margin-top: 20px;">
-            <button type="button" class="btn ghost" onclick="closeMainAiModal()" style="width: 100%; padding: 12px; font-size: 15px;">Zamknij Asystenta</button>
-        </div>
-    </div>
-</div>
-
 <script>
     document.addEventListener("DOMContentLoaded", () => {
         const menuSec = document.getElementById('mainMenuSection') || document.body;
@@ -30560,7 +30511,6 @@ if (celInput) {
         mainAiBtn.type = 'button';
         mainAiBtn.id = 'mainAiFloatBtn';
         mainAiBtn.innerHTML = '🧠';
-        // POPRAWKA: Prawy górny róg, pod znakiem zapytania i ewentualnym przyciskiem instalacji
         mainAiBtn.style.cssText = 'position: fixed; top: 115px; right: 15px; width: 55px; height: 55px; border-radius: 50%; font-size: 28px; line-height: 1; padding: 0; z-index: 1000; background-color: #f39c12; color: white; border: 2px solid white; box-shadow: 0 4px 15px rgba(0,0,0,0.3); cursor: pointer; display: none;';
         
         menuSec.appendChild(mainAiBtn);
@@ -30586,9 +30536,8 @@ if (celInput) {
     let mainAiWatchdog = null;
     let activeAiNotes = [];
     
-    // Zmienne stanu do sterowania rozmową
     let mainAiState = -1; 
-    let currentVisitsData = null; // Przechowuje stan wizyt do kontynuowania czytania
+    let currentVisitsData = null; 
     let pendingVisitsToResolve = []; 
 
     const mainModal = document.getElementById('mainMenuAiModal');
@@ -30742,7 +30691,6 @@ if (celInput) {
         stopMainAiAudio();
     });
 
-    // --- LOGIKA BIZNESOWA: CZYTANIE WIZYT Z DOM ---
     function getTodayVisitsFromDOM() {
         const items = document.querySelectorAll('#todayVisitList .visit-item');
         let visits = [];
@@ -30751,7 +30699,6 @@ if (celInput) {
             const celEl = item.querySelector('.visit-item-info .purpose');
             const btnStatus = item.querySelector('.btn-quick-status');
             
-            // POPRAWKA: Inteligentne usuwanie podwójnego słowa "Cel:"
             let rawCel = celEl ? celEl.textContent.trim() : '';
             let cleanCel = rawCel.replace(/^Cel:\s*/i, '').trim(); 
             
@@ -30767,20 +30714,42 @@ if (celInput) {
         return visits;
     }
 
-    // Funkcja do czytania reszty raportu (wykorzystywana w wielu miejscach)
+    // --- FUNKCJE JĘZYKOWE (GRAMATYKA) ---
+    function formatWizyty(liczba, przypadek = 'biernik') {
+        if (liczba === 1) {
+            return przypadek === 'biernik' ? "jedną wizytę" : "1 wizyta";
+        }
+        const r10 = liczba % 10;
+        const r100 = liczba % 100;
+        if (r10 >= 2 && r10 <= 4 && (r100 < 10 || r100 >= 20)) {
+            return `${liczba} wizyty`;
+        }
+        return `${liczba} wizyt`;
+    }
+
+    function formatPozostalo(liczba) {
+        if (liczba === 1) return "pozostała Ci";
+        const r10 = liczba % 10;
+        const r100 = liczba % 100;
+        if (r10 >= 2 && r10 <= 4 && (r100 < 10 || r100 >= 20)) {
+            return "pozostały Ci";
+        }
+        return "pozostało Ci";
+    }
+    // -------------------------------------
+
     function generateRestOfBriefing(pendingRemaining) {
         let text = "";
         
         if (pendingRemaining.length === 0) {
             text += "Wszystkie wizyty na dziś zostały zrealizowane. Dobra robota! ";
         } else {
-            text += `Do zrealizowania pozostało ${pendingRemaining.length} wizyt. `;
+            text += `Do zrealizowania ${formatPozostalo(pendingRemaining.length)} ${formatWizyty(pendingRemaining.length, 'mianownik')}. `;
             const firstPending = pendingRemaining[0];
             let celWymowa = firstPending.cel.replace('💉', 'szczepienie').replace('🔍', 'badanie');
             text += `Następna wizyta, klient: ${firstPending.klient}. Zaplanowany zabieg to: ${celWymowa}. `;
         }
 
-        // POPRAWKA: Asystent nareszcie czyta treść notatek!
         if (activeAiNotes.length > 0) {
             text += `W notatniku masz zapisane ${activeAiNotes.length} przypomnienia. Oto one. `;
             activeAiNotes.forEach((note, idx) => {
@@ -30792,7 +30761,6 @@ if (celInput) {
         return text;
     }
 
-    // AKCJA 1: BRIEFING I INTERAKCJA
     briefingBtn.addEventListener('click', () => {
         actionButtons.style.display = 'none';
         cancelBtn.style.display = 'block';
@@ -30809,27 +30777,23 @@ if (celInput) {
         const morningPending = pending.filter(v => v.pora === '6-10');
         
         if (currentHour >= 11 && morningPending.length > 0) {
-            // WYZWANIE INTERAKTYWNE
             const names = morningPending.map(v => v.klient).join(" oraz ");
             pendingVisitsToResolve = morningPending;
-            currentVisitsData = { all: visits, pending: pending }; // Zapisujemy stan
+            currentVisitsData = { all: visits, pending: pending }; 
             mainAiState = 1; 
             
-            // POPRAWKA GRAMATYKI: Zmiana z "u: Kowalski" na "Klienci to: Kowalski"
-            const askText = `Dzień dobry. Masz dzisiaj łącznie ${visits.length} wizyt. Zauważyłem jednak, że wciąż masz niezrealizowane wizyty poranne. Klienci to: ${names}. Czy mam je teraz oznaczyć jako zakończone? Powiedz tak lub nie.`;
+            const askText = `Dzień dobry. Masz dzisiaj łącznie ${formatWizyty(visits.length, 'biernik')}. Zauważyłem jednak, że wciąż masz niezrealizowane wizyty poranne. Klienci to: ${names}. Czy mam je teraz oznaczyć jako zakończone? Powiedz tak lub nie.`;
             
             mainAiSpeak(askText, () => {
                 startMainAiListening(8000); 
             });
         } else {
-            // STANDARDOWY BRIEFING BEZ PRZERYWANIA
-            let briefingText = `Dzień dobry. Masz dzisiaj łącznie ${visits.length} wizyt. `;
+            let briefingText = `Dzień dobry. Masz dzisiaj łącznie ${formatWizyty(visits.length, 'biernik')}. `;
             briefingText += generateRestOfBriefing(pending);
             mainAiSpeak(briefingText, stopMainAiAudio);
         }
     });
 
-    // AKCJA 2: NOTATNIK
     noteBtn.addEventListener('click', () => {
         actionButtons.style.display = 'none';
         cancelBtn.style.display = 'block';
@@ -30840,27 +30804,21 @@ if (celInput) {
         });
     });
 
-    // --- PRZETWARZANIE ODPOWIEDZI (GŁÓWNY MÓZG) ---
     function processMainAiAnswer(text) {
         const lowText = text.toLowerCase();
 
-        // SCENARIUSZ 1: Potwierdzenie zrealizowania zaległych wizyt
         if (mainAiState === 1) {
             if (lowText.includes('tak') || lowText.includes('zrealizuj') || lowText.includes('oznacz') || lowText.includes('pewnie')) {
-                // Symuluje kliknięcie w tle
                 pendingVisitsToResolve.forEach(v => {
                     if (v.btn) v.btn.click();
                 });
                 
-                // POPRAWKA: Po zamknięciu wizyt asystent czyta resztę raportu
                 let remainingPending = currentVisitsData.pending.filter(v => !pendingVisitsToResolve.includes(v));
                 let responseText = "Gotowe, oznaczyłem je jako zrealizowane. " + generateRestOfBriefing(remainingPending);
                 
                 mainAiSpeak(responseText, stopMainAiAudio);
                 
             } else if (lowText.includes('nie') || lowText.includes('zostaw') || lowText.includes('pomiń')) {
-                
-                // Jeśli odmówisz, też przeczyta resztę
                 let responseText = "Zrozumiałem, zostawiam bez zmian. " + generateRestOfBriefing(currentVisitsData.pending);
                 mainAiSpeak(responseText, stopMainAiAudio);
                 
@@ -30869,7 +30827,6 @@ if (celInput) {
                 mainAiSpeak(responseText, stopMainAiAudio);
             }
         } 
-        // SCENARIUSZ 2: Zapisywanie Notatki
         else if (mainAiState === 2) {
             if (text.length > 2 && !lowText.includes('pomiń') && !lowText.includes('anuluj')) {
                 const formattedNote = text.charAt(0).toUpperCase() + text.slice(1);
