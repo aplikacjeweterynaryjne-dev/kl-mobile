@@ -30277,6 +30277,129 @@ if (celInput) {
 </div>
 
 <script>
+<!-- ========================================== -->
+<!-- 🤖 ASYSTENT GŁOSOWY: KALENDARZ WIZYT       -->
+<!-- ========================================== -->
+<div id="calendarAiModal" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.6); display: none; z-index: 20000; justify-content: center; align-items: center;">
+    <div class="form-card" style="width: 95%; max-width: 480px; background: white; padding: 20px; border-radius: 12px; border-top: 5px solid #2980b9; max-height: 95vh; overflow-y: auto;">
+        
+        <h3 style="margin-top: 0; color: #2980b9; text-align: center; margin-bottom: 20px; font-size: 20px;">
+            🗓️ Asystent Wizyt
+        </h3>
+
+        <div style="text-align: center; padding-bottom: 10px;">
+            <div id="calAiAvatar" style="font-size: 60px; margin-bottom: 10px; transition: transform 0.3s;">🤖</div>
+            <p id="calAiStatusText" style="font-size: 16px; font-weight: bold; color: #2980b9; min-height: 50px; margin: 0 0 15px 0;">
+                Gotowy do zaplanowania wizyty.
+            </p>
+            <p id="calAiListeningPreview" style="font-size: 14px; color: #555; font-style: italic; background: #f4f6f7; padding: 10px; border-radius: 6px; display: none;">
+                " <span id="calAiHeardText"></span> "
+            </p>
+            
+            <button type="button" id="calAiStartBtn" class="btn" style="background-color: #2980b9; color: white; border: none; padding: 12px 25px; font-weight: bold; font-size: 18px; border-radius: 8px; width: 100%; margin-bottom: 10px;">
+                ▶️ Rozpocznij
+            </button>
+            
+            <div style="display: flex; gap: 8px; margin-bottom: 5px;">
+                <button type="button" id="calAiRetryBtn" class="btn" style="display: none; flex: 2; padding: 8px 10px; font-size: 14px; background-color: #f39c12; color: white; font-weight: bold;">
+                    🔄 Powtórz
+                </button>
+                <button type="button" id="calAiSkipBtn" class="btn ghost" style="display: none; flex: 1; padding: 8px 10px; font-size: 14px;">
+                    ⏭️ Pomiń
+                </button>
+            </div>
+        </div>
+
+        <div id="calAiPreviewForm" style="background: #fdfdfd; border: 1px solid #eee; padding: 10px; border-radius: 8px; margin-top: 15px; font-size: 13px;">
+            <div style="margin-bottom: 8px; display: flex; flex-direction: column;">
+                <label style="color: #777; font-size: 11px; margin-bottom: 2px;">Klient:</label>
+                <input type="text" id="calPrvKlient" placeholder="Brak" style="border: none; border-bottom: 1px solid #ddd; background: transparent; padding: 4px; font-weight: bold; color: #2980b9; outline: none; width: 100%;">
+            </div>
+            <div style="display: flex; gap: 10px; margin-bottom: 8px;">
+                <div style="flex: 1; display: flex; flex-direction: column;">
+                    <label style="color: #777; font-size: 11px; margin-bottom: 2px;">Data:</label>
+                    <input type="date" id="calPrvData" style="border: none; border-bottom: 1px solid #ddd; background: transparent; padding: 4px; font-weight: bold; color: #2980b9; outline: none; width: 100%;">
+                </div>
+                <div style="flex: 1; display: flex; flex-direction: column;">
+                    <label style="color: #777; font-size: 11px; margin-bottom: 2px;">Pora:</label>
+                    <select id="calPrvPora" style="border: none; border-bottom: 1px solid #ddd; background: transparent; padding: 4px; font-weight: bold; color: #2980b9; outline: none; width: 100%;">
+                        <option value="Obojętne">Obojętne</option>
+                        <option value="6-10">Rano (6-10)</option>
+                        <option value="10-15">Południe (10-15)</option>
+                        <option value="15-20">Wieczór (15-20)</option>
+                        <option value="Pilne">Pilne</option>
+                    </select>
+                </div>
+            </div>
+            <div style="margin-bottom: 8px; display: flex; flex-direction: column;">
+                <label style="color: #777; font-size: 11px; margin-bottom: 2px;">Cel:</label>
+                <input type="text" id="calPrvCel" placeholder="Brak" style="border: none; border-bottom: 1px solid #ddd; background: transparent; padding: 4px; font-weight: bold; color: #2980b9; outline: none; width: 100%;">
+            </div>
+            <div style="margin-bottom: 8px; display: flex; flex-direction: column;">
+                <label style="color: #777; font-size: 11px; margin-bottom: 2px;">Notatka:</label>
+                <textarea id="calPrvNotatka" rows="2" placeholder="Brak" style="border: 1px solid #ddd; border-radius: 4px; background: transparent; padding: 4px; color: #2980b9; outline: none; width: 100%; box-sizing: border-box;"></textarea>
+            </div>
+        </div>
+
+        <div class="form-actions" style="justify-content: center; margin-top: 15px;">
+            <button type="button" class="btn ghost" onclick="document.getElementById('calendarAiModal').style.display='none'; stopCalAiAudio();" style="width: 100%;">Anuluj i zamknij</button>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================== -->
+<!-- 🧠 ASYSTENT GŁÓWNY (INTERAKTYWNY BRIEFING) -->
+<!-- ========================================== -->
+<div id="mainMenuAiModal" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.7); display: none; z-index: 30000; justify-content: center; align-items: center;">
+    <div class="form-card" style="width: 95%; max-width: 480px; background: white; padding: 20px; border-radius: 12px; border-top: 5px solid #f39c12; max-height: 95vh; overflow-y: auto; box-shadow: 0 10px 25px rgba(0,0,0,0.5);">
+        
+        <h3 style="margin-top: 0; color: #d35400; text-align: center; margin-bottom: 20px; font-size: 20px;">
+            🧠 Centralny Asystent
+        </h3>
+
+        <div style="text-align: center; padding-bottom: 15px;">
+            <div id="mainAiAvatar" style="font-size: 60px; margin-bottom: 10px; transition: transform 0.3s;">🤖</div>
+            <p id="mainAiStatusText" style="font-size: 16px; font-weight: bold; color: #d35400; min-height: 50px; margin: 0 0 15px 0;">
+                Witaj w Menu. W czym mogę pomóc?
+            </p>
+            <p id="mainAiListeningPreview" style="font-size: 14px; color: #555; font-style: italic; background: #fdf3e7; padding: 10px; border-radius: 6px; display: none; border: 1px solid #fae5d3;">
+                " <span id="mainAiHeardText"></span> "
+            </p>
+            
+            <div id="mainAiActionButtons" style="display: flex; flex-direction: column; gap: 10px;">
+                <button type="button" id="mainAiBriefingBtn" class="btn" style="background-color: #2980b9; color: white; border: none; padding: 12px; font-weight: bold; font-size: 16px; border-radius: 8px; width: 100%;">
+                    🌅 Podsumowanie Dnia (Briefing)
+                </button>
+                <button type="button" id="mainAiTreatmentCardBtn" class="btn" style="background-color: #8e44ad; color: white; border: none; padding: 12px; font-weight: bold; font-size: 16px; border-radius: 8px; width: 100%;">
+                    🩺 Asystent Karty Leczenia
+                </button>
+                <button type="button" id="mainAiNoteBtn" class="btn" style="background-color: #27ae60; color: white; border: none; padding: 12px; font-weight: bold; font-size: 16px; border-radius: 8px; width: 100%;">
+                    📝 Podyktuj Notatkę
+                </button>
+            </div>
+            
+            <button type="button" id="mainAiCancelActionBtn" class="btn ghost" style="display: none; width: 100%; margin-top: 10px; padding: 10px; font-size: 14px; border-color: #e74c3c; color: #e74c3c;">
+                ❌ Przerwij słuchanie
+            </button>
+        </div>
+
+        <!-- LISTA ZAPISANYCH NOTATEK -->
+        <div style="margin-top: 10px; border-top: 2px dashed #eee; padding-top: 15px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <h4 style="margin: 0; color: #333; font-size: 14px;">Twoje aktywne notatki:</h4>
+                <span id="mainAiNoteCountBadge" style="background: #f39c12; color: white; padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: bold;">0</span>
+            </div>
+            <div id="mainAiNotesList" style="max-height: 150px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; background: #fafafa; border: 1px solid #eee; padding: 10px; border-radius: 8px;">
+            </div>
+        </div>
+
+        <div class="form-actions" style="justify-content: center; margin-top: 20px;">
+            <button type="button" class="btn ghost" onclick="closeMainAiModal()" style="width: 100%; padding: 12px; font-size: 15px;">Zamknij Asystenta</button>
+        </div>
+    </div>
+</div>
+
+<script>
     // ==========================================
     // Skrypt Asystenta Kalendarza Wizyt
     // ==========================================
@@ -30556,6 +30679,7 @@ if (celInput) {
         get modal() { return document.getElementById('mainMenuAiModal'); },
         get noteBtn() { return document.getElementById('mainAiNoteBtn'); },
         get briefingBtn() { return document.getElementById('mainAiBriefingBtn'); },
+        get cardBtn() { return document.getElementById('mainAiTreatmentCardBtn'); }, // Nowy przycisk
         get cancelBtn() { return document.getElementById('mainAiCancelActionBtn'); },
         get status() { return document.getElementById('mainAiStatusText'); },
         get avatar() { return document.getElementById('mainAiAvatar'); },
@@ -30569,11 +30693,14 @@ if (celInput) {
     document.addEventListener("DOMContentLoaded", () => {
         const menuSec = document.getElementById('mainMenuSection') || document.body;
         
+        // Ukryj stary, duży przycisk asystenta w menu głównym
+        const oldAsystentBtn = document.getElementById('menuAsystentBtn');
+        if (oldAsystentBtn) oldAsystentBtn.style.display = 'none';
+
         const mainAiBtn = document.createElement('button');
         mainAiBtn.type = 'button';
         mainAiBtn.id = 'mainAiFloatBtn';
         mainAiBtn.innerHTML = '🧠';
-        // POPRAWKA: Przycisk zmniejszony (40px) i przesunięty pod znak zapytania (prawo-góra)
         mainAiBtn.style.cssText = 'position: fixed; top: 15px; right: 65px; width: 40px; height: 40px; border-radius: 50%; font-size: 20px; display: flex; justify-content: center; align-items: center; padding: 0; z-index: 1000; background-color: #f39c12; color: white; border: 2px solid white; box-shadow: 0 4px 15px rgba(0,0,0,0.3); cursor: pointer; display: none;';
         
         menuSec.appendChild(mainAiBtn);
@@ -30588,6 +30715,9 @@ if (celInput) {
         }, 500);
 
         mainAiBtn.addEventListener('click', () => {
+            // "Cichy Ninja": Ładujemy kalendarz w tle, żeby pobrał wizyty do DOM
+            if (typeof onShowKalendarz === 'function') onShowKalendarz();
+
             loadAiNotes();
             if (ui.modal) ui.modal.style.display = 'flex';
             mainAiSpeak("Witaj. Wybierz opcję na ekranie.");
@@ -30596,6 +30726,14 @@ if (celInput) {
         if (ui.cancelBtn) ui.cancelBtn.addEventListener('click', stopMainAiAudio);
         if (ui.briefingBtn) ui.briefingBtn.addEventListener('click', handleBriefingClick);
         if (ui.noteBtn) ui.noteBtn.addEventListener('click', handleNoteClick);
+        
+        // Podpięcie logiczne Asystenta Karty Leczenia
+        if (ui.cardBtn) {
+            ui.cardBtn.addEventListener('click', () => {
+                closeMainAiModal();
+                if (oldAsystentBtn) oldAsystentBtn.click();
+            });
+        }
     });
 
     function loadAiNotes() {
@@ -30800,7 +30938,7 @@ if (celInput) {
                 text += "Niezły zapiernicz dzisiaj! Nie ma co się ociągać. ";
             }
 
-            const toRead = pendingRemaining.slice(0, 5); // ODCZYTUJE DO 5 WIZYT
+            const toRead = pendingRemaining.slice(0, 5); 
             if (toRead.length > 0) {
                 text += "Na liście są: ";
                 toRead.forEach((v, index) => {
