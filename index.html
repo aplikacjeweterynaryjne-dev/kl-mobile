@@ -30400,417 +30400,7 @@ if (celInput) {
 </div>
 
 <script>
-<!-- ========================================== -->
-<!-- 🤖 ASYSTENT GŁOSOWY: KALENDARZ WIZYT       -->
-<!-- ========================================== -->
-<div id="calendarAiModal" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.6); display: none; z-index: 20000; justify-content: center; align-items: center;">
-    <div class="form-card" style="width: 95%; max-width: 480px; background: white; padding: 20px; border-radius: 12px; border-top: 5px solid #2980b9; max-height: 95vh; overflow-y: auto;">
-        
-        <h3 style="margin-top: 0; color: #2980b9; text-align: center; margin-bottom: 20px; font-size: 20px;">
-            🗓️ Asystent Wizyt
-        </h3>
-
-        <div style="text-align: center; padding-bottom: 10px;">
-            <div id="calAiAvatar" style="font-size: 60px; margin-bottom: 10px; transition: transform 0.3s;">🤖</div>
-            <p id="calAiStatusText" style="font-size: 16px; font-weight: bold; color: #2980b9; min-height: 50px; margin: 0 0 15px 0;">
-                Gotowy do zaplanowania wizyty.
-            </p>
-            <p id="calAiListeningPreview" style="font-size: 14px; color: #555; font-style: italic; background: #f4f6f7; padding: 10px; border-radius: 6px; display: none;">
-                " <span id="calAiHeardText"></span> "
-            </p>
-            
-            <button type="button" id="calAiStartBtn" class="btn" style="background-color: #2980b9; color: white; border: none; padding: 12px 25px; font-weight: bold; font-size: 18px; border-radius: 8px; width: 100%; margin-bottom: 10px;">
-                ▶️ Rozpocznij
-            </button>
-            
-            <div style="display: flex; gap: 8px; margin-bottom: 5px;">
-                <button type="button" id="calAiRetryBtn" class="btn" style="display: none; flex: 2; padding: 8px 10px; font-size: 14px; background-color: #f39c12; color: white; font-weight: bold;">
-                    🔄 Powtórz
-                </button>
-                <button type="button" id="calAiSkipBtn" class="btn ghost" style="display: none; flex: 1; padding: 8px 10px; font-size: 14px;">
-                    ⏭️ Pomiń
-                </button>
-            </div>
-        </div>
-
-        <div id="calAiPreviewForm" style="background: #fdfdfd; border: 1px solid #eee; padding: 10px; border-radius: 8px; margin-top: 15px; font-size: 13px;">
-            <div style="margin-bottom: 8px; display: flex; flex-direction: column;">
-                <label style="color: #777; font-size: 11px; margin-bottom: 2px;">Klient:</label>
-                <input type="text" id="calPrvKlient" placeholder="Brak" style="border: none; border-bottom: 1px solid #ddd; background: transparent; padding: 4px; font-weight: bold; color: #2980b9; outline: none; width: 100%;">
-            </div>
-            <div style="display: flex; gap: 10px; margin-bottom: 8px;">
-                <div style="flex: 1; display: flex; flex-direction: column;">
-                    <label style="color: #777; font-size: 11px; margin-bottom: 2px;">Data:</label>
-                    <input type="date" id="calPrvData" style="border: none; border-bottom: 1px solid #ddd; background: transparent; padding: 4px; font-weight: bold; color: #2980b9; outline: none; width: 100%;">
-                </div>
-                <div style="flex: 1; display: flex; flex-direction: column;">
-                    <label style="color: #777; font-size: 11px; margin-bottom: 2px;">Pora:</label>
-                    <select id="calPrvPora" style="border: none; border-bottom: 1px solid #ddd; background: transparent; padding: 4px; font-weight: bold; color: #2980b9; outline: none; width: 100%;">
-                        <option value="Obojętne">Obojętne</option>
-                        <option value="6-10">Rano (6-10)</option>
-                        <option value="10-15">Południe (10-15)</option>
-                        <option value="15-20">Wieczór (15-20)</option>
-                        <option value="Pilne">Pilne</option>
-                    </select>
-                </div>
-            </div>
-            <div style="margin-bottom: 8px; display: flex; flex-direction: column;">
-                <label style="color: #777; font-size: 11px; margin-bottom: 2px;">Cel:</label>
-                <input type="text" id="calPrvCel" placeholder="Brak" style="border: none; border-bottom: 1px solid #ddd; background: transparent; padding: 4px; font-weight: bold; color: #2980b9; outline: none; width: 100%;">
-            </div>
-            <div style="margin-bottom: 8px; display: flex; flex-direction: column;">
-                <label style="color: #777; font-size: 11px; margin-bottom: 2px;">Notatka:</label>
-                <textarea id="calPrvNotatka" rows="2" placeholder="Brak" style="border: 1px solid #ddd; border-radius: 4px; background: transparent; padding: 4px; color: #2980b9; outline: none; width: 100%; box-sizing: border-box;"></textarea>
-            </div>
-            <div style="margin-bottom: 8px; display: flex; flex-direction: column;">
-                <label style="color: #777; font-size: 11px; margin-bottom: 2px;">Przypisany pracownik:</label>
-                <input type="text" id="calPrvPracownik" placeholder="Domyślnie (Ty)" style="border: none; border-bottom: 1px solid #ddd; background: transparent; padding: 4px; font-weight: bold; color: #8e44ad; outline: none; width: 100%;">
-            </div>
-        </div>
-
-        <div class="form-actions" style="justify-content: center; margin-top: 15px;">
-            <button type="button" class="btn ghost" onclick="document.getElementById('calendarAiModal').style.display='none'; stopCalAiAudio();" style="width: 100%;">Anuluj i zamknij</button>
-        </div>
-    </div>
-</div>
-
-<!-- ========================================== -->
-<!-- 🧠 ASYSTENT GŁÓWNY (INTERAKTYWNY BRIEFING) -->
-<!-- ========================================== -->
-<div id="mainMenuAiModal" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.7); display: none; z-index: 30000; justify-content: center; align-items: center;">
-    <div class="form-card" style="width: 95%; max-width: 480px; background: white; padding: 20px; border-radius: 12px; border-top: 5px solid #f39c12; max-height: 95vh; overflow-y: auto; box-shadow: 0 10px 25px rgba(0,0,0,0.5);">
-        
-        <h3 style="margin-top: 0; color: #d35400; text-align: center; margin-bottom: 20px; font-size: 20px;">
-            🧠 Centralny Asystent
-        </h3>
-
-        <div style="text-align: center; padding-bottom: 15px;">
-            <div id="mainAiAvatar" style="font-size: 60px; margin-bottom: 10px; transition: transform 0.3s;">🤖</div>
-            <p id="mainAiStatusText" style="font-size: 16px; font-weight: bold; color: #d35400; min-height: 50px; margin: 0 0 15px 0;">
-                Witaj w Menu. W czym mogę pomóc?
-            </p>
-            <p id="mainAiListeningPreview" style="font-size: 14px; color: #555; font-style: italic; background: #fdf3e7; padding: 10px; border-radius: 6px; display: none; border: 1px solid #fae5d3;">
-                " <span id="mainAiHeardText"></span> "
-            </p>
-            
-            <div id="mainAiActionButtons" style="display: flex; flex-direction: column; gap: 10px;">
-                <button type="button" id="mainAiBriefingBtn" class="btn" style="background-color: #2980b9; color: white; border: none; padding: 12px; font-weight: bold; font-size: 16px; border-radius: 8px; width: 100%;">
-                    🌅 Podsumowanie Dnia (Briefing)
-                </button>
-                <button type="button" id="mainAiTreatmentCardBtn" class="btn" style="background-color: #8e44ad; color: white; border: none; padding: 12px; font-weight: bold; font-size: 16px; border-radius: 8px; width: 100%;">
-                    🩺 Asystent Karty Leczenia
-                </button>
-                <button type="button" id="mainAiNoteBtn" class="btn" style="background-color: #27ae60; color: white; border: none; padding: 12px; font-weight: bold; font-size: 16px; border-radius: 8px; width: 100%;">
-                    📝 Podyktuj Notatkę
-                </button>
-            </div>
-            
-            <button type="button" id="mainAiCancelActionBtn" class="btn ghost" style="display: none; width: 100%; margin-top: 10px; padding: 10px; font-size: 14px; border-color: #e74c3c; color: #e74c3c;">
-                ❌ Przerwij słuchanie
-            </button>
-        </div>
-
-        <div style="margin-top: 10px; border-top: 2px dashed #eee; padding-top: 15px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                <h4 style="margin: 0; color: #333; font-size: 14px;">Twoje aktywne notatki:</h4>
-                <span id="mainAiNoteCountBadge" style="background: #f39c12; color: white; padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: bold;">0</span>
-            </div>
-            <div id="mainAiNotesList" style="max-height: 150px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; background: #fafafa; border: 1px solid #eee; padding: 10px; border-radius: 8px;">
-            </div>
-        </div>
-
-        <div class="form-actions" style="justify-content: center; margin-top: 20px;">
-            <button type="button" class="btn ghost" onclick="closeMainAiModal()" style="width: 100%; padding: 12px; font-size: 15px;">Zamknij Asystenta</button>
-        </div>
-    </div>
-</div>
-
-<script>
-    // ==========================================
-    // Skrypt Asystenta Kalendarza Wizyt
-    // ==========================================
-    document.addEventListener("DOMContentLoaded", () => {
-        const kalendarzSec = document.getElementById('kalendarzWizytSection');
-        if (kalendarzSec) {
-            const calAiBtn = document.createElement('button');
-            calAiBtn.type = 'button';
-            calAiBtn.id = 'calendarAiFloatBtn';
-            calAiBtn.innerHTML = '🤖';
-            calAiBtn.style.cssText = 'position: fixed; bottom: 150px; right: 20px; width: 60px; height: 60px; border-radius: 50%; font-size: 30px; line-height: 1; padding: 0; z-index: 1000; background-color: #8e44ad; color: white; border: 2px solid white; box-shadow: 0 4px 10px rgba(0,0,0,0.3); cursor: pointer;';
-            kalendarzSec.appendChild(calAiBtn);
-            
-            calAiBtn.addEventListener('click', () => {
-                resetCalAiForm();
-                document.getElementById('calendarAiModal').style.display = 'flex';
-            });
-        }
-    });
-
-    let calAiState = -1;
-    let calAiRec = null;
-    let calAiRecording = false;
-    let calAiWatchdog = null;
-    let calData = { klient: '', data: '', pora: 'Obojętne', cel: '', notatka: '', pracownik: '' };
-
-    const calPrompts = {
-        0: "Podaj imię i nazwisko klienta.",
-        1: "Kiedy ma się odbyć wizyta? Powiedz dzisiaj, jutro lub pojutrze.",
-        2: "O jakiej porze? Powiedz rano, południe, wieczór, obojętnie lub pilne.",
-        3: "Jaki jest cel wizyty?",
-        4: "Czy chcesz dodać notatkę? Podyktuj ją lub powiedz pomiń.",
-        5: "Czy przypisać wizytę komuś innemu? Powiedz imię i nazwisko pracownika, albo powiedz nie, by przypisać ją sobie."
-    };
-
-    const calModal = document.getElementById('calendarAiModal');
-    const calStartBtn = document.getElementById('calAiStartBtn');
-    const calSkipBtn = document.getElementById('calAiSkipBtn');
-    const calRetryBtn = document.getElementById('calAiRetryBtn');
-    const calStatus = document.getElementById('calAiStatusText');
-    const calAvatar = document.getElementById('calAiAvatar');
-    const calPreviewBox = document.getElementById('calAiListeningPreview');
-    const calHeard = document.getElementById('calAiHeardText');
-
-    function stopCalAiAudio() {
-        clearTimeout(calAiWatchdog);
-        if (calAiRec) calAiRec.stop();
-        window.speechSynthesis.cancel();
-        calAiRecording = false;
-    }
-
-    function resetCalAiForm() {
-        calAiState = -1;
-        calData = { klient: '', data: '', pora: 'Obojętne', cel: '', notatka: '', pracownik: '' };
-        calStartBtn.style.display = 'inline-block';
-        calSkipBtn.style.display = 'none';
-        calRetryBtn.style.display = 'none';
-        calPreviewBox.style.display = 'none';
-        calStatus.textContent = "Gotowy do zaplanowania wizyty.";
-        updateCalAiPreviewUI();
-    }
-
-    function updateCalAiPreviewUI() {
-        document.getElementById('calPrvKlient').value = calData.klient || '';
-        document.getElementById('calPrvData').value = calData.data || '';
-        document.getElementById('calPrvPora').value = calData.pora || 'Obojętne';
-        document.getElementById('calPrvCel').value = calData.cel || '';
-        document.getElementById('calPrvNotatka').value = calData.notatka || '';
-        document.getElementById('calPrvPracownik').value = calData.pracownik || '';
-    }
-
-    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        calAiRec = new SpeechRecognition();
-        calAiRec.lang = 'pl-PL';
-        calAiRec.continuous = false;     
-        calAiRec.interimResults = false; 
-
-        calAiRec.onresult = (e) => {
-            clearTimeout(calAiWatchdog);
-            const text = e.results[0][0].transcript.trim();
-            calPreviewBox.style.display = 'block';
-            calHeard.textContent = text;
-            processCalAiAnswer(text);
-        };
-
-        calAiRec.onerror = () => {
-            clearTimeout(calAiWatchdog);
-            calStatus.textContent = "Błąd mikrofonu. Kliknij Powtórz.";
-            calAiRecording = false;
-        };
-        
-        calAiRec.onend = () => {
-            clearTimeout(calAiWatchdog);
-            calAvatar.style.transform = 'scale(1)';
-            calAiRecording = false;
-        };
-    }
-
-    function calAiSpeak(text, callback) {
-        window.speechSynthesis.cancel();
-        const utterance = new SpeechSynthesisUtterance(text);
-        utterance.lang = 'pl-PL';
-        let voices = window.speechSynthesis.getVoices();
-        let plVoices = voices.filter(v => v.lang.includes('pl') || v.lang.includes('PL'));
-        utterance.voice = plVoices.find(v => v.name.toLowerCase().includes('network') || v.name.toLowerCase().includes('google')) || plVoices[0];
-        utterance.rate = 1.05; 
-        
-        calAvatar.style.transform = 'scale(1.2)';
-        calStatus.textContent = `🔊 ${text}`;
-        
-        utterance.onend = () => {
-            calAvatar.style.transform = 'scale(1)';
-            if(callback) callback();
-        };
-        window.speechSynthesis.speak(utterance);
-    }
-
-    function startCalAiStep() {
-        if (calAiState > 5) return;
-        calAiSpeak(calPrompts[calAiState], () => {
-            calStatus.textContent = "🎙️ Słucham...";
-            calPreviewBox.style.display = 'none';
-            try { 
-                calAiRecording = true; 
-                calAiRec.start(); 
-                
-                calAiWatchdog = setTimeout(() => {
-                    if (calAiRecording) {
-                        calAiRec.stop();
-                        calAiRecording = false;
-                        calStatus.textContent = "⏱️ Zbyt długa cisza. Kliknij Powtórz.";
-                        calAvatar.style.transform = 'scale(1)';
-                    }
-                }, 6500);
-            } catch(e) {}
-        });
-    }
-
-    calStartBtn.addEventListener('click', () => {
-        calAiState = 0;
-        calStartBtn.style.display = 'none';
-        calSkipBtn.style.display = 'inline-block';
-        calRetryBtn.style.display = 'inline-block';
-        startCalAiStep();
-    });
-
-    calSkipBtn.addEventListener('click', () => {
-        if(calAiRec) calAiRec.stop();
-        processCalAiAnswer("pomiń");
-    });
-
-    calRetryBtn.addEventListener('click', () => {
-        stopCalAiAudio();
-        setTimeout(startCalAiStep, 400);
-    });
-
-    function parseSpokenDate(text) {
-        const today = new Date();
-        const lowText = text.toLowerCase();
-        
-        if (lowText.includes('pojutrz')) {
-            today.setDate(today.getDate() + 2);
-        } else if (lowText.includes('jutr')) {
-            today.setDate(today.getDate() + 1);
-        } 
-        
-        const year = today.getFullYear();
-        const month = String(today.getMonth() + 1).padStart(2, '0');
-        const day = String(today.getDate()).padStart(2, '0');
-        return `${year}-${month}-${day}`;
-    }
-
-    function parseSpokenTime(text) {
-        const lowText = text.toLowerCase();
-        if (lowText.includes('rano') || lowText.includes('szóst') || lowText.includes('dziesiąt')) return '6-10';
-        if (lowText.includes('połudn') || lowText.includes('jedenast') || lowText.includes('dwunast')) return '10-15';
-        if (lowText.includes('wieczór') || lowText.includes('wieczor') || lowText.includes('popołudn') || lowText.includes('piętnast')) return '15-20';
-        if (lowText.includes('piln')) return 'Pilne';
-        return 'Obojętne';
-    }
-
-    function processCalAiAnswer(text) {
-        const isSkip = text.toLowerCase().includes('pomiń') || text.toLowerCase().includes('pomin') || (calAiState === 5 && text.toLowerCase().includes('nie'));
-
-        if (calAiState === 0) {
-            if(!isSkip) calData.klient = text.replace(/\b\w/g, l => l.toUpperCase());
-        } else if (calAiState === 1) {
-            if(!isSkip) calData.data = parseSpokenDate(text);
-            else {
-                const now = new Date();
-                calData.data = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
-            }
-        } else if (calAiState === 2) {
-            if(!isSkip) calData.pora = parseSpokenTime(text);
-        } else if (calAiState === 3) {
-            if(!isSkip) calData.cel = text.charAt(0).toUpperCase() + text.slice(1);
-        } else if (calAiState === 4) {
-            if(!isSkip) calData.notatka = text.charAt(0).toUpperCase() + text.slice(1);
-        } else if (calAiState === 5) {
-            if(!isSkip) calData.pracownik = text.charAt(0).toUpperCase() + text.slice(1);
-        }
-
-        updateCalAiPreviewUI();
-        calAiState++;
-
-        if (calAiState > 5) {
-            const finalKlient = document.getElementById('calPrvKlient').value.trim();
-            const finalData = document.getElementById('calPrvData').value;
-            const finalPora = document.getElementById('calPrvPora').value;
-            const finalCel = document.getElementById('calPrvCel').value.trim();
-            const finalNotatka = document.getElementById('calPrvNotatka').value.trim();
-            const finalPracownik = document.getElementById('calPrvPracownik').value.trim();
-
-            calStatus.textContent = "✅ Gotowe! Otwieram formularz wizyty...";
-            calSkipBtn.style.display = 'none';
-            calRetryBtn.style.display = 'none';
-            
-            calAiSpeak("Gotowe. Otwieram formularz wizyty.", () => {
-                calModal.style.display = 'none';
-                
-                const addVisitBtn = document.getElementById('addVisitBtn');
-                if(addVisitBtn) addVisitBtn.click();
-                
-                setTimeout(() => {
-                    // Cichy ninja dla klienta
-                    if(finalKlient) {
-                        let searchName = finalKlient.toLowerCase();
-                        let matchedName = finalKlient; 
-                        let matchedAdres = '---';
-                        let matchedTelefon = '---';
-
-                        if (typeof cachedClients !== 'undefined' && cachedClients && cachedClients.length > 0) {
-                            const clientObj = cachedClients.find(c => c.nazwa && c.nazwa.toLowerCase().includes(searchName));
-                            if (clientObj) {
-                                matchedName = clientObj.nazwa;
-                                matchedAdres = clientObj.adres || '---';
-                                matchedTelefon = clientObj.telefon || '---';
-                            }
-                        } else {
-                            const datalist = document.getElementById('klientList');
-                            if (datalist) {
-                                const opts = Array.from(datalist.options);
-                                const opt = opts.find(o => o.value.toLowerCase().includes(searchName));
-                                if (opt) {
-                                    matchedName = opt.value;
-                                    matchedAdres = opt.dataset.adres || '---';
-                                }
-                            }
-                        }
-
-                        document.getElementById('visitFormKlient').value = matchedName;
-                        const adresEl = document.getElementById('visitFormKlientAdres');
-                        const telEl = document.getElementById('visitFormKlientTelefon');
-                        if(adresEl) adresEl.textContent = matchedAdres;
-                        if(telEl) telEl.textContent = matchedTelefon;
-                    }
-                    
-                    // Cichy ninja dla pracownika
-                    if(finalPracownik) {
-                        const userSelect = document.getElementById('visitFormUserSelect');
-                        if(userSelect) {
-                            const searchPracName = finalPracownik.toLowerCase();
-                            const opts = Array.from(userSelect.options);
-                            const matchPrac = opts.find(o => {
-                                const txt = o.textContent.toLowerCase();
-                                return searchPracName.split(/\s+/).some(w => w.length > 2 && txt.includes(w));
-                            });
-                            if(matchPrac) {
-                                userSelect.value = matchPrac.value;
-                            }
-                        }
-                    }
-
-                    if(finalData) document.getElementById('visitFormDate').value = finalData;
-                    if(finalPora) document.getElementById('visitFormPoraDnia').value = finalPora;
-                    if(finalCel) document.getElementById('visitFormCel').value = finalCel;
-                    if(finalNotatka) document.getElementById('visitFormNotatka').value = finalNotatka;
-                }, 300);
-            });
-        } else {
-            setTimeout(startCalAiStep, 800);
-        }
-    }
-
+    <script>
     // ==========================================
     // Skrypt Centralnego Asystenta w Menu
     // ==========================================
@@ -30838,16 +30428,23 @@ if (celInput) {
         get actions() { return document.getElementById('mainAiActionButtons'); }
     };
 
-    document.addEventListener("DOMContentLoaded", () => {
+    // Uruchamiamy natychmiast (bez czekania na DOMContentLoaded)
+    (function initCentralAssistant() {
+        // 1. Zabijamy stary przycisk
         const hideStyle = document.createElement('style');
         hideStyle.innerHTML = '#menuAsystentBtn { display: none !important; }';
         document.head.appendChild(hideStyle);
 
+        const oldAsystentBtn = document.getElementById('menuAsystentBtn');
+        if (oldAsystentBtn) oldAsystentBtn.style.display = 'none';
+
+        // 2. Tworzymy nowy pływający przycisk
         const mainAiBtn = document.createElement('button');
         mainAiBtn.type = 'button';
         mainAiBtn.id = 'mainAiFloatBtn';
         mainAiBtn.innerHTML = '🧠';
-        mainAiBtn.style.cssText = 'position: fixed; top: 15px; right: 65px; width: 45px; height: 45px; border-radius: 50%; font-size: 24px; display: none; justify-content: center; align-items: center; padding: 0; z-index: 99999; background-color: #f39c12; color: white; border: 2px solid white; box-shadow: 0 4px 15px rgba(0,0,0,0.3); cursor: pointer;';
+        // Pozycja w prawym górnym rogu (pod pomocą)
+        mainAiBtn.style.cssText = 'position: fixed; top: 75px; right: 15px; width: 45px; height: 45px; border-radius: 50%; font-size: 24px; display: none; justify-content: center; align-items: center; padding: 0; z-index: 99999; background-color: #f39c12; color: white; border: 2px solid white; box-shadow: 0 4px 15px rgba(0,0,0,0.3); cursor: pointer;';
         
         document.body.appendChild(mainAiBtn);
         
@@ -30867,18 +30464,22 @@ if (celInput) {
             mainAiSpeak("Witaj. Wybierz opcję na ekranie.");
         });
 
-        if (ui.cancelBtn) ui.cancelBtn.addEventListener('click', stopMainAiAudio);
-        if (ui.briefingBtn) ui.briefingBtn.addEventListener('click', handleBriefingClick);
-        if (ui.noteBtn) ui.noteBtn.addEventListener('click', handleNoteClick);
-        
-        if (ui.cardBtn) {
-            ui.cardBtn.addEventListener('click', () => {
-                closeMainAiModal();
-                const oldAsystentBtn = document.getElementById('menuAsystentBtn');
-                if (oldAsystentBtn) oldAsystentBtn.click();
-            });
-        }
-    });
+        // Opóźnione podpinanie przycisków modala (na wypadek gdyby DOM jeszcze się ładował)
+        setTimeout(() => {
+            if (ui.cancelBtn) ui.cancelBtn.addEventListener('click', stopMainAiAudio);
+            if (ui.briefingBtn) ui.briefingBtn.addEventListener('click', handleBriefingClick);
+            if (ui.noteBtn) ui.noteBtn.addEventListener('click', handleNoteClick);
+            if (ui.cardBtn) {
+                ui.cardBtn.addEventListener('click', () => {
+                    closeMainAiModal();
+                    const oldBtn = document.getElementById('menuAsystentBtn');
+                    if (oldBtn) oldBtn.click();
+                });
+            }
+        }, 500);
+    })();
+
+    // ... [TUTAJ ZOSTAW RESZTĘ FUNKCJI Z POPRZEDNIEGO KODU: loadAiNotes, mainAiSpeak, formatWizyty, itp.] ...
 
     function loadAiNotes() {
         const saved = localStorage.getItem('weterynarz_ai_notes');
@@ -30895,32 +30496,23 @@ if (celInput) {
 
     function renderAiNotes() {
         if (!ui.notesList || !ui.noteBadge) return;
-
         ui.notesList.innerHTML = '';
         ui.noteBadge.textContent = activeAiNotes.length;
-        
         if (activeAiNotes.length === 0) {
             ui.notesList.innerHTML = '<span style="color: #999; font-style: italic; text-align: center;">Brak notatek. Czysty umysł!</span>';
             return;
         }
-
         activeAiNotes.forEach((note, index) => {
             const div = document.createElement('div');
             div.style.cssText = "display: flex; justify-content: space-between; align-items: center; background: white; padding: 10px; border-radius: 6px; border: 1px solid #e0e0e0; box-shadow: 0 1px 3px rgba(0,0,0,0.05);";
-            
             const textSpan = document.createElement('span');
             textSpan.style.cssText = "font-size: 13px; color: #333; line-height: 1.4; width: 85%; word-wrap: break-word;";
             textSpan.textContent = `📌 ${note}`;
-
             const delBtn = document.createElement('button');
             delBtn.type = 'button';
             delBtn.innerHTML = '🗑️';
             delBtn.style.cssText = "background: #fdf1f0; border: 1px solid #fadbd8; border-radius: 4px; cursor:pointer; font-size: 14px; padding: 5px 8px;";
-            delBtn.onclick = () => {
-                activeAiNotes.splice(index, 1);
-                saveAiNotes();
-            };
-
+            delBtn.onclick = () => { activeAiNotes.splice(index, 1); saveAiNotes(); };
             div.appendChild(textSpan);
             div.appendChild(delBtn);
             ui.notesList.appendChild(div);
@@ -30938,7 +30530,6 @@ if (celInput) {
         window.speechSynthesis.cancel();
         mainAiRecording = false;
         mainAiState = -1;
-        
         if (ui.actions) ui.actions.style.display = 'flex';
         if (ui.cancelBtn) ui.cancelBtn.style.display = 'none';
         if (ui.previewBox) ui.previewBox.style.display = 'none';
@@ -30960,7 +30551,6 @@ if (celInput) {
         mainAiRec.lang = 'pl-PL';
         mainAiRec.continuous = false;     
         mainAiRec.interimResults = false; 
-
         mainAiRec.onresult = (e) => {
             clearTimeout(mainAiWatchdog);
             const text = e.results[0][0].transcript.trim();
@@ -30968,14 +30558,12 @@ if (celInput) {
             if (ui.heardText) ui.heardText.textContent = text;
             processMainAiAnswer(text);
         };
-
         mainAiRec.onerror = () => {
             clearTimeout(mainAiWatchdog);
             if (ui.status) ui.status.textContent = "Nie usłyszałem. Spróbuj ponownie.";
             mainAiRecording = false;
             setTimeout(stopMainAiAudio, 2000);
         };
-        
         mainAiRec.onend = () => {
             clearTimeout(mainAiWatchdog);
             if (ui.avatar) ui.avatar.style.transform = 'scale(1)';
@@ -30989,10 +30577,8 @@ if (celInput) {
         utterance.lang = 'pl-PL';
         if (mainPolishVoice) utterance.voice = mainPolishVoice;
         utterance.rate = 1.05; 
-        
         if (ui.avatar) ui.avatar.style.transform = 'scale(1.2)';
         if (ui.status) ui.status.textContent = `🔊 Trwa odtwarzanie...`;
-        
         utterance.onend = () => {
             if (ui.avatar) ui.avatar.style.transform = 'scale(1)';
             if(callback) callback();
@@ -31006,7 +30592,6 @@ if (celInput) {
         try { 
             mainAiRecording = true; 
             mainAiRec.start(); 
-            
             mainAiWatchdog = setTimeout(() => {
                 if (mainAiRecording) {
                     mainAiRec.stop();
@@ -31024,10 +30609,8 @@ if (celInput) {
             const klientEl = item.querySelector('.visit-item-info strong');
             const celEl = item.querySelector('.visit-item-info .purpose');
             const btnStatus = item.querySelector('.btn-quick-status');
-            
             let rawCel = celEl ? celEl.textContent.trim() : '';
             let cleanCel = rawCel.replace(/^Cel:\s*/i, '').trim(); 
-            
             visits.push({
                 element: item,
                 status: item.dataset.status || 'Nowa',
@@ -31050,12 +30633,9 @@ if (celInput) {
     function formatWizyty(liczba, przypadek = 'biernik') {
         let strLiczba = getWordNumber(liczba, przypadek === 'biernik');
         if (liczba === 1) return przypadek === 'biernik' ? `${strLiczba} wizytę` : `${strLiczba} wizyta`;
-        
         const r10 = liczba % 10;
         const r100 = liczba % 100;
-        if (r10 >= 2 && r10 <= 4 && (r100 < 10 || r100 >= 20)) {
-            return `${strLiczba} wizyty`;
-        }
+        if (r10 >= 2 && r10 <= 4 && (r100 < 10 || r100 >= 20)) return `${strLiczba} wizyty`;
         return `${strLiczba} wizyt`;
     }
 
@@ -31063,57 +30643,35 @@ if (celInput) {
         if (liczba === 1) return "pozostała Ci";
         const r10 = liczba % 10;
         const r100 = liczba % 100;
-        if (r10 >= 2 && r10 <= 4 && (r100 < 10 || r100 >= 20)) {
-            return "pozostały Ci";
-        }
+        if (r10 >= 2 && r10 <= 4 && (r100 < 10 || r100 >= 20)) return "pozostały Ci";
         return "pozostało Ci";
     }
 
     function generateRestOfBriefing(pendingRemaining) {
         let text = "";
-        
         if (pendingRemaining.length === 0) {
             text += "Wszystkie wizyty na dziś zostały zrealizowane. Dobra robota, można iść na kawę! ";
         } else {
             text += `Do zrealizowania ${formatPozostalo(pendingRemaining.length)} ${formatWizyty(pendingRemaining.length, 'mianownik')}. `;
-            
-            if (pendingRemaining.length > 10) {
-                text += "Niezły zapiernicz dzisiaj! Nie ma co się ociągać. ";
-            }
-
+            if (pendingRemaining.length > 10) text += "Niezły zapiernicz dzisiaj! Nie ma co się ociągać. ";
             const toRead = pendingRemaining.slice(0, 5); 
             if (toRead.length > 0) {
                 text += "Na liście są: ";
                 toRead.forEach((v, index) => {
                     let celWymowa = v.cel.replace('💉', 'szczepienie').replace('🔍', 'badanie');
                     if (!celWymowa) celWymowa = "brak wpisanego celu";
-                    
-                    if (index === 0) {
-                        text += `Najpierw klient: ${v.klient}, zabieg to ${celWymowa}. `;
-                    } else if (index === toRead.length - 1 && toRead.length > 1) {
-                        text += `A na koniec ${v.klient} na ${celWymowa}. `;
-                    } else {
-                        text += `Następnie ${v.klient}, w celu: ${celWymowa}. `;
-                    }
+                    if (index === 0) text += `Najpierw klient: ${v.klient}, zabieg to ${celWymowa}. `;
+                    else if (index === toRead.length - 1 && toRead.length > 1) text += `A na koniec ${v.klient} na ${celWymowa}. `;
+                    else text += `Następnie ${v.klient}, w celu: ${celWymowa}. `;
                 });
             }
-            if (pendingRemaining.length > 5) {
-                text += "I jeszcze kilka innych, ale to sprawdzisz już w kalendarzu. ";
-            }
+            if (pendingRemaining.length > 5) text += "I jeszcze kilka innych, ale to sprawdzisz już w kalendarzu. ";
         }
-
         if (activeAiNotes.length > 0) {
             text += `W notatniku masz zapisane ${activeAiNotes.length} przypomnienia. Otwieram listę: `;
-            activeAiNotes.forEach((note, idx) => {
-                text += `Numer ${idx + 1}: ${note}. `;
-            });
+            activeAiNotes.forEach((note, idx) => { text += `Numer ${idx + 1}: ${note}. `; });
         }
-        
-        const goodbyes = [
-            "Życzę spokojnego dnia w terenie!",
-            "Szerokiej drogi!",
-            "Powodzenia dzisiaj!"
-        ];
+        const goodbyes = ["Życzę spokojnego dnia w terenie!", "Szerokiej drogi!", "Powodzenia dzisiaj!"];
         text += goodbyes[Math.floor(Math.random() * goodbyes.length)];
         return text;
     }
@@ -31121,29 +30679,21 @@ if (celInput) {
     function handleBriefingClick() {
         if (ui.actions) ui.actions.style.display = 'none';
         if (ui.cancelBtn) ui.cancelBtn.style.display = 'block';
-        
         const visits = getTodayVisitsFromDOM();
         const pending = visits.filter(v => v.status !== 'Zrealizowana');
-        
         if (visits.length === 0) {
             mainAiSpeak("Dzień dobry. W kalendarzu nie ma na dzisiaj żadnych wizyt, lub lista nie została jeszcze zsynchronizowana.", stopMainAiAudio);
             return;
         }
-
         const currentHour = new Date().getHours();
         const morningPending = pending.filter(v => v.pora === '6-10');
-        
         if (currentHour >= 11 && morningPending.length > 0) {
             const names = morningPending.map(v => v.klient).join(" oraz ");
             pendingVisitsToResolve = morningPending;
             currentVisitsData = { all: visits, pending: pending }; 
             mainAiState = 1; 
-            
             const askText = `Dzień dobry. Masz dzisiaj łącznie ${formatWizyty(visits.length, 'biernik')}. Zauważyłem jednak, że wciąż masz niezrealizowane wizyty poranne. Klienci to: ${names}. Czy mam je teraz oznaczyć jako zakończone? Powiedz tak lub nie.`;
-            
-            mainAiSpeak(askText, () => {
-                startMainAiListening(8000); 
-            });
+            mainAiSpeak(askText, () => { startMainAiListening(8000); });
         } else {
             let briefingText = `Dzień dobry. Masz dzisiaj łącznie ${formatWizyty(visits.length, 'biernik')}. `;
             briefingText += generateRestOfBriefing(pending);
@@ -31155,30 +30705,20 @@ if (celInput) {
         if (ui.actions) ui.actions.style.display = 'none';
         if (ui.cancelBtn) ui.cancelBtn.style.display = 'block';
         mainAiState = 2; 
-        
-        mainAiSpeak("Słucham. Co zapisać?", () => {
-            startMainAiListening(8000);
-        });
+        mainAiSpeak("Słucham. Co zapisać?", () => { startMainAiListening(8000); });
     }
 
     function processMainAiAnswer(text) {
         const lowText = text.toLowerCase();
-
         if (mainAiState === 1) {
             if (lowText.includes('tak') || lowText.includes('zrealizuj') || lowText.includes('oznacz') || lowText.includes('pewnie')) {
-                pendingVisitsToResolve.forEach(v => {
-                    if (v.btn) v.btn.click();
-                });
-                
+                pendingVisitsToResolve.forEach(v => { if (v.btn) v.btn.click(); });
                 let remainingPending = currentVisitsData.pending.filter(v => !pendingVisitsToResolve.includes(v));
                 let responseText = "Gotowe, oznaczyłem je jako zrealizowane. " + generateRestOfBriefing(remainingPending);
-                
                 mainAiSpeak(responseText, stopMainAiAudio);
-                
             } else if (lowText.includes('nie') || lowText.includes('zostaw') || lowText.includes('pomiń')) {
                 let responseText = "Zrozumiałem, zostawiam bez zmian. " + generateRestOfBriefing(currentVisitsData.pending);
                 mainAiSpeak(responseText, stopMainAiAudio);
-                
             } else {
                 let responseText = "Nie usłyszałem wyraźnego tak lub nie. Zostawiam wizyty bez zmian. " + generateRestOfBriefing(currentVisitsData.pending);
                 mainAiSpeak(responseText, stopMainAiAudio);
@@ -31196,7 +30736,6 @@ if (celInput) {
                 setTimeout(stopMainAiAudio, 2000);
             }
         }
-        
         mainAiState = -1;
     }
 </script>
