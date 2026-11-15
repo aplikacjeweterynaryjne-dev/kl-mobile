@@ -28702,6 +28702,35 @@ async function loadSwiadectwaForUser(lekarz_uid, mode = '180days') {
         tableBody.innerHTML = '<tr><td colspan="6" style="text-align: center; color:red;">Błąd ładowania. Sprawdź indeksy.</td></tr>';
     }
 }
+} catch(e) { 
+        console.error("Błąd ładowania świadectw:", e); 
+        tableBody.innerHTML = '<tr><td colspan="6" style="text-align: center; color:red;">Błąd ładowania. Sprawdź indeksy.</td></tr>';
+    }
+}
+
+// --- Wklejony nowy fragment ---
+window.applySwiFilters = function() {
+    const clientSearch = document.getElementById('arcSwiClient').value.toLowerCase().trim();
+    const docSearch = document.getElementById('arcSwiDoc').value.toLowerCase().trim();
+    const rows = document.querySelectorAll('#arcSwiTableBody tr');
+
+    rows.forEach(row => {
+        if (row.cells.length < 6) return;
+
+        const klient = row.dataset.klient || '';
+        const nrDokumentu = (row.dataset.nrDokumentu || '').toLowerCase();
+
+        const matchesClient = klient.includes(clientSearch);
+        const matchesDoc = nrDokumentu.includes(docSearch);
+
+        if (matchesClient && matchesDoc) {
+            row.style.display = ''; 
+        } else {
+            row.style.display = 'none'; 
+        }
+    });
+};
+// --- Koniec nowego fragmentu ---
 
 window.deleteSwiadectwo = async function(id) {
     if(!confirm("Czy na pewno usunąć to świadectwo?")) return;
