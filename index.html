@@ -12980,11 +12980,20 @@ async function loadArchiveUsers() {
         
         snapshot.docs.forEach(doc => {
             const user = doc.data();
-            const optionText = `${user.Imie} ${user.Nazwisko}`;
+            
+            // ✅ NOWOŚĆ: Filtrujemy klientów z panelu (wykluczamy ich z listy)
+            if (user.Rola === 'klient') {
+                return; // Pomija dodanie tego użytkownika
+            }
+
+            // Dodajemy widoczną informację o roli w nawiasie (opcjonalnie, ale pomaga)
+            const rolaZnak = user.Rola === 'właściciel' ? ' (Wł.)' : '';
+            const optionText = `${user.Imie} ${user.Nazwisko}${rolaZnak}`;
+            
             archiveUserSelect.add(new Option(optionText, user.uid)); 
         });
         
-        // ✅ ZMIANA: Ustaw domyślnie na zalogowanego użytkownika
+        // Ustaw domyślnie na zalogowanego użytkownika
         if (currentUserProfile.uid) {
             archiveUserSelect.value = currentUserProfile.uid;
             
@@ -13657,6 +13666,9 @@ if (archivePrintBtn) {
 }
 /* ⬆️ KONIEC ZASTĘPOWANIA ⬆️ */
 
+/**
+ * Pkt 8: Wczytuje użytkowników do listy rozwijanej w Archiwum Paragonów
+ */
 async function loadArchiveReceiptUsers() {
     if (!archiveReceiptUserSelect || !loadArchiveReceiptUsersBtn) return;
     
@@ -13683,7 +13695,16 @@ async function loadArchiveReceiptUsers() {
         
         snapshot.docs.forEach(doc => {
             const user = doc.data();
-            const optionText = `${user.Imie} ${user.Nazwisko}`;
+            
+            // ✅ NOWOŚĆ: Filtrujemy klientów z panelu (wykluczamy ich z listy)
+            if (user.Rola === 'klient') {
+                return; // Pomija dodanie tego użytkownika do listy
+            }
+
+            // Dodajemy widoczną informację o roli (opcjonalnie, jak w kartach)
+            const rolaZnak = user.Rola === 'właściciel' ? ' (Wł.)' : '';
+            const optionText = `${user.Imie} ${user.Nazwisko}${rolaZnak}`;
+            
             archiveReceiptUserSelect.add(new Option(optionText, user.uid));
         });
         
@@ -28501,7 +28522,7 @@ async function loadArchiveSwiUsers() {
     const btnEl = document.getElementById('loadArchiveSwiUsersBtn');
     if (!selectEl || !btnEl || !currentUserProfile) return;
     
-    // ✅ AUTO-CZYSZCZENIE: Zmiana limitu z 180 na 365 dni
+    // ✅ AUTO-CZYSZCZENIE: Zmiana limitu z 180 na 365 dni (ZACHOWANE)
     const cutoffD = new Date();
     cutoffD.setDate(cutoffD.getDate() - 365);
     const cutoffStr = cutoffD.toISOString().split('T')[0];
@@ -28534,7 +28555,17 @@ async function loadArchiveSwiUsers() {
         
         snapshot.docs.forEach(doc => {
             const user = doc.data();
-            selectEl.add(new Option(`${user.Imie} ${user.Nazwisko}`, user.uid)); 
+            
+            // ✅ NOWOŚĆ: Filtrujemy klientów z panelu (wykluczamy ich z listy)
+            if (user.Rola === 'klient') {
+                return; // Pomija dodanie tego użytkownika
+            }
+
+            // Opcjonalny dopisek roli (jak w innych archiwach)
+            const rolaZnak = user.Rola === 'właściciel' ? ' (Wł.)' : '';
+            const optionText = `${user.Imie} ${user.Nazwisko}${rolaZnak}`;
+
+            selectEl.add(new Option(optionText, user.uid)); 
         });
         
         if (currentUserProfile.uid) {
