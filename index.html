@@ -29651,8 +29651,28 @@ if (celInput) {
             isRecording = false;
         };
 
+      function wakeUpBluetooth() {
+            try {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                if (!AudioContext) return;
+                const ctx = new AudioContext();
+                const oscillator = ctx.createOscillator();
+                const gainNode = ctx.createGain();
+                gainNode.gain.value = 0; 
+                oscillator.connect(gainNode);
+                gainNode.connect(ctx.destination);
+                oscillator.start(0);
+                oscillator.stop(ctx.currentTime + 0.1);
+            } catch (e) {
+                console.warn("Wyzwalacz Bluetooth nie zadziałał: ", e);
+            }
+        }
+
         function speak(text, callback) {
             window.speechSynthesis.cancel();
+            
+            wakeUpBluetooth();
+
             const utterance = new SpeechSynthesisUtterance(text);
             utterance.lang = 'pl-PL';
             if (bestPolishVoice) utterance.voice = bestPolishVoice;
@@ -29665,7 +29685,10 @@ if (celInput) {
                 convoAvatar.style.transform = 'scale(1)';
                 if(callback) callback();
             };
-            window.speechSynthesis.speak(utterance);
+            
+            setTimeout(() => {
+                window.speechSynthesis.speak(utterance);
+            }, 50);
         }
 
         convoStartBtn.addEventListener('click', () => {
