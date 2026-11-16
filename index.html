@@ -29427,6 +29427,7 @@ if (celInput) {
 <!-- ========================================== -->
 <!-- 🤖 ASYSTENT GŁOSOWY AI 10.8 (PERFEKCYJNE WIERSZE)-->
 <!-- ========================================== -->
+<audio id="bluetoothAudioBridge" src="data:audio/mp3;base64,//NExAAAAANIAAAAAExBTUUzLjEwMKqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq" preload="auto" style="display: none;"></audio>
 <div id="aiAssistantModal" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.6); display: none; z-index: 20000; justify-content: center; align-items: center;">
     <div class="form-card" style="width: 95%; max-width: 480px; background: white; padding: 20px; border-radius: 12px; border-top: 5px solid #8e44ad; max-height: 95vh; overflow-y: auto;">
         
@@ -29651,27 +29652,33 @@ if (celInput) {
             isRecording = false;
         };
 
-      function wakeUpBluetooth() {
+function forceBluetoothWakeup() {
+            const bridge = document.getElementById('bluetoothAudioBridge');
+            if (bridge) {
+                bridge.play().catch(e => console.warn(e));
+                setTimeout(() => { bridge.pause(); }, 100);
+            }
             try {
                 const AudioContext = window.AudioContext || window.webkitAudioContext;
                 if (!AudioContext) return;
                 const ctx = new AudioContext();
                 const oscillator = ctx.createOscillator();
                 const gainNode = ctx.createGain();
-                gainNode.gain.value = 0; 
+                gainNode.gain.value = 0.01; 
                 oscillator.connect(gainNode);
                 gainNode.connect(ctx.destination);
                 oscillator.start(0);
                 oscillator.stop(ctx.currentTime + 0.1);
             } catch (e) {
-                console.warn("Wyzwalacz Bluetooth nie zadziałał: ", e);
+                console.warn(e);
             }
         }
 
         function speak(text, callback) {
             window.speechSynthesis.cancel();
             
-            wakeUpBluetooth();
+            // Nowy, podwójny wybudzacz Bluetooth
+            forceBluetoothWakeup();
 
             const utterance = new SpeechSynthesisUtterance(text);
             utterance.lang = 'pl-PL';
@@ -29686,9 +29693,10 @@ if (celInput) {
                 if(callback) callback();
             };
             
+            // Wydłużone opóźnienie, by radio zdążyło otworzyć kanał
             setTimeout(() => {
                 window.speechSynthesis.speak(utterance);
-            }, 50);
+            }, 100);
         }
 
         convoStartBtn.addEventListener('click', () => {
