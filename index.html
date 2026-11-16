@@ -30812,31 +30812,42 @@ if (celInput) {
         +
     </button>
 </div>
-
 <!-- 💉 MODAL DODAWANIA SZCZEPIENIA -->
 <div id="szczepienieModal" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.7); display: none; z-index: 10000; justify-content: center; align-items: center;">
-    <div class="form-card" style="width: 90%; max-width: 400px; background: white; padding: 20px; border-radius: 12px; border-top: 5px solid #16a085; box-shadow: 0 10px 25px rgba(0,0,0,0.5);">
+    <div class="form-card" style="width: 90%; max-width: 400px; background: white; padding: 20px; border-radius: 12px; border-top: 5px solid #16a085; box-shadow: 0 10px 25px rgba(0,0,0,0.5); max-height: 90vh; overflow-y: auto;">
         <h3 style="margin-top: 0; color: #16a085; text-align: center; margin-bottom: 20px;">Dodaj Szczepienie</h3>
         
-        <div style="margin-bottom: 15px;">
+        <div style="margin-bottom: 12px;">
             <label style="font-size: 12px; font-weight: bold; color: #555;">1. Klient</label>
             <select id="ksFormKlient" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px;"></select>
         </div>
 
-        <div style="margin-bottom: 15px;">
+        <div style="margin-bottom: 12px;">
             <label style="font-size: 12px; font-weight: bold; color: #555;">2. Data szczepienia</label>
             <input type="date" id="ksFormData" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; font-size: 14px;">
         </div>
 
-        <div style="margin-bottom: 15px;">
+        <div style="margin-bottom: 12px;">
             <label style="font-size: 12px; font-weight: bold; color: #555;">3. Nazwa szczepionki</label>
-            <input type="text" id="ksFormSzczepionka" placeholder="np. Rabisin, Biocan..." style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; font-size: 14px;">
+            <!-- input połączony z listą zapamiętanych -->
+            <input type="text" id="ksFormSzczepionka" list="ksListaZapisanychSzczepionek" placeholder="np. Rabisin, Biocan..." autocomplete="off" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; font-size: 14px;">
+            <datalist id="ksListaZapisanychSzczepionek"></datalist>
+        </div>
+
+        <div style="margin-bottom: 12px;">
+            <label style="font-size: 12px; font-weight: bold; color: #555;">4. Prognozowana l. sztuk (opcjonalnie)</label>
+            <input type="number" id="ksFormSztuki" placeholder="np. 15" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; font-size: 14px;">
+        </div>
+
+        <div style="margin-bottom: 12px;">
+            <label style="font-size: 12px; font-weight: bold; color: #555;">5. Nr kolczyków (opcjonalnie)</label>
+            <textarea id="ksFormKolczyki" rows="2" placeholder="PL123456789..." style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; font-size: 14px; font-family: inherit;"></textarea>
         </div>
 
         <div style="margin-bottom: 15px; padding: 15px; background: #e8f8f5; border-radius: 8px; border: 1px solid #d1f2eb;">
             <label style="display: flex; align-items: center; gap: 10px; font-weight: bold; color: #0e6655; cursor: pointer; font-size: 14px;">
                 <input type="checkbox" id="ksFormKolejnaDawka" onchange="document.getElementById('ksKolejnaDataBox').style.display = this.checked ? 'block' : 'none';" style="width: 20px; height: 20px;">
-                4. Zaplanuj kolejną dawkę
+                6. Zaplanuj kolejną dawkę
             </label>
             <div id="ksKolejnaDataBox" style="display: none; margin-top: 15px;">
                 <label style="font-size: 12px; color: #555;">Data kolejnego szczepienia:</label>
@@ -30844,7 +30855,7 @@ if (celInput) {
             </div>
         </div>
 
-        <div style="display: flex; justify-content: space-between; margin-top: 25px;">
+        <div style="display: flex; justify-content: space-between; margin-top: 10px;">
             <button class="btn ghost" onclick="document.getElementById('szczepienieModal').style.display='none'" style="padding: 10px 20px;">Anuluj</button>
             <button class="btn primary" style="background-color: #16a085; border: none; padding: 10px 30px; font-size: 16px;" onclick="zapiszSzczepienie()">💾 Zapisz</button>
         </div>
@@ -30853,18 +30864,16 @@ if (celInput) {
 
 <script>
 // ==========================================
-// LOGIKA KALENDARZA SZCZEPIEŃ
+// LOGIKA KALENDARZA SZCZEPIEŃ (z pamięcią)
 // ==========================================
 let ksCurrentWeekStart = new Date();
 let ksWybranyKlient = '';
 
-// TWARDE OTWIERANIE (omija ewentualne limity w twojej głównej funkcji showSection)
+// TWARDE OTWIERANIE
 function otworzKalendarzSzczepien() {
-    // Chowamy menu główne
     let menu = document.getElementById('mainMenuSection');
     if (menu) menu.style.display = 'none';
     
-    // Pokazujemy nasz kalendarz
     document.getElementById('kalendarzSzczepienSection').style.display = 'block';
     
     ksCurrentWeekStart = getMonday(new Date());
@@ -30879,7 +30888,7 @@ function otworzKalendarzSzczepien() {
 function zamknijKalendarzSzczepien() {
     document.getElementById('kalendarzSzczepienSection').style.display = 'none';
     let menu = document.getElementById('mainMenuSection');
-    if (menu) menu.style.display = 'flex'; // Zgodnie z twoim CSS
+    if (menu) menu.style.display = 'flex'; 
 }
 
 function getMonday(d) {
@@ -30888,6 +30897,35 @@ function getMonday(d) {
     d.setDate(diff);
     d.setHours(0,0,0,0);
     return d;
+}
+
+// Ładowanie historii 10 ostatnich szczepionek z localStorage
+function zaladujZapamietaneSzczepionki() {
+    let saved = localStorage.getItem('ks_historia_szczepionek');
+    let lista = saved ? JSON.parse(saved) : [];
+    let datalist = document.getElementById('ksListaZapisanychSzczepionek');
+    if (datalist) {
+        datalist.innerHTML = '';
+        lista.forEach(nazwa => {
+            let option = document.createElement('option');
+            option.value = nazwa;
+            datalist.appendChild(option);
+        });
+    }
+}
+
+// Dodawanie nowej szczepionki na szczyt listy (max 10)
+function zapiszSzczepionkeDoPamięci(nowaNazwa) {
+    if (!nowaNazwa) return;
+    let saved = localStorage.getItem('ks_historia_szczepionek');
+    let lista = saved ? JSON.parse(saved) : [];
+    
+    // Usuwamy jeśli już była (żeby wylądowała z powrotem na górze)
+    lista = lista.filter(n => n.toLowerCase() !== nowaNazwa.toLowerCase());
+    lista.unshift(nowaNazwa); // Wrzucenie na sam początek
+    
+    if (lista.length > 10) lista.pop(); // Obcięcie do max 10
+    localStorage.setItem('ks_historia_szczepionek', JSON.stringify(lista));
 }
 
 async function zaladujKlientowDoSzczepien() {
@@ -30920,9 +30958,8 @@ function zmienFiltrKlientaKS() {
     ksWybranyKlient = document.getElementById('ksFilterKlient').value;
     const weekControls = document.getElementById('ksWeekControls');
     
-    if (ksWybranyKlient !== '') {
-        weekControls.style.display = 'none';
-    } else {
+    if (ksWybranyKlient !== '') weekControls.style.display = 'none';
+    else {
         weekControls.style.display = 'flex';
         ksCurrentWeekStart = getMonday(new Date()); 
     }
@@ -30951,12 +30988,10 @@ async function odswiezWidokSzczepien() {
     } else {
         let niedziela = new Date(ksCurrentWeekStart);
         niedziela.setDate(niedziela.getDate() + 6);
-        
         let startStr = ksCurrentWeekStart.toISOString().split('T')[0];
         let endStr = niedziela.toISOString().split('T')[0];
         
         labelTydzien.textContent = `${startStr}  do  ${endStr}`;
-        
         q = q.where("dataSzczepienia", ">=", startStr)
              .where("dataSzczepienia", "<=", endStr)
              .orderBy("dataSzczepienia", "asc");
@@ -30983,26 +31018,34 @@ async function odswiezWidokSzczepien() {
             else if (data.dataSzczepienia === dzis) dateColor = '#f39c12'; 
             else dateColor = '#16a085'; 
 
+            // Generowanie bloku z dodatkowymi informacjami (sztuki, kolczyki)
+            let dodatki = '';
+            if(data.liczba_sztuk) dodatki += `<span style="display:inline-block; margin-right: 10px; background: #eee; padding: 2px 6px; border-radius: 4px; font-size: 11px; color: #555;">🐄 Sztuk: <b>${data.liczba_sztuk}</b></span>`;
+            if(data.kolczyki) dodatki += `<span style="display:inline-block; background: #eee; padding: 2px 6px; border-radius: 4px; font-size: 11px; color: #555;">🏷️ Kolczyki: <b>${data.kolczyki}</b></span>`;
+
             lista.innerHTML += `
                 <div style="background: white; padding: 15px; border-radius: 10px; border-left: 6px solid ${dateColor}; box-shadow: 0 2px 5px rgba(0,0,0,0.05); display: flex; justify-content: space-between; align-items: center;">
                     <div>
                         <div style="font-weight: bold; color: #2c3e50; font-size: 15px;">${data.klient_nazwa}</div>
                         <div style="color: ${dateColor}; font-weight: bold; font-size: 14px; margin: 6px 0;">📅 ${data.dataSzczepienia}</div>
                         <div style="color: #7f8c8d; font-size: 13px;">💉 ${data.szczepionka}</div>
+                        ${dodatki ? `<div style="margin-top: 8px;">${dodatki}</div>` : ''}
                     </div>
-                    <button onclick="usunSzczepienie('${doc.id}')" style="background: #fdf1f0; border: 1px solid #fadbd8; color: #e74c3c; border-radius: 8px; width: 40px; height: 40px; cursor: pointer; font-size: 18px; display: flex; justify-content: center; align-items: center;">🗑</button>
+                    <button onclick="usunSzczepienie('${doc.id}')" style="background: #fdf1f0; border: 1px solid #fadbd8; color: #e74c3c; border-radius: 8px; width: 40px; height: 40px; cursor: pointer; font-size: 18px; display: flex; justify-content: center; align-items: center; margin-left: 10px;">🗑</button>
                 </div>
             `;
         });
     } catch (e) {
         console.error("Błąd:", e);
-        lista.innerHTML = '<p style="text-align: center; color: red; margin-top: 20px;">Wystąpił błąd. Wymagane utworzenie indeksu w Firebase (kliknij link w konsoli przeglądarki).</p>';
+        lista.innerHTML = '<p style="text-align: center; color: red; margin-top: 20px;">Wystąpił błąd odczytu bazy.</p>';
     }
 }
 
 function otworzModalSzczepienia() {
     document.getElementById('ksFormData').value = new Date().toISOString().split('T')[0];
     document.getElementById('ksFormSzczepionka').value = '';
+    document.getElementById('ksFormSztuki').value = '';
+    document.getElementById('ksFormKolczyki').value = '';
     document.getElementById('ksFormKolejnaDawka').checked = false;
     document.getElementById('ksKolejnaDataBox').style.display = 'none';
     
@@ -31010,6 +31053,7 @@ function otworzModalSzczepienia() {
     zaRok.setFullYear(zaRok.getFullYear() + 1);
     document.getElementById('ksFormKolejnaData').value = zaRok.toISOString().split('T')[0];
     
+    zaladujZapamietaneSzczepionki();
     document.getElementById('szczepienieModal').style.display = 'flex';
 }
 
@@ -31017,6 +31061,8 @@ async function zapiszSzczepienie() {
     const sel = document.getElementById('ksFormKlient');
     const dataV = document.getElementById('ksFormData').value;
     const szczepionka = document.getElementById('ksFormSzczepionka').value.trim();
+    const sztuki = document.getElementById('ksFormSztuki').value.trim();
+    const kolczyki = document.getElementById('ksFormKolczyki').value.trim();
     const chceKolejna = document.getElementById('ksFormKolejnaDawka').checked;
     const dataKolejna = document.getElementById('ksFormKolejnaData').value;
 
@@ -31024,6 +31070,9 @@ async function zapiszSzczepienie() {
         alert("Wybierz klienta, datę i wpisz nazwę szczepionki!");
         return;
     }
+
+    // Zapisujemy nową nazwę do podręcznej pamięci (datalist)
+    zapiszSzczepionkeDoPamięci(szczepionka);
 
     let uid = (typeof firebase !== 'undefined' && firebase.auth().currentUser) ? firebase.auth().currentUser.uid : 'brak';
     let id_lecznicy = (typeof currentUserProfile !== 'undefined' && currentUserProfile) ? currentUserProfile['ID lecznicy'] : 'brak';
@@ -31033,27 +31082,27 @@ async function zapiszSzczepienie() {
         const batch = db.batch();
         const szczepRef = db.collection('kalendarzSzczepienia');
 
-        const doc1 = szczepRef.doc();
-        batch.set(doc1, {
+        const podstawowyObiekt = {
             lekarz_uid: uid,
             id_lecznicy: id_lecznicy,
             klient_id: sel.value,
             klient_nazwa: klientNazwa,
-            dataSzczepienia: dataV,
             szczepionka: szczepionka,
+            liczba_sztuk: sztuki,
+            kolczyki: kolczyki,
             utworzono: firebase.firestore.FieldValue.serverTimestamp()
-        });
+        };
 
+        const doc1 = szczepRef.doc();
+        batch.set(doc1, { ...podstawowyObiekt, dataSzczepienia: dataV });
+
+        // Jeśli zaznaczono kolejną dawkę – kopiujemy sztuki i kolczyki do przyszłego szczepienia
         if (chceKolejna && dataKolejna) {
             const doc2 = szczepRef.doc();
-            batch.set(doc2, {
-                lekarz_uid: uid,
-                id_lecznicy: id_lecznicy,
-                klient_id: sel.value,
-                klient_nazwa: klientNazwa,
-                dataSzczepienia: dataKolejna,
-                szczepionka: szczepionka + ' (Kolejna dawka)',
-                utworzono: firebase.firestore.FieldValue.serverTimestamp()
+            batch.set(doc2, { 
+                ...podstawowyObiekt, 
+                dataSzczepienia: dataKolejna, 
+                szczepionka: szczepionka + ' (Kolejna dawka)' 
             });
         }
 
