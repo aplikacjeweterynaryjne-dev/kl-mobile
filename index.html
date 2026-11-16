@@ -29572,12 +29572,16 @@ if (celInput) {
     window.speechSynthesis.onvoiceschanged = loadVoices;
 
     function stopAllAudio(resetState = true) {
-        clearTimeout(convoWatchdog);
-        if (aiRecognition) aiRecognition.stop();
-        window.speechSynthesis.cancel();
-        isRecording = false;
-        if(resetState) resetConvoUI();
-    }
+            clearTimeout(convoWatchdog);
+            if (aiRecognition) aiRecognition.stop();
+            window.speechSynthesis.cancel();
+            
+            // Wymuszenie zamknięcia kanału w radiu przy przerwaniu
+            if (typeof stopBluetoothBridge === 'function') stopBluetoothBridge(); 
+            
+            isRecording = false;
+            if(resetState) resetConvoUI();
+        }
 
     function closeAiModal() {
         aiModal.style.display = 'none';
@@ -29652,51 +29656,87 @@ if (celInput) {
             isRecording = false;
         };
 
-function forceBluetoothWakeup() {
+// ===============================================
+        // MOCNY WYZWALACZ BLUETOOTH (Zmusza Audio Androida do pobudki)
+        // ===============================================
+        let btOscillator = null;
+        let btAudioCtx = null;
+
+        function startBluetoothBridge() {
+            // 1. Odtwarzacz HTML5 (zapętlony)
             const bridge = document.getElementById('bluetoothAudioBridge');
             if (bridge) {
+                bridge.loop = true; // Trzymamy dźwięk w pętli!
                 bridge.play().catch(e => console.warn(e));
-                setTimeout(() => { bridge.pause(); }, 100);
             }
+            // 2. Oscylator Web Audio API
             try {
                 const AudioContext = window.AudioContext || window.webkitAudioContext;
-                if (!AudioContext) return;
-                const ctx = new AudioContext();
-                const oscillator = ctx.createOscillator();
-                const gainNode = ctx.createGain();
-                gainNode.gain.value = 0.01; 
-                oscillator.connect(gainNode);
-                gainNode.connect(ctx.destination);
-                oscillator.start(0);
-                oscillator.stop(ctx.currentTime + 0.1);
+                if (!btAudioCtx) btAudioCtx = new AudioContext();
+                if (btAudioCtx.state === 'suspended') btAudioCtx.resume();
+                
+                btOscillator = btAudioCtx.createOscillator();
+                const gainNode = btAudioCtx.createGain();
+                gainNode.gain.value = 0.01; // Minimalny szum utrzymujący kanał przy życiu
+                btOscillator.connect(gainNode);
+                gainNode.connect(btAudioCtx.destination);
+                btOscillator.start(0);
+                // Celowo nie stopujemy oscylatora tutaj!
             } catch (e) {
                 console.warn(e);
             }
         }
 
+        function stopBluetoothBridge() {
+            const bridge = document.getElementById('bluetoothAudioBridge');
+            if (bridge) {
+                bridge.pause();
+                bridge.currentTime = 0;
+            }
+            if (btOscillator) {
+                try {
+                    btOscillator.stop();
+                    btOscillator.disconnect();
+                    btOscillator = null;
+                } catch (e) {}
+            }
+        }
+
+        // ===============================================
+        // ZMODYFIKOWANA FUNKCJA MÓWIENIA
+        // ===============================================
         function speak(text, callback) {
             window.speechSynthesis.cancel();
             
-            // Nowy, podwójny wybudzacz Bluetooth
-            forceBluetoothWakeup();
+            // Otwieramy kanał BT i trzymamy go OTWARTEGO
+            startBluetoothBridge();
 
             const utterance = new SpeechSynthesisUtterance(text);
             utterance.lang = 'pl-PL';
             if (bestPolishVoice) utterance.voice = bestPolishVoice;
             utterance.rate = 1.05; 
             
+            // Trik na Androida: przypisujemy do globalnej zmiennej, by system nie uciął głosu w połowie zdania (Garbage Collection bug)
+            window.currentAiUtterance = utterance;
+            
             convoAvatar.style.transform = 'scale(1.2)';
             convoStatusText.textContent = `🔊 ${text}`;
             
             utterance.onend = () => {
                 convoAvatar.style.transform = 'scale(1)';
+                stopBluetoothBridge(); // Zamykamy kanał w radiu DOPIERO po ostatnim słowie
                 if(callback) callback();
             };
+
+            utterance.onerror = () => {
+                convoAvatar.style.transform = 'scale(1)';
+                stopBluetoothBridge(); // Awaryjne zamknięcie w razie błędu
+            };
             
-            // Wydłużone opóźnienie, by radio zdążyło otworzyć kanał
+            // Wydłużone do 250ms, żeby stare zestawy Android Auto zdążyły wyciszyć muzykę z np. Spotify
             setTimeout(() => {
                 window.speechSynthesis.speak(utterance);
-            }, 100);
+            }, 250);
         }
 
         convoStartBtn.addEventListener('click', () => {
