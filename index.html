@@ -3244,8 +3244,7 @@ background-color: #eef;
         🤖 Asystent Głosowy AI TESTY
     </button>
   <button id="menuKalendarzBtn" class="menu-btn">🗓️ Kalendarz wizyt</button>
-    <button class="btn" style="background-color: #16a085; color: white; width: 100%; margin-bottom: 10px; font-size: 16px; font-weight: bold; padding: 15px; border-radius: 8px; border: none; box-shadow: 0 4px 6px rgba(0,0,0,0.1);" onclick="otworzKalendarzSzczepien()">
-    💉 Kalendarz Szczepień </button>
+  <button class="menu-btn" onclick="otworzKalendarzSzczepien()">💉 Kalendarz szczepień</button>
   <button id="menuKartaBtn" class="menu-btn">📝 Generator kart leczenia</button>
 <button id="menuKalkulatorBtn" class="menu-btn">🧮 Kalkulator wizyty</button>
   <button id="menuSwiadectwoBtn" class="menu-btn">🐮 Świadectwo inseminacji</button>
@@ -30778,71 +30777,76 @@ if (celInput) {
 
 })();
 </script>
-    <!-- ========================================== -->
+<!-- ========================================== -->
 <!-- 💉 SEKCJA: KALENDARZ SZCZEPIEŃ             -->
 <!-- ========================================== -->
-<div id="kalendarzSzczepienSection" class="section" style="display: none; padding-bottom: 80px;">
-    <div class="top-nav" style="display: flex; justify-content: space-between; align-items: center; background: #16a085; color: white; padding: 15px; border-radius: 0 0 15px 15px; margin-bottom: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.1);">
-        <button class="btn ghost" onclick="showSection('mainMenuSection')" style="color: white; border-color: white;">⬅ Wróć</button>
+<div id="kalendarzSzczepienSection" style="display: none; padding-bottom: 80px; width: 100%; min-height: 100vh; background: #f9f9f9; box-sizing: border-box;">
+    <!-- Górny pasek -->
+    <div class="top-nav" style="display: flex; justify-content: space-between; align-items: center; background: #16a085; color: white; padding: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.1);">
+        <button class="btn ghost" onclick="zamknijKalendarzSzczepien()" style="color: white; border: 1px solid white; padding: 5px 10px;">⬅ Wróć</button>
         <h2 style="margin: 0; font-size: 18px;">Kalendarz Szczepień</h2>
-        <button class="btn" onclick="otworzModalSzczepienia()" style="background: white; color: #16a085; font-weight: bold;">+ Dodaj</button>
+        <div style="width: 60px;"></div> <!-- Pusty div dla wyśrodkowania tytułu -->
     </div>
 
-    <!-- Pasek filtrów i nawigacji -->
-    <div class="form-card" style="margin: 0 10px 15px 10px; padding: 15px; background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
-        <label style="font-size: 12px; color: #777; font-weight: bold;">Filtruj szczepienia klienta (historia i plany):</label>
-        <select id="ksFilterKlient" onchange="zmienFiltrKlientaKS()" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; margin-top: 5px; margin-bottom: 15px;">
-            <option value="">-- Wszyscy (Widok Tygodnia) --</option>
-            <!-- Wypełniane przez JS -->
+    <!-- Pasek filtrów i nawigacji tygodniowej -->
+    <div style="margin: 15px; padding: 15px; background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
+        <label style="font-size: 12px; color: #777; font-weight: bold;">Filtruj po kliencie (opcjonalnie):</label>
+        <select id="ksFilterKlient" onchange="zmienFiltrKlientaKS()" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; margin-top: 5px; margin-bottom: 15px; font-size: 14px;">
+            <option value="">-- Pokazuj układ tygodniowy --</option>
         </select>
 
         <div id="ksWeekControls" style="display: flex; justify-content: space-between; align-items: center; background: #f4f6f7; padding: 10px; border-radius: 8px;">
-            <button class="btn ghost small" onclick="zmienTydzienKS(-1)">⬅ Poprzedni</button>
-            <strong id="ksTydzienLabel" style="font-size: 13px; color: #333;">Tydzień...</strong>
-            <button class="btn ghost small" onclick="zmienTydzienKS(1)">Następny ➡</button>
+            <button class="btn ghost small" onclick="zmienTydzienKS(-1)" style="font-size: 16px; padding: 5px 15px;">⬅</button>
+            <strong id="ksTydzienLabel" style="font-size: 13px; color: #333;">Ładowanie...</strong>
+            <button class="btn ghost small" onclick="zmienTydzienKS(1)" style="font-size: 16px; padding: 5px 15px;">➡</button>
         </div>
     </div>
 
     <!-- Lista szczepień -->
-    <div id="ksListaSzczepien" style="padding: 0 10px; display: flex; flex-direction: column; gap: 10px;">
-        <p style="text-align: center; color: #999; margin-top: 20px;">Ładowanie szczepień...</p>
+    <div id="ksListaSzczepien" style="padding: 0 15px; display: flex; flex-direction: column; gap: 10px;">
+        <!-- Zawartość renderowana z bazy -->
     </div>
+
+    <!-- Pływający Przycisk PLUS w prawym dolnym rogu (Floating Action Button) -->
+    <button onclick="otworzModalSzczepienia()" style="position: fixed; bottom: 30px; right: 30px; width: 60px; height: 60px; border-radius: 50%; background-color: #16a085; color: white; font-size: 30px; border: none; box-shadow: 0 4px 15px rgba(0,0,0,0.3); z-index: 1000; cursor: pointer; display: flex; justify-content: center; align-items: center; padding-bottom: 4px;">
+        +
+    </button>
 </div>
 
 <!-- 💉 MODAL DODAWANIA SZCZEPIENIA -->
-<div id="szczepienieModal" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.6); display: none; z-index: 10000; justify-content: center; align-items: center;">
-    <div class="form-card" style="width: 90%; max-width: 400px; background: white; padding: 20px; border-radius: 12px; border-top: 5px solid #16a085;">
-        <h3 style="margin-top: 0; color: #16a085; text-align: center;">Dodaj Szczepienie</h3>
+<div id="szczepienieModal" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.7); display: none; z-index: 10000; justify-content: center; align-items: center;">
+    <div class="form-card" style="width: 90%; max-width: 400px; background: white; padding: 20px; border-radius: 12px; border-top: 5px solid #16a085; box-shadow: 0 10px 25px rgba(0,0,0,0.5);">
+        <h3 style="margin-top: 0; color: #16a085; text-align: center; margin-bottom: 20px;">Dodaj Szczepienie</h3>
         
         <div style="margin-bottom: 15px;">
             <label style="font-size: 12px; font-weight: bold; color: #555;">1. Klient</label>
-            <select id="ksFormKlient" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px;"></select>
+            <select id="ksFormKlient" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px;"></select>
         </div>
 
         <div style="margin-bottom: 15px;">
             <label style="font-size: 12px; font-weight: bold; color: #555;">2. Data szczepienia</label>
-            <input type="date" id="ksFormData" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box;">
+            <input type="date" id="ksFormData" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; font-size: 14px;">
         </div>
 
         <div style="margin-bottom: 15px;">
             <label style="font-size: 12px; font-weight: bold; color: #555;">3. Nazwa szczepionki</label>
-            <input type="text" id="ksFormSzczepionka" placeholder="np. Rabisin, Biocan..." style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box;">
+            <input type="text" id="ksFormSzczepionka" placeholder="np. Rabisin, Biocan..." style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; font-size: 14px;">
         </div>
 
-        <div style="margin-bottom: 15px; padding: 10px; background: #e8f8f5; border-radius: 8px;">
-            <label style="display: flex; align-items: center; gap: 10px; font-weight: bold; color: #0e6655; cursor: pointer;">
+        <div style="margin-bottom: 15px; padding: 15px; background: #e8f8f5; border-radius: 8px; border: 1px solid #d1f2eb;">
+            <label style="display: flex; align-items: center; gap: 10px; font-weight: bold; color: #0e6655; cursor: pointer; font-size: 14px;">
                 <input type="checkbox" id="ksFormKolejnaDawka" onchange="document.getElementById('ksKolejnaDataBox').style.display = this.checked ? 'block' : 'none';" style="width: 20px; height: 20px;">
                 4. Zaplanuj kolejną dawkę
             </label>
-            <div id="ksKolejnaDataBox" style="display: none; margin-top: 10px;">
+            <div id="ksKolejnaDataBox" style="display: none; margin-top: 15px;">
                 <label style="font-size: 12px; color: #555;">Data kolejnego szczepienia:</label>
-                <input type="date" id="ksFormKolejnaData" style="width: 100%; padding: 10px; border: 1px solid #16a085; border-radius: 6px; box-sizing: border-box;">
+                <input type="date" id="ksFormKolejnaData" style="width: 100%; padding: 10px; border: 1px solid #16a085; border-radius: 6px; box-sizing: border-box; font-size: 14px;">
             </div>
         </div>
 
-        <div style="display: flex; justify-content: space-between; margin-top: 20px;">
-            <button class="btn ghost" onclick="document.getElementById('szczepienieModal').style.display='none'">Anuluj</button>
-            <button class="btn primary" style="background-color: #16a085; border: none;" onclick="zapiszSzczepienie()">💾 Zapisz</button>
+        <div style="display: flex; justify-content: space-between; margin-top: 25px;">
+            <button class="btn ghost" onclick="document.getElementById('szczepienieModal').style.display='none'" style="padding: 10px 20px;">Anuluj</button>
+            <button class="btn primary" style="background-color: #16a085; border: none; padding: 10px 30px; font-size: 16px;" onclick="zapiszSzczepienie()">💾 Zapisz</button>
         </div>
     </div>
 </div>
@@ -30854,13 +30858,14 @@ if (celInput) {
 let ksCurrentWeekStart = new Date();
 let ksWybranyKlient = '';
 
-// Otwiera sekcję z menu
+// TWARDE OTWIERANIE (omija ewentualne limity w twojej głównej funkcji showSection)
 function otworzKalendarzSzczepien() {
-    if(typeof showSection === 'function') showSection('kalendarzSzczepienSection');
-    else {
-        document.querySelectorAll('.section').forEach(s => s.style.display = 'none');
-        document.getElementById('kalendarzSzczepienSection').style.display = 'block';
-    }
+    // Chowamy menu główne
+    let menu = document.getElementById('mainMenuSection');
+    if (menu) menu.style.display = 'none';
+    
+    // Pokazujemy nasz kalendarz
+    document.getElementById('kalendarzSzczepienSection').style.display = 'block';
     
     ksCurrentWeekStart = getMonday(new Date());
     document.getElementById('ksFilterKlient').value = '';
@@ -30870,7 +30875,13 @@ function otworzKalendarzSzczepien() {
     odswiezWidokSzczepien();
 }
 
-// Funkcja pomocnicza - znajduje poniedziałek dla danej daty
+// TWARDE ZAMYKANIE
+function zamknijKalendarzSzczepien() {
+    document.getElementById('kalendarzSzczepienSection').style.display = 'none';
+    let menu = document.getElementById('mainMenuSection');
+    if (menu) menu.style.display = 'flex'; // Zgodnie z twoim CSS
+}
+
 function getMonday(d) {
     d = new Date(d);
     let day = d.getDay(), diff = d.getDate() - day + (day === 0 ? -6 : 1); 
@@ -30879,18 +30890,17 @@ function getMonday(d) {
     return d;
 }
 
-// Ładowanie listy klientów do "selectów" (filtra i formularza)
 async function zaladujKlientowDoSzczepien() {
     const selFilter = document.getElementById('ksFilterKlient');
     const selForm = document.getElementById('ksFormKlient');
     
     try {
         let q = db.collection("klienci");
-        if (currentUserProfile && currentUserProfile.Rola !== 'administrator') {
+        if (typeof currentUserProfile !== 'undefined' && currentUserProfile && currentUserProfile.Rola !== 'administrator') {
             q = q.where("id_lecznicy", "==", currentUserProfile['ID lecznicy']);
         }
         const snapshot = await q.orderBy("nazwa").get();
-        let options = '<option value="">-- Wszyscy (Widok Tygodnia) --</option>';
+        let options = '<option value="">-- Pokazuj układ tygodniowy --</option>';
         let formOptions = '<option value="">Wybierz klienta...</option>';
         
         snapshot.forEach(doc => {
@@ -30906,53 +30916,46 @@ async function zaladujKlientowDoSzczepien() {
     }
 }
 
-// Zmiana filtra klienta
 function zmienFiltrKlientaKS() {
     ksWybranyKlient = document.getElementById('ksFilterKlient').value;
     const weekControls = document.getElementById('ksWeekControls');
     
-    // Jeśli wybraliśmy klienta - chowamy strzałki tygodni, bo pokazujemy wszystko chronologicznie
     if (ksWybranyKlient !== '') {
         weekControls.style.display = 'none';
     } else {
         weekControls.style.display = 'flex';
-        ksCurrentWeekStart = getMonday(new Date()); // wracamy do obecnego tygodnia
+        ksCurrentWeekStart = getMonday(new Date()); 
     }
     odswiezWidokSzczepien();
 }
 
-// Przewijanie tygodni w lewo / prawo
 function zmienTydzienKS(offset) {
     ksCurrentWeekStart.setDate(ksCurrentWeekStart.getDate() + (offset * 7));
     odswiezWidokSzczepien();
 }
 
-// Pobieranie i rysowanie szczepień z bazy
 async function odswiezWidokSzczepien() {
     const lista = document.getElementById('ksListaSzczepien');
     const labelTydzien = document.getElementById('ksTydzienLabel');
     
-    lista.innerHTML = '<p style="text-align: center; color: #999;">Ładowanie szczepień... ⏳</p>';
+    lista.innerHTML = '<p style="text-align: center; color: #999; margin-top: 30px;">Ładowanie szczepień... ⏳</p>';
     
     let q = db.collection("kalendarzSzczepienia");
     
-    // Zabezpieczenie danych pod lecznicę
-    if (currentUserProfile && currentUserProfile.Rola !== 'administrator') {
+    if (typeof currentUserProfile !== 'undefined' && currentUserProfile && currentUserProfile.Rola !== 'administrator') {
         q = q.where("id_lecznicy", "==", currentUserProfile['ID lecznicy']);
     }
 
     if (ksWybranyKlient !== '') {
-        // TRYB KLIENTA: Wszystkie szczepienia jednego rolnika (bez dat)
         q = q.where("klient_id", "==", ksWybranyKlient).orderBy("dataSzczepienia", "desc");
     } else {
-        // TRYB TYGODNIA: Pokazuje dany tydzień (od poniedziałku do niedzieli)
         let niedziela = new Date(ksCurrentWeekStart);
         niedziela.setDate(niedziela.getDate() + 6);
         
         let startStr = ksCurrentWeekStart.toISOString().split('T')[0];
         let endStr = niedziela.toISOString().split('T')[0];
         
-        labelTydzien.textContent = `${startStr} - ${endStr}`;
+        labelTydzien.textContent = `${startStr}  do  ${endStr}`;
         
         q = q.where("dataSzczepienia", ">=", startStr)
              .where("dataSzczepienia", "<=", endStr)
@@ -30964,45 +30967,45 @@ async function odswiezWidokSzczepien() {
         lista.innerHTML = '';
         
         if (snapshot.empty) {
-            lista.innerHTML = `<p style="text-align: center; color: #999; margin-top: 20px;">${ksWybranyKlient ? 'Brak szczepień dla tego klienta.' : 'Brak zaplanowanych szczepień w tym tygodniu.'}</p>`;
+            lista.innerHTML = `<div style="text-align: center; padding: 40px 20px; color: #999; background: white; border-radius: 12px; margin-top: 20px;">
+                <div style="font-size: 40px; margin-bottom: 10px;">💉</div>
+                Brak zaplanowanych szczepień w tym okresie. Kliknij <b>+</b> w prawym dolnym rogu, aby coś dodać.
+            </div>`;
             return;
         }
 
         snapshot.forEach(doc => {
             const data = doc.data();
-            
-            // Kolorowanie przeterminowanych/dzisiejszych
             let dateColor = '#333';
             const dzis = new Date().toISOString().split('T')[0];
-            if (data.dataSzczepienia < dzis) dateColor = '#e74c3c'; // zaległe czerwone
-            else if (data.dataSzczepienia === dzis) dateColor = '#f39c12'; // dzisiejsze pomarańczowe
-            else dateColor = '#27ae60'; // przyszłe zielone
+            
+            if (data.dataSzczepienia < dzis) dateColor = '#e74c3c'; 
+            else if (data.dataSzczepienia === dzis) dateColor = '#f39c12'; 
+            else dateColor = '#16a085'; 
 
             lista.innerHTML += `
-                <div style="background: white; padding: 12px; border-radius: 8px; border-left: 5px solid ${dateColor}; box-shadow: 0 2px 5px rgba(0,0,0,0.05); display: flex; justify-content: space-between; align-items: center;">
+                <div style="background: white; padding: 15px; border-radius: 10px; border-left: 6px solid ${dateColor}; box-shadow: 0 2px 5px rgba(0,0,0,0.05); display: flex; justify-content: space-between; align-items: center;">
                     <div>
-                        <div style="font-weight: bold; color: #2c3e50; font-size: 14px;">${data.klient_nazwa}</div>
-                        <div style="color: ${dateColor}; font-weight: bold; font-size: 13px; margin: 4px 0;">📅 ${data.dataSzczepienia}</div>
-                        <div style="color: #7f8c8d; font-size: 12px;">💉 ${data.szczepionka}</div>
+                        <div style="font-weight: bold; color: #2c3e50; font-size: 15px;">${data.klient_nazwa}</div>
+                        <div style="color: ${dateColor}; font-weight: bold; font-size: 14px; margin: 6px 0;">📅 ${data.dataSzczepienia}</div>
+                        <div style="color: #7f8c8d; font-size: 13px;">💉 ${data.szczepionka}</div>
                     </div>
-                    <button onclick="usunSzczepienie('${doc.id}')" style="background: #fdf1f0; border: 1px solid #fadbd8; color: #e74c3c; border-radius: 6px; padding: 8px; cursor: pointer; font-size: 16px;">🗑</button>
+                    <button onclick="usunSzczepienie('${doc.id}')" style="background: #fdf1f0; border: 1px solid #fadbd8; color: #e74c3c; border-radius: 8px; width: 40px; height: 40px; cursor: pointer; font-size: 18px; display: flex; justify-content: center; align-items: center;">🗑</button>
                 </div>
             `;
         });
     } catch (e) {
         console.error("Błąd:", e);
-        lista.innerHTML = '<p style="text-align: center; color: red;">Wystąpił błąd. Wymagane utworzenie indeksu w Firebase (kliknij link w konsoli przeglądarki).</p>';
+        lista.innerHTML = '<p style="text-align: center; color: red; margin-top: 20px;">Wystąpił błąd. Wymagane utworzenie indeksu w Firebase (kliknij link w konsoli przeglądarki).</p>';
     }
 }
 
-// Obsługa okienka dodawania
 function otworzModalSzczepienia() {
     document.getElementById('ksFormData').value = new Date().toISOString().split('T')[0];
     document.getElementById('ksFormSzczepionka').value = '';
     document.getElementById('ksFormKolejnaDawka').checked = false;
     document.getElementById('ksKolejnaDataBox').style.display = 'none';
     
-    // Automatycznie ustaw nastepny rok dla drugiej dawki
     let zaRok = new Date();
     zaRok.setFullYear(zaRok.getFullYear() + 1);
     document.getElementById('ksFormKolejnaData').value = zaRok.toISOString().split('T')[0];
@@ -31010,7 +31013,6 @@ function otworzModalSzczepienia() {
     document.getElementById('szczepienieModal').style.display = 'flex';
 }
 
-// Zapis szczepienia (i ewentualnie od razu kolejnej dawki)
 async function zapiszSzczepienie() {
     const sel = document.getElementById('ksFormKlient');
     const dataV = document.getElementById('ksFormData').value;
@@ -31023,15 +31025,14 @@ async function zapiszSzczepienie() {
         return;
     }
 
-    let uid = firebase.auth().currentUser ? firebase.auth().currentUser.uid : 'brak';
-    let id_lecznicy = currentUserProfile ? currentUserProfile['ID lecznicy'] : 'brak';
+    let uid = (typeof firebase !== 'undefined' && firebase.auth().currentUser) ? firebase.auth().currentUser.uid : 'brak';
+    let id_lecznicy = (typeof currentUserProfile !== 'undefined' && currentUserProfile) ? currentUserProfile['ID lecznicy'] : 'brak';
     let klientNazwa = sel.options[sel.selectedIndex].text;
 
     try {
         const batch = db.batch();
         const szczepRef = db.collection('kalendarzSzczepienia');
 
-        // Wpis 1: Bieżące szczepienie
         const doc1 = szczepRef.doc();
         batch.set(doc1, {
             lekarz_uid: uid,
@@ -31043,7 +31044,6 @@ async function zapiszSzczepienie() {
             utworzono: firebase.firestore.FieldValue.serverTimestamp()
         });
 
-        // Wpis 2: Jeśli zaznaczono kolejną dawkę
         if (chceKolejna && dataKolejna) {
             const doc2 = szczepRef.doc();
             batch.set(doc2, {
