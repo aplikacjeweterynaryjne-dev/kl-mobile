@@ -20772,14 +20772,21 @@ async function loadZarzadzanieUsers() {
 
     try {
         const snapshot = await query.get();
-        zarzadzanieUzytkownicyCache = snapshot.docs.map(doc => {
+        
+        // ✅ ZMIANA: Używamy forEach z blokadą, by odsiać klientów
+        zarzadzanieUzytkownicyCache = [];
+        snapshot.docs.forEach(doc => {
             const data = doc.data();
-            return {
+            
+            // ✅ BLOKADA: Pomijamy klientów i hodowców
+            if (data.Rola === 'klient' || data.Rola === 'hodowca') return;
+            
+            zarzadzanieUzytkownicyCache.push({
                 docId: doc.id, // ID dokumentu w konfiguracja (KLUCZOWE!)
                 uid: data.uid, // ID z autentykacji (jeśli połączone)
                 nazwa: `${data.Imie} ${data.Nazwisko}`,
                 uzywaMagazynu: data.uzywaStanowMagazynowych || false
-            };
+            });
         });
 
         populateZarzadzanieUsers();
@@ -20792,7 +20799,6 @@ async function loadZarzadzanieUsers() {
         zarzadzanieLoadUsersBtn.textContent = '📥 Wczytaj Użytkowników';
     }
 }
-
 /**
  * Wypełnia listę rozwijaną <select> na podstawie 'zarzadzanieUzytkownicyCache'.
  */
