@@ -30945,22 +30945,33 @@ function getMonday(d) {
 // POBIERANIE KLIENTÓW (ZELAZNE BEZPIECZEŃSTWO)
 // ----------------------------------------------------
 async function zaladujKlientowDoSzczepien() {
+    // BLOKADA: Jeśli system jeszcze nie wie, kim jesteś - czekamy ułamek sekundy
+    if (typeof currentUserProfile === 'undefined' || !currentUserProfile) {
+        console.warn("Czekam na załadowanie profilu lecznicy...");
+        setTimeout(zaladujKlientowDoSzczepien, 400);
+        return;
+    }
+
     try {
         let q = db.collection("klienci");
         
         // Prawidłowe i elastyczne pobieranie ID Lecznicy dla pracownika
-        let idLecznicy = (typeof currentUserProfile !== 'undefined' && currentUserProfile) ? (currentUserProfile['ID lecznicy'] || currentUserProfile.id_lecznicy) : null;
+        let idLecznicy = currentUserProfile['ID lecznicy'] || currentUserProfile.id_lecznicy;
         
         if (typeof currentUserProfile !== 'undefined' && currentUserProfile.Rola !== 'administrator') {
-            if (idLecznicy) {
-                q = q.where("id_lecznicy", "==", idLecznicy);
+            if (!idLecznicy) {
+                console.error("Błąd krytyczny: Brak ID lecznicy w profilu!");
+                return;
             }
+            // Zabezpieczenie przed pokazaniem wszystkich klientów (Poprawione idLecznicy)
+            q = q.where("idLecznicy", "==", idLecznicy);
         }
         
         const snapshot = await q.get();
         globalKlienciKS = [];
         snapshot.forEach(doc => globalKlienciKS.push({ id: doc.id, ...doc.data() }));
         
+        // Sortowanie
         globalKlienciKS.sort((a, b) => (a.nazwa || '').localeCompare(b.nazwa || ''));
         odswiezWidokSzczepien();
         
