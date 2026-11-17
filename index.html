@@ -30784,9 +30784,6 @@ if (celInput) {
 <!-- ========================================== -->
 <div id="kalendarzSzczepienSection" style="display: none; padding-bottom: 80px; width: 100%; min-height: 100vh; background: #f9f9f9; box-sizing: border-box;">
     
-    <!-- Ukryta, wspólna lista klientów (Datalist) -->
-    <datalist id="ksKlienciDataList"></datalist>
-    
     <!-- Górny pasek -->
     <div class="top-nav" style="display: flex; justify-content: space-between; align-items: center; background: #16a085; color: white; padding: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.1);">
         <button class="btn ghost" onclick="zamknijKalendarzSzczepien()" style="color: white; border: 1px solid white; padding: 5px 10px;">⬅ Wróć</button>
@@ -30796,10 +30793,13 @@ if (celInput) {
 
     <!-- Pasek filtrów i nawigacji tygodniowej -->
     <div style="margin: 15px; padding: 15px; background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
-        <label style="font-size: 12px; color: #777; font-weight: bold;">Wyszukaj i filtruj po kliencie:</label>
+        <label style="font-size: 12px; color: #777; font-weight: bold; margin-bottom: 5px; display: block;">Wyszukaj i filtruj po kliencie:</label>
         
-        <!-- Inteligentne pole wyszukiwania (Combobox) -->
-        <input type="text" id="ksFilterKlientInput" list="ksKlienciDataList" onchange="zmienFiltrKlientaKS()" onkeyup="zmienFiltrKlientaKS()" placeholder="🔍 Wpisz i wybierz z listy..." autocomplete="off" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; margin-top: 5px; margin-bottom: 15px; font-size: 14px; background: #fff;">
+        <!-- Przycisk otwierający nasz nowy Wybierak Klienta -->
+        <div onclick="otworzWybierakKS('filter')" style="width: 100%; padding: 12px; border: 1px solid #16a085; border-radius: 6px; background: #e8f8f5; font-size: 14px; color: #0e6655; font-weight: bold; text-align: left; cursor: pointer; display: flex; justify-content: space-between; align-items: center; box-sizing: border-box; margin-bottom: 15px;">
+            <span id="ksFilterBtnText">-- Pokazuj układ tygodniowy --</span>
+            <span style="font-size: 18px;">🔍</span>
+        </div>
 
         <div id="ksWeekControls" style="display: flex; justify-content: space-between; align-items: center; background: #f4f6f7; padding: 10px; border-radius: 8px;">
             <button class="btn ghost small" onclick="zmienTydzienKS(-1)" style="font-size: 16px; padding: 5px 15px;">⬅</button>
@@ -30809,9 +30809,7 @@ if (celInput) {
     </div>
 
     <!-- Lista szczepień -->
-    <div id="ksListaSzczepien" style="padding: 0 15px; display: flex; flex-direction: column; gap: 10px;">
-        <!-- Zawartość renderowana z bazy -->
-    </div>
+    <div id="ksListaSzczepien" style="padding: 0 15px; display: flex; flex-direction: column; gap: 10px;"></div>
 
     <!-- Pływający Przycisk PLUS -->
     <button onclick="otworzModalSzczepienia()" style="position: fixed; bottom: 30px; right: 30px; width: 60px; height: 60px; border-radius: 50%; background-color: #16a085; color: white; font-size: 30px; border: none; box-shadow: 0 4px 15px rgba(0,0,0,0.3); z-index: 1000; cursor: pointer; display: flex; justify-content: center; align-items: center; padding-bottom: 4px;">
@@ -30824,13 +30822,14 @@ if (celInput) {
     <div class="form-card" style="width: 90%; max-width: 400px; background: white; padding: 20px; border-radius: 12px; border-top: 5px solid #16a085; box-shadow: 0 10px 25px rgba(0,0,0,0.5); max-height: 90vh; overflow-y: auto;">
         
         <h3 id="ksModalTitle" style="margin-top: 0; color: #16a085; text-align: center; margin-bottom: 20px;">Dodaj Szczepienie</h3>
-        
-        <!-- Ukryte pole do trzymania ID edytowanego wpisu -->
         <input type="hidden" id="ksEditDocId" value="">
 
-        <div style="margin-bottom: 12px;">
-            <label style="font-size: 12px; font-weight: bold; color: #555;">1. Klient</label>
-            <input type="text" id="ksFormKlientInput" list="ksKlienciDataList" placeholder="🔍 Wpisz i wybierz z listy..." autocomplete="off" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; font-size: 14px;">
+        <div style="margin-bottom: 15px;">
+            <label style="font-size: 12px; font-weight: bold; color: #555; display: block; margin-bottom: 5px;">1. Klient</label>
+            <div onclick="otworzWybierakKS('form')" style="width: 100%; padding: 12px; border: 1px solid #16a085; border-radius: 6px; background: #e8f8f5; font-size: 14px; color: #0e6655; font-weight: bold; text-align: left; cursor: pointer; display: flex; justify-content: space-between; align-items: center; box-sizing: border-box;">
+                <span id="ksFormBtnText">Wybierz klienta z listy...</span>
+                <span style="font-size: 18px;">🔍</span>
+            </div>
         </div>
 
         <div style="margin-bottom: 12px;">
@@ -30876,15 +30875,44 @@ if (celInput) {
     </div>
 </div>
 
+<!-- 🔎 NOWY MODAL: PEŁNOEKRANOWY WYBIERAK KLIENTÓW -->
+<div id="ksWybierakModal" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #f9f9f9; display: none; flex-direction: column; z-index: 10005;">
+    <div style="background: #16a085; padding: 15px; display: flex; align-items: center; gap: 15px; color: white; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+        <button onclick="zamknijWybierakKS()" style="background: none; border: none; color: white; font-size: 24px; padding: 0;">⬅</button>
+        <h3 style="margin: 0; font-size: 18px;">Wybierz lub wpisz klienta</h3>
+    </div>
+    
+    <div style="padding: 15px; background: white; border-bottom: 1px solid #ddd;">
+        <input type="text" id="ksWybierakSearch" onkeyup="renderWybierakListKS(this.value)" placeholder="🔍 Szukaj na liście..." style="width: 100%; padding: 12px; border: 1px solid #16a085; border-radius: 8px; font-size: 16px; box-sizing: border-box;">
+    </div>
+    
+    <div id="ksWybierakListContainer" style="flex: 1; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px;">
+        <!-- Elementy generowane przez JS -->
+    </div>
+
+    <div style="padding: 15px; background: white; border-top: 1px solid #ddd; box-shadow: 0 -2px 10px rgba(0,0,0,0.05);">
+        <button onclick="zatwierdzRecznegoKlientaKS()" style="width: 100%; padding: 15px; background: #e8f8f5; color: #16a085; border: 2px dashed #16a085; border-radius: 8px; font-weight: bold; font-size: 14px;">
+            ➕ Użyj wpisanej nazwy (spoza bazy)
+        </button>
+    </div>
+</div>
+
 <script>
 // ==========================================
-// LOGIKA KALENDARZA SZCZEPIEŃ 
+// LOGIKA KALENDARZA SZCZEPIEŃ (MOBILNA & BEZPIECZNA)
 // ==========================================
 let ksCurrentWeekStart = new Date();
-let ksWybranyKlient = '';
 let globalKlienciKS = []; 
 let ksBiezaceKolczyki = []; 
 let ksZaladowaneSzczepienia = []; 
+
+// Zmienne przechowujące aktualnie wybranego klienta
+let ksFilterSelectedId = '';
+let ksFilterSelectedName = '';
+let ksFormSelectedId = '';
+let ksFormSelectedName = '';
+
+let ksAktualnyTargetWybieraka = ''; // 'filter' lub 'form'
 
 function otworzKalendarzSzczepien() {
     let menu = document.getElementById('mainMenuSection');
@@ -30894,9 +30922,7 @@ function otworzKalendarzSzczepien() {
     document.getElementById('kalendarzSzczepienSection').style.display = 'block';
     
     ksCurrentWeekStart = getMonday(new Date());
-    ksWybranyKlient = '';
-    document.getElementById('ksFilterKlientInput').value = '';
-    
+    wyczyscFiltrKS();
     zaladujKlientowDoSzczepien();
 }
 
@@ -30916,44 +30942,26 @@ function getMonday(d) {
 }
 
 // ----------------------------------------------------
-// OBSŁUGA KLIENTÓW Z BLOKADĄ BEZPIECZEŃSTWA (ID_LECZNICY)
+// POBIERANIE KLIENTÓW (ZELAZNE BEZPIECZEŃSTWO)
 // ----------------------------------------------------
 async function zaladujKlientowDoSzczepien() {
-    // BLOKADA: Jeśli system jeszcze nie wie, kim jesteś - czekamy ułamek sekundy i próbujemy ponownie
-    if (typeof currentUserProfile === 'undefined' || !currentUserProfile) {
-        console.warn("Czekam na załadowanie profilu lecznicy...");
-        setTimeout(zaladujKlientowDoSzczepien, 400); // Ponowna próba za 400ms
-        return;
-    }
-
     try {
         let q = db.collection("klienci");
         
-        // Zabezpieczenie przed pokazaniem "wszystkich"
-        if (currentUserProfile.Rola !== 'administrator') {
-            if (!currentUserProfile['ID lecznicy']) {
-                console.error("Błąd krytyczny: Brak ID lecznicy w profilu!");
-                return;
+        // Prawidłowe i elastyczne pobieranie ID Lecznicy dla pracownika
+        let idLecznicy = (typeof currentUserProfile !== 'undefined' && currentUserProfile) ? (currentUserProfile['ID lecznicy'] || currentUserProfile.id_lecznicy) : null;
+        
+        if (typeof currentUserProfile !== 'undefined' && currentUserProfile.Rola !== 'administrator') {
+            if (idLecznicy) {
+                q = q.where("id_lecznicy", "==", idLecznicy);
             }
-            q = q.where("id_lecznicy", "==", currentUserProfile['ID lecznicy']);
         }
         
         const snapshot = await q.get();
         globalKlienciKS = [];
         snapshot.forEach(doc => globalKlienciKS.push({ id: doc.id, ...doc.data() }));
         
-        // Sortowanie
         globalKlienciKS.sort((a, b) => (a.nazwa || '').localeCompare(b.nazwa || ''));
-        
-        // Pakowanie do inteligentnej listy <datalist>
-        let datalist = document.getElementById('ksKlienciDataList');
-        datalist.innerHTML = '';
-        globalKlienciKS.forEach(c => {
-            let opt = document.createElement('option');
-            opt.value = c.nazwa;
-            datalist.appendChild(opt);
-        });
-
         odswiezWidokSzczepien();
         
     } catch(e) {
@@ -30961,19 +30969,95 @@ async function zaladujKlientowDoSzczepien() {
     }
 }
 
-function zmienFiltrKlientaKS() {
-    let wpisanaNazwa = document.getElementById('ksFilterKlientInput').value.trim();
-    let znaleziony = globalKlienciKS.find(k => k.nazwa === wpisanaNazwa);
+// ----------------------------------------------------
+// NOWY WYBIERAK KLIENTA (MOBILNY MODAL)
+// ----------------------------------------------------
+function otworzWybierakKS(target) {
+    ksAktualnyTargetWybieraka = target;
+    document.getElementById('ksWybierakSearch').value = '';
+    renderWybierakListKS('');
+    document.getElementById('ksWybierakModal').style.display = 'flex';
+}
+
+function zamknijWybierakKS() {
+    document.getElementById('ksWybierakModal').style.display = 'none';
+}
+
+function renderWybierakListKS(filtr) {
+    let kontener = document.getElementById('ksWybierakListContainer');
+    let txt = filtr.toLowerCase();
     
-    ksWybranyKlient = znaleziony ? znaleziony.id : '';
-    const weekControls = document.getElementById('ksWeekControls');
+    let html = '';
     
-    if (ksWybranyKlient !== '') {
-        weekControls.style.display = 'none';
-    } else {
-        weekControls.style.display = 'flex';
-        ksCurrentWeekStart = getMonday(new Date()); 
+    // Zawsze pokazuj opcję "Wszyscy klienci" jeśli to filtr
+    if (ksAktualnyTargetWybieraka === 'filter') {
+        html += `<div onclick="wyczyscFiltrKS()" style="padding: 15px; background: #34495e; color: white; border-radius: 8px; font-weight: bold; text-align: center; margin-bottom: 10px;">📅 Pokaż wszystkich (Widok tygodnia)</div>`;
     }
+
+    globalKlienciKS.forEach(c => {
+        let nazwa = c.nazwa || '';
+        if (nazwa.toLowerCase().includes(txt)) {
+            // Bezpieczne przekazanie parametrów bez zepsucia cudzysłowów
+            let safeName = nazwa.replace(/'/g, "\\'");
+            html += `<div onclick="wybierzZListyKS('${c.id}', '${safeName}')" style="padding: 15px; background: white; border: 1px solid #eee; border-radius: 8px; font-size: 15px; color: #333;">${nazwa}</div>`;
+        }
+    });
+    
+    if (html === '' && ksAktualnyTargetWybieraka !== 'filter') {
+        html = '<p style="text-align: center; color: #999; margin-top: 20px;">Brak dopasowań. Użyj przycisku poniżej, aby wpisać ręcznie.</p>';
+    }
+    
+    kontener.innerHTML = html;
+}
+
+function wybierzZListyKS(id, nazwa) {
+    if (ksAktualnyTargetWybieraka === 'filter') {
+        ksFilterSelectedId = id;
+        ksFilterSelectedName = nazwa;
+        document.getElementById('ksFilterBtnText').textContent = nazwa;
+        document.getElementById('ksWeekControls').style.display = 'none';
+        odswiezWidokSzczepien();
+    } else {
+        ksFormSelectedId = id;
+        ksFormSelectedName = nazwa;
+        document.getElementById('ksFormBtnText').textContent = nazwa;
+    }
+    zamknijWybierakKS();
+}
+
+function zatwierdzRecznegoKlientaKS() {
+    let wpisanaNazwa = document.getElementById('ksWybierakSearch').value.trim();
+    if (!wpisanaNazwa) {
+        alert("Najpierw wpisz nazwę klienta w pasku wyszukiwania u góry!");
+        return;
+    }
+    
+    // Klient ręczny nie ma ID z bazy
+    if (ksAktualnyTargetWybieraka === 'filter') {
+        ksFilterSelectedId = ''; 
+        ksFilterSelectedName = wpisanaNazwa;
+        document.getElementById('ksFilterBtnText').textContent = wpisanaNazwa + " (Spoza bazy)";
+        document.getElementById('ksWeekControls').style.display = 'none';
+        odswiezWidokSzczepien();
+    } else {
+        ksFormSelectedId = ''; 
+        ksFormSelectedName = wpisanaNazwa;
+        document.getElementById('ksFormBtnText').textContent = wpisanaNazwa + " (Spoza bazy)";
+    }
+    zamknijWybierakKS();
+}
+
+function wyczyscFiltrKS() {
+    ksFilterSelectedId = '';
+    ksFilterSelectedName = '';
+    let btn = document.getElementById('ksFilterBtnText');
+    if (btn) btn.textContent = "-- Pokazuj układ tygodniowy --";
+    
+    let controls = document.getElementById('ksWeekControls');
+    if (controls) controls.style.display = 'flex';
+    
+    ksCurrentWeekStart = getMonday(new Date());
+    zamknijWybierakKS();
     odswiezWidokSzczepien();
 }
 
@@ -30983,30 +31067,39 @@ function zmienTydzienKS(offset) {
 }
 
 // ----------------------------------------------------
-// POBIERANIE SZCZEPIEŃ 
+// POBIERANIE SZCZEPIEŃ
 // ----------------------------------------------------
 async function odswiezWidokSzczepien() {
     const lista = document.getElementById('ksListaSzczepien');
     const labelTydzien = document.getElementById('ksTydzienLabel');
+    if(!lista) return;
     lista.innerHTML = '<p style="text-align: center; color: #999; margin-top: 30px;">Ładowanie szczepień... ⏳</p>';
     
     try {
         let q = db.collection("kalendarzSzczepienia");
-        if (typeof currentUserProfile !== 'undefined' && currentUserProfile && currentUserProfile.Rola !== 'administrator') {
-            q = q.where("id_lecznicy", "==", currentUserProfile['ID lecznicy']);
+        let idLecznicy = (typeof currentUserProfile !== 'undefined' && currentUserProfile) ? (currentUserProfile['ID lecznicy'] || currentUserProfile.id_lecznicy) : null;
+        
+        if (typeof currentUserProfile !== 'undefined' && currentUserProfile.Rola !== 'administrator' && idLecznicy) {
+            q = q.where("id_lecznicy", "==", idLecznicy);
         }
 
         const snapshot = await q.get();
         let wszystkie = [];
         snapshot.forEach(doc => wszystkie.push({ id: doc.id, ...doc.data() }));
-
         ksZaladowaneSzczepienia = wszystkie; 
+
         let wyfiltrowane = [];
 
-        if (ksWybranyKlient !== '') {
-            wyfiltrowane = wszystkie.filter(x => x.klient_id === ksWybranyKlient);
+        if (ksFilterSelectedName !== '') {
+            // Tryb jednego klienta
+            if (ksFilterSelectedId !== '') {
+                wyfiltrowane = wszystkie.filter(x => x.klient_id === ksFilterSelectedId);
+            } else {
+                wyfiltrowane = wszystkie.filter(x => x.klient_nazwa.toLowerCase() === ksFilterSelectedName.toLowerCase());
+            }
             wyfiltrowane.sort((a,b) => b.dataSzczepienia.localeCompare(a.dataSzczepienia)); 
         } else {
+            // Tryb widoku tygodnia
             let niedziela = new Date(ksCurrentWeekStart);
             niedziela.setDate(niedziela.getDate() + 6);
             let startStr = ksCurrentWeekStart.toISOString().split('T')[0];
@@ -31021,7 +31114,7 @@ async function odswiezWidokSzczepien() {
         if (wyfiltrowane.length === 0) {
             lista.innerHTML = `<div style="text-align: center; padding: 40px 20px; color: #999; background: white; border-radius: 12px; margin-top: 20px;">
                 <div style="font-size: 40px; margin-bottom: 10px;">💉</div>
-                Brak szczepień. Kliknij <b>+</b> w prawym dolnym rogu, aby dodać.
+                Brak szczepień w tym widoku. Kliknij <b>+</b> w prawym dolnym rogu.
             </div>`;
             return;
         }
@@ -31117,7 +31210,11 @@ function otworzModalSzczepienia() {
     document.getElementById('ksModalTitle').textContent = "Dodaj Szczepienie";
     document.getElementById('ksEditDocId').value = ""; 
     
-    document.getElementById('ksFormKlientInput').value = '';
+    // Czyszczenie formularza
+    ksFormSelectedId = '';
+    ksFormSelectedName = '';
+    document.getElementById('ksFormBtnText').textContent = "Wybierz klienta z listy...";
+    
     document.getElementById('ksFormData').value = new Date().toISOString().split('T')[0];
     document.getElementById('ksFormSzczepionka').value = '';
     document.getElementById('ksFormSztuki').value = '';
@@ -31144,7 +31241,11 @@ function edytujSzczepienie(docId) {
     document.getElementById('ksModalTitle').textContent = "Edytuj Szczepienie";
     document.getElementById('ksEditDocId').value = docId; 
     
-    document.getElementById('ksFormKlientInput').value = item.klient_nazwa || '';
+    // Wczytanie zapisanego klienta
+    ksFormSelectedId = item.klient_id || '';
+    ksFormSelectedName = item.klient_nazwa || '';
+    document.getElementById('ksFormBtnText').textContent = item.klient_nazwa || "Wybierz klienta...";
+    
     document.getElementById('ksFormData').value = item.dataSzczepienia;
     document.getElementById('ksFormSzczepionka').value = item.szczepionka;
     document.getElementById('ksFormSztuki').value = item.liczba_sztuk || '';
@@ -31161,7 +31262,6 @@ function edytujSzczepienie(docId) {
 }
 
 async function zapiszSzczepienie() {
-    const klientNazwa = document.getElementById('ksFormKlientInput').value.trim();
     const dataV = document.getElementById('ksFormData').value;
     const szczepionka = document.getElementById('ksFormSzczepionka').value.trim();
     const sztuki = document.getElementById('ksFormSztuki').value.trim();
@@ -31170,25 +31270,23 @@ async function zapiszSzczepienie() {
     const dataKolejna = document.getElementById('ksFormKolejnaData').value;
     const editId = document.getElementById('ksEditDocId').value;
 
-    let znaleziony = globalKlienciKS.find(k => k.nazwa === klientNazwa);
-
-    if(!znaleziony || !dataV || !szczepionka) {
-        alert("Wybierz prawidłowego klienta z listy, wprowadź datę i nazwę szczepionki!");
+    if(!ksFormSelectedName || !dataV || !szczepionka) {
+        alert("Wybierz klienta w punkcie 1, wprowadź datę i nazwę szczepionki!");
         return;
     }
 
     zapiszSzczepionkeDoPamięci(szczepionka);
 
     let uid = (typeof firebase !== 'undefined' && firebase.auth().currentUser) ? firebase.auth().currentUser.uid : 'brak';
-    let id_lecznicy = (typeof currentUserProfile !== 'undefined' && currentUserProfile) ? currentUserProfile['ID lecznicy'] : 'brak';
+    let id_lecznicy = (typeof currentUserProfile !== 'undefined' && currentUserProfile) ? (currentUserProfile['ID lecznicy'] || currentUserProfile.id_lecznicy) : 'brak';
 
     try {
         const szczepRef = db.collection('kalendarzSzczepienia');
         const podstawowyObiekt = {
             lekarz_uid: uid,
             id_lecznicy: id_lecznicy,
-            klient_id: znaleziony.id,
-            klient_nazwa: znaleziony.nazwa,
+            klient_id: ksFormSelectedId,
+            klient_nazwa: ksFormSelectedName,
             szczepionka: szczepionka,
             liczba_sztuk: sztuki,
             kolczyki: kolczykiStr
