@@ -30783,6 +30783,10 @@ if (celInput) {
 <!-- 💉 SEKCJA: KALENDARZ SZCZEPIEŃ             -->
 <!-- ========================================== -->
 <div id="kalendarzSzczepienSection" style="display: none; padding-bottom: 80px; width: 100%; min-height: 100vh; background: #f9f9f9; box-sizing: border-box;">
+    
+    <!-- Ukryta, wspólna lista klientów (Datalist) -->
+    <datalist id="ksKlienciDataList"></datalist>
+    
     <!-- Górny pasek -->
     <div class="top-nav" style="display: flex; justify-content: space-between; align-items: center; background: #16a085; color: white; padding: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.1);">
         <button class="btn ghost" onclick="zamknijKalendarzSzczepien()" style="color: white; border: 1px solid white; padding: 5px 10px;">⬅ Wróć</button>
@@ -30792,14 +30796,10 @@ if (celInput) {
 
     <!-- Pasek filtrów i nawigacji tygodniowej -->
     <div style="margin: 15px; padding: 15px; background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
-        <label style="font-size: 12px; color: #777; font-weight: bold;">Filtruj po kliencie (opcjonalnie):</label>
+        <label style="font-size: 12px; color: #777; font-weight: bold;">Wyszukaj i filtruj po kliencie:</label>
         
-        <!-- Wyszukiwarka do filtra -->
-        <input type="text" id="ksSearchFilter" placeholder="🔍 Wpisz, aby wyszukać klienta..." onkeyup="renderSelectKlientow('ksFilterKlient', this.value, true)" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; margin-top: 5px; font-size: 14px; background: #f4f6f7;">
-        
-        <select id="ksFilterKlient" onchange="zmienFiltrKlientaKS()" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; margin-top: 5px; margin-bottom: 15px; font-size: 14px;">
-            <option value="">-- Pokazuj układ tygodniowy --</option>
-        </select>
+        <!-- Inteligentne pole wyszukiwania (Combobox) -->
+        <input type="text" id="ksFilterKlientInput" list="ksKlienciDataList" onchange="zmienFiltrKlientaKS()" onkeyup="zmienFiltrKlientaKS()" placeholder="🔍 Wpisz i wybierz z listy..." autocomplete="off" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; margin-top: 5px; margin-bottom: 15px; font-size: 14px; background: #fff;">
 
         <div id="ksWeekControls" style="display: flex; justify-content: space-between; align-items: center; background: #f4f6f7; padding: 10px; border-radius: 8px;">
             <button class="btn ghost small" onclick="zmienTydzienKS(-1)" style="font-size: 16px; padding: 5px 15px;">⬅</button>
@@ -30830,8 +30830,7 @@ if (celInput) {
 
         <div style="margin-bottom: 12px;">
             <label style="font-size: 12px; font-weight: bold; color: #555;">1. Klient</label>
-            <input type="text" id="ksSearchForm" placeholder="🔍 Wpisz, aby wyszukać..." onkeyup="renderSelectKlientow('ksFormKlient', this.value, false)" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; margin-bottom: 5px; font-size: 14px; background: #f4f6f7;">
-            <select id="ksFormKlient" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px;"></select>
+            <input type="text" id="ksFormKlientInput" list="ksKlienciDataList" placeholder="🔍 Wpisz i wybierz z listy..." autocomplete="off" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; font-size: 14px;">
         </div>
 
         <div style="margin-bottom: 12px;">
@@ -30879,7 +30878,7 @@ if (celInput) {
 
 <script>
 // ==========================================
-// LOGIKA KALENDARZA SZCZEPIEŃ (INDEKSY FIREBASE)
+// LOGIKA KALENDARZA SZCZEPIEŃ 
 // ==========================================
 let ksCurrentWeekStart = new Date();
 let ksWybranyKlient = '';
@@ -30891,24 +30890,20 @@ function otworzKalendarzSzczepien() {
     let menu = document.getElementById('mainMenuSection');
     if (menu) menu.style.display = 'none';
     
-    // Ukrywanie przycisków pomocy
     document.querySelectorAll('#helpBtn, #btnPomoc, #pomocBtn, .help-icon').forEach(el => el.style.display = 'none');
-
     document.getElementById('kalendarzSzczepienSection').style.display = 'block';
     
     ksCurrentWeekStart = getMonday(new Date());
     ksWybranyKlient = '';
+    document.getElementById('ksFilterKlientInput').value = '';
     
     zaladujKlientowDoSzczepien();
-    odswiezWidokSzczepien();
 }
 
 function zamknijKalendarzSzczepien() {
     document.getElementById('kalendarzSzczepienSection').style.display = 'none';
     let menu = document.getElementById('mainMenuSection');
     if (menu) menu.style.display = 'flex'; 
-    
-    // Przywracanie przycisku pomocy
     document.querySelectorAll('#helpBtn, #btnPomoc, #pomocBtn, .help-icon').forEach(el => el.style.display = 'block');
 }
 
@@ -30921,55 +30916,61 @@ function getMonday(d) {
 }
 
 // ----------------------------------------------------
-// OBSŁUGA KLIENTÓW (Z powrotem z indexami Firebase!)
+// OBSŁUGA KLIENTÓW Z BLOKADĄ BEZPIECZEŃSTWA (ID_LECZNICY)
 // ----------------------------------------------------
 async function zaladujKlientowDoSzczepien() {
+    // BLOKADA: Jeśli system jeszcze nie wie, kim jesteś - czekamy ułamek sekundy i próbujemy ponownie
+    if (typeof currentUserProfile === 'undefined' || !currentUserProfile) {
+        console.warn("Czekam na załadowanie profilu lecznicy...");
+        setTimeout(zaladujKlientowDoSzczepien, 400); // Ponowna próba za 400ms
+        return;
+    }
+
     try {
         let q = db.collection("klienci");
-        if (typeof currentUserProfile !== 'undefined' && currentUserProfile && currentUserProfile.Rola !== 'administrator') {
+        
+        // Zabezpieczenie przed pokazaniem "wszystkich"
+        if (currentUserProfile.Rola !== 'administrator') {
+            if (!currentUserProfile['ID lecznicy']) {
+                console.error("Błąd krytyczny: Brak ID lecznicy w profilu!");
+                return;
+            }
             q = q.where("id_lecznicy", "==", currentUserProfile['ID lecznicy']);
         }
         
-        // POBIERAMY BEZ ORDER BY (omijamy błąd brakującego indeksu!)
         const snapshot = await q.get();
         globalKlienciKS = [];
         snapshot.forEach(doc => globalKlienciKS.push({ id: doc.id, ...doc.data() }));
         
-        // SORTUJEMY ALFABETYCZNIE W TELEFONIE (Błyskawiczne i niezawodne)
+        // Sortowanie
         globalKlienciKS.sort((a, b) => (a.nazwa || '').localeCompare(b.nazwa || ''));
         
-        document.getElementById('ksSearchFilter').value = '';
-        document.getElementById('ksSearchForm').value = '';
+        // Pakowanie do inteligentnej listy <datalist>
+        let datalist = document.getElementById('ksKlienciDataList');
+        datalist.innerHTML = '';
+        globalKlienciKS.forEach(c => {
+            let opt = document.createElement('option');
+            opt.value = c.nazwa;
+            datalist.appendChild(opt);
+        });
+
+        odswiezWidokSzczepien();
         
-        renderSelectKlientow('ksFilterKlient', '', true);
-        renderSelectKlientow('ksFormKlient', '', false);
     } catch(e) {
         console.error("Błąd ładowania klientów do szczepień:", e);
-        alert("Błąd pobierania klientów. Sprawdź konsolę.");
     }
 }
 
-// Wyszukiwarka w locie
-function renderSelectKlientow(selectId, filterTxt, isFilterSelect) {
-    let sel = document.getElementById(selectId);
-    let html = isFilterSelect ? '<option value="">-- Pokazuj układ tygodniowy --</option>' : '<option value="">Wybierz klienta...</option>';
-    
-    let txt = filterTxt.toLowerCase();
-    globalKlienciKS.forEach(c => {
-        let n = c.nazwa || '';
-        if(n.toLowerCase().includes(txt)) {
-            html += `<option value="${c.id}">${n}</option>`;
-        }
-    });
-    sel.innerHTML = html;
-}
-
 function zmienFiltrKlientaKS() {
-    ksWybranyKlient = document.getElementById('ksFilterKlient').value;
+    let wpisanaNazwa = document.getElementById('ksFilterKlientInput').value.trim();
+    let znaleziony = globalKlienciKS.find(k => k.nazwa === wpisanaNazwa);
+    
+    ksWybranyKlient = znaleziony ? znaleziony.id : '';
     const weekControls = document.getElementById('ksWeekControls');
     
-    if (ksWybranyKlient !== '') weekControls.style.display = 'none';
-    else {
+    if (ksWybranyKlient !== '') {
+        weekControls.style.display = 'none';
+    } else {
         weekControls.style.display = 'flex';
         ksCurrentWeekStart = getMonday(new Date()); 
     }
@@ -30982,7 +30983,7 @@ function zmienTydzienKS(offset) {
 }
 
 // ----------------------------------------------------
-// POBIERANIE SZCZEPIEŃ (Z powrotem z indexami Firebase!)
+// POBIERANIE SZCZEPIEŃ 
 // ----------------------------------------------------
 async function odswiezWidokSzczepien() {
     const lista = document.getElementById('ksListaSzczepien');
@@ -30995,8 +30996,16 @@ async function odswiezWidokSzczepien() {
             q = q.where("id_lecznicy", "==", currentUserProfile['ID lecznicy']);
         }
 
+        const snapshot = await q.get();
+        let wszystkie = [];
+        snapshot.forEach(doc => wszystkie.push({ id: doc.id, ...doc.data() }));
+
+        ksZaladowaneSzczepienia = wszystkie; 
+        let wyfiltrowane = [];
+
         if (ksWybranyKlient !== '') {
-            q = q.where("klient_id", "==", ksWybranyKlient).orderBy("dataSzczepienia", "desc");
+            wyfiltrowane = wszystkie.filter(x => x.klient_id === ksWybranyKlient);
+            wyfiltrowane.sort((a,b) => b.dataSzczepienia.localeCompare(a.dataSzczepienia)); 
         } else {
             let niedziela = new Date(ksCurrentWeekStart);
             niedziela.setDate(niedziela.getDate() + 6);
@@ -31004,17 +31013,12 @@ async function odswiezWidokSzczepien() {
             let endStr = niedziela.toISOString().split('T')[0];
             
             labelTydzien.textContent = `${startStr}  do  ${endStr}`;
-            
-            q = q.where("dataSzczepienia", ">=", startStr)
-                 .where("dataSzczepienia", "<=", endStr)
-                 .orderBy("dataSzczepienia", "asc");
+            wyfiltrowane = wszystkie.filter(x => x.dataSzczepienia >= startStr && x.dataSzczepienia <= endStr);
+            wyfiltrowane.sort((a,b) => a.dataSzczepienia.localeCompare(b.dataSzczepienia)); 
         }
 
-        const snapshot = await q.get();
-        ksZaladowaneSzczepienia = [];
         lista.innerHTML = '';
-        
-        if (snapshot.empty) {
+        if (wyfiltrowane.length === 0) {
             lista.innerHTML = `<div style="text-align: center; padding: 40px 20px; color: #999; background: white; border-radius: 12px; margin-top: 20px;">
                 <div style="font-size: 40px; margin-bottom: 10px;">💉</div>
                 Brak szczepień. Kliknij <b>+</b> w prawym dolnym rogu, aby dodać.
@@ -31022,11 +31026,7 @@ async function odswiezWidokSzczepien() {
             return;
         }
 
-        snapshot.forEach(doc => {
-            let data = doc.data();
-            data.id = doc.id;
-            ksZaladowaneSzczepienia.push(data); // do pamięci edycji
-
+        wyfiltrowane.forEach(data => {
             let dateColor = '#333';
             const dzis = new Date().toISOString().split('T')[0];
             if (data.dataSzczepienia < dzis) dateColor = '#e74c3c'; 
@@ -31053,13 +31053,12 @@ async function odswiezWidokSzczepien() {
             `;
         });
     } catch (e) {
-        console.error("Błąd bazy (sprawdź konsolę pod kątem linków do indeksów):", e);
-        lista.innerHTML = '<p style="text-align: center; color: red; margin-top: 20px;">Kliknij link w konsoli, aby utworzyć wymagany indeks bazy danych.</p>';
+        console.error("Błąd bazy:", e);
     }
 }
 
 // ----------------------------------------------------
-// OBSŁUGA KOLCZYKÓW (Dodawanie / Usuwanie)
+// OBSŁUGA KOLCZYKÓW 
 // ----------------------------------------------------
 function dodajKolczykKS() {
     let pole = document.getElementById('ksNowyKolczyk');
@@ -31116,11 +31115,9 @@ function zapiszSzczepionkeDoPamięci(nowaNazwa) {
 
 function otworzModalSzczepienia() {
     document.getElementById('ksModalTitle').textContent = "Dodaj Szczepienie";
-    document.getElementById('ksEditDocId').value = ""; // Tryb dodawania
+    document.getElementById('ksEditDocId').value = ""; 
     
-    document.getElementById('ksSearchForm').value = '';
-    renderSelectKlientow('ksFormKlient', '', false);
-    
+    document.getElementById('ksFormKlientInput').value = '';
     document.getElementById('ksFormData').value = new Date().toISOString().split('T')[0];
     document.getElementById('ksFormSzczepionka').value = '';
     document.getElementById('ksFormSztuki').value = '';
@@ -31145,12 +31142,9 @@ function edytujSzczepienie(docId) {
     if(!item) return;
 
     document.getElementById('ksModalTitle').textContent = "Edytuj Szczepienie";
-    document.getElementById('ksEditDocId').value = docId; // Tryb edycji
+    document.getElementById('ksEditDocId').value = docId; 
     
-    document.getElementById('ksSearchForm').value = '';
-    renderSelectKlientow('ksFormKlient', '', false);
-    document.getElementById('ksFormKlient').value = item.klient_id;
-    
+    document.getElementById('ksFormKlientInput').value = item.klient_nazwa || '';
     document.getElementById('ksFormData').value = item.dataSzczepienia;
     document.getElementById('ksFormSzczepionka').value = item.szczepionka;
     document.getElementById('ksFormSztuki').value = item.liczba_sztuk || '';
@@ -31167,7 +31161,7 @@ function edytujSzczepienie(docId) {
 }
 
 async function zapiszSzczepienie() {
-    const sel = document.getElementById('ksFormKlient');
+    const klientNazwa = document.getElementById('ksFormKlientInput').value.trim();
     const dataV = document.getElementById('ksFormData').value;
     const szczepionka = document.getElementById('ksFormSzczepionka').value.trim();
     const sztuki = document.getElementById('ksFormSztuki').value.trim();
@@ -31176,8 +31170,10 @@ async function zapiszSzczepienie() {
     const dataKolejna = document.getElementById('ksFormKolejnaData').value;
     const editId = document.getElementById('ksEditDocId').value;
 
-    if(!sel.value || !dataV || !szczepionka) {
-        alert("Wybierz klienta, datę i wpisz nazwę szczepionki!");
+    let znaleziony = globalKlienciKS.find(k => k.nazwa === klientNazwa);
+
+    if(!znaleziony || !dataV || !szczepionka) {
+        alert("Wybierz prawidłowego klienta z listy, wprowadź datę i nazwę szczepionki!");
         return;
     }
 
@@ -31185,15 +31181,14 @@ async function zapiszSzczepienie() {
 
     let uid = (typeof firebase !== 'undefined' && firebase.auth().currentUser) ? firebase.auth().currentUser.uid : 'brak';
     let id_lecznicy = (typeof currentUserProfile !== 'undefined' && currentUserProfile) ? currentUserProfile['ID lecznicy'] : 'brak';
-    let klientNazwa = sel.options[sel.selectedIndex].text;
 
     try {
         const szczepRef = db.collection('kalendarzSzczepienia');
         const podstawowyObiekt = {
             lekarz_uid: uid,
             id_lecznicy: id_lecznicy,
-            klient_id: sel.value,
-            klient_nazwa: klientNazwa,
+            klient_id: znaleziony.id,
+            klient_nazwa: znaleziony.nazwa,
             szczepionka: szczepionka,
             liczba_sztuk: sztuki,
             kolczyki: kolczykiStr
