@@ -14513,10 +14513,17 @@ async function loadReportUsers() {
         
         snapshot.docs.forEach(doc => {
             const user = doc.data();
+            
+            // ✅ BLOKADA: Pomijamy klientów i hodowców (ładujemy tylko personel)
+            if (user.Rola === 'klient' || user.Rola === 'hodowca') {
+                return; 
+            }
+            
             // Właściciel nie powinien widzieć Administratora na liście do raportów (chyba że chce)
             if (currentUserProfile.Rola === 'właściciel' && user.Rola === 'administrator') {
                 return; 
             }
+            
             const optionText = `${user.Imie} ${user.Nazwisko}`;
             reportUserSelect.add(new Option(optionText, user.uid));
         });
@@ -14544,7 +14551,6 @@ async function loadReportClients() {
 
     try {
         // Funkcja pomocnicza do wypełniania datalist
-      // Funkcja pomocnicza do wypełniania datalist
         const populateDatalist = (clients) => {
              datalist.innerHTML = ''; // Wyczyść
              // Opcja "Wszyscy" jest usuwana (puste pole = wszyscy)
@@ -14555,7 +14561,7 @@ async function loadReportClients() {
              });
         };
 
-   // Używamy cachedClients jeśli są już wczytani
+       // Używamy cachedClients jeśli są już wczytani
         if (cachedClients && cachedClients.length > 0) {
              console.log("Używanie klientów z cache dla raportów datalist.");
              // Sortuj cache (jeśli nie jest)
@@ -14583,6 +14589,7 @@ async function loadReportClients() {
         // Nie psujemy datalist, zostawiamy puste
     }
 }
+
 // Listener zmiany użytkownika w filtrze raportów
 if (reportUserSelect) {
     reportUserSelect.addEventListener('change', () => {
