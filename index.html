@@ -30785,12 +30785,16 @@ if (celInput) {
     <div class="top-nav" style="display: flex; justify-content: space-between; align-items: center; background: #16a085; color: white; padding: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.1);">
         <button class="btn ghost" onclick="zamknijKalendarzSzczepien()" style="color: white; border: 1px solid white; padding: 5px 10px;">⬅ Wróć</button>
         <h2 style="margin: 0; font-size: 18px;">Kalendarz Szczepień</h2>
-        <div style="width: 60px;"></div> <!-- Pusty div dla wyśrodkowania tytułu -->
+        <div style="width: 60px;"></div>
     </div>
 
     <!-- Pasek filtrów i nawigacji tygodniowej -->
     <div style="margin: 15px; padding: 15px; background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
         <label style="font-size: 12px; color: #777; font-weight: bold;">Filtruj po kliencie (opcjonalnie):</label>
+        
+        <!-- Wyszukiwarka do filtra -->
+        <input type="text" id="ksSearchFilter" placeholder="🔍 Wpisz, aby wyszukać klienta..." onkeyup="renderSelectKlientow('ksFilterKlient', this.value, true)" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; margin-top: 5px; font-size: 14px; background: #f4f6f7;">
+        
         <select id="ksFilterKlient" onchange="zmienFiltrKlientaKS()" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; margin-top: 5px; margin-bottom: 15px; font-size: 14px;">
             <option value="">-- Pokazuj układ tygodniowy --</option>
         </select>
@@ -30807,18 +30811,24 @@ if (celInput) {
         <!-- Zawartość renderowana z bazy -->
     </div>
 
-    <!-- Pływający Przycisk PLUS w prawym dolnym rogu (Floating Action Button) -->
+    <!-- Pływający Przycisk PLUS -->
     <button onclick="otworzModalSzczepienia()" style="position: fixed; bottom: 30px; right: 30px; width: 60px; height: 60px; border-radius: 50%; background-color: #16a085; color: white; font-size: 30px; border: none; box-shadow: 0 4px 15px rgba(0,0,0,0.3); z-index: 1000; cursor: pointer; display: flex; justify-content: center; align-items: center; padding-bottom: 4px;">
         +
     </button>
 </div>
-<!-- 💉 MODAL DODAWANIA SZCZEPIENIA -->
+
+<!-- 💉 MODAL DODAWANIA / EDYCJI SZCZEPIENIA -->
 <div id="szczepienieModal" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.7); display: none; z-index: 10000; justify-content: center; align-items: center;">
     <div class="form-card" style="width: 90%; max-width: 400px; background: white; padding: 20px; border-radius: 12px; border-top: 5px solid #16a085; box-shadow: 0 10px 25px rgba(0,0,0,0.5); max-height: 90vh; overflow-y: auto;">
-        <h3 style="margin-top: 0; color: #16a085; text-align: center; margin-bottom: 20px;">Dodaj Szczepienie</h3>
         
+        <h3 id="ksModalTitle" style="margin-top: 0; color: #16a085; text-align: center; margin-bottom: 20px;">Dodaj Szczepienie</h3>
+        
+        <!-- Ukryte pole do trzymania ID edytowanego wpisu -->
+        <input type="hidden" id="ksEditDocId" value="">
+
         <div style="margin-bottom: 12px;">
             <label style="font-size: 12px; font-weight: bold; color: #555;">1. Klient</label>
+            <input type="text" id="ksSearchForm" placeholder="🔍 Wpisz, aby wyszukać..." onkeyup="renderSelectKlientow('ksFormKlient', this.value, false)" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; margin-bottom: 5px; font-size: 14px; background: #f4f6f7;">
             <select id="ksFormKlient" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px;"></select>
         </div>
 
@@ -30829,19 +30839,23 @@ if (celInput) {
 
         <div style="margin-bottom: 12px;">
             <label style="font-size: 12px; font-weight: bold; color: #555;">3. Nazwa szczepionki</label>
-            <!-- input połączony z listą zapamiętanych -->
             <input type="text" id="ksFormSzczepionka" list="ksListaZapisanychSzczepionek" placeholder="np. Rabisin, Biocan..." autocomplete="off" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; font-size: 14px;">
             <datalist id="ksListaZapisanychSzczepionek"></datalist>
         </div>
 
         <div style="margin-bottom: 12px;">
-            <label style="font-size: 12px; font-weight: bold; color: #555;">4. Prognozowana l. sztuk (opcjonalnie)</label>
+            <label style="font-size: 12px; font-weight: bold; color: #555;">4. Prognozowana l. sztuk</label>
             <input type="number" id="ksFormSztuki" placeholder="np. 15" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; font-size: 14px;">
         </div>
 
         <div style="margin-bottom: 12px;">
-            <label style="font-size: 12px; font-weight: bold; color: #555;">5. Nr kolczyków (opcjonalnie)</label>
-            <textarea id="ksFormKolczyki" rows="2" placeholder="PL123456789..." style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; font-size: 14px; font-family: inherit;"></textarea>
+            <label style="font-size: 12px; font-weight: bold; color: #555;">5. Nr kolczyków</label>
+            <div style="display: flex; gap: 8px;">
+                <input type="text" id="ksNowyKolczyk" placeholder="np. PL1234..." style="flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; font-size: 14px;">
+                <button type="button" onclick="dodajKolczykKS()" style="background: #16a085; color: white; border: none; border-radius: 6px; padding: 0 15px; font-weight: bold; font-size: 18px; cursor: pointer;">+</button>
+            </div>
+            <!-- Lista dodanych kolczyków -->
+            <div id="ksListaKolczykowUI" style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px;"></div>
         </div>
 
         <div style="margin-bottom: 15px; padding: 15px; background: #e8f8f5; border-radius: 8px; border: 1px solid #d1f2eb;">
@@ -30864,31 +30878,37 @@ if (celInput) {
 
 <script>
 // ==========================================
-// LOGIKA KALENDARZA SZCZEPIEŃ (z pamięcią)
+// LOGIKA KALENDARZA SZCZEPIEŃ (BEZ BŁĘDÓW INDEKSÓW)
 // ==========================================
 let ksCurrentWeekStart = new Date();
 let ksWybranyKlient = '';
+let globalKlienciKS = []; // Zbuforowani klienci do filtrowania
+let ksBiezaceKolczyki = []; // Zmienna na listę kolczyków
+let ksZaladowaneSzczepienia = []; // Zbuforowane szczepienia do edycji
 
-// TWARDE OTWIERANIE
 function otworzKalendarzSzczepien() {
     let menu = document.getElementById('mainMenuSection');
     if (menu) menu.style.display = 'none';
     
+    // Ukrywanie ewentualnych przycisków pomocy
+    document.querySelectorAll('#helpBtn, #btnPomoc, #pomocBtn, .help-icon').forEach(el => el.style.display = 'none');
+
     document.getElementById('kalendarzSzczepienSection').style.display = 'block';
     
     ksCurrentWeekStart = getMonday(new Date());
-    document.getElementById('ksFilterKlient').value = '';
     ksWybranyKlient = '';
     
     zaladujKlientowDoSzczepien();
     odswiezWidokSzczepien();
 }
 
-// TWARDE ZAMYKANIE
 function zamknijKalendarzSzczepien() {
     document.getElementById('kalendarzSzczepienSection').style.display = 'none';
     let menu = document.getElementById('mainMenuSection');
     if (menu) menu.style.display = 'flex'; 
+    
+    // Przywracanie przycisku pomocy
+    document.querySelectorAll('#helpBtn, #btnPomoc, #pomocBtn, .help-icon').forEach(el => el.style.display = 'block');
 }
 
 function getMonday(d) {
@@ -30899,59 +30919,46 @@ function getMonday(d) {
     return d;
 }
 
-// Ładowanie historii 10 ostatnich szczepionek z localStorage
-function zaladujZapamietaneSzczepionki() {
-    let saved = localStorage.getItem('ks_historia_szczepionek');
-    let lista = saved ? JSON.parse(saved) : [];
-    let datalist = document.getElementById('ksListaZapisanychSzczepionek');
-    if (datalist) {
-        datalist.innerHTML = '';
-        lista.forEach(nazwa => {
-            let option = document.createElement('option');
-            option.value = nazwa;
-            datalist.appendChild(option);
-        });
-    }
-}
-
-// Dodawanie nowej szczepionki na szczyt listy (max 10)
-function zapiszSzczepionkeDoPamięci(nowaNazwa) {
-    if (!nowaNazwa) return;
-    let saved = localStorage.getItem('ks_historia_szczepionek');
-    let lista = saved ? JSON.parse(saved) : [];
-    
-    // Usuwamy jeśli już była (żeby wylądowała z powrotem na górze)
-    lista = lista.filter(n => n.toLowerCase() !== nowaNazwa.toLowerCase());
-    lista.unshift(nowaNazwa); // Wrzucenie na sam początek
-    
-    if (lista.length > 10) lista.pop(); // Obcięcie do max 10
-    localStorage.setItem('ks_historia_szczepionek', JSON.stringify(lista));
-}
-
+// ----------------------------------------------------
+// OBSŁUGA KLIENTÓW (BEZ BŁĘDU INDEXÓW BAZY DANYCH)
+// ----------------------------------------------------
 async function zaladujKlientowDoSzczepien() {
-    const selFilter = document.getElementById('ksFilterKlient');
-    const selForm = document.getElementById('ksFormKlient');
-    
     try {
         let q = db.collection("klienci");
         if (typeof currentUserProfile !== 'undefined' && currentUserProfile && currentUserProfile.Rola !== 'administrator') {
             q = q.where("id_lecznicy", "==", currentUserProfile['ID lecznicy']);
         }
-        const snapshot = await q.orderBy("nazwa").get();
-        let options = '<option value="">-- Pokazuj układ tygodniowy --</option>';
-        let formOptions = '<option value="">Wybierz klienta...</option>';
         
-        snapshot.forEach(doc => {
-            const data = doc.data();
-            options += `<option value="${doc.id}">${data.nazwa}</option>`;
-            formOptions += `<option value="${doc.id}">${data.nazwa}</option>`;
-        });
+        // Pobieramy bez orderBy (omijamy błąd composite index!), sortujemy w kodzie JS
+        const snapshot = await q.get();
+        globalKlienciKS = [];
+        snapshot.forEach(doc => globalKlienciKS.push({ id: doc.id, ...doc.data() }));
         
-        selFilter.innerHTML = options;
-        selForm.innerHTML = formOptions;
+        // Sortowanie alfabetyczne "w locie"
+        globalKlienciKS.sort((a,b) => (a.nazwa || '').localeCompare(b.nazwa || ''));
+        
+        document.getElementById('ksSearchFilter').value = '';
+        document.getElementById('ksSearchForm').value = '';
+        
+        renderSelectKlientow('ksFilterKlient', '', true);
+        renderSelectKlientow('ksFormKlient', '', false);
     } catch(e) {
         console.error("Błąd ładowania klientów do szczepień:", e);
     }
+}
+
+// Generuje opcje dla Selecta na podstawie wpisanego tekstu
+function renderSelectKlientow(selectId, filterTxt, isFilterSelect) {
+    let sel = document.getElementById(selectId);
+    let html = isFilterSelect ? '<option value="">-- Pokazuj układ tygodniowy --</option>' : '<option value="">Wybierz klienta...</option>';
+    
+    let txt = filterTxt.toLowerCase();
+    globalKlienciKS.forEach(c => {
+        if(c.nazwa.toLowerCase().includes(txt)) {
+            html += `<option value="${c.id}">${c.nazwa}</option>`;
+        }
+    });
+    sel.innerHTML = html;
 }
 
 function zmienFiltrKlientaKS() {
@@ -30971,54 +30978,59 @@ function zmienTydzienKS(offset) {
     odswiezWidokSzczepien();
 }
 
+// ----------------------------------------------------
+// POBIERANIE SZCZEPIEŃ (FILTROWANIE LOKALNE = BEZ BŁĘDÓW)
+// ----------------------------------------------------
 async function odswiezWidokSzczepien() {
     const lista = document.getElementById('ksListaSzczepien');
     const labelTydzien = document.getElementById('ksTydzienLabel');
-    
     lista.innerHTML = '<p style="text-align: center; color: #999; margin-top: 30px;">Ładowanie szczepień... ⏳</p>';
     
-    let q = db.collection("kalendarzSzczepienia");
-    
-    if (typeof currentUserProfile !== 'undefined' && currentUserProfile && currentUserProfile.Rola !== 'administrator') {
-        q = q.where("id_lecznicy", "==", currentUserProfile['ID lecznicy']);
-    }
-
-    if (ksWybranyKlient !== '') {
-        q = q.where("klient_id", "==", ksWybranyKlient).orderBy("dataSzczepienia", "desc");
-    } else {
-        let niedziela = new Date(ksCurrentWeekStart);
-        niedziela.setDate(niedziela.getDate() + 6);
-        let startStr = ksCurrentWeekStart.toISOString().split('T')[0];
-        let endStr = niedziela.toISOString().split('T')[0];
-        
-        labelTydzien.textContent = `${startStr}  do  ${endStr}`;
-        q = q.where("dataSzczepienia", ">=", startStr)
-             .where("dataSzczepienia", "<=", endStr)
-             .orderBy("dataSzczepienia", "asc");
-    }
-
     try {
+        let q = db.collection("kalendarzSzczepienia");
+        if (typeof currentUserProfile !== 'undefined' && currentUserProfile && currentUserProfile.Rola !== 'administrator') {
+            q = q.where("id_lecznicy", "==", currentUserProfile['ID lecznicy']);
+        }
+
+        // Pobieramy całą pulę szczepień dla lecznicy (omijamy wymóg indeksów sortowania)
         const snapshot = await q.get();
+        let wszystkie = [];
+        snapshot.forEach(doc => wszystkie.push({ id: doc.id, ...doc.data() }));
+
+        ksZaladowaneSzczepienia = wszystkie; // Zapamiętujemy do edycji
+        let wyfiltrowane = [];
+
+        if (ksWybranyKlient !== '') {
+            wyfiltrowane = wszystkie.filter(x => x.klient_id === ksWybranyKlient);
+            wyfiltrowane.sort((a,b) => b.dataSzczepienia.localeCompare(a.dataSzczepienia)); // Od najnowszych
+        } else {
+            let niedziela = new Date(ksCurrentWeekStart);
+            niedziela.setDate(niedziela.getDate() + 6);
+            let startStr = ksCurrentWeekStart.toISOString().split('T')[0];
+            let endStr = niedziela.toISOString().split('T')[0];
+            
+            labelTydzien.textContent = `${startStr}  do  ${endStr}`;
+            
+            wyfiltrowane = wszystkie.filter(x => x.dataSzczepienia >= startStr && x.dataSzczepienia <= endStr);
+            wyfiltrowane.sort((a,b) => a.dataSzczepienia.localeCompare(b.dataSzczepienia)); // Chronologicznie
+        }
+
         lista.innerHTML = '';
-        
-        if (snapshot.empty) {
+        if (wyfiltrowane.length === 0) {
             lista.innerHTML = `<div style="text-align: center; padding: 40px 20px; color: #999; background: white; border-radius: 12px; margin-top: 20px;">
                 <div style="font-size: 40px; margin-bottom: 10px;">💉</div>
-                Brak zaplanowanych szczepień w tym okresie. Kliknij <b>+</b> w prawym dolnym rogu, aby coś dodać.
+                Brak szczepień. Kliknij <b>+</b> w prawym dolnym rogu, aby dodać.
             </div>`;
             return;
         }
 
-        snapshot.forEach(doc => {
-            const data = doc.data();
+        wyfiltrowane.forEach(data => {
             let dateColor = '#333';
             const dzis = new Date().toISOString().split('T')[0];
-            
             if (data.dataSzczepienia < dzis) dateColor = '#e74c3c'; 
             else if (data.dataSzczepienia === dzis) dateColor = '#f39c12'; 
             else dateColor = '#16a085'; 
 
-            // Generowanie bloku z dodatkowymi informacjami (sztuki, kolczyki)
             let dodatki = '';
             if(data.liczba_sztuk) dodatki += `<span style="display:inline-block; margin-right: 10px; background: #eee; padding: 2px 6px; border-radius: 4px; font-size: 11px; color: #555;">🐄 Sztuk: <b>${data.liczba_sztuk}</b></span>`;
             if(data.kolczyki) dodatki += `<span style="display:inline-block; background: #eee; padding: 2px 6px; border-radius: 4px; font-size: 11px; color: #555;">🏷️ Kolczyki: <b>${data.kolczyki}</b></span>`;
@@ -31031,21 +31043,91 @@ async function odswiezWidokSzczepien() {
                         <div style="color: #7f8c8d; font-size: 13px;">💉 ${data.szczepionka}</div>
                         ${dodatki ? `<div style="margin-top: 8px;">${dodatki}</div>` : ''}
                     </div>
-                    <button onclick="usunSzczepienie('${doc.id}')" style="background: #fdf1f0; border: 1px solid #fadbd8; color: #e74c3c; border-radius: 8px; width: 40px; height: 40px; cursor: pointer; font-size: 18px; display: flex; justify-content: center; align-items: center; margin-left: 10px;">🗑</button>
+                    <div style="display:flex; flex-direction:column; gap:8px;">
+                        <button onclick="edytujSzczepienie('${data.id}')" style="background: #e8f8f5; border: 1px solid #a3e4d7; color: #16a085; border-radius: 8px; width: 40px; height: 35px; cursor: pointer; font-size: 16px; display: flex; justify-content: center; align-items: center;">✏️</button>
+                        <button onclick="usunSzczepienie('${data.id}')" style="background: #fdf1f0; border: 1px solid #fadbd8; color: #e74c3c; border-radius: 8px; width: 40px; height: 35px; cursor: pointer; font-size: 16px; display: flex; justify-content: center; align-items: center;">🗑</button>
+                    </div>
                 </div>
             `;
         });
     } catch (e) {
-        console.error("Błąd:", e);
+        console.error("Błąd bazy:", e);
         lista.innerHTML = '<p style="text-align: center; color: red; margin-top: 20px;">Wystąpił błąd odczytu bazy.</p>';
     }
 }
 
+// ----------------------------------------------------
+// OBSŁUGA KOLCZYKÓW (Dodawanie / Usuwanie)
+// ----------------------------------------------------
+function dodajKolczykKS() {
+    let pole = document.getElementById('ksNowyKolczyk');
+    let val = pole.value.trim();
+    if(val) {
+        ksBiezaceKolczyki.push(val);
+        pole.value = '';
+        renderKolczykiKS();
+    }
+}
+
+function usunKolczykZListyKS(index) {
+    ksBiezaceKolczyki.splice(index, 1);
+    renderKolczykiKS();
+}
+
+function renderKolczykiKS() {
+    let kontener = document.getElementById('ksListaKolczykowUI');
+    let html = '';
+    ksBiezaceKolczyki.forEach((k, i) => {
+        html += `<span style="background: #e8f8f5; color: #0e6655; padding: 5px 10px; border-radius: 15px; font-size: 12px; border: 1px solid #a3e4d7;">
+            ${k} <b style="color: #e74c3c; cursor: pointer; margin-left: 8px; padding: 0 4px;" onclick="usunKolczykZListyKS(${i})">x</b>
+        </span>`;
+    });
+    kontener.innerHTML = html;
+}
+
+
+// ----------------------------------------------------
+// MODAL (Dodawanie / Edycja / Zapis)
+// ----------------------------------------------------
+function zaladujZapamietaneSzczepionki() {
+    let saved = localStorage.getItem('ks_historia_szczepionek');
+    let lista = saved ? JSON.parse(saved) : [];
+    let datalist = document.getElementById('ksListaZapisanychSzczepionek');
+    if (datalist) {
+        datalist.innerHTML = '';
+        lista.forEach(nazwa => {
+            let option = document.createElement('option');
+            option.value = nazwa;
+            datalist.appendChild(option);
+        });
+    }
+}
+
+function zapiszSzczepionkeDoPamięci(nowaNazwa) {
+    if (!nowaNazwa) return;
+    let saved = localStorage.getItem('ks_historia_szczepionek');
+    let lista = saved ? JSON.parse(saved) : [];
+    lista = lista.filter(n => n.toLowerCase() !== nowaNazwa.toLowerCase());
+    lista.unshift(nowaNazwa); 
+    if (lista.length > 10) lista.pop(); 
+    localStorage.setItem('ks_historia_szczepionek', JSON.stringify(lista));
+}
+
 function otworzModalSzczepienia() {
+    document.getElementById('ksModalTitle').textContent = "Dodaj Szczepienie";
+    document.getElementById('ksEditDocId').value = ""; // Czyścimy tryb edycji
+    
+    document.getElementById('ksSearchForm').value = '';
+    renderSelectKlientow('ksFormKlient', '', false);
+    
     document.getElementById('ksFormData').value = new Date().toISOString().split('T')[0];
     document.getElementById('ksFormSzczepionka').value = '';
     document.getElementById('ksFormSztuki').value = '';
-    document.getElementById('ksFormKolczyki').value = '';
+    document.getElementById('ksNowyKolczyk').value = '';
+    
+    ksBiezaceKolczyki = [];
+    renderKolczykiKS();
+
     document.getElementById('ksFormKolejnaDawka').checked = false;
     document.getElementById('ksKolejnaDataBox').style.display = 'none';
     
@@ -31057,21 +31139,48 @@ function otworzModalSzczepienia() {
     document.getElementById('szczepienieModal').style.display = 'flex';
 }
 
+function edytujSzczepienie(docId) {
+    let item = ksZaladowaneSzczepienia.find(x => x.id === docId);
+    if(!item) return;
+
+    document.getElementById('ksModalTitle').textContent = "Edytuj Szczepienie";
+    document.getElementById('ksEditDocId').value = docId; // Wchodzimy w tryb edycji
+    
+    document.getElementById('ksSearchForm').value = '';
+    renderSelectKlientow('ksFormKlient', '', false);
+    document.getElementById('ksFormKlient').value = item.klient_id;
+    
+    document.getElementById('ksFormData').value = item.dataSzczepienia;
+    document.getElementById('ksFormSzczepionka').value = item.szczepionka;
+    document.getElementById('ksFormSztuki').value = item.liczba_sztuk || '';
+    
+    // Wczytanie kolczyków
+    ksBiezaceKolczyki = item.kolczyki ? item.kolczyki.split(',').map(x=>x.trim()).filter(x=>x) : [];
+    document.getElementById('ksNowyKolczyk').value = '';
+    renderKolczykiKS();
+
+    document.getElementById('ksFormKolejnaDawka').checked = false;
+    document.getElementById('ksKolejnaDataBox').style.display = 'none';
+    
+    zaladujZapamietaneSzczepionki();
+    document.getElementById('szczepienieModal').style.display = 'flex';
+}
+
 async function zapiszSzczepienie() {
     const sel = document.getElementById('ksFormKlient');
     const dataV = document.getElementById('ksFormData').value;
     const szczepionka = document.getElementById('ksFormSzczepionka').value.trim();
     const sztuki = document.getElementById('ksFormSztuki').value.trim();
-    const kolczyki = document.getElementById('ksFormKolczyki').value.trim();
+    const kolczykiStr = ksBiezaceKolczyki.join(', ');
     const chceKolejna = document.getElementById('ksFormKolejnaDawka').checked;
     const dataKolejna = document.getElementById('ksFormKolejnaData').value;
+    const editId = document.getElementById('ksEditDocId').value; // Czy to edycja?
 
     if(!sel.value || !dataV || !szczepionka) {
         alert("Wybierz klienta, datę i wpisz nazwę szczepionki!");
         return;
     }
 
-    // Zapisujemy nową nazwę do podręcznej pamięci (datalist)
     zapiszSzczepionkeDoPamięci(szczepionka);
 
     let uid = (typeof firebase !== 'undefined' && firebase.auth().currentUser) ? firebase.auth().currentUser.uid : 'brak';
@@ -31079,7 +31188,6 @@ async function zapiszSzczepienie() {
     let klientNazwa = sel.options[sel.selectedIndex].text;
 
     try {
-        const batch = db.batch();
         const szczepRef = db.collection('kalendarzSzczepienia');
 
         const podstawowyObiekt = {
@@ -31089,25 +31197,39 @@ async function zapiszSzczepienie() {
             klient_nazwa: klientNazwa,
             szczepionka: szczepionka,
             liczba_sztuk: sztuki,
-            kolczyki: kolczyki,
-            utworzono: firebase.firestore.FieldValue.serverTimestamp()
+            kolczyki: kolczykiStr
         };
 
-        const doc1 = szczepRef.doc();
-        batch.set(doc1, { ...podstawowyObiekt, dataSzczepienia: dataV });
-
-        // Jeśli zaznaczono kolejną dawkę – kopiujemy sztuki i kolczyki do przyszłego szczepienia
-        if (chceKolejna && dataKolejna) {
-            const doc2 = szczepRef.doc();
-            batch.set(doc2, { 
-                ...podstawowyObiekt, 
-                dataSzczepienia: dataKolejna, 
-                szczepionka: szczepionka + ' (Kolejna dawka)' 
+        if (editId) {
+            // TRYB EDYCJI - nadpisujemy tylko jeden dokument
+            await szczepRef.doc(editId).update({
+                ...podstawowyObiekt,
+                dataSzczepienia: dataV
             });
-        }
+            if(typeof showToast === 'function') showToast("Zaktualizowano pomyślnie!", "success");
+            
+            // Jesli podczas edycji kazał też zaplanować kolejną dawkę (nowy wpis)
+            if (chceKolejna && dataKolejna) {
+                await szczepRef.add({
+                    ...podstawowyObiekt,
+                    dataSzczepienia: dataKolejna,
+                    szczepionka: szczepionka + ' (Kolejna dawka)',
+                    utworzono: firebase.firestore.FieldValue.serverTimestamp()
+                });
+            }
+        } else {
+            // TRYB DODAWANIA NOWEGO
+            const batch = db.batch();
+            const doc1 = szczepRef.doc();
+            batch.set(doc1, { ...podstawowyObiekt, dataSzczepienia: dataV, utworzono: firebase.firestore.FieldValue.serverTimestamp() });
 
-        await batch.commit();
-        if(typeof showToast === 'function') showToast("Szczepienie zapisane!", "success");
+            if (chceKolejna && dataKolejna) {
+                const doc2 = szczepRef.doc();
+                batch.set(doc2, { ...podstawowyObiekt, dataSzczepienia: dataKolejna, szczepionka: szczepionka + ' (Kolejna dawka)', utworzono: firebase.firestore.FieldValue.serverTimestamp() });
+            }
+            await batch.commit();
+            if(typeof showToast === 'function') showToast("Szczepienie zapisane!", "success");
+        }
         
         document.getElementById('szczepienieModal').style.display = 'none';
         odswiezWidokSzczepien();
