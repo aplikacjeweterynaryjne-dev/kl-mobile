@@ -20799,6 +20799,13 @@ async function loadZarzadzanieUsers() {
 function populateZarzadzanieUsers() {
     zarzadzanieUserSelect.innerHTML = '<option value="">--- Wybierz pracownika ---</option>';
     zarzadzanieUzytkownicyCache.forEach(user => {
+        
+        // ✅ BLOKADA: Pomijamy klientów i hodowców
+        // (Sprawdzamy z dużej i małej litery na wszelki wypadek)
+        if (user.Rola === 'klient' || user.rola === 'klient' || user.Rola === 'hodowca' || user.rola === 'hodowca') {
+            return; // Przerywa pętlę dla tego użytkownika (nie dodaje go do listy)
+        }
+
         // Dodajemy informację, czy magazyn jest aktywny
         const suffix = user.uzywaMagazynu ? " (Magazyn Aktywny)" : " (Magazyn Nieaktywny)";
         const option = new Option(user.nazwa + suffix, user.docId);
