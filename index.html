@@ -30930,10 +30930,13 @@ async function zaladujKlientowDoSzczepien() {
             q = q.where("id_lecznicy", "==", currentUserProfile['ID lecznicy']);
         }
         
-        // Z powrotem ORDER BY (użyje indeksu)
-        const snapshot = await q.orderBy("nazwa").get();
+        // POBIERAMY BEZ ORDER BY (omijamy błąd brakującego indeksu!)
+        const snapshot = await q.get();
         globalKlienciKS = [];
         snapshot.forEach(doc => globalKlienciKS.push({ id: doc.id, ...doc.data() }));
+        
+        // SORTUJEMY ALFABETYCZNIE W TELEFONIE (Błyskawiczne i niezawodne)
+        globalKlienciKS.sort((a, b) => (a.nazwa || '').localeCompare(b.nazwa || ''));
         
         document.getElementById('ksSearchFilter').value = '';
         document.getElementById('ksSearchForm').value = '';
@@ -30942,6 +30945,7 @@ async function zaladujKlientowDoSzczepien() {
         renderSelectKlientow('ksFormKlient', '', false);
     } catch(e) {
         console.error("Błąd ładowania klientów do szczepień:", e);
+        alert("Błąd pobierania klientów. Sprawdź konsolę.");
     }
 }
 
