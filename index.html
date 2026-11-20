@@ -28306,7 +28306,7 @@ async function generateSwiNumber() {
     }
 }
 
-// ✅ ZAPIS ŚWIADECTWA Z AUTOMATYCZNYM POBRANIEM Z MAGAZYNU NASIENIA
+// ✅ ZAPIS ŚWIADECTWA Z AUTOMATYCZNYM POBRANIEM Z MAGAZYNU NASIENIA ORAZ SYNCHRONIZACJĄ KROWY KLIENTA
 async function saveSwiadectwo() {
     const nrDok = document.getElementById('swiNrDokumentuDisplay').textContent;
     if(nrDok.includes("X") || nrDok.includes("GENEROWANIE")) return alert("Błąd numeru, nie można zapisać.");
@@ -28367,18 +28367,55 @@ async function saveSwiadectwo() {
 
         // 3. Pobranie sztuki nasienia z bazy danych
         if (selectedSemenItem && selectedSemenItem.trackStock) {
-            // Zdejmujemy 1 sztukę z konta użytkownika w obiekcie JS
             selectedSemenItem.stanyOsobiste[currentUserProfile.uid] -= 1; 
-            
-            // Nadpisujemy cały dokument magazynu nasienia w Firebase
             const clinicId = currentUserProfile['ID lecznicy'];
             const semenMagRef = db.collection('nasienie_magazyn').doc(clinicId);
             batch.set(semenMagRef, currentSemenData); 
         }
 
+        // =========================================================================
+        // 4. ✅ AUTOMATYCZNA SYNCHRONIZACJA Z BAZĄ ZWIERZĄT KLIENTA
+        // =========================================================================
+        if (dataObj.krowaKolczyk && dataObj.dataZabiegu) {
+            try {
+                // Szukamy krowy w bazie po numerze kolczyka
+                const krowaQuery = await db.collection("animals").where("tag", "==", dataObj.krowaKolczyk).get();
+                
+                if (!krowaQuery.empty) {
+                    const krowaDoc = krowaQuery.docs[0];
+                    const daneKrowy = krowaDoc.data();
+                    const obecnaDataZacielenia = daneKrowy.lastInsem;
+                    const biezacaNazwaBuhaja = dataObj.buhajNazwa || daneKrowy.semen;
+
+                    // Porównujemy daty
+                    if (!obecnaDataZacielenia || new Date(dataObj.dataZabiegu) > new Date(obecnaDataZacielenia)) {
+                        
+                        const updateData = {
+                            lastInsem: dataObj.dataZabiegu,
+                            semen: biezacaNazwaBuhaja,
+                            pregStatus: "check" // Ustawia status na "Do USG", jeśli chcesz (opcjonalne)
+                        };
+
+                        // 💡 MIEJSCE NA HISTORIĘ - uzupełnimy to, jak podeślesz kod z panelu klienta!
+                        /*
+                        updateData.history = firebase.firestore.FieldValue.arrayUnion({
+                            // tu wpiszemy odpowiednie klucze...
+                        });
+                        */
+
+                        batch.update(krowaDoc.ref, updateData);
+                        console.log(`Dodano krowę ${dataObj.krowaKolczyk} do paczki synchronizacji.`);
+                    }
+                }
+            } catch (err) {
+                console.warn("Nie udało się pobrać danych krowy klienta do synchronizacji:", err);
+            }
+        }
+        // =========================================================================
+
         await batch.commit();
 
-        if(typeof showToast === 'function') showToast("Świadectwo zapisane i pobrano nasienie z magazynu!", "success");
+        if(typeof showToast === 'function') showToast("Świadectwo zapisane i zsynchronizowane pomyślnie!", "success");
         initSwiadectwoWizard(); 
     } catch(e) {
         alert("Błąd zapisu! Sprawdź reguły Firebase.");
