@@ -5563,10 +5563,6 @@ Zastosowane u poszczególnych zwierząt produkty lecznicze lub nabyte przez posi
             <button class="btn" style="width: 100%; background: #dcdcdc; font-size: 18px; padding: 10px;" onclick="previewSwiadectwo()">
                 🧾 Podgląd (Wydruk 110mm)
             </button>
-            <!-- ✅ NOWY PRZYCISK: Przejście do panelu klienta -->
-            <button class="btn" style="width: 100%; background: #f39c12; color: white; border-color: #e67e22; font-size: 18px; padding: 10px; font-weight: bold;" onclick="openClientPanelAndInsem()">
-                🐄 Zapisz i otwórz kartę krowy u klienta
-            </button>
             <button class="btn primary" style="width: 100%; font-size: 22px; padding: 15px;" onclick="saveSwiadectwo()">
                 💾 ZAPISZ W ARCHIWUM
             </button>
@@ -28310,7 +28306,7 @@ async function generateSwiNumber() {
     }
 }
 
-// ✅ ZAPIS ŚWIADECTWA Z AUTOMATYCZNYM POBRANIEM Z MAGAZYNU NASIENIA
+// ✅ ZAPIS ŚWIADECTWA Z AUTOMATYCZNYM POBRANIEM Z MAGAZYNU NASIENIA ORAZ SYNCHRONIZACJĄ Z KROWĄ KLIENTA
 async function saveSwiadectwo() {
     const nrDok = document.getElementById('swiNrDokumentuDisplay').textContent;
     if(nrDok.includes("X") || nrDok.includes("GENEROWANIE")) return alert("Błąd numeru, nie można zapisać.");
@@ -28319,7 +28315,7 @@ async function saveSwiadectwo() {
     const buhajSelectId = document.getElementById('swiBuhajSelect').value;
     let selectedSemenItem = null;
     
-    if (buhajSelectId && currentSemenData && currentSemenData.pozycje) {
+    if (buhajSelectId && typeof currentSemenData !== 'undefined' && currentSemenData && currentSemenData.pozycje) {
         selectedSemenItem = currentSemenData.pozycje.find(p => p.id === buhajSelectId);
     }
 
@@ -28371,18 +28367,61 @@ async function saveSwiadectwo() {
 
         // 3. Pobranie sztuki nasienia z bazy danych
         if (selectedSemenItem && selectedSemenItem.trackStock) {
-            // Zdejmujemy 1 sztukę z konta użytkownika w obiekcie JS
             selectedSemenItem.stanyOsobiste[currentUserProfile.uid] -= 1; 
-            
-            // Nadpisujemy cały dokument magazynu nasienia w Firebase
             const clinicId = currentUserProfile['ID lecznicy'];
             const semenMagRef = db.collection('nasienie_magazyn').doc(clinicId);
             batch.set(semenMagRef, currentSemenData); 
         }
 
+        // =========================================================================
+        // 4. ✅ AUTOMATYCZNA SYNCHRONIZACJA Z BAZĄ ZWIERZĄT KLIENTA (Z HISTORIĄ)
+        // =========================================================================
+        if (dataObj.krowaKolczyk && dataObj.dataZabiegu) {
+            try {
+                // Pobieramy z bazy zwierząt krowę o wpisanym numerze kolczyka
+                const krowaQuery = await db.collection("animals").where("tag", "==", dataObj.krowaKolczyk).get();
+                
+                if (!krowaQuery.empty) {
+                    const krowaDoc = krowaQuery.docs[0];
+                    const daneKrowy = krowaDoc.data();
+                    const obecnaDataZacielenia = daneKrowy.lastInsemination; // W panelu klienta to 'lastInsemination'
+                    const biezacaNazwaBuhaja = dataObj.buhajNazwa || daneKrowy.semen || '';
+
+                    // Aktualizujemy tylko, gdy pole u rolnika jest puste lub wpisywana data jest nowsza
+                    if (!obecnaDataZacielenia || new Date(dataObj.dataZabiegu) >= new Date(obecnaDataZacielenia)) {
+                        
+                        // Przygotowanie historii wpisu identycznie jak u klienta
+                        const nowyWpisHistorii = {
+                            date: dataObj.dataZabiegu,
+                            time: "", // Zostawiamy puste, bo weterynarz podaje tylko datę na świadectwie
+                            bull: biezacaNazwaBuhaja,
+                            note: 'Zacielenie (Weterynarz)',
+                            added: new Date().toISOString()
+                        };
+
+                        batch.update(krowaDoc.ref, {
+                            lastInsemination: dataObj.dataZabiegu,
+                            semen: biezacaNazwaBuhaja,
+                            isPregnantConfirmed: false,     // Resetujemy status cielności
+                            usgStatus: 'pending',           // Zmieniamy na "Do USG"
+                            lastActivityDate: new Date().toISOString().split('T')[0],
+                            // arrayUnion dopisuje wpis na koniec historii rolnika
+                            historyInsemination: firebase.firestore.FieldValue.arrayUnion(nowyWpisHistorii)
+                        });
+                        console.log(`Dodano aktualizację krowy ${dataObj.krowaKolczyk} do paczki zapisu.`);
+                    }
+                } else {
+                    console.log(`Krowa o kolczyku ${dataObj.krowaKolczyk} nie została znaleziona w bazie panelu klienta.`);
+                }
+            } catch (err) {
+                console.warn("Nie udało się pobrać/zaktualizować krowy klienta (błąd uprawnień):", err);
+            }
+        }
+        // =========================================================================
+
         await batch.commit();
 
-        if(typeof showToast === 'function') showToast("Świadectwo zapisane i pobrano nasienie z magazynu!", "success");
+        if(typeof showToast === 'function') showToast("Świadectwo zapisane i zsynchronizowane pomyślnie!", "success");
         initSwiadectwoWizard(); 
     } catch(e) {
         alert("Błąd zapisu! Sprawdź reguły Firebase.");
@@ -31370,60 +31409,6 @@ async function usunSzczepienie(docId) {
         if(typeof showToast === 'function') showToast("Usunięto.", "info");
         odswiezWidokSzczepien();
     }
-}
-    function openClientPanelAndInsem() {
-    // 1. Zbieramy dane wpisane na świadectwie
-    const kolczyk = document.getElementById('swiKolczykInput').value.trim();
-    const dataZabiegu = document.getElementById('swiDataZabieguInput').value;
-    const buhaj = document.getElementById('swiBuhajNazwa').value.trim();
-    const nazwaKlienta = document.getElementById('swiKlientInput').value.trim();
-
-    if (!kolczyk || !nazwaKlienta) {
-        return alert("Wybierz klienta i krowę, aby przejść do jej karty.");
-    }
-
-    // 2. NAJPIERW ZAPISUJEMY ŚWIADECTWO W ARCHIWUM WETA
-    // Wywołujemy Twoją standardową funkcję zapisu (bez żadnych ukrytych aktualizacji w tle)
-    if (typeof saveSwiadectwo === 'function') {
-        saveSwiadectwo();
-    }
-
-    // 3. PRZEŁĄCZENIE DO PANELU KLIENTA
-    // Tutaj musisz wywołać swoją funkcję, która normalnie ładuje panel tego klienta
-    // np.: otworzPanelKlienta(nazwaKlienta);
-    console.log("Przełączanie do panelu klienta: ", nazwaKlienta);
-
-    // 4. OTWIERAMY I WYPEŁNIAMY MODAL INSEMINACJI
-    setTimeout(() => {
-        // Otwieramy okno masowego zacielenia w panelu klienta
-        if (typeof openInsemModal === 'function') {
-            openInsemModal();
-        } else {
-            // Jeśli nie korzystasz z `openInsemModal`, spróbuj podmienić na odpowiednią funkcję otwierającą
-            document.getElementById('insemModal').style.display = 'flex';
-        }
-
-        // Uzupełniamy dane w modalu klienta na podstawie tego, co weterynarz wpisał w świadectwie
-        const dataInput = document.getElementById('insemDate');
-        const buhajInput = document.getElementById('massInsemBull');
-        const szukajKrowyInput = document.getElementById('insemAnimalSearch');
-
-        if (dataInput) dataInput.value = dataZabiegu;
-        if (buhajInput) buhajInput.value = buhaj;
-        
-        if (szukajKrowyInput) {
-            szukajKrowyInput.value = kolczyk;
-            // Wymuszamy przefiltrowanie listy krów u klienta, żeby weterynarz od razu widział tylko tę jedną sztukę
-            if (typeof populateMassInsemAnimals === 'function') {
-                populateMassInsemAnimals();
-            }
-            // Zaznaczamy checkbox dla tej konkretnej krowy, jeśli funkcja to wspiera
-            setTimeout(() => {
-                const cb = document.querySelector(`.mass-animal-cb[value="${kolczyk}"]`);
-                if (cb) cb.checked = true;
-            }, 300);
-        }
-    }, 800); // 800ms opóźnienia, żeby panel klienta zdążył się w pełni załadować
 }
 </script>
 </body>
