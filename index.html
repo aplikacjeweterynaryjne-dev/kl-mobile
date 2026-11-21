@@ -28194,6 +28194,9 @@ function refreshSwiSemenList() {
     };
 }
 
+// ============================================================================
+// 1. ZARZĄDZANIE WIDOKIEM KROKÓW (WIZARD)
+// ============================================================================
 function goToSwiStep(stepNum) {
     for(let i=1; i<=5; i++) {
         document.getElementById('swiStep'+i).classList.remove('active');
@@ -28205,30 +28208,127 @@ function goToSwiStep(stepNum) {
     if(stepNum === 5) generateSwiNumber();
 }
 
-async function populateSwiCowList(clientName) {
-    const dataList = document.getElementById('swiKolczykiList');
-    dataList.innerHTML = '';
-    if(!clientName) return;
+// ============================================================================
+// 2. PODPOWIADANIE KOLCZYKÓW (BEZBŁĘDNE KOLEJKOWANIE + ZASYSANIE ŻYWEGO STADA)
+// ============================================================================
+let currentTagFetchId = 0; // Globalny licznik blokujący wyścig zapytań (race conditions)
 
-    try {
-        // ✅ ZMIANA: Szukamy w archiwumSwiadectwa po polu 'klient' 
-        const q = db.collection("archiwumSwiadectwa")
-                    .where("klient", "==", clientName)
-                    .orderBy("dataZabiegu", "desc")
-                    .limit(100);
+if (document.getElementById('swiKlientInput')) {
+    // Reagujemy na każdy wpis z odpowiednim opóźnieniem (debounce)
+    document.getElementById('swiKlientInput').addEventListener('input', function() {
+        const klientName = this.value.trim();
+        const swiKolczykiList = document.getElementById('swiKolczykiList');
+        
+        if (!swiKolczykiList) return;
 
-        const snap = await q.get();
-        const tags = new Set();
-        snap.docs.forEach(doc => {
-            const d = doc.data();
-            // ✅ ZMIANA: Pobieramy numer z pola 'krowaKolczyk' 
-            if(d.krowaKolczyk) tags.add(d.krowaKolczyk); 
-        });
-        tags.forEach(t => { dataList.appendChild(new Option(t, t)); });
-        console.log(`Pobrano ${tags.size} unikalnych kolczyków z historii świadectw.`);
-    } catch(e) { console.error("Błąd pobierania kolczyków z archiwum świadectw:", e); }
+        // Jeśli formularz został wyczyszczony (np. przy nowym świadectwie), czyścimy też listę podpowiedzi
+        if (!klientName || !currentUserProfile || !currentUserProfile['ID lecznicy']) {
+            swiKolczykiList.innerHTML = '';
+            return;
+        }
+
+        const fetchId = ++currentTagFetchId;
+
+        // Opóźnienie 500ms zapobiega nadmiarowym zapytaniom i daje czas HTML na zaktualizowanie numeru stada
+        setTimeout(async () => {
+            if (fetchId !== currentTagFetchId) return; 
+            
+            swiKolczykiList.innerHTML = '<option value="">Szukam krów klienta...</option>';
+
+            try {
+                const uniqueTags = new Map(); // Mapa wycina duplikaty
+                let rolnikUid = null;
+
+                // A. Szukamy klienta w naszej bazie weterynarza, aby wyciągnąć jego prawdziwy numer stada
+                const klientQuery = await db.collection("klienci")
+                    .where("idLecznicy", "==", currentUserProfile['ID lecznicy'])
+                    .where("nazwa", "==", klientName).limit(1).get();
+                
+                let nrStadaZBazy = null;
+                if (!klientQuery.empty) {
+                    nrStadaZBazy = klientQuery.docs[0].data().nrStada;
+                }
+
+                // B. Namierzamy UID rolnika, uwzględniając, że bracia mogli podać kilka numerów po przecinku
+                if (nrStadaZBazy && nrStadaZBazy.trim() !== '' && nrStadaZBazy !== '---') {
+                    const searchStadaArr = nrStadaZBazy.split(',').map(s => s.replace(/\s/g, '').toUpperCase()).filter(Boolean);
+                    
+                    const konfigSnap = await db.collection("konfiguracja").get();
+                    konfigSnap.forEach(doc => {
+                        const d = doc.data();
+                        if (d.numer_gospodarstwa) {
+                            const dbStadaArr = d.numer_gospodarstwa.split(',').map(s => s.replace(/\s/g, '').toUpperCase()).filter(Boolean);
+                            const isMatch = searchStadaArr.some(stado => dbStadaArr.includes(stado));
+                            if (isMatch) {
+                                rolnikUid = d.uid; 
+                            }
+                        }
+                    });
+                }
+
+                if (fetchId !== currentTagFetchId) return;
+
+                // C. Jeżeli znaleziono Panel Klienta, wciągamy wszystkie jego aktywne krowy i jałówki
+                if (rolnikUid) {
+                    const stadoQuery = await db.collection("animals").where("ownerUid", "==", rolnikUid).get();
+                    stadoQuery.forEach(doc => {
+                        const data = doc.data();
+                        if (data.tag && data.type !== 'byk') {
+                            uniqueTags.set(data.tag.toUpperCase(), "Ze Stada");
+                        }
+                    });
+                }
+
+                if (fetchId !== currentTagFetchId) return;
+
+                // D. Uzupełniamy ewentualne luki z archiwalnych świadectw weterynarza z ostatnich 360 dni
+                const dateLimit = new Date();
+                dateLimit.setDate(dateLimit.getDate() - 360);
+                
+                const archiveQuery = await db.collection("archiwumSwiadectwa")
+                    .where("id_lecznicy", "==", currentUserProfile['ID lecznicy'])
+                    .where("klient", "==", klientName).get();
+
+                archiveQuery.forEach(doc => {
+                    const data = doc.data();
+                    if (data.krowaKolczyk && data.createdAt) {
+                        const docDate = data.createdAt.toDate ? data.createdAt.toDate() : new Date(data.createdAt);
+                        if (docDate >= dateLimit) {
+                            const tagUpper = data.krowaKolczyk.toUpperCase();
+                            // Dodajemy stary kolczyk TYLKO wtedy, gdy nie widnieje już jako pobrany z "Ze Stada"
+                            if (!uniqueTags.has(tagUpper)) {
+                                uniqueTags.set(tagUpper, "Z Archiwum");
+                            }
+                        }
+                    }
+                });
+
+                if (fetchId !== currentTagFetchId) return;
+
+                // E. Generujemy wyczyszczoną, docelową listę dla weterynarza
+                swiKolczykiList.innerHTML = '';
+                
+                if (uniqueTags.size === 0) {
+                    swiKolczykiList.innerHTML = '<option value="">Brak krów (Wpisz kolczyk ręcznie)</option>';
+                } else {
+                    uniqueTags.forEach((zrodlo, kolczyk) => {
+                        const opt = document.createElement('option');
+                        opt.value = kolczyk;
+                        opt.textContent = `(${zrodlo})`;
+                        swiKolczykiList.appendChild(opt);
+                    });
+                }
+            } catch (error) {
+                console.error("Błąd ładowania podpowiedzi kolczyków:", error);
+                swiKolczykiList.innerHTML = '';
+            }
+        }, 500);
+    });
 }
 
+// ============================================================================
+// 3. SYMULACJE DAT WYCIELENIA I ZABIEGÓW
+// ============================================================================
 function calcSwiDates() {
     const dStr = document.getElementById('swiDataZabieguInput').value;
     if(!dStr) return;
@@ -28271,6 +28371,9 @@ async function autoCalcZabieg() {
     }
 }
 
+// ============================================================================
+// 4. GENEROWANIE NUMERU ŚWIADECTWA (BEZ LIMITU INDEKSÓW)
+// ============================================================================
 async function generateSwiNumber() {
     const d = new Date();
     currentSwiData.currentMonth = d.getMonth() + 1;
@@ -28278,7 +28381,6 @@ async function generateSwiNumber() {
     currentSwiData.initials = currentUserProfile.Inicjaly || 'NN';
 
     try {
-        // Usuwamy "orderBy" i "limit(1)", żeby obejść restrykcje indeksowania Firebase
         const q = db.collection("archiwumSwiadectwa")
             .where("lekarz_uid", "==", currentUserProfile.uid)
             .where("rok", "==", currentSwiData.currentYear)
@@ -28287,7 +28389,6 @@ async function generateSwiNumber() {
         const snapshot = await q.get();
         let maxCounter = 0;
         
-        // Szukamy najwyższego licznika w JavaScript
         snapshot.docs.forEach(doc => {
             const c = parseInt(doc.data().counter, 10);
             if (!isNaN(c) && c > maxCounter) {
@@ -28296,7 +28397,6 @@ async function generateSwiNumber() {
         });
         
         currentSwiData.nextCounter = maxCounter + 1;
-
         const nr = `SWI-${currentSwiData.nextCounter}/${currentSwiData.currentMonth}/${currentSwiData.currentYear}/${currentSwiData.initials}`;
         document.getElementById('swiNrDokumentuDisplay').textContent = nr;
 
@@ -28306,13 +28406,14 @@ async function generateSwiNumber() {
     }
 }
 
-// ✅ ZAPIS ŚWIADECTWA Z AUTOMATYCZNYM POBRANIEM NASIENIA, SYNCHRONIZACJĄ, TWORZENIEM KROWY I OSTRZEŻENIEM USG
-// ✅ ZAPIS ŚWIADECTWA Z AUTOMATYCZNYM POBRANIEM NASIENIA, SYNCHRONIZACJĄ, TWORZENIEM KROWY I OSTRZEŻENIEM USG
+// ============================================================================
+// 5. ZAPIS ŚWIADECTWA Z AUTOMATYCZNĄ SYNCHRONIZACJĄ STADA KLIENTA
+// ============================================================================
 async function saveSwiadectwo() {
     const nrDok = document.getElementById('swiNrDokumentuDisplay').textContent;
     if(nrDok.includes("X") || nrDok.includes("GENEROWANIE")) return alert("Błąd numeru, nie można zapisać.");
 
-    // 1. WALIDACJA STANU MAGAZYNOWEGO NASIENIA
+    // WALIDACJA STANU MAGAZYNOWEGO NASIENIA
     const buhajSelectId = document.getElementById('swiBuhajSelect').value;
     let selectedSemenItem = null;
     
@@ -28323,6 +28424,7 @@ async function saveSwiadectwo() {
     if (selectedSemenItem && selectedSemenItem.trackStock) {
         const myUid = currentUserProfile.uid;
         const myStock = (selectedSemenItem.stanyOsobiste && selectedSemenItem.stanyOsobiste[myUid]) ? selectedSemenItem.stanyOsobiste[myUid] : 0;
+        
         if (myStock <= 0) {
             alert(`❌ BŁĄD MAGAZYNU NASIENIA!\n\nBrak nasienia "${selectedSemenItem.nazwa}" na Twoim koncie.`);
             return;
@@ -28362,11 +28464,11 @@ async function saveSwiadectwo() {
         const batch = db.batch();
         let rolnikUidDoSprawdzenia = null; 
         
-        // 2. Zapis w Archiwum Weta
+        // Zapis dokumentu świadectwa w Archiwum Weta
         const newDocRef = db.collection("archiwumSwiadectwa").doc();
         batch.set(newDocRef, dataObj);
 
-        // 3. Pobranie z magazynu
+        // Pobranie z magazynu weterynarza
         if (selectedSemenItem && selectedSemenItem.trackStock) {
             selectedSemenItem.stanyOsobiste[currentUserProfile.uid] -= 1; 
             const clinicId = currentUserProfile['ID lecznicy'];
@@ -28374,22 +28476,33 @@ async function saveSwiadectwo() {
             batch.set(semenMagRef, currentSemenData); 
         }
 
-        // =========================================================================
-        // 4. ✅ INTELIGENTNA SYNCHRONIZACJA / TWORZENIE KROWY KLIENTA
-        // =========================================================================
+        // --- AKTUALIZACJA / TWORZENIE KROWY U KLIENTA ---
         if (dataObj.krowaKolczyk && dataObj.dataZabiegu) {
             try {
                 const kolczykUpper = dataObj.krowaKolczyk.toUpperCase(); 
                 
-                // Szukamy rolnika w niezawodny sposób (ignorujemy spacje w numerze stada)
-                if (dataObj.klientStado && dataObj.klientStado !== '---' && dataObj.klientStado.trim() !== '') {
-                    const searchStado = dataObj.klientStado.replace(/\s/g, '').toUpperCase();
+                // 1. Zdobądź niezawodnie numer stada bezpośrednio z bazy
+                let prawdziwyNrStada = dataObj.klientStado;
+                if (!prawdziwyNrStada || prawdziwyNrStada === '---') {
+                    const klientBazaQuery = await db.collection("klienci")
+                        .where("idLecznicy", "==", currentUserProfile['ID lecznicy'])
+                        .where("nazwa", "==", dataObj.klient).limit(1).get();
+                    if (!klientBazaQuery.empty) {
+                        prawdziwyNrStada = klientBazaQuery.docs[0].data().nrStada;
+                    }
+                }
+                
+                // 2. Szukamy UID klienta, uwzględniając podział na numery po przecinku
+                if (prawdziwyNrStada && prawdziwyNrStada.trim() !== '') {
+                    const searchStadaArr = prawdziwyNrStada.split(',').map(s => s.replace(/\s/g, '').toUpperCase()).filter(Boolean);
+                    
                     const konfigSnap = await db.collection("konfiguracja").get();
                     konfigSnap.forEach(doc => {
                         const d = doc.data();
                         if (d.numer_gospodarstwa) {
-                            const dbStado = d.numer_gospodarstwa.replace(/\s/g, '').toUpperCase();
-                            if (dbStado === searchStado || dbStado.includes(searchStado)) {
+                            const dbStadaArr = d.numer_gospodarstwa.split(',').map(s => s.replace(/\s/g, '').toUpperCase()).filter(Boolean);
+                            const isMatch = searchStadaArr.some(stado => dbStadaArr.includes(stado));
+                            if (isMatch) {
                                 rolnikUidDoSprawdzenia = d.uid; 
                             }
                         }
@@ -28404,7 +28517,7 @@ async function saveSwiadectwo() {
                     added: new Date().toISOString()
                 };
 
-                // Jeśli wiemy kim jest rolnik, szukamy krowy W JEGO STADZIE
+                // 3. Aktualizujemy lub tworzymy krowę
                 if (rolnikUidDoSprawdzenia) {
                     const krowaQuery = await db.collection("animals")
                         .where("ownerUid", "==", rolnikUidDoSprawdzenia)
@@ -28412,7 +28525,7 @@ async function saveSwiadectwo() {
                         .get();
 
                     if (!krowaQuery.empty) {
-                        // KROWA ISTNIEJE -> AKTUALIZUJEMY
+                        // Zaktualizuj, jeśli krowa istnieje
                         const krowaDoc = krowaQuery.docs[0];
                         const daneKrowy = krowaDoc.data();
                         const obecnaData = daneKrowy.lastInsemination;
@@ -28428,7 +28541,7 @@ async function saveSwiadectwo() {
                             });
                         }
                     } else {
-                        // KROWA NIE ISTNIEJE -> TWORZYMY NOWĄ DLA TEGO ROLNIKA
+                        // Utwórz NOWĄ krowę u rolnika, jeśli weterynarz wpisał jej kolczyk
                         const nowaKrowaRef = db.collection("animals").doc();
                         batch.set(nowaKrowaRef, {
                             ownerUid: rolnikUidDoSprawdzenia,
@@ -28449,15 +28562,13 @@ async function saveSwiadectwo() {
                             createdAt: firebase.firestore.FieldValue.serverTimestamp(),
                             lastActivityDate: new Date().toISOString().split('T')[0]
                         });
-                        console.log(`Utworzono krowę ${kolczykUpper} w stuku klienta.`);
                     }
                 } else {
-                    // FALLBACK: Jeśli mimo wszystko nie znaleziono klienta po numerze stada, zróbmy aktualizację globalną 
-                    // (To działa dla starych krów wprowadzonych zanim mechanizm stada zaczął działać)
+                    // FALLBACK: Krowa starsza, dodana bez ownerUid (działamy ryzykownie globalnie)
                     const krowaGlobalQuery = await db.collection("animals").where("tag", "==", kolczykUpper).get();
                     if (!krowaGlobalQuery.empty) {
                         const krowaDoc = krowaGlobalQuery.docs[0];
-                        rolnikUidDoSprawdzenia = krowaDoc.data().ownerUid; // wyciągnij UID do USG
+                        rolnikUidDoSprawdzenia = krowaDoc.data().ownerUid; 
                         
                         batch.update(krowaDoc.ref, {
                             lastInsemination: dataObj.dataZabiegu,
@@ -28476,9 +28587,7 @@ async function saveSwiadectwo() {
         
         await batch.commit();
 
-        // =========================================================================
-        // 5. ✅ ANALIZA STADA: SZUKAMY KRÓW GOTOWYCH DO USG
-        // =========================================================================
+        // --- INTELIGENTNA ANALIZA USG KLIENTA ---
         let alertUsgMsg = "";
         if (rolnikUidDoSprawdzenia) {
             try {
@@ -28505,11 +28614,11 @@ async function saveSwiadectwo() {
                 console.warn("Nie udało się pobrać statystyk USG:", err);
             }
         }
-        // =========================================================================
 
         if(typeof showToast === 'function') showToast("Zapisano pomyślnie!", "success");
         
-        if (confirm(`Świadectwo zostało zapisane w archiwum!${alertUsgMsg}\n\nCzy chcesz wyczyścić formularz i rozpocząć wypisywanie KOLEJNEGO świadectwa?\n(Kliknij "Anuluj", aby zostać w obecnym, np. żeby je wydrukować)`)) {
+        // Zamykanie / Opróżnianie świadectwa
+        if (confirm(`Świadectwo zostało zapisane w archiwum!${alertUsgMsg}\n\nCzy chcesz wyczyścić formularz i rozpocząć wypisywanie KOLEJNEGO świadectwa?\n(Kliknij "Anuluj", aby zostać w obecnym i móc je np. wydrukować)`)) {
             initSwiadectwoWizard(); 
         }
         
