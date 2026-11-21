@@ -1563,8 +1563,28 @@ function populateLists() {
 }
 
 // --- KARTA ZWIERZĘCIA I EDYCJA ---
+// --- KARTA ZWIERZĘCIA I EDYCJA (ROZBUDOWANA O ARCHIWUM) ---
 
-function openAnimalCard(id) {
+function switchCowTab(tab) {
+    const btnData = document.getElementById('tabCowData');
+    const btnArchive = document.getElementById('tabCowArchive');
+    const viewData = document.getElementById('cowDataView');
+    const viewArchive = document.getElementById('cowArchiveView');
+
+    if (tab === 'data') {
+        btnData.classList.replace('ghost', 'primary');
+        btnArchive.classList.replace('primary', 'ghost');
+        viewData.classList.remove('hidden');
+        viewArchive.classList.add('hidden');
+    } else {
+        btnArchive.classList.replace('ghost', 'primary');
+        btnData.classList.replace('primary', 'ghost');
+        viewArchive.classList.remove('hidden');
+        viewData.classList.add('hidden');
+    }
+}
+
+async function openAnimalCard(id) {
     const animal = myHerd.find(a => a.id === id);
     if (!animal) return;
     currentEditingAnimalId = id;
@@ -1572,13 +1592,15 @@ function openAnimalCard(id) {
     document.getElementById('viewMode').classList.remove('hidden');
     document.getElementById('editMode').classList.add('hidden');
 
-  // --- 1. Podstawowe dane ---
+    // Reset zakładek na domyślną ("Dane Zwierzęcia")
+    if(document.getElementById('tabCowData')) switchCowTab('data');
+
+    // --- 1. Podstawowe dane ---
     document.getElementById('cardTag').textContent = animal.tag;
     document.getElementById('cardTag').style.color = getTagColor(animal.type);
     document.getElementById('cardDob').textContent = animal.dob;
     document.getElementById('cardType').textContent = animal.type.toUpperCase();
     
-    // Obsługa braku elementów w DOM (dla bezpieczeństwa)
     if(document.getElementById('cardMother')) document.getElementById('cardMother').textContent = animal.motherTag || 'Brak danych';
     if(document.getElementById('cardFather')) document.getElementById('cardFather').textContent = animal.fatherSemen || 'Brak danych';
     if(document.getElementById('cardLocation')) document.getElementById('cardLocation').textContent = animal.location || 'Brak danych';
@@ -1586,15 +1608,9 @@ function openAnimalCard(id) {
     // --- 2. LOGIKA UKRYWANIA SEKCJI (Byk vs Krowa) ---
     const isBull = (animal.type === 'byk');
 
-    // Lista ID elementów do ukrycia u byka (Nagłówki + Listy + Panel)
     const elementsToToggle = [
-        'cowStatsPanel',    // Zielony panel z datami
-        'headerOffspring',  // Nagłówek Potomstwo
-        'cardOffspring',    // Lista Potomstwa
-        'headerInsem',      // Nagłówek Inseminacji
-        'cardHistory',      // Lista Inseminacji
-        'headerCalving',    // Nagłówek Wycielen
-        'cardCalvingHistory'// Lista Wycielen
+        'cowStatsPanel', 'headerOffspring', 'cardOffspring', 
+        'headerInsem', 'cardHistory', 'headerCalving', 'cardCalvingHistory'
     ];
 
     elementsToToggle.forEach(elId => {
@@ -1602,8 +1618,6 @@ function openAnimalCard(id) {
         if(el) el.style.display = isBull ? 'none' : 'block';
     });
 
-    // --- 3. SEKCJA DLA BYKA (Cele Sprzedażowe) ---
-    // Usuwamy starą sekcję dynamiczną (jeśli istnieje), żeby się nie dublowała przy kolejnych kliknięciach
     const oldBullSection = document.getElementById('bullAgeSection');
     if (oldBullSection) oldBullSection.remove();
 
@@ -1611,30 +1625,17 @@ function openAnimalCard(id) {
         const bullSection = document.createElement('div');
         bullSection.id = 'bullAgeSection';
         bullSection.style.cssText = "background:#fff3e0; padding:10px; border-radius:10px; margin:10px 0; border:1px solid #ffe0b2; font-size:14px;";
-        
-        // Wstawiamy pod szarym boksem z danymi podstawowymi
         const basicInfoBox = document.getElementById('cardType').closest('div'); 
         if(basicInfoBox) basicInfoBox.after(bullSection);
-
         const dob = new Date(animal.dob);
         const d24 = new Date(dob); d24.setMonth(d24.getMonth() + 24);
         const d30 = new Date(dob); d30.setMonth(d30.getMonth() + 30);
-        
-        bullSection.innerHTML = `
-            <strong>🎯 Cele hodowlane:</strong><br>
-            24 mies: <b>${d24.toLocaleDateString('pl-PL')}</b><br>
-            30 mies: <b>${d30.toLocaleDateString('pl-PL')}</b>
-        `;
-    } 
-   // --- 4. SEKCJA DLA KROWY (Laktacja i Dane) ---
-    else {
+        bullSection.innerHTML = `<strong>🎯 Cele hodowlane:</strong><br>24 mies: <b>${d24.toLocaleDateString('pl-PL')}</b><br>30 mies: <b>${d30.toLocaleDateString('pl-PL')}</b>`;
+    } else {
         document.getElementById('cardLastCalving').textContent = animal.lastCalving || '---';
-        
-        // Ukryj datę, jeśli krowa po USG jest pusta (widać to będzie w panelu historii)
         const insText = (animal.lastInsemination && animal.usgStatus !== 'negative') ? animal.lastInsemination : 'Brak aktywnego';
         document.getElementById('cardLastInsem').textContent = insText;
         
-        // --- OBLICZANIE DNI LAKTACJI (DIM) ---
         const dimEl = document.getElementById('cardDimStat');
         if (dimEl) {
             if (animal.lastCalving) {
@@ -1642,138 +1643,166 @@ function openAnimalCard(id) {
                 const lastCalv = new Date(animal.lastCalving);
                 const diffTime = today - lastCalv;
                 const days = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-                
-                if (days >= 0) {
-                    dimEl.innerHTML = `📊 Dni laktacji: <b>${days}</b>`;
-                    dimEl.style.color = '#2e7d32'; // Zielony kolor
-                } else {
-                    dimEl.textContent = 'Błąd daty';
-                }
+                if (days >= 0) { dimEl.innerHTML = `📊 Dni laktacji: <b>${days}</b>`; dimEl.style.color = '#2e7d32'; } 
+                else { dimEl.textContent = 'Błąd daty'; }
             } else {
-                dimEl.textContent = 'Brak trwającej laktacji';
-                dimEl.style.color = '#7f8c8d'; // Szary kolor
+                dimEl.textContent = 'Brak trwającej laktacji'; dimEl.style.color = '#7f8c8d'; 
             }
         }
 
-// Status Cielności i Prognozowane Wycielenie
         const statusDiv = document.getElementById('cardPregStatus');
         if(statusDiv) {
             const statusInfo = getDetailedStatus(animal); 
             statusDiv.textContent = statusInfo.text;
             statusDiv.style.color = statusInfo.color;
-            
-            // Dodaj prognozowaną datę wycielenia, TYLKO jeśli krowa jest po aktywnym/pozytywnym zabiegu
             if (animal.lastInsemination && animal.usgStatus !== 'negative') {
                 const estCalv = addDays(new Date(animal.lastInsemination), userSettings.gestation || 280);
-                const estCalvStr = estCalv.toLocaleDateString('pl-PL');
-                statusDiv.innerHTML += `<br><span style="color:#e67e22; font-size: 13px; font-weight: normal;">🐮 Prognozowany poród: <b style="font-size:14px;">${estCalvStr}</b></span>`;
+                statusDiv.innerHTML += `<br><span style="color:#e67e22; font-size: 13px; font-weight: normal;">🐮 Prognozowany poród: <b style="font-size:14px;">${estCalv.toLocaleDateString('pl-PL')}</b></span>`;
             }
         }
 
-        // ✅ STATYSTYKI INSEMINACJI (Naprawiona skuteczność)
         const insemStatsDiv = document.getElementById('cardInsemStats');
         if (insemStatsDiv) {
-            if (animal.type === 'krowa' || animal.type === 'jalowka') {
-                let currentLactInsems = 0;
-                let prevLactInsems = 0;
-                
-                // Licznik absolutnie WSZYSTKICH prób w historii (udanych i nieudanych)
-                let totalInsems = animal.historyInsemination ? animal.historyInsemination.length : 0;
-                
-                const sortedCalvings = (animal.historyCalving || []).map(c => new Date(c.date)).sort((a,b) => b - a);
-                const lastCalv = sortedCalvings[0] || new Date(0);
-                const prevCalv = sortedCalvings[1] || new Date(0);
-
-                (animal.historyInsemination || []).forEach(ins => {
-                    const d = new Date(ins.date);
-                    if (d >= lastCalv) currentLactInsems++;
-                    else if (d >= prevCalv && d < lastCalv) prevLactInsems++;
-                });
-
-                // Liczymy TYLKO potwierdzone ciąże (czyli te z historii wycieleń + ewentualna trwająca)
-                let pregnanciesCount = sortedCalvings.length + (animal.isPregnantConfirmed ? 1 : 0);
-                
-                // Prawidłowa matematyka dla średniej: jeśli jest 0 ciąż, wyświetl liczbę "zmarnowanych" prób
-                let avgDisplay = '';
-                if (pregnanciesCount > 0) {
-                    avgDisplay = (totalInsems / pregnanciesCount).toFixed(1) + ' zab. / ciążę';
-                } else {
-                    avgDisplay = totalInsems + ' zab. (Brak ciąż)';
-                }
-
-                insemStatsDiv.innerHTML = `
-                    <div style="display:flex; justify-content: space-between; border-bottom: 1px dashed #ccc; padding-bottom: 4px; margin-bottom: 4px;">
-                        <span style="color:#2e7d32; font-weight:bold;">Średnia skuteczność:</span> <strong style="color:#c0392b;">${avgDisplay}</strong>
-                    </div>
-                    <div style="display:flex; justify-content: space-between; color: #555;">
-                        <span title="Inseminacje po ostatnim wycieleniu">Bieżąca: <b>${currentLactInsems}</b></span>
-                        <span title="Inseminacje w poprzedniej laktacji">Poprzednia: <b>${prevLactInsems}</b></span>
-                        <span>Łącznie prób: <b>${totalInsems}</b></span>
-                    </div>
-                `;
-                insemStatsDiv.style.display = 'block';
-            } else {
-                insemStatsDiv.style.display = 'none';
-            }
+            let currentLactInsems = 0; let prevLactInsems = 0;
+            let totalInsems = animal.historyInsemination ? animal.historyInsemination.length : 0;
+            const sortedCalvings = (animal.historyCalving || []).map(c => new Date(c.date)).sort((a,b) => b - a);
+            const lastCalv = sortedCalvings[0] || new Date(0);
+            const prevCalv = sortedCalvings[1] || new Date(0);
+            (animal.historyInsemination || []).forEach(ins => {
+                const d = new Date(ins.date);
+                if (d >= lastCalv) currentLactInsems++;
+                else if (d >= prevCalv && d < lastCalv) prevLactInsems++;
+            });
+            let pregnanciesCount = sortedCalvings.length + (animal.isPregnantConfirmed ? 1 : 0);
+            let avgDisplay = pregnanciesCount > 0 ? (totalInsems / pregnanciesCount).toFixed(1) + ' zab. / ciążę' : totalInsems + ' zab. (Brak ciąż)';
+            insemStatsDiv.innerHTML = `<div style="display:flex; justify-content: space-between; border-bottom: 1px dashed #ccc; padding-bottom: 4px; margin-bottom: 4px;"><span style="color:#2e7d32; font-weight:bold;">Średnia skuteczność:</span> <strong style="color:#c0392b;">${avgDisplay}</strong></div><div style="display:flex; justify-content: space-between; color: #555;"><span>Bieżąca: <b>${currentLactInsems}</b></span><span>Poprzednia: <b>${prevLactInsems}</b></span><span>Łącznie: <b>${totalInsems}</b></span></div>`;
+            insemStatsDiv.style.display = 'block';
         }
 
-       // ✅ NOWOŚĆ: Guzik "Zgłoś Wycielenie" w Karcie Krowy (tylko dla cielnych)
         const existingEarlyBtn = document.getElementById('btnEarlyCalvingDynamic');
         if (existingEarlyBtn) existingEarlyBtn.remove(); 
-
         if (animal.isPregnantConfirmed) {
             const earlyBtn = document.createElement('button');
-            earlyBtn.id = 'btnEarlyCalvingDynamic';
-            earlyBtn.className = 'btn small';
-            // Ciemnopomarańczowy kolor (wyróżniający)
+            earlyBtn.id = 'btnEarlyCalvingDynamic'; earlyBtn.className = 'btn small';
             earlyBtn.style.cssText = 'background:#d35400; color:white; margin-top:10px; width:100%; border:none; font-weight:bold; font-size:14px; padding: 10px; border-radius: 8px; cursor:pointer;';
-            earlyBtn.innerHTML = '🍼 Zgłoś Wycielenie';
-            earlyBtn.onclick = () => initiateEarlyCalving(animal.id);
-            
+            earlyBtn.innerHTML = '🍼 Zgłoś Wycielenie'; earlyBtn.onclick = () => initiateEarlyCalving(animal.id);
             const statsPanel = document.getElementById('cowStatsPanel');
-            if (statsPanel) {
-                // Wstawiamy guzik na sam dół panelu danych rozrodczych
-                statsPanel.appendChild(earlyBtn);
-            }
+            if (statsPanel) statsPanel.appendChild(earlyBtn);
         }
 
-        // ✅ NOWOŚĆ: Sekcja Zadań w Karcie
         const cardTasksDiv = document.getElementById('cardTasksSection');
-        if (cardTasksDiv) cardTasksDiv.remove(); // Usuń starą sekcję jeśli istnieje (żeby nie dublować)
-        // Szukamy aktywnych zadań dla tego zwierzęcia
+        if (cardTasksDiv) cardTasksDiv.remove(); 
         const animalTasks = window.myAllTasksGlobal.filter(t => t.animalId === id && !t.isDone);
-
         if (animalTasks.length > 0) {
             const tasksContainer = document.createElement('div');
             tasksContainer.id = 'cardTasksSection';
             tasksContainer.style.cssText = "background:#fff3e0; padding:10px; border-radius:10px; margin:10px 0; border:1px solid #ffe0b2;";
             tasksContainer.innerHTML = '<h4 style="margin:0 0 10px 0; color:#e67e22; font-size:14px;">⚡ Aktywne Zadania:</h4>';
-
             animalTasks.forEach(t => {
                 const btn = document.createElement('button');
                 btn.className = 'btn small';
                 btn.style.cssText = "margin-bottom:5px; background:white; border:1px solid #e67e22; color:#e67e22; text-align:left; width:100%; display:flex; justify-content:space-between; align-items:center;";
                 btn.innerHTML = `<span>${t.title}</span> <span style="font-weight:bold;">✔ Wykonaj</span>`;
-                
-                // Kliknięcie uruchamia standardową procedurę potwierdzania
                 btn.onclick = () => {
-                    closeModal('animalCardModal'); // Zamknij kartę, żeby widzieć modal potwierdzenia
-                    if (t.isGroupTask) {
-                        initiateSyncTaskCompletion(t.id);
-                    } else {
-                        initiateTaskCompletion(t.id, t.type, t.animalId, t.dueDate.toISOString());
-                    }
+                    closeModal('animalCardModal'); 
+                    if (t.isGroupTask) initiateSyncTaskCompletion(t.id);
+                    else initiateTaskCompletion(t.id, t.type, t.animalId, t.dueDate.toISOString());
                 };
                 tasksContainer.appendChild(btn);
             });
-
-            // Wstaw sekcję zadań pod statystykami (cowStatsPanel)
             const statsPanel = document.getElementById('cowStatsPanel');
             if (statsPanel) statsPanel.after(tasksContainer);
         }
-
-        // Renderowanie list (Potomstwo, Historia)
         renderSubListsForCow(animal);
+    }
+
+    // =========================================================================
+    // ✅ 4. NOWOŚĆ: WYSZUKIWANIE DOKUMENTÓW Z ARCHIWUM DO ZAKŁADKI
+    // =========================================================================
+    const archiveTreatmentsDiv = document.getElementById('cowArchiveTreatments');
+    const archiveSwiadectwaDiv = document.getElementById('cowArchiveSwiadectwa');
+    
+    if (archiveTreatmentsDiv && archiveSwiadectwaDiv && currentUser['ID lecznicy']) {
+        archiveTreatmentsDiv.innerHTML = '<i>Szukam kart leczenia...</i>';
+        archiveSwiadectwaDiv.innerHTML = '<i>Szukam świadectw...</i>';
+
+        try {
+            // 1. Świadectwa Inseminacji (Bardzo precyzyjne)
+            const swiSnap = await db.collection("archiwumSwiadectwa")
+                .where("id_lecznicy", "==", currentUser['ID lecznicy'])
+                .where("krowaKolczyk", "==", animal.tag)
+                .orderBy("createdAt", "desc").limit(20).get();
+
+            if (swiSnap.empty) {
+                archiveSwiadectwaDiv.innerHTML = '<div style="color:#999; padding:5px;">Brak wystawionych świadectw dla tej sztuki.</div>';
+            } else {
+                archiveSwiadectwaDiv.innerHTML = '';
+                swiSnap.forEach(doc => {
+                    const d = doc.data();
+                    const div = document.createElement('div');
+                    div.style.cssText = 'padding: 8px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; background: #fff; margin-bottom: 5px; border-radius: 4px;';
+                    div.innerHTML = `
+                        <div>
+                            <span style="font-weight:bold; color:#d35400;">${d.dataZabiegu}</span><br>
+                            <span style="font-size:11px; color:#555;">${d.buhajNazwa || 'Brak nazwy buhaja'} (${d.nrDokumentu})</span>
+                        </div>
+                    `;
+                    archiveSwiadectwaDiv.appendChild(div);
+                });
+            }
+
+            // 2. Karty Leczenia (Szukanie tekstowe w tabeli leków)
+            if (currentUser.numer_gospodarstwa) {
+                const farmNumbers = currentUser.numer_gospodarstwa.split(',').map(s => s.trim()).filter(Boolean);
+                
+                const kartySnap = await db.collection("archiwumKarty")
+                    .where("id_lecznicy", "==", currentUser['ID lecznicy'])
+                    .where("header.nrStada", "in", farmNumbers)
+                    .orderBy("header.dataWykonania", "desc").limit(50).get();
+                
+                let foundKarty = 0;
+                archiveTreatmentsDiv.innerHTML = '';
+
+                kartySnap.forEach(doc => {
+                    const d = doc.data();
+                    let dotyczyKrowy = false;
+                    let rozpoznanieText = "Zabieg ogólny";
+                    
+                    if (d.table) {
+                        for (const row of d.table) {
+                            if (row.opis && row.opis.includes(animal.tag)) {
+                                dotyczyKrowy = true;
+                                if (row.rozpoznanie) rozpoznanieText = row.rozpoznanie;
+                                break;
+                            }
+                        }
+                    }
+                    
+                    if (dotyczyKrowy) {
+                        foundKarty++;
+                        const div = document.createElement('div');
+                        div.style.cssText = 'padding: 8px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; background: #fff; margin-bottom: 5px; border-radius: 4px; cursor: pointer; border-left: 3px solid #2980b9;';
+                        div.onclick = () => { openClientPrintWindow(doc.id); }; 
+                        div.innerHTML = `
+                            <div>
+                                <span style="font-weight:bold; color:#2980b9;">${d.header.dataWykonania}</span><br>
+                                <span style="font-size:11px; color:#555;">Dolegliwość: ${rozpoznanieText}</span>
+                            </div>
+                            <span style="font-size: 18px; color: #2980b9;">📄</span>
+                        `;
+                        archiveTreatmentsDiv.appendChild(div);
+                    }
+                });
+
+                if (foundKarty === 0) {
+                    archiveTreatmentsDiv.innerHTML = '<div style="color:#999; padding:5px;">Brak historii chorobowej (kart leczenia) dla tej sztuki.</div>';
+                }
+            }
+
+        } catch (e) {
+            console.error("Błąd ładowania archiwum w karcie zwierzęcia:", e);
+            archiveTreatmentsDiv.innerHTML = '<div style="color:#c0392b; padding:5px;">Błąd łączenia z bazą.</div>';
+        }
     }
 
     // --- 5. WYPEŁNIANIE FORMULARZA EDYCJI ---
