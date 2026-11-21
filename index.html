@@ -28306,12 +28306,12 @@ async function generateSwiNumber() {
     }
 }
 
-// ✅ ZAPIS ŚWIADECTWA Z AUTOMATYCZNYM POBRANIEM Z MAGAZYNU NASIENIA ORAZ SYNCHRONIZACJĄ Z KROWĄ KLIENTA
+// ✅ ZAPIS ŚWIADECTWA Z AUTOMATYCZNYM POBRANIEM NASIENIA, SYNCHRONIZACJĄ KROWY I INTELIGENTNYM POWIADOMIENIEM O USG
 async function saveSwiadectwo() {
     const nrDok = document.getElementById('swiNrDokumentuDisplay').textContent;
     if(nrDok.includes("X") || nrDok.includes("GENEROWANIE")) return alert("Błąd numeru, nie można zapisać.");
 
-    // 1. WALIDACJA STANU MAGAZYNOWEGO NASIENIA (Przed zapisem)
+    // 1. WALIDACJA STANU MAGAZYNOWEGO NASIENIA
     const buhajSelectId = document.getElementById('swiBuhajSelect').value;
     let selectedSemenItem = null;
     
@@ -28324,8 +28324,8 @@ async function saveSwiadectwo() {
         const myStock = (selectedSemenItem.stanyOsobiste && selectedSemenItem.stanyOsobiste[myUid]) ? selectedSemenItem.stanyOsobiste[myUid] : 0;
         
         if (myStock <= 0) {
-            alert(`❌ BŁĄD MAGAZYNU NASIENIA!\n\nBrak nasienia "${selectedSemenItem.nazwa}" na Twoim koncie (Twój stan: 0 szt.).\n\nWejdź w Magazyn Nasienia -> Edytuj dane nasienia i przesuń porcję z bazy lecznicy na siebie, zanim wystawisz zaświadczenie.`);
-            return; // Blokada zapisu!
+            alert(`❌ BŁĄD MAGAZYNU NASIENIA!\n\nBrak nasienia "${selectedSemenItem.nazwa}" na Twoim koncie (Twój stan: 0 szt.).`);
+            return;
         }
     }
 
@@ -28343,7 +28343,7 @@ async function saveSwiadectwo() {
         klientAdres: document.getElementById('swiKlientAdres').textContent,
         klientStado: document.getElementById('swiKlientStado').textContent,
         
-        krowaKolczyk: document.getElementById('swiKolczykInput').value,
+        krowaKolczyk: document.getElementById('swiKolczykInput').value.trim(),
         krowaRasa: document.getElementById('swiNazwaRasaInput').value,
         krowaWycielenie: document.getElementById('swiOstWycielenieInput').value,
         
@@ -28360,8 +28360,9 @@ async function saveSwiadectwo() {
 
     try {
         const batch = db.batch();
+        let rolnikUidDoSprawdzenia = null; // Zmienna do przechwycenia UID klienta
         
-        // 2. Zapis dokumentu świadectwa
+        // 2. Zapis dokumentu świadectwa w Archiwum Weta
         const newDocRef = db.collection("archiwumSwiadectwa").doc();
         batch.set(newDocRef, dataObj);
 
@@ -28374,62 +28375,121 @@ async function saveSwiadectwo() {
         }
 
         // =========================================================================
-        // 4. ✅ AUTOMATYCZNA SYNCHRONIZACJA Z BAZĄ ZWIERZĄT KLIENTA (Z HISTORIĄ)
+        // 4. ✅ INTELIGENTNA SYNCHRONIZACJA / TWORZENIE KROWY KLIENTA
         // =========================================================================
         if (dataObj.krowaKolczyk && dataObj.dataZabiegu) {
             try {
-                // Pobieramy z bazy zwierząt krowę o wpisanym numerze kolczyka
                 const krowaQuery = await db.collection("animals").where("tag", "==", dataObj.krowaKolczyk).get();
                 
+                const nowyWpisHistorii = {
+                    date: dataObj.dataZabiegu,
+                    time: "", 
+                    bull: dataObj.buhajNazwa || '',
+                    note: 'Zacielenie (Weterynarz)',
+                    added: new Date().toISOString()
+                };
+
                 if (!krowaQuery.empty) {
+                    // KROWA ISTNIEJE -> AKTUALIZUJEMY
                     const krowaDoc = krowaQuery.docs[0];
                     const daneKrowy = krowaDoc.data();
-                    const obecnaDataZacielenia = daneKrowy.lastInsemination; // W panelu klienta to 'lastInsemination'
-                    const biezacaNazwaBuhaja = dataObj.buhajNazwa || daneKrowy.semen || '';
+                    const obecnaData = daneKrowy.lastInsemination;
+                    rolnikUidDoSprawdzenia = daneKrowy.ownerUid; // Zapisujemy UID do statystyk USG
 
-                    // Aktualizujemy tylko, gdy pole u rolnika jest puste lub wpisywana data jest nowsza
-                    if (!obecnaDataZacielenia || new Date(dataObj.dataZabiegu) >= new Date(obecnaDataZacielenia)) {
-                        
-                        // Przygotowanie historii wpisu identycznie jak u klienta
-                        const nowyWpisHistorii = {
-                            date: dataObj.dataZabiegu,
-                            time: "", // Zostawiamy puste, bo weterynarz podaje tylko datę na świadectwie
-                            bull: biezacaNazwaBuhaja,
-                            note: 'Zacielenie (Weterynarz)',
-                            added: new Date().toISOString()
-                        };
-
+                    if (!obecnaData || new Date(dataObj.dataZabiegu) >= new Date(obecnaData)) {
                         batch.update(krowaDoc.ref, {
                             lastInsemination: dataObj.dataZabiegu,
-                            semen: biezacaNazwaBuhaja,
-                            isPregnantConfirmed: false,     // Resetujemy status cielności
-                            usgStatus: 'pending',           // Zmieniamy na "Do USG"
+                            semen: dataObj.buhajNazwa || daneKrowy.semen || '',
+                            isPregnantConfirmed: false,
+                            usgStatus: 'pending',
                             lastActivityDate: new Date().toISOString().split('T')[0],
-                            // arrayUnion dopisuje wpis na koniec historii rolnika
                             historyInsemination: firebase.firestore.FieldValue.arrayUnion(nowyWpisHistorii)
                         });
-                        console.log(`Dodano aktualizację krowy ${dataObj.krowaKolczyk} do paczki zapisu.`);
                     }
-                } else {
-                    console.log(`Krowa o kolczyku ${dataObj.krowaKolczyk} nie została znaleziona w bazie panelu klienta.`);
+                } else if (dataObj.klientStado && dataObj.klientStado !== '---') {
+                    // KROWA NIE ISTNIEJE -> TWORZYMY NOWĄ
+                    const rolnikQuery = await db.collection("konfiguracja").where("numer_gospodarstwa", "==", dataObj.klientStado).limit(1).get();
+                    
+                    if (!rolnikQuery.empty) {
+                        rolnikUidDoSprawdzenia = rolnikQuery.docs[0].data().uid; // Zapisujemy UID
+                        const nowaKrowaRef = db.collection("animals").doc();
+                        
+                        batch.set(nowaKrowaRef, {
+                            ownerUid: rolnikUidDoSprawdzenia,
+                            tag: dataObj.krowaKolczyk,
+                            type: 'krowa',
+                            dob: '',
+                            location: '',
+                            motherTag: '',
+                            fatherSemen: '',
+                            lastCalving: dataObj.krowaWycielenie || null,
+                            lastInsemination: dataObj.dataZabiegu,
+                            semen: dataObj.buhajNazwa || '',
+                            isPregnantConfirmed: false,
+                            usgStatus: 'pending',
+                            isDriedOff: false,
+                            historyInsemination: [nowyWpisHistorii],
+                            historyCalving: [],
+                            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                            lastActivityDate: new Date().toISOString().split('T')[0]
+                        });
+                    }
                 }
             } catch (err) {
-                console.warn("Nie udało się pobrać/zaktualizować krowy klienta (błąd uprawnień):", err);
+                console.warn("Błąd integracji ze stadem klienta:", err);
+            }
+        }
+        
+        await batch.commit();
+
+        // =========================================================================
+        // 5. ✅ ANALIZA STADA: SZUKAMY KRÓW GOTOWYCH DO USG
+        // =========================================================================
+        let alertUsgMsg = "";
+        if (rolnikUidDoSprawdzenia) {
+            try {
+                // Pobieramy całe stado tego klienta, aby poszukać krów "pending"
+                const stadoQuery = await db.collection("animals").where("ownerUid", "==", rolnikUidDoSprawdzenia).get();
+                let doUsgCount = 0;
+                const dzisiaj = new Date();
+                dzisiaj.setHours(0,0,0,0);
+
+                stadoQuery.forEach(doc => {
+                    const k = doc.data();
+                    // Szukamy krów, które mają status "do sprawdzenia" i nie są jeszcze potwierdzone jako cielne
+                    if (k.usgStatus === 'pending' && !k.isPregnantConfirmed && k.lastInsemination) {
+                        const dataZac = new Date(k.lastInsemination);
+                        const diffDays = Math.floor((dzisiaj - dataZac) / (1000 * 60 * 60 * 24));
+                        
+                        // Krowa "gotowa do USG" to taka, od której zacielenia minęło np. 35 dni.
+                        // (Krowa, którą weterynarz zapisał przed sekundą ma diffDays = 0, więc się tu nie wliczy - to poprawne zachowanie)
+                        if (diffDays >= 35) { 
+                            doUsgCount++;
+                        }
+                    }
+                });
+
+                if (doUsgCount > 0) {
+                    alertUsgMsg = `\n\n💡 WSKAZÓWKA BIZNESOWA:\nTen klient używa Panelu Hodowcy. System wykrył, że w jego stadzie jest obecnie ${doUsgCount} sztuk gotowych do badania USG (powyżej 35 dni od inseminacji).\n\nZaproponuj mu wykonanie badania przy okazji dzisiejszej wizyty!`;
+                }
+            } catch (err) {
+                console.warn("Nie udało się pobrać statystyk USG dla klienta:", err);
             }
         }
         // =========================================================================
 
-        await batch.commit();
-
-        if(typeof showToast === 'function') showToast("Świadectwo zapisane i zsynchronizowane pomyślnie!", "success");
-        initSwiadectwoWizard(); 
+        if(typeof showToast === 'function') showToast("Zapisano pomyślnie!", "success");
+        
+        // Wyświetlamy połączony komunikat
+        if (confirm(`Świadectwo zostało zapisane w archiwum!${alertUsgMsg}\n\nCzy chcesz wyczyścić formularz i rozpocząć wypisywanie KOLEJNEGO świadectwa?\n(Kliknij "Anuluj", aby zostać w obecnym, np. po to by je wydrukować)`)) {
+            initSwiadectwoWizard(); 
+        }
+        
     } catch(e) {
         alert("Błąd zapisu! Sprawdź reguły Firebase.");
         console.error(e);
     }
 }
-
-// ✅ MODYFIKACJA: Funkcja pobiera dane z pól i przekazuje do uniwersalnego druku
 // ✅ MODYFIKACJA: Funkcja pobiera dane z pól i przekazuje do uniwersalnego druku
 function previewSwiadectwo() {
     const data = {
@@ -29182,38 +29242,70 @@ function generateKartaObrotuReport(logs, filters) {
 // PAKIET AKTUALIZACJI: KROWY, KALKULATOR, KALENDARZ STRZAŁKI (NAPRAWIONY)
 // ===================================================================
 
-// 1. UZUPEŁNIANIE KRÓW (ŚWIADECTWO INSEMINACJI)
+// 1. UZUPEŁNIANIE KRÓW (ŚWIADECTWO INSEMINACJI) - WERSJA ZAAWANSOWANA (STADO + HISTORIA)
 if (document.getElementById('swiKlientInput')) {
-    document.getElementById('swiKlientInput').addEventListener('input', async function() {
+    document.getElementById('swiKlientInput').addEventListener('change', function() {
         const klientName = this.value.trim();
         if (!klientName || !currentUserProfile || !currentUserProfile['ID lecznicy']) return;
 
-        try {
-            // Szukamy archiwalnych świadectw tego klienta
-            const snap = await db.collection("archiwumSwiadectwa")
-                                 .where("id_lecznicy", "==", currentUserProfile['ID lecznicy'])
-                                 .where("klient", "==", klientName)
-                                 .get();
+        // Opóźnienie 200ms, aby skrypt odczekal aż inna funkcja zaczyta numer stada z listy klientów
+        setTimeout(async () => {
+            try {
+                // Używamy struktury Map, która automatycznie zapobiega powielaniu tych samych kolczyków
+                const krowyMap = new Map();
+                const nrStada = document.getElementById('swiKlientStado').textContent.trim();
+                
+                // ETAP 1: Próba pobrania "żywych" krów z Panelu Klienta
+                if (nrStada && nrStada !== '...' && nrStada !== '---') {
+                    // Szukamy UID rolnika po jego numerze stada
+                    const rolnikQuery = await db.collection("konfiguracja").where("numer_gospodarstwa", "==", nrStada).limit(1).get();
+                    
+                    if (!rolnikQuery.empty) {
+                        const rolnikUid = rolnikQuery.docs[0].data().uid;
+                        // Pobieramy stado rolnika
+                        const stadoQuery = await db.collection("animals").where("ownerUid", "==", rolnikUid).get();
+                        
+                        stadoQuery.forEach(doc => {
+                            const data = doc.data();
+                            // Dodajemy tylko samice (ignorujemy byki)
+                            if (data.tag && data.type !== 'byk') { 
+                                krowyMap.set(data.tag, "Panel Klienta");
+                            }
+                        });
+                    }
+                }
 
-            const krowyMap = new Map();
-            snap.forEach(doc => {
-                const data = doc.data();
-                if (data.krowaKolczyk) krowyMap.set(data.krowaKolczyk, data.krowaNazwa || '');
-            });
+                // ETAP 2: Pobieranie z archiwum weterynarza (jako historia dla rolników bez panelu lub usuniętych krów)
+                const snap = await db.collection("archiwumSwiadectwa")
+                                     .where("id_lecznicy", "==", currentUserProfile['ID lecznicy'])
+                                     .where("klient", "==", klientName)
+                                     .get();
 
-            const swiKolczykiList = document.getElementById('swiKolczykiList');
-            if (swiKolczykiList) {
-                swiKolczykiList.innerHTML = '';
-                krowyMap.forEach((nazwa, kolczyk) => {
-                    const opt = document.createElement('option');
-                    opt.value = kolczyk;
-                    opt.textContent = nazwa ? `(${nazwa})` : '';
-                    swiKolczykiList.appendChild(opt);
+                snap.forEach(doc => {
+                    const data = doc.data();
+                    if (data.krowaKolczyk) {
+                        // Dodajemy do listy tylko wtedy, gdy tego kolczyka nie ma jeszcze w Mapie
+                        if (!krowyMap.has(data.krowaKolczyk)) {
+                            krowyMap.set(data.krowaKolczyk, data.krowaRasa || 'Historia leczenia');
+                        }
+                    }
                 });
+
+                // ETAP 3: Wrzucenie połączonej listy do HTML (bez żadnych duplikatów)
+                const swiKolczykiList = document.getElementById('swiKolczykiList');
+                if (swiKolczykiList) {
+                    swiKolczykiList.innerHTML = '';
+                    krowyMap.forEach((zrodlo, kolczyk) => {
+                        const opt = document.createElement('option');
+                        opt.value = kolczyk;
+                        opt.textContent = `(${zrodlo})`;
+                        swiKolczykiList.appendChild(opt);
+                    });
+                }
+            } catch (error) {
+                console.error("Błąd pobierania bazy/historii krów:", error);
             }
-        } catch (error) {
-            console.error("Błąd pobierania historii krów:", error);
-        }
+        }, 200); // Koniec setTimeout
     });
 }
 
