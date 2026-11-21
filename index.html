@@ -29270,112 +29270,110 @@ function generateKartaObrotuReport(logs, filters) {
 // PAKIET AKTUALIZACJI: KROWY, KALKULATOR, KALENDARZ STRZAŁKI (NAPRAWIONY)
 // ===================================================================
 
-// 1. UZUPEŁNIANIE KRÓW (ŚWIADECTWO INSEMINACJI) - WERSJA BEZBŁĘDNA Z KOLEJKOWANIEM
-let currentTagFetchId = 0; // Globalny licznik zapytań zapobiegający dublowaniu
-
+// 1. UZUPEŁNIANIE KRÓW (ŚWIADECTWO INSEMINACJI) - WERSJA BEZBŁĘDNA (STADO KLIENTA + ARCHIWUM)
 if (document.getElementById('swiKlientInput')) {
-    document.getElementById('swiKlientInput').addEventListener('change', function() {
+    document.getElementById('swiKlientInput').addEventListener('change', async function() {
         const klientName = this.value.trim();
         const swiKolczykiList = document.getElementById('swiKolczykiList');
         
-        if (!swiKolczykiList) return;
+        if (!swiKolczykiList || !klientName) return;
 
-        // Jeśli wyczyszczono klienta (np. po zapisaniu świadectwa), od razu czyść kolczyki
-        if (!klientName || !currentUserProfile || !currentUserProfile['ID lecznicy']) {
-            swiKolczykiList.innerHTML = '';
-            return;
-        }
+        swiKolczykiList.innerHTML = '<option value="">Szukam krów w bazie...</option>';
 
-        const fetchId = ++currentTagFetchId; // Rejestrujemy nowe zapytanie
+        try {
+            const uniqueTags = new Map(); // Mapa to nasze sito na duplikaty
 
-        // Czekamy 400ms, aby upewnić się, że funkcja setupClientAutoFill zdążyła wstawić nr stada na ekran
-        setTimeout(async () => {
-            if (fetchId !== currentTagFetchId) return; // Jeśli w międzyczasie odpalono nowe zapytanie, to porzucamy
-            
-            swiKolczykiList.innerHTML = '<option value="">Szukam krów klienta...</option>';
+            // ETAP 1: Pobieramy numer stada klienta wprost z bazy weterynarza
+            const klientSnap = await db.collection("klienci")
+                .where("idLecznicy", "==", currentUserProfile['ID lecznicy'])
+                .where("nazwa", "==", klientName)
+                .limit(1).get();
 
-            try {
-                const uniqueTags = new Map(); // Mapa wycina wszelkie duplikaty
+            let nrStadaWet = null;
+            if (!klientSnap.empty) {
+                nrStadaWet = klientSnap.docs[0].data().nrStada;
+            }
+
+            // ETAP 2: Szukamy UID rolnika w konfiguracji (uwzględniając numery po przecinku)
+            let rolnikUid = null;
+            if (nrStadaWet && nrStadaWet.trim() !== '' && nrStadaWet !== '---') {
+                const szukaneStada = nrStadaWet.split(',').map(s => s.replace(/\s/g, '').toUpperCase()).filter(Boolean);
                 
-                // A. Pobieramy numer stada bezpośrednio z tego, co wyświetliło się na ekranie!
-                const swiStadoElement = document.getElementById('swiKlientStado');
-                const nrStadaDOM = swiStadoElement ? swiStadoElement.textContent.trim() : '';
-                
-                let rolnikUid = null;
-
-                // B. Szukamy konta Rolnika (Obsługa wielu numerów oddzielonych przecinkiem)
-                if (nrStadaDOM && nrStadaDOM !== '...' && nrStadaDOM !== '---') {
-                    const searchStadaArr = nrStadaDOM.split(',').map(s => s.replace(/\s/g, '').toUpperCase()).filter(Boolean);
-                    
-                    const konfigSnap = await db.collection("konfiguracja").get();
-                    konfigSnap.forEach(doc => {
-                        const d = doc.data();
-                        if (d.numer_gospodarstwa) {
-                            const dbStadaArr = d.numer_gospodarstwa.split(',').map(s => s.replace(/\s/g, '').toUpperCase()).filter(Boolean);
-                            // Jeśli istnieje chociaż jedno dopasowanie (np. jeden z braci)
-                            const isMatch = searchStadaArr.some(stado => dbStadaArr.includes(stado));
-                            if (isMatch) {
-                                rolnikUid = d.uid; 
-                            }
-                        }
-                    });
-                }
-
-                // C. Jeśli klient ma Panel Rolnika, wciągamy całe jego "żywe" stado
-                if (rolnikUid) {
-                    const stadoQuery = await db.collection("animals").where("ownerUid", "==", rolnikUid).get();
-                    stadoQuery.forEach(doc => {
-                        const data = doc.data();
-                        if (data.tag && data.type !== 'byk') {
-                            uniqueTags.set(data.tag.toUpperCase(), "Ze Stada");
-                        }
-                    });
-                }
-
-                // D. Pobieramy archiwalne świadectwa (maks. 360 dni wstecz) jako uzupełnienie
-                const dateLimit = new Date();
-                dateLimit.setDate(dateLimit.getDate() - 360);
-                
-                const archiveQuery = await db.collection("archiwumSwiadectwa")
-                    .where("id_lecznicy", "==", currentUserProfile['ID lecznicy'])
-                    .where("klient", "==", klientName).get();
-
-                archiveQuery.forEach(doc => {
-                    const data = doc.data();
-                    if (data.krowaKolczyk && data.createdAt) {
-                        const docDate = data.createdAt.toDate ? data.createdAt.toDate() : new Date(data.createdAt);
-                        if (docDate >= dateLimit) {
-                            const tagUpper = data.krowaKolczyk.toUpperCase();
-                            // Dodajemy do listy tylko wtedy, gdy nie ma go w żywym stadzie
-                            if (!uniqueTags.has(tagUpper)) {
-                                uniqueTags.set(tagUpper, "Z Archiwum");
-                            }
+                const konfigSnap = await db.collection("konfiguracja").where("Rola", "==", "klient").get();
+                konfigSnap.forEach(doc => {
+                    const d = doc.data();
+                    if (d.numer_gospodarstwa) {
+                        const stadaRolnika = d.numer_gospodarstwa.split(',').map(s => s.replace(/\s/g, '').toUpperCase()).filter(Boolean);
+                        // Jeśli weta i rolnika łączy chociaż jeden wspólny numer stada:
+                        if (szukaneStada.some(stado => stadaRolnika.includes(stado))) {
+                            rolnikUid = d.uid;
                         }
                     }
                 });
-
-                // Zabezpieczenie tuż przed wklejeniem do HTML (żeby nie nałożyły się na siebie odświeżenia)
-                if (fetchId !== currentTagFetchId) return;
-
-                // E. Wrzucamy listę do HTML (CZYŚCIMY bezpośrednio przed wrzuceniem)
-                swiKolczykiList.innerHTML = '';
-                
-                if (uniqueTags.size === 0) {
-                    swiKolczykiList.innerHTML = '<option value="">Brak krów (Wpisz kolczyk ręcznie)</option>';
-                } else {
-                    uniqueTags.forEach((zrodlo, kolczyk) => {
-                        const opt = document.createElement('option');
-                        opt.value = kolczyk;
-                        opt.textContent = `(${zrodlo})`;
-                        swiKolczykiList.appendChild(opt);
-                    });
-                }
-
-            } catch (error) {
-                console.error("Błąd ładowania kolczyków:", error);
-                swiKolczykiList.innerHTML = '';
             }
-        }, 400); // 400ms opóźnienia daje interfejsowi czas na spokojne załadowanie numeru stada
+
+            console.log("🔍 Podpowiadanie kolczyków -> Znalezione UID rolnika:", rolnikUid || "BRAK");
+
+            // ETAP 3: Pobieramy Krowy i Jałówki z Panelu Klienta (Kolekcja 'animals')
+            if (rolnikUid) {
+                const animalsSnap = await db.collection("animals").where("ownerUid", "==", rolnikUid).get();
+                let pobranoZeStada = 0;
+                
+                animalsSnap.forEach(doc => {
+                    const a = doc.data();
+                    // Zgodnie z klient.js interesują nas tylko typy 'krowa' i 'jalowka'
+                    if (a.tag && (a.type === 'krowa' || a.type === 'jalowka')) {
+                        uniqueTags.set(a.tag.toUpperCase(), "Panel Klienta");
+                        pobranoZeStada++;
+                    }
+                });
+                console.log(`🐄 Pobrano z żywego stada klienta: ${pobranoZeStada} szt.`);
+            }
+
+            // ETAP 4: Uzupełniamy o archiwalne świadectwa weterynarza (ostatnie 360 dni)
+            const dateLimit = new Date();
+            dateLimit.setDate(dateLimit.getDate() - 360);
+
+            const archiveSnap = await db.collection("archiwumSwiadectwa")
+                .where("id_lecznicy", "==", currentUserProfile['ID lecznicy'])
+                .where("klient", "==", klientName)
+                .get();
+
+            let pobranoZArchiwum = 0;
+            archiveSnap.forEach(doc => {
+                const data = doc.data();
+                if (data.krowaKolczyk && data.createdAt) {
+                    const docDate = data.createdAt.toDate ? data.createdAt.toDate() : new Date(data.createdAt);
+                    if (docDate >= dateLimit) {
+                        const tag = data.krowaKolczyk.toUpperCase();
+                        // Dodajemy tylko te kolczyki, których nie ma jeszcze w Mapie (nie nadpisze to "Panelu Klienta")
+                        if (!uniqueTags.has(tag)) {
+                            uniqueTags.set(tag, "Archiwum Świadectw");
+                            pobranoZArchiwum++;
+                        }
+                    }
+                }
+            });
+            console.log(`📜 Dodano unikalne kolczyki z archiwum: ${pobranoZArchiwum} szt.`);
+
+            // ETAP 5: Wyświetlamy wszystko na liście w HTML
+            swiKolczykiList.innerHTML = '';
+            
+            if (uniqueTags.size === 0) {
+                swiKolczykiList.innerHTML = '<option value="">Brak krów (Wpisz ręcznie)</option>';
+            } else {
+                uniqueTags.forEach((zrodlo, tag) => {
+                    const opt = document.createElement('option');
+                    opt.value = tag;
+                    opt.textContent = `(${zrodlo})`;
+                    swiKolczykiList.appendChild(opt);
+                });
+            }
+
+        } catch (err) {
+            console.error("❌ Błąd podczas generowania podpowiedzi kolczyków:", err);
+            swiKolczykiList.innerHTML = '<option value="">Błąd wczytywania</option>';
+        }
     });
 }
 
