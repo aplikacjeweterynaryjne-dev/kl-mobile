@@ -28306,7 +28306,7 @@ async function generateSwiNumber() {
     }
 }
 
-// ✅ ZAPIS ŚWIADECTWA Z AUTOMATYCZNYM POBRANIEM NASIENIA, SYNCHRONIZACJĄ KROWY I INTELIGENTNYM POWIADOMIENIEM O USG
+// ✅ ZAPIS ŚWIADECTWA Z AUTOMATYCZNYM POBRANIEM NASIENIA, SYNCHRONIZACJĄ, TWORZENIEM KROWY I OSTRZEŻENIEM USG
 async function saveSwiadectwo() {
     const nrDok = document.getElementById('swiNrDokumentuDisplay').textContent;
     if(nrDok.includes("X") || nrDok.includes("GENEROWANIE")) return alert("Błąd numeru, nie można zapisać.");
@@ -28324,7 +28324,7 @@ async function saveSwiadectwo() {
         const myStock = (selectedSemenItem.stanyOsobiste && selectedSemenItem.stanyOsobiste[myUid]) ? selectedSemenItem.stanyOsobiste[myUid] : 0;
         
         if (myStock <= 0) {
-            alert(`❌ BŁĄD MAGAZYNU NASIENIA!\n\nBrak nasienia "${selectedSemenItem.nazwa}" na Twoim koncie (Twój stan: 0 szt.).`);
+            alert(`❌ BŁĄD MAGAZYNU NASIENIA!\n\nBrak nasienia "${selectedSemenItem.nazwa}" na Twoim koncie.`);
             return;
         }
     }
@@ -28360,13 +28360,13 @@ async function saveSwiadectwo() {
 
     try {
         const batch = db.batch();
-        let rolnikUidDoSprawdzenia = null; // Zmienna do przechwycenia UID klienta
+        let rolnikUidDoSprawdzenia = null; 
         
-        // 2. Zapis dokumentu świadectwa w Archiwum Weta
+        // 2. Zapis w Archiwum Weta
         const newDocRef = db.collection("archiwumSwiadectwa").doc();
         batch.set(newDocRef, dataObj);
 
-        // 3. Pobranie sztuki nasienia z bazy danych
+        // 3. Pobranie z magazynu
         if (selectedSemenItem && selectedSemenItem.trackStock) {
             selectedSemenItem.stanyOsobiste[currentUserProfile.uid] -= 1; 
             const clinicId = currentUserProfile['ID lecznicy'];
@@ -28379,7 +28379,9 @@ async function saveSwiadectwo() {
         // =========================================================================
         if (dataObj.krowaKolczyk && dataObj.dataZabiegu) {
             try {
-                const krowaQuery = await db.collection("animals").where("tag", "==", dataObj.krowaKolczyk).get();
+                // Konwersja na wielkie litery, by ujednolicić wyszukiwanie
+                const kolczykUpper = dataObj.krowaKolczyk.toUpperCase(); 
+                const krowaQuery = await db.collection("animals").where("tag", "==", kolczykUpper).get();
                 
                 const nowyWpisHistorii = {
                     date: dataObj.dataZabiegu,
@@ -28394,7 +28396,7 @@ async function saveSwiadectwo() {
                     const krowaDoc = krowaQuery.docs[0];
                     const daneKrowy = krowaDoc.data();
                     const obecnaData = daneKrowy.lastInsemination;
-                    rolnikUidDoSprawdzenia = daneKrowy.ownerUid; // Zapisujemy UID do statystyk USG
+                    rolnikUidDoSprawdzenia = daneKrowy.ownerUid;
 
                     if (!obecnaData || new Date(dataObj.dataZabiegu) >= new Date(obecnaData)) {
                         batch.update(krowaDoc.ref, {
@@ -28406,33 +28408,46 @@ async function saveSwiadectwo() {
                             historyInsemination: firebase.firestore.FieldValue.arrayUnion(nowyWpisHistorii)
                         });
                     }
-                } else if (dataObj.klientStado && dataObj.klientStado !== '---') {
+                } else {
                     // KROWA NIE ISTNIEJE -> TWORZYMY NOWĄ
-                    const rolnikQuery = await db.collection("konfiguracja").where("numer_gospodarstwa", "==", dataObj.klientStado).limit(1).get();
-                    
-                    if (!rolnikQuery.empty) {
-                        rolnikUidDoSprawdzenia = rolnikQuery.docs[0].data().uid; // Zapisujemy UID
-                        const nowaKrowaRef = db.collection("animals").doc();
+                    // Niezależnie od tego, co jest w HTML, szukamy prawdziwego klienta w bazie
+                    const klientBazaQuery = await db.collection("klienci")
+                        .where("idLecznicy", "==", currentUserProfile['ID lecznicy'])
+                        .where("nazwa", "==", dataObj.klient).limit(1).get();
                         
-                        batch.set(nowaKrowaRef, {
-                            ownerUid: rolnikUidDoSprawdzenia,
-                            tag: dataObj.krowaKolczyk,
-                            type: 'krowa',
-                            dob: '',
-                            location: '',
-                            motherTag: '',
-                            fatherSemen: '',
-                            lastCalving: dataObj.krowaWycielenie || null,
-                            lastInsemination: dataObj.dataZabiegu,
-                            semen: dataObj.buhajNazwa || '',
-                            isPregnantConfirmed: false,
-                            usgStatus: 'pending',
-                            isDriedOff: false,
-                            historyInsemination: [nowyWpisHistorii],
-                            historyCalving: [],
-                            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                            lastActivityDate: new Date().toISOString().split('T')[0]
-                        });
+                    if (!klientBazaQuery.empty) {
+                        const nrStadaBaza = klientBazaQuery.docs[0].data().nrStada;
+                        
+                        if (nrStadaBaza && nrStadaBaza.trim() !== '') {
+                            const rolnikQuery = await db.collection("konfiguracja")
+                                .where("numer_gospodarstwa", "==", nrStadaBaza.trim()).limit(1).get();
+                            
+                            if (!rolnikQuery.empty) {
+                                rolnikUidDoSprawdzenia = rolnikQuery.docs[0].data().uid; 
+                                const nowaKrowaRef = db.collection("animals").doc();
+                                
+                                batch.set(nowaKrowaRef, {
+                                    ownerUid: rolnikUidDoSprawdzenia,
+                                    tag: kolczykUpper, // Zapisz z wielkiej litery
+                                    type: 'krowa',
+                                    dob: '',
+                                    location: '',
+                                    motherTag: '',
+                                    fatherSemen: '',
+                                    lastCalving: dataObj.krowaWycielenie || null,
+                                    lastInsemination: dataObj.dataZabiegu,
+                                    semen: dataObj.buhajNazwa || '',
+                                    isPregnantConfirmed: false,
+                                    usgStatus: 'pending',
+                                    isDriedOff: false,
+                                    historyInsemination: [nowyWpisHistorii],
+                                    historyCalving: [],
+                                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                                    lastActivityDate: new Date().toISOString().split('T')[0]
+                                });
+                                console.log(`Utworzono krowę ${kolczykUpper} w panelu klienta!`);
+                            }
+                        }
                     }
                 }
             } catch (err) {
@@ -28448,7 +28463,6 @@ async function saveSwiadectwo() {
         let alertUsgMsg = "";
         if (rolnikUidDoSprawdzenia) {
             try {
-                // Pobieramy całe stado tego klienta, aby poszukać krów "pending"
                 const stadoQuery = await db.collection("animals").where("ownerUid", "==", rolnikUidDoSprawdzenia).get();
                 let doUsgCount = 0;
                 const dzisiaj = new Date();
@@ -28456,13 +28470,9 @@ async function saveSwiadectwo() {
 
                 stadoQuery.forEach(doc => {
                     const k = doc.data();
-                    // Szukamy krów, które mają status "do sprawdzenia" i nie są jeszcze potwierdzone jako cielne
                     if (k.usgStatus === 'pending' && !k.isPregnantConfirmed && k.lastInsemination) {
                         const dataZac = new Date(k.lastInsemination);
                         const diffDays = Math.floor((dzisiaj - dataZac) / (1000 * 60 * 60 * 24));
-                        
-                        // Krowa "gotowa do USG" to taka, od której zacielenia minęło np. 35 dni.
-                        // (Krowa, którą weterynarz zapisał przed sekundą ma diffDays = 0, więc się tu nie wliczy - to poprawne zachowanie)
                         if (diffDays >= 35) { 
                             doUsgCount++;
                         }
@@ -28470,18 +28480,17 @@ async function saveSwiadectwo() {
                 });
 
                 if (doUsgCount > 0) {
-                    alertUsgMsg = `\n\n💡 WSKAZÓWKA BIZNESOWA:\nTen klient używa Panelu Hodowcy. System wykrył, że w jego stadzie jest obecnie ${doUsgCount} sztuk gotowych do badania USG (powyżej 35 dni od inseminacji).\n\nZaproponuj mu wykonanie badania przy okazji dzisiejszej wizyty!`;
+                    alertUsgMsg = `\n\n💡 WSKAZÓWKA BIZNESOWA:\nTen klient używa Panelu Hodowcy. W jego stadzie jest obecnie ${doUsgCount} sztuk gotowych do badania USG (powyżej 35 dni od inseminacji).\n\nZaproponuj mu wykonanie badania!`;
                 }
             } catch (err) {
-                console.warn("Nie udało się pobrać statystyk USG dla klienta:", err);
+                console.warn("Nie udało się pobrać statystyk USG:", err);
             }
         }
         // =========================================================================
 
         if(typeof showToast === 'function') showToast("Zapisano pomyślnie!", "success");
         
-        // Wyświetlamy połączony komunikat
-        if (confirm(`Świadectwo zostało zapisane w archiwum!${alertUsgMsg}\n\nCzy chcesz wyczyścić formularz i rozpocząć wypisywanie KOLEJNEGO świadectwa?\n(Kliknij "Anuluj", aby zostać w obecnym, np. po to by je wydrukować)`)) {
+        if (confirm(`Świadectwo zostało zapisane w archiwum!${alertUsgMsg}\n\nCzy chcesz wyczyścić formularz i rozpocząć wypisywanie KOLEJNEGO świadectwa?\n(Kliknij "Anuluj", aby zostać w obecnym)`)) {
             initSwiadectwoWizard(); 
         }
         
@@ -29242,70 +29251,85 @@ function generateKartaObrotuReport(logs, filters) {
 // PAKIET AKTUALIZACJI: KROWY, KALKULATOR, KALENDARZ STRZAŁKI (NAPRAWIONY)
 // ===================================================================
 
-// 1. UZUPEŁNIANIE KRÓW (ŚWIADECTWO INSEMINACJI) - WERSJA ZAAWANSOWANA (STADO + HISTORIA)
+// 1. UZUPEŁNIANIE KRÓW (ŚWIADECTWO INSEMINACJI) - BEZ DUPLIKATÓW
 if (document.getElementById('swiKlientInput')) {
-    document.getElementById('swiKlientInput').addEventListener('change', function() {
+    document.getElementById('swiKlientInput').addEventListener('change', async function() {
         const klientName = this.value.trim();
         if (!klientName || !currentUserProfile || !currentUserProfile['ID lecznicy']) return;
 
-        // Opóźnienie 200ms, aby skrypt odczekal aż inna funkcja zaczyta numer stada z listy klientów
-        setTimeout(async () => {
-            try {
-                // Używamy struktury Map, która automatycznie zapobiega powielaniu tych samych kolczyków
-                const krowyMap = new Map();
-                const nrStada = document.getElementById('swiKlientStado').textContent.trim();
+        const swiKolczykiList = document.getElementById('swiKolczykiList');
+        if (!swiKolczykiList) return;
+        
+        swiKolczykiList.innerHTML = '<option value="">Ładowanie...</option>';
+
+        try {
+            const uniqueTags = new Map(); // Mapa automatycznie zapobiega duplikatom
+
+            // A. Szukamy klienta w bazie lecznicy, aby zdobyć jego nr stada
+            let nrStada = null;
+            const klientQuery = await db.collection("klienci")
+                .where("idLecznicy", "==", currentUserProfile['ID lecznicy'])
+                .where("nazwa", "==", klientName).limit(1).get();
+            
+            if (!klientQuery.empty) {
+                nrStada = klientQuery.docs[0].data().nrStada;
+            }
+
+            // B. Pobieramy "żywe" krowy i jałówki z Panelu Klienta (jeśli posiada konto)
+            if (nrStada && nrStada.trim() !== '') {
+                const rolnikQuery = await db.collection("konfiguracja")
+                    .where("numer_gospodarstwa", "==", nrStada.trim()).limit(1).get();
                 
-                // ETAP 1: Próba pobrania "żywych" krów z Panelu Klienta
-                if (nrStada && nrStada !== '...' && nrStada !== '---') {
-                    // Szukamy UID rolnika po jego numerze stada
-                    const rolnikQuery = await db.collection("konfiguracja").where("numer_gospodarstwa", "==", nrStada).limit(1).get();
+                if (!rolnikQuery.empty) {
+                    const rolnikUid = rolnikQuery.docs[0].data().uid;
+                    const stadoQuery = await db.collection("animals").where("ownerUid", "==", rolnikUid).get();
                     
-                    if (!rolnikQuery.empty) {
-                        const rolnikUid = rolnikQuery.docs[0].data().uid;
-                        // Pobieramy stado rolnika
-                        const stadoQuery = await db.collection("animals").where("ownerUid", "==", rolnikUid).get();
-                        
-                        stadoQuery.forEach(doc => {
-                            const data = doc.data();
-                            // Dodajemy tylko samice (ignorujemy byki)
-                            if (data.tag && data.type !== 'byk') { 
-                                krowyMap.set(data.tag, "Panel Klienta");
-                            }
-                        });
-                    }
-                }
-
-                // ETAP 2: Pobieranie z archiwum weterynarza (jako historia dla rolników bez panelu lub usuniętych krów)
-                const snap = await db.collection("archiwumSwiadectwa")
-                                     .where("id_lecznicy", "==", currentUserProfile['ID lecznicy'])
-                                     .where("klient", "==", klientName)
-                                     .get();
-
-                snap.forEach(doc => {
-                    const data = doc.data();
-                    if (data.krowaKolczyk) {
-                        // Dodajemy do listy tylko wtedy, gdy tego kolczyka nie ma jeszcze w Mapie
-                        if (!krowyMap.has(data.krowaKolczyk)) {
-                            krowyMap.set(data.krowaKolczyk, data.krowaRasa || 'Historia leczenia');
+                    stadoQuery.forEach(doc => {
+                        const data = doc.data();
+                        if (data.tag && (data.type === 'krowa' || data.type === 'jalowka')) {
+                            // Zapisujemy tag wielkimi literami, żeby wykluczyć błędy w wielkości liter
+                            uniqueTags.set(data.tag.toUpperCase(), "Baza Klienta"); 
                         }
-                    }
-                });
-
-                // ETAP 3: Wrzucenie połączonej listy do HTML (bez żadnych duplikatów)
-                const swiKolczykiList = document.getElementById('swiKolczykiList');
-                if (swiKolczykiList) {
-                    swiKolczykiList.innerHTML = '';
-                    krowyMap.forEach((zrodlo, kolczyk) => {
-                        const opt = document.createElement('option');
-                        opt.value = kolczyk;
-                        opt.textContent = `(${zrodlo})`;
-                        swiKolczykiList.appendChild(opt);
                     });
                 }
-            } catch (error) {
-                console.error("Błąd pobierania bazy/historii krów:", error);
             }
-        }, 200); // Koniec setTimeout
+
+            // C. Pobieramy z archiwum weterynarza (Tylko z ostatnich 360 dni)
+            const dateLimit = new Date();
+            dateLimit.setDate(dateLimit.getDate() - 360);
+            
+            const archiveQuery = await db.collection("archiwumSwiadectwa")
+                .where("id_lecznicy", "==", currentUserProfile['ID lecznicy'])
+                .where("klient", "==", klientName).get();
+
+            archiveQuery.forEach(doc => {
+                const data = doc.data();
+                if (data.krowaKolczyk && data.createdAt) {
+                    const docDate = data.createdAt.toDate ? data.createdAt.toDate() : new Date(data.createdAt);
+                    if (docDate >= dateLimit) {
+                        const tagUpper = data.krowaKolczyk.toUpperCase();
+                        // Dodajemy tylko, jeśli nie ma go jeszcze w Mapie (czyli nie ma go w żywym stadzie)
+                        if (!uniqueTags.has(tagUpper)) {
+                            uniqueTags.set(tagUpper, "Archiwum");
+                        }
+                    }
+                }
+            });
+
+            // D. Wrzucenie połączonej, czystej listy do HTML
+            swiKolczykiList.innerHTML = '';
+            uniqueTags.forEach((zrodlo, kolczyk) => {
+                const opt = document.createElement('option');
+                opt.value = kolczyk;
+                // Wyświetlamy skąd pochodzi dany kolczyk dla jasności
+                opt.textContent = `(${zrodlo})`;
+                swiKolczykiList.appendChild(opt);
+            });
+
+        } catch (error) {
+            console.error("Błąd ładowania kolczyków:", error);
+            swiKolczykiList.innerHTML = '';
+        }
     });
 }
 
