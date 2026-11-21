@@ -1562,9 +1562,9 @@ function populateLists() {
     });
 }
 
-// --- KARTA ZWIERZĘCIA I EDYCJA ---
 // --- KARTA ZWIERZĘCIA I EDYCJA (ROZBUDOWANA O ARCHIWUM) ---
 
+// --- FUNKCJA PRZEŁĄCZANIA ZAKŁADEK W KARCIE KROWY ---
 function switchCowTab(tab) {
     const btnData = document.getElementById('tabCowData');
     const btnArchive = document.getElementById('tabCowArchive');
