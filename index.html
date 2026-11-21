@@ -28211,118 +28211,122 @@ function goToSwiStep(stepNum) {
 // ============================================================================
 // 2. PODPOWIADANIE KOLCZYKÓW (BEZBŁĘDNE KOLEJKOWANIE + ZASYSANIE ŻYWEGO STADA)
 // ============================================================================
-let currentTagFetchId = 0; // Globalny licznik blokujący wyścig zapytań (race conditions)
+let currentTagFetchId = 0; // Globalny licznik blokujący wyścig zapytań
 
-if (document.getElementById('swiKlientInput')) {
-    // Reagujemy na każdy wpis z odpowiednim opóźnieniem (debounce)
-    document.getElementById('swiKlientInput').addEventListener('input', function() {
-        const klientName = this.value.trim();
-        const swiKolczykiList = document.getElementById('swiKolczykiList');
-        
-        if (!swiKolczykiList) return;
+// Główna funkcja wywoływana przez Twój "Uniwersalny Modal Klienta" oraz listener 'input' poniżej
+async function populateSwiCowList(klientName) {
+    if (typeof klientName !== 'string') return;
+    klientName = klientName.trim();
+    
+    const swiKolczykiList = document.getElementById('swiKolczykiList');
+    if (!swiKolczykiList) return;
 
-        // Jeśli formularz został wyczyszczony (np. przy nowym świadectwie), czyścimy też listę podpowiedzi
-        if (!klientName || !currentUserProfile || !currentUserProfile['ID lecznicy']) {
-            swiKolczykiList.innerHTML = '';
-            return;
-        }
+    if (!klientName || !currentUserProfile || !currentUserProfile['ID lecznicy']) {
+        swiKolczykiList.innerHTML = '';
+        return;
+    }
 
-        const fetchId = ++currentTagFetchId;
+    const fetchId = ++currentTagFetchId;
+    swiKolczykiList.innerHTML = '<option value="">Szukam krów klienta...</option>';
 
-        // Opóźnienie 500ms zapobiega nadmiarowym zapytaniom i daje czas HTML na zaktualizowanie numeru stada
-        setTimeout(async () => {
-            if (fetchId !== currentTagFetchId) return; 
+    // Opóźnienie 400ms zapobiega nadmiarowym zapytaniom i daje czas HTML na wgranie numeru stada
+    setTimeout(async () => {
+        if (fetchId !== currentTagFetchId) return; 
+
+        try {
+            const uniqueTags = new Map(); // Mapa wycina duplikaty
+            let rolnikUid = null;
+
+            // A. Szukamy klienta w naszej bazie weterynarza, aby wyciągnąć jego prawdziwy numer stada
+            const klientQuery = await db.collection("klienci")
+                .where("idLecznicy", "==", currentUserProfile['ID lecznicy'])
+                .where("nazwa", "==", klientName).limit(1).get();
             
-            swiKolczykiList.innerHTML = '<option value="">Szukam krów klienta...</option>';
+            let nrStadaZBazy = null;
+            if (!klientQuery.empty) {
+                nrStadaZBazy = klientQuery.docs[0].data().nrStada;
+            }
 
-            try {
-                const uniqueTags = new Map(); // Mapa wycina duplikaty
-                let rolnikUid = null;
-
-                // A. Szukamy klienta w naszej bazie weterynarza, aby wyciągnąć jego prawdziwy numer stada
-                const klientQuery = await db.collection("klienci")
-                    .where("idLecznicy", "==", currentUserProfile['ID lecznicy'])
-                    .where("nazwa", "==", klientName).limit(1).get();
+            // B. Namierzamy UID rolnika, uwzględniając, że bracia mogli podać kilka numerów po przecinku
+            if (nrStadaZBazy && nrStadaZBazy.trim() !== '' && nrStadaZBazy !== '---') {
+                const searchStadaArr = nrStadaZBazy.split(',').map(s => s.replace(/\s/g, '').toUpperCase()).filter(Boolean);
                 
-                let nrStadaZBazy = null;
-                if (!klientQuery.empty) {
-                    nrStadaZBazy = klientQuery.docs[0].data().nrStada;
-                }
-
-                // B. Namierzamy UID rolnika, uwzględniając, że bracia mogli podać kilka numerów po przecinku
-                if (nrStadaZBazy && nrStadaZBazy.trim() !== '' && nrStadaZBazy !== '---') {
-                    const searchStadaArr = nrStadaZBazy.split(',').map(s => s.replace(/\s/g, '').toUpperCase()).filter(Boolean);
-                    
-                    const konfigSnap = await db.collection("konfiguracja").get();
-                    konfigSnap.forEach(doc => {
-                        const d = doc.data();
-                        if (d.numer_gospodarstwa) {
-                            const dbStadaArr = d.numer_gospodarstwa.split(',').map(s => s.replace(/\s/g, '').toUpperCase()).filter(Boolean);
-                            const isMatch = searchStadaArr.some(stado => dbStadaArr.includes(stado));
-                            if (isMatch) {
-                                rolnikUid = d.uid; 
-                            }
-                        }
-                    });
-                }
-
-                if (fetchId !== currentTagFetchId) return;
-
-                // C. Jeżeli znaleziono Panel Klienta, wciągamy wszystkie jego aktywne krowy i jałówki
-                if (rolnikUid) {
-                    const stadoQuery = await db.collection("animals").where("ownerUid", "==", rolnikUid).get();
-                    stadoQuery.forEach(doc => {
-                        const data = doc.data();
-                        if (data.tag && data.type !== 'byk') {
-                            uniqueTags.set(data.tag.toUpperCase(), "Ze Stada");
-                        }
-                    });
-                }
-
-                if (fetchId !== currentTagFetchId) return;
-
-                // D. Uzupełniamy ewentualne luki z archiwalnych świadectw weterynarza z ostatnich 360 dni
-                const dateLimit = new Date();
-                dateLimit.setDate(dateLimit.getDate() - 360);
-                
-                const archiveQuery = await db.collection("archiwumSwiadectwa")
-                    .where("id_lecznicy", "==", currentUserProfile['ID lecznicy'])
-                    .where("klient", "==", klientName).get();
-
-                archiveQuery.forEach(doc => {
-                    const data = doc.data();
-                    if (data.krowaKolczyk && data.createdAt) {
-                        const docDate = data.createdAt.toDate ? data.createdAt.toDate() : new Date(data.createdAt);
-                        if (docDate >= dateLimit) {
-                            const tagUpper = data.krowaKolczyk.toUpperCase();
-                            // Dodajemy stary kolczyk TYLKO wtedy, gdy nie widnieje już jako pobrany z "Ze Stada"
-                            if (!uniqueTags.has(tagUpper)) {
-                                uniqueTags.set(tagUpper, "Z Archiwum");
-                            }
+                const konfigSnap = await db.collection("konfiguracja").get();
+                konfigSnap.forEach(doc => {
+                    const d = doc.data();
+                    if (d.numer_gospodarstwa) {
+                        const dbStadaArr = d.numer_gospodarstwa.split(',').map(s => s.replace(/\s/g, '').toUpperCase()).filter(Boolean);
+                        const isMatch = searchStadaArr.some(stado => dbStadaArr.includes(stado));
+                        if (isMatch) {
+                            rolnikUid = d.uid; 
                         }
                     }
                 });
-
-                if (fetchId !== currentTagFetchId) return;
-
-                // E. Generujemy wyczyszczoną, docelową listę dla weterynarza
-                swiKolczykiList.innerHTML = '';
-                
-                if (uniqueTags.size === 0) {
-                    swiKolczykiList.innerHTML = '<option value="">Brak krów (Wpisz kolczyk ręcznie)</option>';
-                } else {
-                    uniqueTags.forEach((zrodlo, kolczyk) => {
-                        const opt = document.createElement('option');
-                        opt.value = kolczyk;
-                        opt.textContent = `(${zrodlo})`;
-                        swiKolczykiList.appendChild(opt);
-                    });
-                }
-            } catch (error) {
-                console.error("Błąd ładowania podpowiedzi kolczyków:", error);
-                swiKolczykiList.innerHTML = '';
             }
-        }, 500);
+
+            if (fetchId !== currentTagFetchId) return;
+
+            // C. Jeżeli znaleziono Panel Klienta, wciągamy wszystkie jego aktywne krowy i jałówki
+            if (rolnikUid) {
+                const stadoQuery = await db.collection("animals").where("ownerUid", "==", rolnikUid).get();
+                stadoQuery.forEach(doc => {
+                    const data = doc.data();
+                    if (data.tag && data.type !== 'byk') {
+                        uniqueTags.set(data.tag.toUpperCase(), "Ze Stada");
+                    }
+                });
+            }
+
+            if (fetchId !== currentTagFetchId) return;
+
+            // D. Uzupełniamy ewentualne luki z archiwalnych świadectw weterynarza z ostatnich 360 dni
+            const dateLimit = new Date();
+            dateLimit.setDate(dateLimit.getDate() - 360);
+            
+            const archiveQuery = await db.collection("archiwumSwiadectwa")
+                .where("id_lecznicy", "==", currentUserProfile['ID lecznicy'])
+                .where("klient", "==", klientName).get();
+
+            archiveQuery.forEach(doc => {
+                const data = doc.data();
+                if (data.krowaKolczyk && data.createdAt) {
+                    const docDate = data.createdAt.toDate ? data.createdAt.toDate() : new Date(data.createdAt);
+                    if (docDate >= dateLimit) {
+                        const tagUpper = data.krowaKolczyk.toUpperCase();
+                        // Dodajemy stary kolczyk TYLKO wtedy, gdy nie widnieje już jako pobrany z "Ze Stada"
+                        if (!uniqueTags.has(tagUpper)) {
+                            uniqueTags.set(tagUpper, "Z Archiwum");
+                        }
+                    }
+                }
+            });
+
+            if (fetchId !== currentTagFetchId) return;
+
+            // E. Generujemy wyczyszczoną, docelową listę dla weterynarza
+            swiKolczykiList.innerHTML = '';
+            
+            if (uniqueTags.size === 0) {
+                swiKolczykiList.innerHTML = '<option value="">Brak krów (Wpisz kolczyk ręcznie)</option>';
+            } else {
+                uniqueTags.forEach((zrodlo, kolczyk) => {
+                    const opt = document.createElement('option');
+                    opt.value = kolczyk;
+                    opt.textContent = `(${zrodlo})`;
+                    swiKolczykiList.appendChild(opt);
+                });
+            }
+        } catch (error) {
+            console.error("Błąd ładowania podpowiedzi kolczyków:", error);
+            swiKolczykiList.innerHTML = '';
+        }
+    }, 400);
+}
+
+// Nasłuchiwanie ręcznego wpisywania (gdy weterynarz pisze z palca, a nie wybiera z modala)
+if (document.getElementById('swiKlientInput')) {
+    document.getElementById('swiKlientInput').addEventListener('input', function() {
+        populateSwiCowList(this.value);
     });
 }
 
