@@ -318,6 +318,11 @@ function toggleEditFields() {
     const type = document.getElementById('editType').value;
     const isBull = (type === 'byk');
     
+    const editSpecEl = document.getElementById('editSpec');
+    if (editSpecEl) {
+        editSpecEl.value = isBull ? 'opas' : 'mleko';
+    }
+    
     // Pola do ukrycia dla byka
     const fieldsToHide = [
         'editLastCalving', 'editLastInsem', 'editSemen', 
@@ -327,8 +332,7 @@ function toggleEditFields() {
     fieldsToHide.forEach(id => {
         const el = document.getElementById(id);
         if(el) {
-            // Ukrywamy cały rząd (form-row), czyli rodzica inputa
-            el.closest('.form-row').style.display = isBull ? 'none' : 'flex'; // lub 'block'
+            el.closest('.form-row').style.display = isBull ? 'none' : 'flex';
         }
     });
 }
@@ -703,11 +707,24 @@ function generateA4HTML(header, rowsHTML) {
     `;
 }
 
-// --- POMOCNICZA FUNKCJA KOLORÓW KOLCZYKÓW ---
-function getTagColor(type) {
-    if (type === 'jalowka') return '#27ae60'; // Zielony
-    if (type === 'byk') return '#c0392b';     // Czerwony
-    return '#2e7d32';                         // Standardowy ciemnozielony dla krów
+// --- POMOCNICZA FUNKCJA KOLORÓW KOLCZYKÓW I IKON OPASA ---
+function getTagColor(animalOrType) {
+    if (typeof animalOrType === 'object' && animalOrType !== null) {
+        if (animalOrType.spec === 'opas') return '#8e44ad'; // Fioletowy dla opasów
+        if (animalOrType.type === 'jalowka') return '#27ae60';
+        if (animalOrType.type === 'byk') return '#c0392b';
+        return '#2e7d32';
+    }
+    if (animalOrType === 'jalowka') return '#27ae60';
+    if (animalOrType === 'byk') return '#c0392b';
+    return '#2e7d32';
+}
+
+function getTagIcon(animal) {
+    if (animal && (animal.spec === 'opas' || animal.type === 'byk')) {
+        return ' 🥩';
+    }
+    return '';
 }
 
 // --- NOWA LOGIKA STATUSÓW ---
@@ -1371,11 +1388,12 @@ function initiateEarlyCalving(animalId) {
 function confirmTaskStandard() {
     if(!pendingTask) return;
     
-    // 0. Obsługa zadania "Wykonaj synchronizację"
+   // 0. Obsługa zadania "Wykonaj synchronizację"
     if (pendingTask.type === 'sync_alert') {
         if (confirm("Czy chcesz przejść do Menedżera Synchronizacji i rozpisać dla niej program?\n\n[OK] - Otwórz Menedżera\n[Anuluj] - Tylko odhacz to przypomnienie")) {
+            const animalIdToPass = pendingTask.animalId;
             closeModal('taskConfirmModal');
-            openSyncManager();
+            openSyncManager([animalIdToPass]);
         } else {
             saveTaskLog(pendingTask, "Odhaczono ręcznie");
             closeModal('taskConfirmModal');
@@ -1595,9 +1613,9 @@ async function openAnimalCard(id) {
     // Reset zakładek na domyślną ("Dane Zwierzęcia")
     if(document.getElementById('tabCowData')) switchCowTab('data');
 
-    // --- 1. Podstawowe dane ---
-    document.getElementById('cardTag').textContent = animal.tag;
-    document.getElementById('cardTag').style.color = getTagColor(animal.type);
+// --- 1. Podstawowe dane ---
+    document.getElementById('cardTag').innerHTML = animal.tag + getTagIcon(animal);
+    document.getElementById('cardTag').style.color = getTagColor(animal);
     document.getElementById('cardDob').textContent = animal.dob;
     document.getElementById('cardType').textContent = animal.type.toUpperCase();
     
@@ -1810,9 +1828,12 @@ async function openAnimalCard(id) {
     document.getElementById('editDob').value = animal.dob;
     document.getElementById('editLocation').value = animal.location || '';
     
-    if(document.getElementById('editType')) {
+ if(document.getElementById('editType')) {
         document.getElementById('editType').value = animal.type;
         toggleEditFields(); 
+    }
+    if(document.getElementById('editSpec')) {
+        document.getElementById('editSpec').value = animal.spec || (animal.type === 'byk' ? 'opas' : 'mleko');
     }
 
     document.getElementById('editMother').value = animal.motherTag || '';
@@ -1911,6 +1932,7 @@ function toggleEditMode() {
 function saveAnimalChanges() {
     if(!currentEditingAnimalId) return;
     let newType = document.getElementById('editType').value; 
+    const newSpec = document.getElementById('editSpec') ? document.getElementById('editSpec').value : (newType === 'byk' ? 'opas' : 'mleko');
     const newTag = document.getElementById('editTag').value;
     const dob = document.getElementById('editDob').value;
     
@@ -1919,21 +1941,21 @@ function saveAnimalChanges() {
     // ✅ AUTO-AWANS: Jeśli to była jałówka i dopisano datę wycielenia, staje się krową
     if (newType === 'jalowka' && lastCalvDate) {
         newType = 'krowa';
-        document.getElementById('editType').value = 'krowa'; // Odśwież widok selektora
+        document.getElementById('editType').value = 'krowa';
     }
     const location = document.getElementById('editLocation').value || '';
     const motherTag = document.getElementById('editMother').value || '';
     const fatherSemen = document.getElementById('editFather').value || '';
     
-   // Obiekt do aktualizacji
     let updateData = {
-        type: newType, // ZAPIS TYPU
+        type: newType,
+        spec: newSpec,
         tag: newTag,
         dob: dob,
         location: location,
         motherTag: motherTag,
         fatherSemen: fatherSemen,
-        lastActivityDate: new Date().toISOString().split('T')[0] // <--- DODANO
+        lastActivityDate: new Date().toISOString().split('T')[0]
     };
 
     if (newType !== 'byk') {
@@ -2022,10 +2044,13 @@ function closeModal(id) { document.getElementById(id).style.display = 'none'; }
 function setupModals() {
     document.getElementById('inpType').addEventListener('change', (e) => {
         const type = e.target.value;
+        const specSelect = document.getElementById('inpSpec');
         if(type === 'krowa' || type === 'jalowka') {
             document.getElementById('cowFields').classList.remove('hidden');
+            if(specSelect) specSelect.value = 'mleko';
         } else {
             document.getElementById('cowFields').classList.add('hidden');
+            if(specSelect) specSelect.value = 'opas';
         }
     });
 // --- NOWOŚĆ: Automatyczna podpowiedź statusu przy dodawaniu ---
@@ -2069,30 +2094,26 @@ function setupModals() {
 document.getElementById('animalForm').addEventListener('submit', (e) => {
         e.preventDefault();
         
-        // 1. Podstawowe dane
+       // 1. Podstawowe dane
         let type = document.getElementById('inpType').value;
+        const spec = document.getElementById('inpSpec') ? document.getElementById('inpSpec').value : (type === 'byk' ? 'opas' : 'mleko');
         const tag = document.getElementById('inpTag').value;
         const dob = document.getElementById('inpDob').value;
         
         const lastCalving = document.getElementById('inpLastCalving').value || null;
 
-        // ✅ AUTO-AWANS: Jeśli dodajemy jałówkę, ale wpisano wycielenie -> staje się krową
         if (type === 'jalowka' && lastCalving) {
             type = 'krowa';
         }
 
-        // 2. NOWE POLA: Lokalizacja i Rodzina
         const location = document.getElementById('inpLocation')?.value || '';
         const motherTag = document.getElementById('inpMother')?.value || '';
         const fatherSemen = document.getElementById('inpFather')?.value || '';
 
-        // 3. Dane rozrodcze (to co zniknęło)
-        // (Usunięto zdublowaną zmienną lastCalving)
         const lastInsem = document.getElementById('inpLastInsem').value || null;
         const semen = document.getElementById('inpSemen')?.value || null;
         const pregStatus = document.getElementById('inpPregStatus').value;
 
-        // Logika statusu cielności
         let isPregnantConfirmed = false;
         let usgStatus = 'pending';
 
@@ -2107,7 +2128,6 @@ document.getElementById('animalForm').addEventListener('submit', (e) => {
             if(lastInsem) usgStatus = 'pending'; 
         }
 
-        // Budowanie historii inseminacji na start, jeśli podano datę
         let historyInsemination = [];
         if(lastInsem) {
             historyInsemination.push({ 
@@ -2118,25 +2138,25 @@ document.getElementById('animalForm').addEventListener('submit', (e) => {
             });
         }
 
-// 4. ZAPIS DO FIREBASE (Wszystkie pola razem)
         db.collection('animals').add({
             ownerUid: currentUser.uid,
             tag: tag,
             type: type,
+            spec: spec,
             dob: dob,
             location: location,
             motherTag: motherTag,
             fatherSemen: fatherSemen,
             lastCalving: lastCalving,
             lastInsemination: lastInsem,
-            semen: semen, // Tutaj zapisujemy nazwę buhaja
+            semen: semen,
             historyInsemination: historyInsemination,
             isPregnantConfirmed: isPregnantConfirmed,
             usgStatus: usgStatus,
             historyCalving: [],
-            isDriedOff: false, // Wartość domyślna dla nowej sztuki
+            isDriedOff: false,
             createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-            lastActivityDate: new Date().toISOString().split('T')[0] // <--- DODANO
+            lastActivityDate: new Date().toISOString().split('T')[0]
         }).catch(err => {
             console.error("Błąd zapisu (offline/online):", err);
         });
@@ -2603,13 +2623,17 @@ function renderHerdList(forceType = null) {
                     </span>
                 </div>`;
         }
-div.innerHTML = `
+const tagColor = getTagColor(a);
+        const tagIcon = getTagIcon(a);
+        const specBadge = a.spec === 'opas' ? ' (OPAS)' : '';
+
+        div.innerHTML = `
             <div style="display:flex; justify-content:space-between; align-items:center;">
                 <div style="display:flex; align-items:center; gap:10px;">
                     <input type="checkbox" class="mass-animal-cb" value="${a.id}" onchange="toggleMassAnimalSelection()" style="width:20px; height:20px; accent-color:#c0392b;" onclick="event.stopPropagation();">
-                    <strong style="color:${getTagColor(a.type)}; font-size:16px;">${a.tag}</strong>
+                    <strong style="color:${tagColor}; font-size:16px;">${a.tag}${tagIcon}</strong>
                 </div>
-                <span class="badge" style="background:#eee; color:#333; padding:2px 8px; border-radius:10px; font-size:10px;">${a.type.toUpperCase()}</span>
+                <span class="badge" style="background:#eee; color:#333; padding:2px 8px; border-radius:10px; font-size:10px;">${a.type.toUpperCase()}${specBadge}</span>
             </div>
             ${detailsHtml}
         `;
@@ -2750,14 +2774,14 @@ function renderMassActionBar() {
 async function executeMassTasks() {
     if (!confirm(`Czy na pewno chcesz potwierdzić wykonanie ${selectedTaskIds.length} zadań?`)) return;
 
-    // Pobieramy pełne obiekty zadań
     const tasksToProcess = window.myAllTasksGlobal.filter(t => selectedTaskIds.includes(t.id));
+    let syncAnimalIdsToPass = [];
     
-    // Proste przetwarzanie sekwencyjne
     for (const task of tasksToProcess) {
-        if (task.type === 'usg') {
-            // Dla USG masowo zakładamy, że są CIELNE (typowe działanie). 
-            // Jeśli pusta - użytkownik powinien odznaczyć ręcznie.
+        if (task.type === 'sync_alert') {
+            syncAnimalIdsToPass.push(task.animalId);
+        }
+        else if (task.type === 'usg') {
             await db.collection('animals').doc(task.animalId).update({ isPregnantConfirmed: true, usgStatus: 'positive' });
             saveTaskLog({ taskId: task.id, type: task.type, animalId: task.animalId }, "Pozytywny (Masowo)");
         } 
@@ -2766,15 +2790,27 @@ async function executeMassTasks() {
             saveTaskLog({ taskId: task.id, type: task.type, animalId: task.animalId }, "Wykonano (Masowo)");
         }
         else {
-            // Inne (Rovac, Kexxtone itp.)
             saveTaskLog({ taskId: task.id, type: task.type, animalId: task.animalId }, "Wykonano (Masowo)");
         }
     }
 
-    alert("Zadania wykonane!");
     selectedTaskIds = [];
     renderMassActionBar();
-    // Odświeżenie nastąpi automatycznie przez saveTaskLog -> generateAndRenderTasks
+    renderTasks(window.myAllTasksGlobal);
+
+    if (syncAnimalIdsToPass.length > 0) {
+        if (confirm(`Zaznaczono ${syncAnimalIdsToPass.length} szt. do synchronizacji.\n\nCzy chcesz teraz wybrać dla nich program w Menedżerze Synchronizacji?`)) {
+            openSyncManager(syncAnimalIdsToPass);
+            return;
+        } else {
+            syncAnimalIdsToPass.forEach(aId => {
+                const t = tasksToProcess.find(x => x.animalId === aId && x.type === 'sync_alert');
+                if (t) saveTaskLog({ taskId: t.id, type: t.type, animalId: aId }, "Odhaczono masowo");
+            });
+        }
+    } else {
+        alert("Zadania wykonane!");
+    }
 }
 function renderStatistics() {
     const today = new Date();
@@ -3036,11 +3072,18 @@ function renderStatistics() {
 // ✅ FUNKCJE OBSŁUGI MODALU SYNCHRONIZACJI
 // =====================================================================
 
-function openSyncManager() {
+let selectedSyncAnimalIds = new Set();
+
+function openSyncManager(preselectedIds = []) {
+    if (typeof populateSyncMethods === 'function') populateSyncMethods();
     document.getElementById('syncManagerModal').style.display = 'flex';
     document.getElementById('syncStartDate').valueAsDate = new Date();
+    document.getElementById('syncAnimalSearch').value = '';
+    
+    selectedSyncAnimalIds = new Set(preselectedIds);
+    
     switchSyncTab('new');
-    populateSyncAnimals();
+    buildSyncAnimalLists();
     renderSyncPreview();
 }
 
@@ -3063,110 +3106,125 @@ function switchSyncTab(tab) {
     }
 }
 
-function populateSyncAnimals() {
-    const list = document.getElementById('syncAnimalList');
-    if (!list) return;
-    
+function buildSyncAnimalLists() {
+    const dueList = document.getElementById('syncDueAnimalList');
+    const otherList = document.getElementById('syncOtherAnimalList');
+    if (!dueList || !otherList) return;
+
+    dueList.innerHTML = '';
+    otherList.innerHTML = '';
+
     const method = document.getElementById('syncMethodSelect').value;
-    const searchTerm = document.getElementById('syncAnimalSearch').value.toLowerCase().trim(); 
     const today = new Date(); today.setHours(0,0,0,0);
 
-    // 1. ZBUDUJ LISTĘ RAZ (Jeśli jest pusta lub wymusiliśmy wyczyszczenie przy zmianie metody)
-    if (list.innerHTML.trim() === '') {
-        const eligible = myHerd.filter(a => a.type !== 'byk'); // Wszystkie krowy i jałówki
-        eligible.sort((a, b) => a.tag.localeCompare(b.tag));
+    const dueAnimalIds = new Set(
+        (window.myAllTasksGlobal || [])
+            .filter(t => t.type === 'sync_alert' && !t.isDone)
+            .map(t => t.animalId)
+    );
 
-        if (eligible.length === 0) {
-            list.innerHTML = '<div style="padding:15px; text-align:center; color:#999;">Brak pasujących zwierząt.</div>';
-            updateSyncCount(); 
-            return;
+    const eligible = myHerd.filter(a => a.type !== 'byk');
+    eligible.sort((a, b) => a.tag.localeCompare(b.tag));
+
+    let dueCount = 0;
+    let otherCount = 0;
+
+    eligible.forEach(a => {
+        let ageMonths = 0;
+        if (a.dob) ageMonths = (today - new Date(a.dob)) / (1000 * 60 * 60 * 24 * 30.4);
+        
+        if (method === 'jalowki' && a.type !== 'jalowka') return;
+        if ((method === 'g6g' || method === 'ovsynch') && a.type === 'jalowka') return;
+        if (a.type === 'jalowka' && ageMonths < 13) return;
+
+        const status = getDetailedStatus(a);
+        const tagColor = getTagColor(a);
+        const tagIcon = getTagIcon(a);
+        let dimInfo = '';
+        if (a.type === 'krowa' && a.lastCalving) {
+            const diffDays = Math.floor((today - new Date(a.lastCalving)) / (1000 * 60 * 60 * 24));
+            dimInfo = ` | <span style="color:#2e7d32; font-weight:700;">DIM: ${diffDays}</span>`;
         }
+        
+        let subDetails = a.type.toUpperCase();
+        if (a.type === 'jalowka') subDetails += ` (${Math.floor(ageMonths)} msc)`;
+        if (a.location) subDetails += ` | Lok: ${a.location}`;
 
-        eligible.forEach(a => {
-            const status = getDetailedStatus(a); 
-            let dimInfo = '';
-            if (a.type === 'krowa' && a.lastCalving) {
-                const diffDays = Math.floor((today - new Date(a.lastCalving)) / (1000 * 60 * 60 * 24));
-                dimInfo = ` | <span style="color:#2e7d32; font-weight:700;">DIM: ${diffDays}</span>`;
-            }
-            let subDetails = a.type.toUpperCase();
-            let ageMonths = 0;
-            if (a.dob) ageMonths = (today - new Date(a.dob)) / (1000 * 60 * 60 * 24 * 30.4);
-            if (a.type === 'jalowka') subDetails += ` (${Math.floor(ageMonths)} msc)`;
-            if (a.location) subDetails += ` | Lok: ${a.location}`;
+        const isChecked = selectedSyncAnimalIds.has(a.id) ? 'checked' : '';
 
-            const div = document.createElement('div');
-            div.className = 'sync-animal-row'; // Klasa do ukrywania
-            div.dataset.tag = a.tag.toLowerCase();
-            div.dataset.type = a.type;
-            div.dataset.age = ageMonths;
-            div.style.cssText = "display:flex; justify-content: space-between; align-items: center; padding: 12px 10px; border-bottom: 1px solid #eee; background: white; width: 100%; box-sizing: border-box;";
-            
-            div.innerHTML = `
-                <div style="text-align: left; flex-grow: 1; padding-right: 10px; cursor:pointer;" onclick="openAnimalCard('${a.id}')">
-                    <div style="display:flex; align-items:center; gap: 8px; margin-bottom: 4px; flex-wrap: wrap;">
-                        <span style="font-weight:800; font-size:15px; color:#2c3e50;">${a.tag}</span>
-                        <span style="font-size:10px; font-weight:bold; color:${status.color}; background:${status.color}15; border: 1px solid ${status.color}33; padding:2px 6px; border-radius:4px; white-space: nowrap;">
-                            ${status.text}
-                        </span>
-                    </div>
-                    <div style="font-size:11px; color:#7f8c8d; line-height: 1.4;">
-                        ${subDetails}${dimInfo}
-                    </div>
+        const div = document.createElement('div');
+        div.className = 'sync-animal-row';
+        div.dataset.tag = a.tag.toLowerCase();
+        div.style.cssText = "display:flex; justify-content: space-between; align-items: center; padding: 10px 8px; border-bottom: 1px solid #eee; background: white; width: 100%; box-sizing: border-box;";
+        
+        div.innerHTML = `
+            <div style="text-align: left; flex-grow: 1; padding-right: 10px; cursor:pointer;" onclick="openAnimalCard('${a.id}')">
+                <div style="display:flex; align-items:center; gap: 8px; margin-bottom: 4px; flex-wrap: wrap;">
+                    <span style="font-weight:800; font-size:15px; color:${tagColor};">${a.tag}${tagIcon}</span>
+                    <span style="font-size:10px; font-weight:bold; color:${status.color}; background:${status.color}15; border: 1px solid ${status.color}33; padding:2px 6px; border-radius:4px; white-space: nowrap;">
+                        ${status.text}
+                    </span>
                 </div>
-                <input type="checkbox" class="sync-animal-cb" value="${a.id}" data-tag="${a.tag}" onchange="updateSyncCount()" style="width: 24px; height: 24px; cursor: pointer; flex-shrink: 0; accent-color: #8e44ad;">
-            `;
-            list.appendChild(div);
-        });
-    }
+                <div style="font-size:11px; color:#7f8c8d; line-height: 1.4;">
+                    ${subDetails}${dimInfo}
+                </div>
+            </div>
+            <input type="checkbox" class="sync-animal-cb" value="${a.id}" data-tag="${a.tag}" ${isChecked} onchange="toggleSyncAnimalCheck(this)" style="width: 24px; height: 24px; cursor: pointer; flex-shrink: 0; accent-color: #8e44ad;">
+        `;
 
-    // 2. FILTROWANIE LOKALNE (CSS)
-    const rows = list.querySelectorAll('.sync-animal-row');
-    rows.forEach(row => {
-        const tag = row.dataset.tag;
-        const type = row.dataset.type;
-        const age = parseFloat(row.dataset.age);
-
-        let isVisible = true;
-
-        // Filtr wyszukiwarki
-        if (searchTerm !== '' && !tag.includes(searchTerm)) isVisible = false;
-        
-        // Filtr Metody
-        if (method === 'jalowki' && type !== 'jalowka') isVisible = false;
-        if ((method === 'g6g' || method === 'ovsynch') && type === 'jalowka') isVisible = false;
-        
-        // Filtr Wiek Jałówki (>13 msc)
-        if (type === 'jalowka' && age < 13) isVisible = false;
-
-        row.style.display = isVisible ? 'flex' : 'none';
-        
-        // Jeśli wiersz jest ukrywany, odznacz jego checkbox, żeby nie wysłać do niego zadania!
-        if (!isVisible) {
-            const cb = row.querySelector('.sync-animal-cb');
-            if (cb) cb.checked = false;
+        if (dueAnimalIds.has(a.id)) {
+            dueList.appendChild(div);
+            dueCount++;
+        } else {
+            otherList.appendChild(div);
+            otherCount++;
         }
     });
 
+    if (dueCount === 0) dueList.innerHTML = '<div style="padding:10px; text-align:center; color:#999; font-size:12px;">Brak krów oczekujących na synchronizację.</div>';
+    if (otherCount === 0) otherList.innerHTML = '<div style="padding:10px; text-align:center; color:#999; font-size:12px;">Brak pozostałych sztuk.</div>';
+
+    filterSyncAnimals();
     updateSyncCount();
 }
 
+function toggleSyncAnimalCheck(cb) {
+    if (cb.checked) {
+        selectedSyncAnimalIds.add(cb.value);
+    } else {
+        selectedSyncAnimalIds.delete(cb.value);
+    }
+    updateSyncCount();
+}
+
+function filterSyncAnimals() {
+    const searchTerm = document.getElementById('syncAnimalSearch').value.toLowerCase().trim();
+    const rows = document.querySelectorAll('.sync-animal-row');
+    
+    rows.forEach(row => {
+        const tag = row.dataset.tag;
+        if (searchTerm === '' || tag.includes(searchTerm)) {
+            row.style.display = 'flex';
+        } else {
+            row.style.display = 'none';
+        }
+    });
+}
+
 function updateSyncCount() {
-    const checked = document.querySelectorAll('.sync-animal-cb:checked').length;
-    document.getElementById('syncAnimalCount').textContent = `${checked} wybrano`;
+    document.getElementById('syncAnimalCount').textContent = `${selectedSyncAnimalIds.size} wybrano`;
 }
 
 function renderSyncPreview() {
-    // Aktualizujemy listę krów jeśli zmieniono metodę (np. krowy -> jałówki)
-    populateSyncAnimals();
-
     const preview = document.getElementById('syncPreview');
     const method = document.getElementById('syncMethodSelect').value;
     const startDate = document.getElementById('syncStartDate').valueAsDate;
     
     if (!startDate) return;
     
-    const protocol = SYNC_PROTOCOLS[method];
+    const protocol = getMergedProtocols()[method];
+    if (!protocol) return;
+
     let html = `<strong>Kroki dla: ${protocol.name}</strong><ul style="margin:5px 0 0 15px; padding:0;">`;
     
     protocol.steps.forEach(step => {
@@ -3176,7 +3234,6 @@ function renderSyncPreview() {
     html += '</ul>';
     preview.innerHTML = html;
 }
-
 function startSynchronization() {
     const method = document.getElementById('syncMethodSelect').value;
     const startDate = document.getElementById('syncStartDate').value;
@@ -4460,18 +4517,10 @@ function populateSyncMethods() {
     }
 }
 
-// Nadpisujemy oryginalną funkcję startową, żeby wczytywała dynamiczną listę
-const originalOpenSyncManager = openSyncManager;
-openSyncManager = function() {
-    populateSyncMethods(); // Wypełnij selecta metodami
-    originalOpenSyncManager();
-};
-
-// Uruchamiamy też przy zmianie metody, żeby wyczyścić listę i zresetować filtry
+// Uruchamiamy przy zmianie metody, żeby przeładować listy i podgląd kroków
 document.getElementById('syncMethodSelect').addEventListener('change', () => {
-    document.getElementById('syncAnimalList').innerHTML = '';
     renderSyncPreview();
-    populateSyncAnimals();
+    buildSyncAnimalLists();
 });
 
 // Zmodyfikowana funkcja zapisu by wspierała własne metody
@@ -4513,28 +4562,6 @@ startSynchronization = function() {
     // Wymuś odświeżenie zadań na głównym ekranie, by ostrzeżenia zniknęły
     setTimeout(generateAndRenderTasks, 500); 
 };;
-
-const originalRenderSyncPreview = renderSyncPreview;
-renderSyncPreview = function() {
-    const preview = document.getElementById('syncPreview');
-    const methodKey = document.getElementById('syncMethodSelect').value;
-    const startDate = document.getElementById('syncStartDate').valueAsDate;
-    
-    if (!startDate) return;
-    
-    const protocol = getMergedProtocols()[methodKey];
-    if (!protocol) return;
-
-    let html = `<strong>Kroki dla: ${protocol.name}</strong><ul style="margin:5px 0 0 15px; padding:0;">`;
-    
-    protocol.steps.forEach(step => {
-        const d = addDays(startDate, step.dayOffset);
-        html += `<li>${d.toLocaleDateString('pl-PL')}: <b>${step.product}</b> ${step.time}</li>`;
-    });
-    html += '</ul>';
-    preview.innerHTML = html;
-};
-
 
 // UI Kreatora
 function openCustomSyncBuilder() {
