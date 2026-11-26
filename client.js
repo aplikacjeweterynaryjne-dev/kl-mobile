@@ -3080,20 +3080,43 @@ function renderStatistics() {
 
 let selectedSyncAnimalIds = new Set();
 
-function openSyncManager(preselectedIds = []) {
+async function openSyncManager(preselectedIds = []) {
     if (typeof populateSyncMethods === 'function') populateSyncMethods();
+    
+    const select = document.getElementById('syncMethodSelect');
+    // Zabezpieczenie: Jeśli select nie ma wybranej żadnej wartości, wymuś pierwszą dostępną opcję
+    if (select && !select.value && select.options.length > 0) {
+        select.selectedIndex = 0;
+    }
+
     document.getElementById('syncManagerModal').style.display = 'flex';
     document.getElementById('syncStartDate').valueAsDate = new Date();
     document.getElementById('syncAnimalSearch').value = '';
     
     selectedSyncAnimalIds = new Set(preselectedIds);
-    
-    // Jeśli zadania nie zdążyły się jeszcze wygenerować, a stado już jest w pamięci -> przelicz je teraz
+    switchSyncTab('new');
+
+    // ✅ ZABEZPIECZENIE: Jeśli tablica myHerd jest jeszcze pusta (np. wolny internet na telefonie),
+    // pobierz stado bezpośrednio z serwera w tej chwili, zamiast czekać na listener
+    if ((!myHerd || myHerd.length === 0) && currentUser && currentUser.uid) {
+        const dueList = document.getElementById('syncDueAnimalList');
+        const otherList = document.getElementById('syncOtherAnimalList');
+        if (dueList) dueList.innerHTML = '<div style="padding:10px; text-align:center; color:#e67e22; font-size:12px;">⏳ Pobieranie stada...</div>';
+        if (otherList) otherList.innerHTML = '<div style="padding:10px; text-align:center; color:#7f8c8d; font-size:12px;">⏳ Ładowanie...</div>';
+        
+        try {
+            const snap = await db.collection('animals').where('ownerUid', '==', currentUser.uid).get();
+            myHerd = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            generateAndRenderTasks();
+        } catch (e) {
+            console.error("Błąd dociągania stada w Menedżerze:", e);
+        }
+    }
+
     if ((!window.myAllTasksGlobal || window.myAllTasksGlobal.length === 0) && myHerd.length > 0) {
         generateAndRenderTasks();
     }
     
-    switchSyncTab('new');
     buildSyncAnimalLists();
     renderSyncPreview();
 }
@@ -3122,19 +3145,11 @@ function buildSyncAnimalLists() {
     const otherList = document.getElementById('syncOtherAnimalList');
     if (!dueList || !otherList) return;
 
-    // Zabezpieczenie: Jeśli baza Firebase jeszcze nie zwróciła stada, pokaż stan ładowania
-    if (!myHerd || myHerd.length === 0) {
-        dueList.innerHTML = '<div style="padding:10px; text-align:center; color:#e67e22; font-size:12px;">⏳ Pobieranie stada z bazy...</div>';
-        otherList.innerHTML = '<div style="padding:10px; text-align:center; color:#7f8c8d; font-size:12px;">⏳ Ładowanie listy...</div>';
-        updateSyncCount();
-        return;
-    }
-
     dueList.innerHTML = '';
     otherList.innerHTML = '';
 
     const methodSelect = document.getElementById('syncMethodSelect');
-    const method = methodSelect ? methodSelect.value : 'g6g';
+    const method = (methodSelect && methodSelect.value) ? methodSelect.value : 'g6g';
     const today = new Date(); today.setHours(0,0,0,0);
 
     const dueAnimalIds = new Set(
@@ -3143,7 +3158,7 @@ function buildSyncAnimalLists() {
             .map(t => t.animalId)
     );
 
-    const eligible = myHerd.filter(a => a.type !== 'byk');
+    const eligible = (myHerd || []).filter(a => a.type !== 'byk');
     eligible.sort((a, b) => a.tag.localeCompare(b.tag));
 
     let dueCount = 0;
