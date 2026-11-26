@@ -373,6 +373,12 @@ function loadHerd() {
           generateAndRenderTasks(); 
           renderStatistics();
           renderCalendar(currentCalDate);
+
+          // ✅ NOWOŚĆ: Jeśli okno Menedżera Synchronizacji jest otwarte, odśwież je natychmiast po dociągnięciu danych z chmury
+          const syncModal = document.getElementById('syncManagerModal');
+          if (syncModal && syncModal.style.display === 'flex') {
+              if (typeof buildSyncAnimalLists === 'function') buildSyncAnimalLists();
+          }
       }, error => console.error("Błąd stada:", error));
 }
 function loadCompletedTasks() {
@@ -3082,6 +3088,11 @@ function openSyncManager(preselectedIds = []) {
     
     selectedSyncAnimalIds = new Set(preselectedIds);
     
+    // Jeśli zadania nie zdążyły się jeszcze wygenerować, a stado już jest w pamięci -> przelicz je teraz
+    if ((!window.myAllTasksGlobal || window.myAllTasksGlobal.length === 0) && myHerd.length > 0) {
+        generateAndRenderTasks();
+    }
+    
     switchSyncTab('new');
     buildSyncAnimalLists();
     renderSyncPreview();
@@ -3111,10 +3122,19 @@ function buildSyncAnimalLists() {
     const otherList = document.getElementById('syncOtherAnimalList');
     if (!dueList || !otherList) return;
 
+    // Zabezpieczenie: Jeśli baza Firebase jeszcze nie zwróciła stada, pokaż stan ładowania
+    if (!myHerd || myHerd.length === 0) {
+        dueList.innerHTML = '<div style="padding:10px; text-align:center; color:#e67e22; font-size:12px;">⏳ Pobieranie stada z bazy...</div>';
+        otherList.innerHTML = '<div style="padding:10px; text-align:center; color:#7f8c8d; font-size:12px;">⏳ Ładowanie listy...</div>';
+        updateSyncCount();
+        return;
+    }
+
     dueList.innerHTML = '';
     otherList.innerHTML = '';
 
-    const method = document.getElementById('syncMethodSelect').value;
+    const methodSelect = document.getElementById('syncMethodSelect');
+    const method = methodSelect ? methodSelect.value : 'g6g';
     const today = new Date(); today.setHours(0,0,0,0);
 
     const dueAnimalIds = new Set(
@@ -3187,7 +3207,6 @@ function buildSyncAnimalLists() {
     filterSyncAnimals();
     updateSyncCount();
 }
-
 function toggleSyncAnimalCheck(cb) {
     if (cb.checked) {
         selectedSyncAnimalIds.add(cb.value);
